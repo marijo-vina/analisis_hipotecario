@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Client" ALTER COLUMN "rfc" DROP NOT NULL;

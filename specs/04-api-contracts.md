@@ -1,0 +1,229 @@
+# 04. API Contracts (Sprint 1)
+
+Este documento define la estructura de las peticiones (Requests) y respuestas (Responses) para los endpoints del backend del Sprint 1, construidos en NestJS.
+
+Todas las peticiones esperan y devuelven `application/json` a menos que se indique lo contrario. Para listar, se asume un envoltorio genérico tipo `{ "data": [...] }`.
+
+## 1. Clientes (`/clients`)
+
+### `POST /clients`
+Crea un nuevo cliente.
+**Request Body:**
+```json
+{
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "secondLastName": "García",
+  "rfc": "PEGJ800101XYZ",
+  "curp": "PEGJ800101HDFRXY00",
+  "email": "juan.perez@email.com",
+  "phone": "5512345678"
+}
+```
+
+### `GET /clients`
+Obtiene la lista de clientes (con paginación opcional en querystring).
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid-client-1",
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "rfc": "PEGJ800101XYZ",
+      "createdAt": "2026-06-03T10:00:00Z"
+    }
+  ],
+  "meta": { "total": 1, "page": 1, "limit": 10 }
+}
+```
+
+### `GET /clients/:id`
+**Response (200 OK):**
+```json
+{
+  "id": "uuid-client-1",
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "secondLastName": "García",
+  "rfc": "PEGJ800101XYZ",
+  "curp": "PEGJ800101HDFRXY00",
+  "email": "juan.perez@email.com",
+  "phone": "5512345678",
+  "createdAt": "2026-06-03T10:00:00Z",
+  "updatedAt": "2026-06-03T10:00:00Z"
+}
+```
+
+### `PATCH /clients/:id`
+Actualiza parcialmente a un cliente.
+**Request Body (Cualquier campo es opcional):**
+```json
+{
+  "phone": "5599887766"
+}
+```
+
+---
+
+## 2. Expedientes Hipotecarios (`/mortgage-cases`)
+
+### `POST /mortgage-cases`
+Crea un nuevo expediente ligado a un cliente y asignado a una asesora.
+**Request Body:**
+```json
+{
+  "clientId": "uuid-client-1",
+  "advisorId": "uuid-user-1",
+  "creditTypeId": 1,
+  "statusId": 1,
+  "requestedAmount": 1500000.00,
+  "propertyValue": 2000000.00,
+  "notes": "Cliente pre-aprobado en simulador."
+}
+```
+
+### `GET /mortgage-cases`
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid-case-1",
+      "clientId": "uuid-client-1",
+      "clientName": "Juan Pérez",
+      "creditType": "COMPRA",
+      "status": "DRAFT",
+      "requestedAmount": "1500000.00",
+      "createdAt": "2026-06-03T10:00:00Z"
+    }
+  ]
+}
+```
+
+### `GET /mortgage-cases/:id`
+**Response (200 OK):**
+```json
+{
+  "id": "uuid-case-1",
+  "client": {
+    "id": "uuid-client-1",
+    "firstName": "Juan",
+    "lastName": "Pérez"
+  },
+  "advisor": {
+    "id": "uuid-user-1",
+    "name": "Cristina Asesora"
+  },
+  "creditType": { "id": 1, "code": "COMPRA", "name": "Compra de vivienda" },
+  "status": { "id": 1, "code": "DRAFT", "name": "Borrador" },
+  "requestedAmount": "1500000.00",
+  "propertyValue": "2000000.00",
+  "notes": "Cliente pre-aprobado en formulario.",
+  "documents": []
+}
+```
+
+### `PATCH /mortgage-cases/:id/status`
+Endpoint específico para cambiar el estado (Pipeline).
+**Request Body:**
+```json
+{
+  "statusId": 2
+}
+```
+
+### `PATCH /mortgage-cases/:id`
+Para actualizar montos o notas generales.
+**Request Body:**
+```json
+{
+  "requestedAmount": 1600000.00
+}
+```
+
+---
+
+## 3. Catálogos (`/catalogs`)
+
+Para simplificar el frontend, podemos tener rutas específicas o agruparlos. Mantendremos las rutas explícitas propuestas:
+
+### `GET /credit-types`
+**Response (200 OK):**
+```json
+{
+  "data": [
+    { "id": 1, "code": "COMPRA", "name": "Compra de vivienda", "isActive": true },
+    { "id": 2, "code": "LIQUIDEZ", "name": "Obtención de liquidez", "isActive": true }
+  ]
+}
+```
+
+### `GET /case-statuses`
+**Response (200 OK):**
+```json
+{
+  "data": [
+    { "id": 1, "code": "DRAFT", "name": "Borrador", "order": 10 },
+    { "id": 2, "code": "INTEGRATION", "name": "Integración", "order": 20 }
+  ]
+}
+```
+
+---
+
+## 4. Documentos (Metadata)
+
+*Nota: Estos endpoints gestionan la metadata; la subida real (multipart) interactuará de otra forma o usará URLs prefirmadas en el futuro, pero la metadata en base de datos responde a estos contratos.*
+
+### `POST /mortgage-cases/:id/documents`
+Registra la metadata de un documento que pertenece a un expediente.
+**Request Body:**
+```json
+{
+  "documentType": "NOMINA",
+  "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
+  "originalName": "recibo_nomina_mayo.pdf",
+  "uploadedById": "uuid-user-1"
+}
+```
+
+### `GET /mortgage-cases/:id/documents`
+Obtiene los documentos de un expediente.
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid-doc-1",
+      "documentType": "NOMINA",
+      "originalName": "recibo_nomina_mayo.pdf",
+      "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
+      "createdAt": "2026-06-03T10:15:00Z"
+    }
+  ]
+}
+```
+
+### `GET /documents/:id`
+Obtiene el detalle de un documento específico. Ideal para cuando el frontend necesita solicitar un Signed URL para descargar/visualizar sin tener que iterar todo el expediente.
+**Response (200 OK):**
+```json
+{
+  "id": "uuid-doc-1",
+  "mortgageCaseId": "uuid-case-1",
+  "documentType": "NOMINA",
+  "originalName": "recibo_nomina_mayo.pdf",
+  "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
+  "uploadedBy": {
+    "id": "uuid-user-1",
+    "name": "María Asesora"
+  },
+  "createdAt": "2026-06-03T10:15:00Z"
+}
+```
+
+### `DELETE /documents/:id` (Opcional recomendado)
+Elimina la metadata (y lógicamente el archivo de GCS a nivel servicio) en caso de subida errónea.
+**Response (204 No Content)**

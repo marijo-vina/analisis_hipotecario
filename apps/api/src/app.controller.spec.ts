@@ -15,8 +15,12 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return health check status', () => {
+      expect(appController.getHealthCheck()).toEqual({
+        status: 'ok',
+        app: 'Gestion Financiera API',
+        module: 'Sprint 1 - Base del sistema',
+      });
     });
   });
 });

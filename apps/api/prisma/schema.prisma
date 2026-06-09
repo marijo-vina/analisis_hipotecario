@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  role         Role           @default(ADVISOR)
+  cases        MortgageCase[]
+  documents    Document[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+enum Role {
+  ADMIN
+  ADVISOR
+}
+
+model Client {
+  id               String         @id @default(uuid())
+  firstName        String
+  paternalLastName String
+  maternalLastName String?
+  fullName         String
+  rfc              String?        @unique
+  curp             String?        @unique
+  email            String         @unique
+  phone            String
+  cases            MortgageCase[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model MortgageCase {
+  id              String       @id @default(uuid())
+  clientId        String
+  client          Client       @relation(fields: [clientId], references: [id])
+  advisorId       String
+  advisor         User         @relation(fields: [advisorId], references: [id])
+  creditTypeId    Int
+  creditType      CreditType   @relation(fields: [creditTypeId], references: [id])
+  statusId        Int
+  status          CaseStatus   @relation(fields: [statusId], references: [id])
+  requestedAmount Decimal
+  propertyValue   Decimal
+  notes           String?
+  documents       Document[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Document {
+  id             String       @id @default(uuid())
+  mortgageCaseId String
+  mortgageCase   MortgageCase @relation(fields: [mortgageCaseId], references: [id])
+  documentType   DocumentType
+  fileUrl        String
+  originalName   String
+  uploadedById   String
+  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+enum DocumentType {
+  NOMINA
+  ESTADO_CUENTA
+  BURO
+  INE
+  COMPROBANTE_DOMICILIO
+}
+
+model CreditType {
+  id       Int            @id @default(autoincrement())
+  code     String         @unique
+  name     String
+  isActive Boolean        @default(true)
+  cases    MortgageCase[]
+}
+
+model CaseStatus {
+  id    Int            @id @default(autoincrement())
+  code  String         @unique
+  name  String
+  order Int            @default(0)
+  cases MortgageCase[]
+}
