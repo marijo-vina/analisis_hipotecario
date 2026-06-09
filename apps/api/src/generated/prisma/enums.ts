@@ -17,6 +17,13 @@ export const Role = {
 export type Role = (typeof Role)[keyof typeof Role]
 
 
+export const PersonType = {
+  SALARIED: 'SALARIED'
+} as const
+
+export type PersonType = (typeof PersonType)[keyof typeof PersonType]
+
+
 export const DocumentType = {
   NOMINA: 'NOMINA',
   ESTADO_CUENTA: 'ESTADO_CUENTA',

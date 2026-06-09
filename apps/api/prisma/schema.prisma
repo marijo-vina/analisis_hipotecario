@@ -52,12 +52,19 @@ model MortgageCase {
   creditType      CreditType   @relation(fields: [creditTypeId], references: [id])
   statusId        Int
   status          CaseStatus   @relation(fields: [statusId], references: [id])
-  requestedAmount Decimal
-  propertyValue   Decimal
+  personType      PersonType   @default(SALARIED)
+  propertyLocation String?
+  estimatedTermMonths Int?
+  requestedAmount Decimal?
+  propertyValue   Decimal?
   notes           String?
   documents       Document[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+}
+
+enum PersonType {
+  SALARIED
 }
 
 model Document {

@@ -928,6 +928,9 @@ export const MortgageCaseScalarFieldEnum = {
   advisorId: 'advisorId',
   creditTypeId: 'creditTypeId',
   statusId: 'statusId',
+  personType: 'personType',
+  propertyLocation: 'propertyLocation',
+  estimatedTermMonths: 'estimatedTermMonths',
   requestedAmount: 'requestedAmount',
   propertyValue: 'propertyValue',
   notes: 'notes',
@@ -1054,6 +1057,20 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'PersonType'
+ */
+export type EnumPersonTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PersonType'>
+    
+
+
+/**
+ * Reference to a field of type 'PersonType[]'
+ */
+export type ListEnumPersonTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PersonType[]'>
     
 
 

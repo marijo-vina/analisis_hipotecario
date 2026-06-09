@@ -29,6 +29,7 @@ export type AggregateMortgageCase = {
 export type MortgageCaseAvgAggregateOutputType = {
   creditTypeId: number | null
   statusId: number | null
+  estimatedTermMonths: number | null
   requestedAmount: runtime.Decimal | null
   propertyValue: runtime.Decimal | null
 }
@@ -36,6 +37,7 @@ export type MortgageCaseAvgAggregateOutputType = {
 export type MortgageCaseSumAggregateOutputType = {
   creditTypeId: number | null
   statusId: number | null
+  estimatedTermMonths: number | null
   requestedAmount: runtime.Decimal | null
   propertyValue: runtime.Decimal | null
 }
@@ -46,6 +48,9 @@ export type MortgageCaseMinAggregateOutputType = {
   advisorId: string | null
   creditTypeId: number | null
   statusId: number | null
+  personType: $Enums.PersonType | null
+  propertyLocation: string | null
+  estimatedTermMonths: number | null
   requestedAmount: runtime.Decimal | null
   propertyValue: runtime.Decimal | null
   notes: string | null
@@ -59,6 +64,9 @@ export type MortgageCaseMaxAggregateOutputType = {
   advisorId: string | null
   creditTypeId: number | null
   statusId: number | null
+  personType: $Enums.PersonType | null
+  propertyLocation: string | null
+  estimatedTermMonths: number | null
   requestedAmount: runtime.Decimal | null
   propertyValue: runtime.Decimal | null
   notes: string | null
@@ -72,6 +80,9 @@ export type MortgageCaseCountAggregateOutputType = {
   advisorId: number
   creditTypeId: number
   statusId: number
+  personType: number
+  propertyLocation: number
+  estimatedTermMonths: number
   requestedAmount: number
   propertyValue: number
   notes: number
@@ -84,6 +95,7 @@ export type MortgageCaseCountAggregateOutputType = {
 export type MortgageCaseAvgAggregateInputType = {
   creditTypeId?: true
   statusId?: true
+  estimatedTermMonths?: true
   requestedAmount?: true
   propertyValue?: true
 }
@@ -91,6 +103,7 @@ export type MortgageCaseAvgAggregateInputType = {
 export type MortgageCaseSumAggregateInputType = {
   creditTypeId?: true
   statusId?: true
+  estimatedTermMonths?: true
   requestedAmount?: true
   propertyValue?: true
 }
@@ -101,6 +114,9 @@ export type MortgageCaseMinAggregateInputType = {
   advisorId?: true
   creditTypeId?: true
   statusId?: true
+  personType?: true
+  propertyLocation?: true
+  estimatedTermMonths?: true
   requestedAmount?: true
   propertyValue?: true
   notes?: true
@@ -114,6 +130,9 @@ export type MortgageCaseMaxAggregateInputType = {
   advisorId?: true
   creditTypeId?: true
   statusId?: true
+  personType?: true
+  propertyLocation?: true
+  estimatedTermMonths?: true
   requestedAmount?: true
   propertyValue?: true
   notes?: true
@@ -127,6 +146,9 @@ export type MortgageCaseCountAggregateInputType = {
   advisorId?: true
   creditTypeId?: true
   statusId?: true
+  personType?: true
+  propertyLocation?: true
+  estimatedTermMonths?: true
   requestedAmount?: true
   propertyValue?: true
   notes?: true
@@ -227,8 +249,11 @@ export type MortgageCaseGroupByOutputType = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal
-  propertyValue: runtime.Decimal
+  personType: $Enums.PersonType
+  propertyLocation: string | null
+  estimatedTermMonths: number | null
+  requestedAmount: runtime.Decimal | null
+  propertyValue: runtime.Decimal | null
   notes: string | null
   createdAt: Date
   updatedAt: Date
@@ -263,8 +288,11 @@ export type MortgageCaseWhereInput = {
   advisorId?: Prisma.StringFilter<"MortgageCase"> | string
   creditTypeId?: Prisma.IntFilter<"MortgageCase"> | number
   statusId?: Prisma.IntFilter<"MortgageCase"> | number
-  requestedAmount?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFilter<"MortgageCase"> | $Enums.PersonType
+  propertyLocation?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  estimatedTermMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
@@ -281,8 +309,11 @@ export type MortgageCaseOrderByWithRelationInput = {
   advisorId?: Prisma.SortOrder
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
-  requestedAmount?: Prisma.SortOrder
-  propertyValue?: Prisma.SortOrder
+  personType?: Prisma.SortOrder
+  propertyLocation?: Prisma.SortOrderInput | Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  propertyValue?: Prisma.SortOrderInput | Prisma.SortOrder
   notes?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -302,8 +333,11 @@ export type MortgageCaseWhereUniqueInput = Prisma.AtLeast<{
   advisorId?: Prisma.StringFilter<"MortgageCase"> | string
   creditTypeId?: Prisma.IntFilter<"MortgageCase"> | number
   statusId?: Prisma.IntFilter<"MortgageCase"> | number
-  requestedAmount?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFilter<"MortgageCase"> | $Enums.PersonType
+  propertyLocation?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  estimatedTermMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
@@ -320,8 +354,11 @@ export type MortgageCaseOrderByWithAggregationInput = {
   advisorId?: Prisma.SortOrder
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
-  requestedAmount?: Prisma.SortOrder
-  propertyValue?: Prisma.SortOrder
+  personType?: Prisma.SortOrder
+  propertyLocation?: Prisma.SortOrderInput | Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  propertyValue?: Prisma.SortOrderInput | Prisma.SortOrder
   notes?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -341,8 +378,11 @@ export type MortgageCaseScalarWhereWithAggregatesInput = {
   advisorId?: Prisma.StringWithAggregatesFilter<"MortgageCase"> | string
   creditTypeId?: Prisma.IntWithAggregatesFilter<"MortgageCase"> | number
   statusId?: Prisma.IntWithAggregatesFilter<"MortgageCase"> | number
-  requestedAmount?: Prisma.DecimalWithAggregatesFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalWithAggregatesFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeWithAggregatesFilter<"MortgageCase"> | $Enums.PersonType
+  propertyLocation?: Prisma.StringNullableWithAggregatesFilter<"MortgageCase"> | string | null
+  estimatedTermMonths?: Prisma.IntNullableWithAggregatesFilter<"MortgageCase"> | number | null
+  requestedAmount?: Prisma.DecimalNullableWithAggregatesFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.DecimalNullableWithAggregatesFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.StringNullableWithAggregatesFilter<"MortgageCase"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"MortgageCase"> | Date | string
@@ -350,8 +390,11 @@ export type MortgageCaseScalarWhereWithAggregatesInput = {
 
 export type MortgageCaseCreateInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -368,8 +411,11 @@ export type MortgageCaseUncheckedCreateInput = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -378,8 +424,11 @@ export type MortgageCaseUncheckedCreateInput = {
 
 export type MortgageCaseUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -396,8 +445,11 @@ export type MortgageCaseUncheckedUpdateInput = {
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -410,8 +462,11 @@ export type MortgageCaseCreateManyInput = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -419,8 +474,11 @@ export type MortgageCaseCreateManyInput = {
 
 export type MortgageCaseUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -432,8 +490,11 @@ export type MortgageCaseUncheckedUpdateManyInput = {
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -455,6 +516,9 @@ export type MortgageCaseCountOrderByAggregateInput = {
   advisorId?: Prisma.SortOrder
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
+  personType?: Prisma.SortOrder
+  propertyLocation?: Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   propertyValue?: Prisma.SortOrder
   notes?: Prisma.SortOrder
@@ -465,6 +529,7 @@ export type MortgageCaseCountOrderByAggregateInput = {
 export type MortgageCaseAvgOrderByAggregateInput = {
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   propertyValue?: Prisma.SortOrder
 }
@@ -475,6 +540,9 @@ export type MortgageCaseMaxOrderByAggregateInput = {
   advisorId?: Prisma.SortOrder
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
+  personType?: Prisma.SortOrder
+  propertyLocation?: Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   propertyValue?: Prisma.SortOrder
   notes?: Prisma.SortOrder
@@ -488,6 +556,9 @@ export type MortgageCaseMinOrderByAggregateInput = {
   advisorId?: Prisma.SortOrder
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
+  personType?: Prisma.SortOrder
+  propertyLocation?: Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   propertyValue?: Prisma.SortOrder
   notes?: Prisma.SortOrder
@@ -498,6 +569,7 @@ export type MortgageCaseMinOrderByAggregateInput = {
 export type MortgageCaseSumOrderByAggregateInput = {
   creditTypeId?: Prisma.SortOrder
   statusId?: Prisma.SortOrder
+  estimatedTermMonths?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   propertyValue?: Prisma.SortOrder
 }
@@ -591,8 +663,20 @@ export type MortgageCaseUncheckedUpdateManyWithoutClientNestedInput = {
   deleteMany?: Prisma.MortgageCaseScalarWhereInput | Prisma.MortgageCaseScalarWhereInput[]
 }
 
-export type DecimalFieldUpdateOperationsInput = {
-  set?: runtime.Decimal | runtime.DecimalJsLike | number | string
+export type EnumPersonTypeFieldUpdateOperationsInput = {
+  set?: $Enums.PersonType
+}
+
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableDecimalFieldUpdateOperationsInput = {
+  set?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
   decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
   multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -707,8 +791,11 @@ export type MortgageCaseUncheckedUpdateManyWithoutStatusNestedInput = {
 
 export type MortgageCaseCreateWithoutAdvisorInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -723,8 +810,11 @@ export type MortgageCaseUncheckedCreateWithoutAdvisorInput = {
   clientId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -766,8 +856,11 @@ export type MortgageCaseScalarWhereInput = {
   advisorId?: Prisma.StringFilter<"MortgageCase"> | string
   creditTypeId?: Prisma.IntFilter<"MortgageCase"> | number
   statusId?: Prisma.IntFilter<"MortgageCase"> | number
-  requestedAmount?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFilter<"MortgageCase"> | $Enums.PersonType
+  propertyLocation?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  estimatedTermMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
+  requestedAmount?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.DecimalNullableFilter<"MortgageCase"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
@@ -775,8 +868,11 @@ export type MortgageCaseScalarWhereInput = {
 
 export type MortgageCaseCreateWithoutClientInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -791,8 +887,11 @@ export type MortgageCaseUncheckedCreateWithoutClientInput = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -827,8 +926,11 @@ export type MortgageCaseUpdateManyWithWhereWithoutClientInput = {
 
 export type MortgageCaseCreateWithoutDocumentsInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -844,8 +946,11 @@ export type MortgageCaseUncheckedCreateWithoutDocumentsInput = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -869,8 +974,11 @@ export type MortgageCaseUpdateToOneWithWhereWithoutDocumentsInput = {
 
 export type MortgageCaseUpdateWithoutDocumentsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -886,8 +994,11 @@ export type MortgageCaseUncheckedUpdateWithoutDocumentsInput = {
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -895,8 +1006,11 @@ export type MortgageCaseUncheckedUpdateWithoutDocumentsInput = {
 
 export type MortgageCaseCreateWithoutCreditTypeInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -911,8 +1025,11 @@ export type MortgageCaseUncheckedCreateWithoutCreditTypeInput = {
   clientId: string
   advisorId: string
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -947,8 +1064,11 @@ export type MortgageCaseUpdateManyWithWhereWithoutCreditTypeInput = {
 
 export type MortgageCaseCreateWithoutStatusInput = {
   id?: string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -963,8 +1083,11 @@ export type MortgageCaseUncheckedCreateWithoutStatusInput = {
   clientId: string
   advisorId: string
   creditTypeId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1002,8 +1125,11 @@ export type MortgageCaseCreateManyAdvisorInput = {
   clientId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1011,8 +1137,11 @@ export type MortgageCaseCreateManyAdvisorInput = {
 
 export type MortgageCaseUpdateWithoutAdvisorInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1027,8 +1156,11 @@ export type MortgageCaseUncheckedUpdateWithoutAdvisorInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1040,8 +1172,11 @@ export type MortgageCaseUncheckedUpdateManyWithoutAdvisorInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1052,8 +1187,11 @@ export type MortgageCaseCreateManyClientInput = {
   advisorId: string
   creditTypeId: number
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1061,8 +1199,11 @@ export type MortgageCaseCreateManyClientInput = {
 
 export type MortgageCaseUpdateWithoutClientInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1077,8 +1218,11 @@ export type MortgageCaseUncheckedUpdateWithoutClientInput = {
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1090,8 +1234,11 @@ export type MortgageCaseUncheckedUpdateManyWithoutClientInput = {
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1102,8 +1249,11 @@ export type MortgageCaseCreateManyCreditTypeInput = {
   clientId: string
   advisorId: string
   statusId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1111,8 +1261,11 @@ export type MortgageCaseCreateManyCreditTypeInput = {
 
 export type MortgageCaseUpdateWithoutCreditTypeInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1127,8 +1280,11 @@ export type MortgageCaseUncheckedUpdateWithoutCreditTypeInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1140,8 +1296,11 @@ export type MortgageCaseUncheckedUpdateManyWithoutCreditTypeInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   statusId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1152,8 +1311,11 @@ export type MortgageCaseCreateManyStatusInput = {
   clientId: string
   advisorId: string
   creditTypeId: number
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1161,8 +1323,11 @@ export type MortgageCaseCreateManyStatusInput = {
 
 export type MortgageCaseUpdateWithoutStatusInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1177,8 +1342,11 @@ export type MortgageCaseUncheckedUpdateWithoutStatusInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1190,8 +1358,11 @@ export type MortgageCaseUncheckedUpdateManyWithoutStatusInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   advisorId?: Prisma.StringFieldUpdateOperationsInput | string
   creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  propertyValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1234,6 +1405,9 @@ export type MortgageCaseSelect<ExtArgs extends runtime.Types.Extensions.Internal
   advisorId?: boolean
   creditTypeId?: boolean
   statusId?: boolean
+  personType?: boolean
+  propertyLocation?: boolean
+  estimatedTermMonths?: boolean
   requestedAmount?: boolean
   propertyValue?: boolean
   notes?: boolean
@@ -1253,6 +1427,9 @@ export type MortgageCaseSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   advisorId?: boolean
   creditTypeId?: boolean
   statusId?: boolean
+  personType?: boolean
+  propertyLocation?: boolean
+  estimatedTermMonths?: boolean
   requestedAmount?: boolean
   propertyValue?: boolean
   notes?: boolean
@@ -1270,6 +1447,9 @@ export type MortgageCaseSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   advisorId?: boolean
   creditTypeId?: boolean
   statusId?: boolean
+  personType?: boolean
+  propertyLocation?: boolean
+  estimatedTermMonths?: boolean
   requestedAmount?: boolean
   propertyValue?: boolean
   notes?: boolean
@@ -1287,6 +1467,9 @@ export type MortgageCaseSelectScalar = {
   advisorId?: boolean
   creditTypeId?: boolean
   statusId?: boolean
+  personType?: boolean
+  propertyLocation?: boolean
+  estimatedTermMonths?: boolean
   requestedAmount?: boolean
   propertyValue?: boolean
   notes?: boolean
@@ -1294,7 +1477,7 @@ export type MortgageCaseSelectScalar = {
   updatedAt?: boolean
 }
 
-export type MortgageCaseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "advisorId" | "creditTypeId" | "statusId" | "requestedAmount" | "propertyValue" | "notes" | "createdAt" | "updatedAt", ExtArgs["result"]["mortgageCase"]>
+export type MortgageCaseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "advisorId" | "creditTypeId" | "statusId" | "personType" | "propertyLocation" | "estimatedTermMonths" | "requestedAmount" | "propertyValue" | "notes" | "createdAt" | "updatedAt", ExtArgs["result"]["mortgageCase"]>
 export type MortgageCaseInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
   advisor?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1331,8 +1514,11 @@ export type $MortgageCasePayload<ExtArgs extends runtime.Types.Extensions.Intern
     advisorId: string
     creditTypeId: number
     statusId: number
-    requestedAmount: runtime.Decimal
-    propertyValue: runtime.Decimal
+    personType: $Enums.PersonType
+    propertyLocation: string | null
+    estimatedTermMonths: number | null
+    requestedAmount: runtime.Decimal | null
+    propertyValue: runtime.Decimal | null
     notes: string | null
     createdAt: Date
     updatedAt: Date
@@ -1769,6 +1955,9 @@ export interface MortgageCaseFieldRefs {
   readonly advisorId: Prisma.FieldRef<"MortgageCase", 'String'>
   readonly creditTypeId: Prisma.FieldRef<"MortgageCase", 'Int'>
   readonly statusId: Prisma.FieldRef<"MortgageCase", 'Int'>
+  readonly personType: Prisma.FieldRef<"MortgageCase", 'PersonType'>
+  readonly propertyLocation: Prisma.FieldRef<"MortgageCase", 'String'>
+  readonly estimatedTermMonths: Prisma.FieldRef<"MortgageCase", 'Int'>
   readonly requestedAmount: Prisma.FieldRef<"MortgageCase", 'Decimal'>
   readonly propertyValue: Prisma.FieldRef<"MortgageCase", 'Decimal'>
   readonly notes: Prisma.FieldRef<"MortgageCase", 'String'>
