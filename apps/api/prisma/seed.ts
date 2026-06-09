@@ -4,6 +4,23 @@ import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 
+const CREDIT_TYPES = [
+  { code: 'COMPRA', name: 'Compra', isActive: true },
+  { code: 'MEJORA_HIPOTECA', name: 'Mejora Hipoteca', isActive: true },
+  { code: 'LIQUIDEZ', name: 'Liquidez', isActive: true },
+  { code: 'TERRENO', name: 'Terreno', isActive: true },
+  { code: 'REMODELACION', name: 'Remodelación', isActive: true },
+  { code: 'CONSTRUCCION', name: 'Construcción', isActive: true },
+];
+
+const CASE_STATUSES = [
+  { code: 'PENDING_DOCUMENTS', name: 'Pendiente de documentos', order: 1 },
+  { code: 'INTEGRATION', name: 'Integración', order: 2 },
+  { code: 'ANALYSIS', name: 'Análisis', order: 3 },
+  { code: 'COMPLETED', name: 'Completado', order: 4 },
+  { code: 'REJECTED', name: 'Rechazado', order: 5 },
+];
+
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const adapter = new PrismaPg(pool);
@@ -12,6 +29,28 @@ async function main() {
   const passwordHash = await bcrypt.hash('admin123', 10);
   
   try {
+    for (const creditType of CREDIT_TYPES) {
+      await prisma.creditType.upsert({
+        where: { code: creditType.code },
+        update: {
+          name: creditType.name,
+          isActive: creditType.isActive,
+        },
+        create: creditType,
+      });
+    }
+
+    for (const caseStatus of CASE_STATUSES) {
+      await prisma.caseStatus.upsert({
+        where: { code: caseStatus.code },
+        update: {
+          name: caseStatus.name,
+          order: caseStatus.order,
+        },
+        create: caseStatus,
+      });
+    }
+
     const admin = await prisma.user.upsert({
       where: { email: 'admin@gestion.com' },
       update: {
@@ -27,6 +66,8 @@ async function main() {
       },
     });
 
+    console.log('Seeded credit types:', CREDIT_TYPES.length);
+    console.log('Seeded case statuses:', CASE_STATUSES.length);
     console.log('Seeded admin user:', admin.email);
   } finally {
     await prisma.$disconnect();
