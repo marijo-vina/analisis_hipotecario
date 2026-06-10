@@ -107,13 +107,13 @@ Layout principal del dashboard con navegación lateral.
 
 CRUD de clientes (list, create, detail).
 
-- [ ] **T-4.1: Create `app/actions/clients.ts`**
+- [x] **T-4.1: Create `app/actions/clients.ts`**
   - Server Action `createClient(prevState, formData)`: recibe firstName, paternalLastName, maternalLastName, rfc, curp, email, phone
   - Llama `apiFetch('/clients', { method: 'POST', body: { ... } })`
   - Éxito (201) → `redirect('/dashboard/clientes')`
   - Error (400/409) → retorna `{ errors: { campo: 'mensaje' } }`
 
-- [ ] **T-4.2: Create `app/dashboard/clientes/page.tsx`**
+- [x] **T-4.2: Create `app/dashboard/clientes/page.tsx`**
   - Server Component
   - Lee query params `page` y `limit` (default: page=1, limit=10)
   - Llama `apiFetch('/clients?page=X&limit=Y')`
@@ -121,24 +121,24 @@ CRUD de clientes (list, create, detail).
   - Si cero resultados → mensaje "No hay clientes registrados"
   - Importa y renderiza `<Pagination />`
 
-- [ ] **T-4.3: Create `app/ui/pagination.tsx`**
+- [x] **T-4.3: Create `app/ui/pagination.tsx`**
   - `'use client'`
   - Props: `currentPage`, `totalPages`, `basePath` (ej. `/dashboard/clientes`)
   - Usa `useRouter` y `useSearchParams` para navegar con `?page=N`
   - Botones: anterior, siguiente, números de página
 
-- [ ] **T-4.4: Create `app/dashboard/clientes/nuevo/page.tsx`**
+- [x] **T-4.4: Create `app/dashboard/clientes/nuevo/page.tsx`**
   - Server Component wrapper
   - Renderiza `<ClientForm />`
 
-- [ ] **T-4.5: Create `app/ui/client-form.tsx`**
+- [x] **T-4.5: Create `app/ui/client-form.tsx`**
   - `'use client'`
   - Usa `useActionState` con `createClient` action
   - Campos: firstName*, paternalLastName*, maternalLastName, rfc, curp, email*, phone* (* = required)
   - Muestra errores inline por campo y error general
   - Botones: "Guardar" y "Cancelar" (redirect al listado)
 
-- [ ] **T-4.6: Create `app/dashboard/clientes/[id]/page.tsx`**
+- [x] **T-4.6: Create `app/dashboard/clientes/[id]/page.tsx`**
   - Server Component
   - Llama `apiFetch('/clients/${id}')`
   - Si 404 → muestra "Cliente no encontrado" con link de volver
