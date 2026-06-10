@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Análisis Hipotecario",
-  description: "Sistema interno de gestión hipotecaria",
+  description: "Sistema de gestión hipotecaria",
 };
 
 export default function RootLayout({

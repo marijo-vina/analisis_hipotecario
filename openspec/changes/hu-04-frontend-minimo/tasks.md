@@ -151,13 +151,13 @@ CRUD de clientes (list, create, detail).
 
 CRUD de expedientes (list, create, detail).
 
-- [ ] **T-5.1: Create `app/actions/mortgage-cases.ts`**
+- [x] **T-5.1: Create `app/actions/cases.ts`**
   - Server Action `createCase(prevState, formData)`: recibe clientId, creditTypeId, personType, propertyLocation, requestedAmount, propertyValue, estimatedTermMonths, notes
   - Llama `apiFetch('/mortgage-cases', { method: 'POST', body: { ... } })`
   - Éxito (201) → `redirect('/dashboard/expedientes')`
   - Error → retorna `{ errors: { campo: 'mensaje' } }`
 
-- [ ] **T-5.2: Create `app/dashboard/expedientes/page.tsx`**
+- [x] **T-5.2: Create `app/dashboard/expedientes/page.tsx`**
   - Server Component
   - Lee query params `page` y `limit`
   - Llama `apiFetch('/mortgage-cases?page=X&limit=Y')`
@@ -165,12 +165,12 @@ CRUD de expedientes (list, create, detail).
   - Si cero resultados → "No hay expedientes registrados"
   - Importa `<Pagination />`
 
-- [ ] **T-5.3: Create `app/dashboard/expedientes/nuevo/page.tsx`**
+- [x] **T-5.3: Create `app/dashboard/expedientes/nuevo/page.tsx`**
   - Server Component wrapper
   - Fetchea `apiFetch('/credit-types')` para obtener opciones del select
   - Pasa creditTypes como prop a `<CaseForm />`
 
-- [ ] **T-5.4: Create `app/ui/case-form.tsx`**
+- [x] **T-5.4: Create `app/ui/case-form.tsx`**
   - `'use client'`
   - Usa `useActionState` con `createCase` action
   - Recibe `creditTypes` como prop para el select
@@ -178,7 +178,7 @@ CRUD de expedientes (list, create, detail).
   - Muestra errores inline por campo y error general
   - Botones: "Guardar" y "Cancelar"
 
-- [ ] **T-5.5: Create `app/dashboard/expedientes/[id]/page.tsx`**
+- [x] **T-5.5: Create `app/dashboard/expedientes/[id]/page.tsx`**
   - Server Component
   - Llama `apiFetch('/mortgage-cases/${id}')`
   - Si 404 → "Expediente no encontrado" con link de volver
