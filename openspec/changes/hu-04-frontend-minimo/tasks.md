@@ -46,25 +46,25 @@ Infraestructura pura, sin output visual. Todo lo demás depende de esto.
 
 Flujo de autenticación completo.
 
-- [ ] **T-2.1: Create `app/actions/auth.ts`**
+- [x] **T-2.1: Create `app/actions/auth.ts`**
   - Server Action `login(prevState, formData)`: valida email/password no vacíos, llama `apiFetch('/auth/login', { method: 'POST', body: { email, password } })`, en éxito → `createSession(access_token)` + `redirect('/dashboard')`, en error → retorna `{ errors: { _form: 'Credenciales inválidas' } }`
   - Server Action `logout()`: `deleteSession()` + `redirect('/login')`
 
-- [ ] **T-2.2: Modify `app/layout.tsx`**
+- [x] **T-2.2: Modify `app/layout.tsx`**
   - Cambiar `lang="en"` → `lang="es"`
   - Actualizar metadata: `title: 'Análisis Hipotecario'`, `description: 'Sistema de gestión hipotecaria'`
 
-- [ ] **T-2.3: Modify `app/page.tsx`**
+- [x] **T-2.3: Modify `app/page.tsx`**
   - Server Component que verifica `getSession()`
   - Si hay sesión → `redirect('/dashboard')`
   - Si no → muestra landing simple con link a `/login` (o redirige a `/login`)
 
-- [ ] **T-2.4: Create `app/login/page.tsx`**
+- [x] **T-2.4: Create `app/login/page.tsx`**
   - Server Component wrapper
   - Verifica `getSession()` → si ya autenticada, `redirect('/dashboard')`
   - Renderiza `<LoginForm />`
 
-- [ ] **T-2.5: Create `app/ui/login-form.tsx`**
+- [x] **T-2.5: Create `app/ui/login-form.tsx`**
   - `'use client'`
   - Usa `useActionState` con `login` action
   - Campos: email (type="email"), password (type="password")
