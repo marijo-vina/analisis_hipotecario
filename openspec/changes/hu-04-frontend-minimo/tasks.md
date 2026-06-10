@@ -77,28 +77,29 @@ Flujo de autenticación completo.
 
 Layout principal del dashboard con navegación lateral.
 
-- [ ] **T-3.1: Create `app/ui/error-message.tsx`**
-  - Server Component reutilizable
-  - Props: `message: string`, `type?: 'error' | 'warning' | 'info'`
-  - Renderiza banner con estilos según tipo
+- [x] **T-3.1: Create `app/ui/error-message.tsx`**
+   - Server Component reutilizable
+   - Props: `message?: string`, `className?: string`
+   - Si no hay mensaje → retorna `null`
+   - Banner rojo: `bg-red-50`, `border-red-200`, `text-red-700`
 
-- [ ] **T-3.2: Create `app/ui/sidebar.tsx`**
-  - `'use client'`
-  - Usa `usePathname` para resaltar link activo
-  - Links: Dashboard (`/dashboard`), Clientes (`/dashboard/clientes`), Expedientes (`/dashboard/expedientes`)
-  - Botón "Cerrar sesión" que llama Server Action `logout` (via form POST)
-  - Importa `logout` de `app/actions/auth.ts`
+- [x] **T-3.2: Create `app/ui/sidebar.tsx`**
+   - `'use client'`
+   - Usa `usePathname` para resaltar link activo (`pathname.startsWith`)
+   - Links: 📊 Dashboard (`/dashboard`), 👥 Clientes (`/dashboard/clientes`), 📁 Expedientes (`/dashboard/expedientes`)
+   - Botón "Cerrar sesión" vía `<form action={logout}>`
+   - Fixed left sidebar, `w-64`, `h-screen`, `bg-slate-50`, `border-r`
 
-- [ ] **T-3.3: Create `app/dashboard/layout.tsx`**
-  - Server Component
-  - Verifica `getSession()` → si no hay sesión, `redirect('/login')` (defensa en caso de que proxy no aplique)
-  - Layout con `<Sidebar />` a la izquierda, `children` a la derecha
-  - Estilos básicos con Tailwind
+- [x] **T-3.3: Create `app/dashboard/layout.tsx`**
+   - Server Component
+   - Verifica `getSession()` → si no hay sesión, `redirect('/login')`
+   - Layout: `<Sidebar />` fijo a izquierda + `<main className="flex-1 ml-64">` para children
+   - Layout envuelve todas las rutas `/dashboard/*`
 
-- [ ] **T-3.4: Create `app/dashboard/page.tsx`**
-  - Server Component
-  - Página home del dashboard con resumen/simple bienvenida
-  - Puede mostrar cards con links a módulos (Clientes, Expedientes)
+- [x] **T-3.4: Create `app/dashboard/page.tsx`**
+   - Server Component
+   - Home del dashboard con cards resumen: Clientes y Expedientes
+   - Grid responsive `grid-cols-1 md:grid-cols-2` con hover shadow
 
 ---
 
