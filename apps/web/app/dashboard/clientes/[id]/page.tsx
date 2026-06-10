@@ -89,6 +89,10 @@ export default async function ClientDetailPage({
             label="Registrado"
             value={new Date(client.createdAt).toLocaleDateString("es-MX")}
           />
+          <Field
+            label="Actualizado"
+            value={new Date(client.updatedAt).toLocaleDateString("es-MX")}
+          />
         </dl>
       </div>
     </div>
