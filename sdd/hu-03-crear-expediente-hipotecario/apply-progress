@@ -1,0 +1,132 @@
+# Apply Progress — HU-03 (Batch A + Batch B + Batch B.1 + Batch C)
+
+## Scope aplicado
+- Schema Prisma
+- Migración Prisma
+- Seed de catálogos
+- Verificación de catálogos
+- CatalogsService (credit-types, case-statuses)
+- CatalogsController (GET /credit-types, GET /case-statuses) con JwtAuthGuard
+- CatalogsModule (PrismaModule)
+- Security hardening de catálogos internos (JWT obligatorio)
+- MortgageCases DTOs (Create + Query)
+- MortgageCasesService (create, findAll, findOne)
+- MortgageCasesController (POST /mortgage-cases, GET /mortgage-cases, GET /mortgage-cases/:id)
+- MortgageCasesModule (PrismaModule)
+
+## Tareas completadas (acumulado)
+- [x] 1.1 Modify prisma/schema.prisma: add PersonType enum, new fields, Decimal→Decimal?
+- [x] 1.2 Run prisma migrate + generate
+- [x] 1.3 Modify prisma/seed.ts: upserts for 6 CreditType + 5 CaseStatus
+- [x] 1.4 Run prisma db seed
+- [x] 2.1-2.2 CatalogsService (TDD: spec → impl) — getCreditTypes, getCaseStatuses
+- [x] 2.3-2.4 CatalogsController (TDD: spec → impl) — GET /credit-types, GET /case-statuses
+- [x] 2.5 CatalogsModule — import PrismaModule
+- [x] 2.6 Catalogs security hardening (Batch B.1) — JwtAuthGuard + respuesta `{ data: [...] }`
+- [x] 3.1-3.2 CreateMortgageCaseDto (TDD) — no advisorId/statusId, optionals >0, personType SALARIED only
+- [x] 3.3 QueryMortgageCaseDto — page/limit
+- [x] 3.4-3.5 MortgageCasesService (TDD) — create(dto, advisorId), findAll, findOne with includes
+- [x] 3.6-3.7 MortgageCasesController (TDD) — POST/GET/GET:id with JwtAuthGuard, req.user.id
+- [x] 3.8 MortgageCasesModule — import PrismaModule
+
+## Evidencia técnica verificable
+
+### Archivos tocados
+- `apps/api/prisma/schema.prisma`
+- `apps/api/prisma/seed.ts`
+- `apps/api/prisma/migrations/20260609230027_add_mortgage_case_preprofiling_fields/migration.sql`
+- `apps/api/src/hu03-foundation.spec.ts`
+- `apps/api/src/catalogs/catalogs.service.spec.ts`
+- `apps/api/src/catalogs/catalogs.service.ts`
+- `apps/api/src/catalogs/catalogs.controller.spec.ts`
+- `apps/api/src/catalogs/catalogs.controller.ts`
+- `apps/api/src/catalogs/catalogs.module.ts`
+- `apps/api/src/mortgage-cases/dto/create-mortgage-case.dto.spec.ts`
+- `apps/api/src/mortgage-cases/dto/create-mortgage-case.dto.ts`
+- `apps/api/src/mortgage-cases/dto/query-mortgage-case.dto.ts`
+- `apps/api/src/mortgage-cases/mortgage-cases.service.spec.ts`
+- `apps/api/src/mortgage-cases/mortgage-cases.service.ts`
+- `apps/api/src/mortgage-cases/mortgage-cases.controller.spec.ts`
+- `apps/api/src/mortgage-cases/mortgage-cases.controller.ts`
+- `apps/api/src/mortgage-cases/mortgage-cases.module.ts`
+- `sdd/hu-03-crear-expediente-hipotecario/tasks`
+- `sdd/hu-03-crear-expediente-hipotecario/apply-progress`
+
+### Migración creada/aplicada
+- Nombre: `20260609230027_add_mortgage_case_preprofiling_fields`
+- Evidencia SQL:
+  - `CREATE TYPE "PersonType" AS ENUM ('SALARIED');`
+  - `ADD COLUMN "personType" "PersonType" NOT NULL DEFAULT 'SALARIED'`
+  - `ADD COLUMN "propertyLocation" TEXT`
+  - `ADD COLUMN "estimatedTermMonths" INTEGER`
+  - `ALTER COLUMN "requestedAmount" DROP NOT NULL`
+  - `ALTER COLUMN "propertyValue" DROP NOT NULL`
+
+### Seed ejecutado
+- Comando: `npx prisma db seed --config ./prisma.config.ts`
+- Resultado:
+  - `Seeded credit types: 6`
+  - `Seeded case statuses: 5`
+  - `Seeded admin user: admin@gestion.com`
+
+### Verificación de catálogos sembrados
+- Comando de verificación (consulta directa con PrismaClient):
+  - `npx ts-node -e "... prisma.creditType.findMany ... prisma.caseStatus.findMany ..."`
+- Resultado:
+  - `creditTypes COMPRA,MEJORA_HIPOTECA,LIQUIDEZ,TERRENO,REMODELACION,CONSTRUCCION`
+  - `caseStatuses PENDING_DOCUMENTS,INTEGRATION,ANALYSIS,COMPLETED,REJECTED`
+  - `counts 6 5`
+
+## TDD Cycle Evidence (Strict TDD)
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 1.1 Schema Prisma | `apps/api/src/hu03-foundation.spec.ts` | Unit | ✅ 22/22 baseline | ✅ Written first (failed) | ✅ Passed (2 tests) | ✅ 2 behaviors + múltiples códigos de catálogo | ➖ None needed |
+| 1.2 Migrate + Generate | `apps/api/src/hu03-foundation.spec.ts` | Unit + Command | N/A (command task) | ✅ Test contractual existente para schema objetivo | ✅ `prisma migrate` + `prisma generate` OK | ➖ Structural command | ➖ None needed |
+| 1.3 Seed catalogs | `apps/api/src/hu03-foundation.spec.ts` | Unit | N/A (new assertions in same file) | ✅ Written first (failed) | ✅ Passed (catálogos presentes en seed) | ✅ 6 CreditType + 5 CaseStatus assertions | ➖ None needed |
+| 1.4 Run seed + verify catalogs | `apps/api/src/hu03-foundation.spec.ts` | Integration Command | N/A (command task) | ✅ Seed expectations definidos antes de ejecutar | ✅ `prisma db seed` + consulta Prisma OK | ✅ Verificación en DB de valores + counts | ➖ None needed |
+| 2.1-2.2 CatalogsService | `apps/api/src/catalogs/catalogs.service.spec.ts` | Unit | N/A (new files) | ✅ Written first (module not found) | ✅ Passed (3 tests) | ✅ 2 behaviors (credit-types + case-statuses) | ➖ None needed |
+| 2.3-2.4 CatalogsController | `apps/api/src/catalogs/catalogs.controller.spec.ts` | Unit | N/A (new files) | ✅ Written first (module not found) | ✅ Passed (3 tests) | ✅ 2 behaviors (dos endpoints) | ➖ None needed |
+| 2.5 CatalogsModule | N/A | Structural | N/A (new file) | ✅ Defined by design contract | ✅ Module created with PrismaModule import | ➖ Triangulation skipped: tarea estructural | ➖ None needed |
+| 2.6 Catalogs security hardening (B.1) | `apps/api/src/catalogs/catalogs.controller.spec.ts` | Unit | ✅ 6/6 baseline | ✅ Written first (3 fallas: guard + response shape) | ✅ Passed (6 tests) | ✅ Casos no vacíos + vacíos para ambos endpoints | ✅ Ajuste mínimo en controller |
+| 3.1-3.2 CreateMortgageCaseDto | `apps/api/src/mortgage-cases/dto/create-mortgage-case.dto.spec.ts` | Unit | N/A (new file) | ✅ Written first (module not found) | ✅ Passed (7 tests) | ✅ Reglas de `personType`, campos opcionales y >0 + `forbidNonWhitelisted` | ✅ Ajuste de assertions a error 400 real de ValidationPipe |
+| 3.3 QueryMortgageCaseDto | `apps/api/src/mortgage-cases/dto/query-mortgage-case.dto.ts` | Structural | N/A (new file) | ✅ Definido por contrato | ✅ DTO implementado (`page`, `limit` >0) | ➖ Triangulation skipped: tarea estructural | ➖ None needed |
+| 3.4-3.5 MortgageCasesService | `apps/api/src/mortgage-cases/mortgage-cases.service.spec.ts` | Unit | N/A (new file) | ✅ Written first (module not found) | ✅ Passed (9 tests) | ✅ create (default/status/fks) + findAll + findOne | ✅ Extracción de include constante |
+| 3.6-3.7 MortgageCasesController | `apps/api/src/mortgage-cases/mortgage-cases.controller.spec.ts` | Unit | N/A (new file) | ✅ Written first (module not found) | ✅ Passed (5 tests) | ✅ guard + POST/GET/GET:id + req.user.id | ➖ None needed |
+| 3.8 MortgageCasesModule | N/A | Structural | N/A (new file) | ✅ Definido por diseño | ✅ Module created with PrismaModule import | ➖ Triangulation skipped: tarea estructural | ➖ None needed |
+
+## Test Summary
+- Total tests written: 21 en módulo mortgage-cases + catálogos (acumulado)
+- Total tests passing: 21 en módulo mortgage-cases + catálogos
+- Layers used: Unit + command-level integration verification
+- Approval tests: None
+- Pure functions created: 0 (se extrajo constante `MORTGAGE_CASE_INCLUDE`)
+
+### Tests Batch B ejecutados
+- `npm test -- src/catalogs/catalogs.service.spec.ts` → FAIL (RED: missing module) → PASS (GREEN)
+- `npm test -- src/catalogs/catalogs.controller.spec.ts` → FAIL (RED: missing module) → PASS (GREEN)
+- `npm test -- src/catalogs/catalogs.service.spec.ts src/catalogs/catalogs.controller.spec.ts` → PASS (2 suites, 6 tests)
+
+### Tests Batch B.1 ejecutados
+- Safety net: `npm test -- src/catalogs/catalogs.service.spec.ts src/catalogs/catalogs.controller.spec.ts` → PASS (2 suites, 6 tests)
+- RED: `npm test -- src/catalogs/catalogs.controller.spec.ts` → FAIL (guard faltante + shape incorrecto)
+- GREEN: `npm test -- src/catalogs/catalogs.controller.spec.ts` → PASS (1 suite, 6 tests)
+- Requested: `npm test -- src/catalogs/catalogs.service.spec.ts src/catalogs/catalogs.controller.spec.ts` → PASS (2 suites, 9 tests)
+- Requested: `npm run test` → PASS (9 suites, 33 tests)
+
+### Tests Batch C ejecutados
+- RED: `npm test -- src/mortgage-cases/dto/create-mortgage-case.dto.spec.ts` → FAIL (missing DTO)
+- GREEN: `npm test -- src/mortgage-cases/dto/create-mortgage-case.dto.spec.ts` → PASS (1 suite, 7 tests)
+- RED: `npm test -- src/mortgage-cases/mortgage-cases.service.spec.ts` → FAIL (missing service)
+- GREEN: `npm test -- src/mortgage-cases/mortgage-cases.service.spec.ts` → PASS (1 suite, 9 tests)
+- RED: `npm test -- src/mortgage-cases/mortgage-cases.controller.spec.ts` → FAIL (missing controller)
+- GREEN: `npm test -- src/mortgage-cases/mortgage-cases.controller.spec.ts` → PASS (1 suite, 5 tests)
+- Requested: `npm test -- src/mortgage-cases/dto/create-mortgage-case.dto.spec.ts src/mortgage-cases/mortgage-cases.service.spec.ts src/mortgage-cases/mortgage-cases.controller.spec.ts` → PASS (3 suites, 21 tests)
+
+## Desviaciones de diseño
+- Ajuste intencional por corrección de seguridad `catalogs-security`: los endpoints de catálogos ya NO son públicos; ahora requieren JWT.
+- Ninguna desviación en Batch C: implementación alineada con reglas obligatorias (JWT, status interno, DTO sin advisorId/statusId, sin PATCH).
+
+## Riesgos / notas
+- La verificación DB requiere `DATABASE_URL` válido en entorno local.
+- Los unit tests del controller validan metadata de `JwtAuthGuard` y contratos de método, pero no ejecutan el ciclo HTTP real de guard (`401/200`); queda para e2e en Phase 5.
+- Phase 4 (wiring en `app.module.ts` y update de `specs/04-api-contracts.md`) sigue pendiente.

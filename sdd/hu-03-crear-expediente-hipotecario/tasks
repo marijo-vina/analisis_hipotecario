@@ -1,0 +1,28 @@
+# Tasks: HU-03 — Crear Expediente Hipotecario
+
+## Phase 1: Foundation (Schema + Seeds)
+- [x] 1.1 Modify prisma/schema.prisma: add PersonType enum, new fields, Decimal→Decimal?
+- [x] 1.2 Run prisma migrate + generate
+- [x] 1.3 Modify prisma/seed.ts: upserts for 6 CreditType + 5 CaseStatus
+- [x] 1.4 Run prisma db seed
+
+## Phase 2: Catalogs Module
+- [x] 2.1-2.2 CatalogsService (TDD: spec → impl) — getCreditTypes, getCaseStatuses
+- [x] 2.3-2.4 CatalogsController (TDD: spec → impl) — GET /credit-types, GET /case-statuses
+- [x] 2.5 CatalogsModule — import PrismaModule
+- [x] 2.6 Catalogs security hardening (Batch B.1) — JwtAuthGuard + `{ data: [...] }` response contract
+
+## Phase 3: MortgageCases Module
+- [x] 3.1-3.2 CreateMortgageCaseDto (TDD) — no advisorId/statusId, optionals >0, personType SALARIED only
+- [x] 3.3 QueryMortgageCaseDto — page/limit
+- [x] 3.4-3.5 MortgageCasesService (TDD) — create(dto, advisorId), findAll, findOne with includes
+- [x] 3.6-3.7 MortgageCasesController (TDD) — POST/GET/GET:id with JwtAuthGuard, req.user.id
+- [x] 3.8 MortgageCasesModule — import PrismaModule
+
+## Phase 4: Wiring + Contracts
+- [ ] 4.1 Modify app.module.ts — import both modules
+- [ ] 4.2 Update specs/04-api-contracts.md — remove advisorId/statusId, mark PATCH deferred
+
+## Phase 5: E2E Tests
+- [ ] 5.1-5.3 mortgage-cases.e2e-spec.ts — create, list, get, 401, 400, 404
+- [ ] 5.4 Run full test suite

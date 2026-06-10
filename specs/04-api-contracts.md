@@ -75,14 +75,20 @@ Crea un nuevo expediente ligado a un cliente y asignado a una asesora.
 ```json
 {
   "clientId": "uuid-client-1",
-  "advisorId": "uuid-user-1",
   "creditTypeId": 1,
-  "statusId": 1,
+  "personType": "SALARIED",
+  "propertyLocation": "CDMX",
   "requestedAmount": 1500000.00,
   "propertyValue": 2000000.00,
+  "estimatedTermMonths": 240,
   "notes": "Cliente pre-aprobado en simulador."
 }
 ```
+
+Notas de contrato:
+- `advisorId` **NO** se acepta en body. Se toma del JWT autenticado.
+- `statusId` **NO** se acepta en body. Se asigna internamente como `PENDING_DOCUMENTS`.
+- Campos opcionales: `propertyLocation?`, `requestedAmount?`, `propertyValue?`, `estimatedTermMonths?`, `personType?`.
 
 ### `GET /mortgage-cases`
 **Response (200 OK):**
@@ -94,7 +100,8 @@ Crea un nuevo expediente ligado a un cliente y asignado a una asesora.
       "clientId": "uuid-client-1",
       "clientName": "Juan Pérez",
       "creditType": "COMPRA",
-      "status": "DRAFT",
+      "status": "PENDING_DOCUMENTS",
+      "personType": "SALARIED",
       "requestedAmount": "1500000.00",
       "createdAt": "2026-06-03T10:00:00Z"
     }
@@ -117,7 +124,10 @@ Crea un nuevo expediente ligado a un cliente y asignado a una asesora.
     "name": "Cristina Asesora"
   },
   "creditType": { "id": 1, "code": "COMPRA", "name": "Compra de vivienda" },
-  "status": { "id": 1, "code": "DRAFT", "name": "Borrador" },
+  "status": { "id": 1, "code": "PENDING_DOCUMENTS", "name": "Pendiente de documentos" },
+  "personType": "SALARIED",
+  "propertyLocation": "CDMX",
+  "estimatedTermMonths": 240,
   "requestedAmount": "1500000.00",
   "propertyValue": "2000000.00",
   "notes": "Cliente pre-aprobado en formulario.",
@@ -125,29 +135,16 @@ Crea un nuevo expediente ligado a un cliente y asignado a una asesora.
 }
 ```
 
-### `PATCH /mortgage-cases/:id/status`
-Endpoint específico para cambiar el estado (Pipeline).
-**Request Body:**
-```json
-{
-  "statusId": 2
-}
-```
-
 ### `PATCH /mortgage-cases/:id`
-Para actualizar montos o notas generales.
-**Request Body:**
-```json
-{
-  "requestedAmount": 1600000.00
-}
-```
+**Diferido a HU-04**. No forma parte del alcance de HU-03.
 
 ---
 
 ## 3. Catálogos (`/catalogs`)
 
 Para simplificar el frontend, podemos tener rutas específicas o agruparlos. Mantendremos las rutas explícitas propuestas:
+
+**Seguridad:** estos endpoints internos requieren JWT (`Authorization: Bearer <token>`).
 
 ### `GET /credit-types`
 **Response (200 OK):**
@@ -165,7 +162,7 @@ Para simplificar el frontend, podemos tener rutas específicas o agruparlos. Man
 ```json
 {
   "data": [
-    { "id": 1, "code": "DRAFT", "name": "Borrador", "order": 10 },
+    { "id": 1, "code": "PENDING_DOCUMENTS", "name": "Pendiente de documentos", "order": 10 },
     { "id": 2, "code": "INTEGRATION", "name": "Integración", "order": 20 }
   ]
 }
