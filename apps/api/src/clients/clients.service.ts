@@ -84,7 +84,7 @@ export class ClientsService {
       fullName = this.generateFullName(
         updateClientDto.firstName ?? current.firstName,
         updateClientDto.paternalLastName ?? current.paternalLastName,
-        updateClientDto.maternalLastName ?? current.maternalLastName,
+        updateClientDto.maternalLastName ?? current.maternalLastName ?? undefined,
       );
     } else if (updateClientDto.maternalLastName !== undefined) {
       fullName = this.generateFullName(
