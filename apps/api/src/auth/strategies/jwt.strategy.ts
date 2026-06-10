@@ -3,13 +3,23 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+function getJwtSecret(configService: ConfigService): string {
+  const jwtSecret = configService.get<string>('JWT_SECRET');
+
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET is not defined');
+  }
+
+  return jwtSecret;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
+  constructor(configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: getJwtSecret(configService),
     });
   }
 
