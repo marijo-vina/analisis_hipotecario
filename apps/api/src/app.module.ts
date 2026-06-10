@@ -4,6 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
+import { CatalogsModule } from './catalogs/catalogs.module';
+import { MortgageCasesModule } from './mortgage-cases/mortgage-cases.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { AuthModule } from './auth/auth.module';
     }),
     AuthModule,
     ClientsModule,
+    CatalogsModule,
+    MortgageCasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
