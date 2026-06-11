@@ -14,11 +14,14 @@ const CREDIT_TYPES = [
 ];
 
 const CASE_STATUSES = [
-  { code: 'PENDING_DOCUMENTS', name: 'Pendiente de documentos', order: 1 },
-  { code: 'INTEGRATION', name: 'Integración', order: 2 },
-  { code: 'ANALYSIS', name: 'Análisis', order: 3 },
-  { code: 'COMPLETED', name: 'Completado', order: 4 },
-  { code: 'REJECTED', name: 'Rechazado', order: 5 },
+  { code: 'PENDING_DOCUMENTS',  name: 'Pendiente de documentos', order: 1 },
+  { code: 'DOCUMENTS_UPLOADED', name: 'Documentos cargados',     order: 2 },
+  { code: 'PROCESSING',         name: 'En procesamiento',        order: 3 },
+  { code: 'DATA_EXTRACTED',     name: 'Datos extraídos',         order: 4 },
+  { code: 'IN_REVIEW',          name: 'En revisión',             order: 5 },
+  { code: 'REPORT_GENERATED',   name: 'Reporte generado',        order: 6 },
+  { code: 'OBSERVED',           name: 'Observado',               order: 7 },
+  { code: 'CLOSED',             name: 'Cerrado',                 order: 8 },
 ];
 
 async function main() {
