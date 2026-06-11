@@ -11,6 +11,6 @@ export class UpdateMortgageCaseStatusDto {
     'REPORT_GENERATED',
     'OBSERVED',
     'CLOSED',
-  ])
+  ], { message: 'Invalid status code' })
   statusCode!: string;
 }
