@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -11,6 +12,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
 import { QueryMortgageCaseDto } from './dto/query-mortgage-case.dto';
+import { UpdateMortgageCaseStatusDto } from './dto/update-mortgage-case-status.dto';
 import { MortgageCasesService } from './mortgage-cases.service';
 
 @UseGuards(JwtAuthGuard)
@@ -34,5 +36,13 @@ export class MortgageCasesController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.mortgageCasesService.findOne(id);
+  }
+
+  @Patch(':id')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateMortgageCaseStatusDto,
+  ) {
+    return this.mortgageCasesService.updateStatus(id, dto.statusCode);
   }
 }
