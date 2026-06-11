@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
+import { UpdateMortgageCaseStatusDto } from './dto/update-mortgage-case-status.dto';
 import { MortgageCasesController } from './mortgage-cases.controller';
 import { MortgageCasesService } from './mortgage-cases.service';
 
@@ -12,6 +13,7 @@ describe('MortgageCasesController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
+    updateStatus: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -82,6 +84,19 @@ describe('MortgageCasesController', () => {
 
       expect(result).toEqual(response);
       expect(mockMortgageCasesService.findOne).toHaveBeenCalledWith('mc-1');
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('should call service.updateStatus with id and dto', async () => {
+      const dto: UpdateMortgageCaseStatusDto = { statusCode: 'IN_REVIEW' };
+      const mockResult = { id: 'case-uuid', status: { code: 'IN_REVIEW' } };
+      mockMortgageCasesService.updateStatus.mockResolvedValue(mockResult);
+
+      const result = await controller.updateStatus('case-uuid', dto);
+
+      expect(mockMortgageCasesService.updateStatus).toHaveBeenCalledWith('case-uuid', 'IN_REVIEW');
+      expect(result).toEqual(mockResult);
     });
   });
 });

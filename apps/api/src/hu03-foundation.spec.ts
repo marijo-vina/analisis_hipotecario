@@ -32,10 +32,13 @@ describe('HU-03 foundation artifacts', () => {
 
     const requiredCaseStatusCodes = [
       'PENDING_DOCUMENTS',
-      'INTEGRATION',
-      'ANALYSIS',
-      'COMPLETED',
-      'REJECTED',
+      'DOCUMENTS_UPLOADED',
+      'PROCESSING',
+      'DATA_EXTRACTED',
+      'IN_REVIEW',
+      'REPORT_GENERATED',
+      'OBSERVED',
+      'CLOSED',
     ];
 
     for (const code of requiredCreditTypeCodes) {
