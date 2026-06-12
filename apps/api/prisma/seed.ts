@@ -13,6 +13,22 @@ const CREDIT_TYPES = [
   { code: 'CONSTRUCCION', name: 'Construcción', isActive: true },
 ];
 
+const DOCUMENT_TYPES = [
+  { code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
+  { code: 'BANK_STATEMENT', name: 'Estado de cuenta', isActive: true },
+  { code: 'CREDIT_BUREAU_REPORT', name: 'Buró de crédito', isActive: true },
+  { code: 'INE', name: 'INE', isActive: true },
+  { code: 'PROOF_OF_ADDRESS', name: 'Comprobante de domicilio', isActive: true },
+];
+
+const DOCUMENT_STATUSES = [
+  { code: 'UPLOADED', name: 'Cargado', order: 1 },
+  { code: 'PENDING_REVIEW', name: 'Pendiente de revisión', order: 2 },
+  { code: 'PROCESSING', name: 'En procesamiento', order: 3 },
+  { code: 'PROCESSED', name: 'Procesado', order: 4 },
+  { code: 'ERROR', name: 'Error', order: 5 },
+];
+
 const CASE_STATUSES = [
   { code: 'PENDING_DOCUMENTS',  name: 'Pendiente de documentos', order: 1 },
   { code: 'DOCUMENTS_UPLOADED', name: 'Documentos cargados',     order: 2 },
@@ -54,6 +70,28 @@ async function main() {
       });
     }
 
+    for (const documentType of DOCUMENT_TYPES) {
+      await prisma.documentType.upsert({
+        where: { code: documentType.code },
+        update: {
+          name: documentType.name,
+          isActive: documentType.isActive,
+        },
+        create: documentType,
+      });
+    }
+
+    for (const documentStatus of DOCUMENT_STATUSES) {
+      await prisma.documentStatus.upsert({
+        where: { code: documentStatus.code },
+        update: {
+          name: documentStatus.name,
+          order: documentStatus.order,
+        },
+        create: documentStatus,
+      });
+    }
+
     const admin = await prisma.user.upsert({
       where: { email: 'admin@gestion.com' },
       update: {
@@ -71,6 +109,8 @@ async function main() {
 
     console.log('Seeded credit types:', CREDIT_TYPES.length);
     console.log('Seeded case statuses:', CASE_STATUSES.length);
+    console.log('Seeded document types:', DOCUMENT_TYPES.length);
+    console.log('Seeded document statuses:', DOCUMENT_STATUSES.length);
     console.log('Seeded admin user:', admin.email);
   } finally {
     await prisma.$disconnect();

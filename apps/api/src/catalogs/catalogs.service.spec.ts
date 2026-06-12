@@ -12,6 +12,12 @@ describe('CatalogsService', () => {
     caseStatus: {
       findMany: jest.fn(),
     },
+    documentType: {
+      findMany: jest.fn(),
+    },
+    documentStatus: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -68,6 +74,60 @@ describe('CatalogsService', () => {
       expect(mockPrismaService.caseStatus.findMany).toHaveBeenCalledWith({
         orderBy: [{ order: 'asc' }, { id: 'asc' }],
       });
+    });
+  });
+
+  describe('getDocumentTypes', () => {
+    it('should return active document types ordered by id asc', async () => {
+      const types = [
+        { id: 1, code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
+        { id: 2, code: 'BANK_STATEMENT', name: 'Estado de cuenta', isActive: true },
+      ];
+
+      mockPrismaService.documentType.findMany.mockResolvedValue(types);
+
+      const result = await service.getDocumentTypes();
+
+      expect(result).toEqual(types);
+      expect(mockPrismaService.documentType.findMany).toHaveBeenCalledWith({
+        where: { isActive: true },
+        orderBy: { id: 'asc' },
+      });
+    });
+
+    it('should return empty array when no active document types', async () => {
+      mockPrismaService.documentType.findMany.mockResolvedValue([]);
+
+      const result = await service.getDocumentTypes();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getDocumentStatuses', () => {
+    it('should return document statuses ordered by order asc and id asc', async () => {
+      const statuses = [
+        { id: 1, code: 'UPLOADED', name: 'Cargado', order: 1 },
+        { id: 2, code: 'PENDING_REVIEW', name: 'Pendiente de revisión', order: 2 },
+        { id: 5, code: 'ERROR', name: 'Error', order: 5 },
+      ];
+
+      mockPrismaService.documentStatus.findMany.mockResolvedValue(statuses);
+
+      const result = await service.getDocumentStatuses();
+
+      expect(result).toEqual(statuses);
+      expect(mockPrismaService.documentStatus.findMany).toHaveBeenCalledWith({
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      });
+    });
+
+    it('should return empty array when no statuses exist', async () => {
+      mockPrismaService.documentStatus.findMany.mockResolvedValue([]);
+
+      const result = await service.getDocumentStatuses();
+
+      expect(result).toEqual([]);
     });
   });
 });

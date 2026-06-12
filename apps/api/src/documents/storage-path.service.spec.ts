@@ -1,0 +1,62 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { StoragePathService } from './storage-path.service';
+
+describe('StoragePathService', () => {
+  let service: StoragePathService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [StoragePathService],
+    }).compile();
+
+    service = module.get<StoragePathService>(StoragePathService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('buildPath', () => {
+    it('should build standard path from caseId, code, and filename', () => {
+      const result = service.buildPath('abc-123', 'PAYROLL_RECEIPT', 'nomina.pdf');
+
+      expect(result).toBe('abc-123/PAYROLL_RECEIPT/nomina.pdf');
+    });
+
+    it('should preserve spaces in filename (GCS-compatible)', () => {
+      const result = service.buildPath('abc-123', 'INE', 'foto frente.jpg');
+
+      expect(result).toBe('abc-123/INE/foto frente.jpg');
+    });
+
+    it('should be deterministic — same inputs always produce same output', () => {
+      const args: [string, string, string] = ['case-1', 'BANK_STATEMENT', 'estado.pdf'];
+
+      const result1 = service.buildPath(...args);
+      const result2 = service.buildPath(...args);
+      const result3 = service.buildPath(...args);
+
+      expect(result1).toBe(result2);
+      expect(result2).toBe(result3);
+      expect(result1).toBe('case-1/BANK_STATEMENT/estado.pdf');
+    });
+
+    it('should handle codes with underscores', () => {
+      const result = service.buildPath('abc-123', 'CREDIT_BUREAU_REPORT', 'report.pdf');
+
+      expect(result).toBe('abc-123/CREDIT_BUREAU_REPORT/report.pdf');
+    });
+
+    it('should handle caseId with hyphens (UUID format)', () => {
+      const result = service.buildPath(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'PROOF_OF_ADDRESS',
+        'comprobante.pdf',
+      );
+
+      expect(result).toBe(
+        '550e8400-e29b-41d4-a716-446655440000/PROOF_OF_ADDRESS/comprobante.pdf',
+      );
+    });
+  });
+});

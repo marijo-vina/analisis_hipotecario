@@ -350,10 +350,6 @@ export type CreditTypeUpdateOneRequiredWithoutCasesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CreditTypeUpdateToOneWithWhereWithoutCasesInput, Prisma.CreditTypeUpdateWithoutCasesInput>, Prisma.CreditTypeUncheckedUpdateWithoutCasesInput>
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type CreditTypeCreateWithoutCasesInput = {
   code: string
   name: string
