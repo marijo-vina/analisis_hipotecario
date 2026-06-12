@@ -12,7 +12,7 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 |---|---|---|
 | `frontend-auth` | New | Login, logout y gestión de sesión JWT en httpOnly cookie |
 | `frontend-clients` | New | Listado, alta y detalle de clientes desde UI |
-| `frontend-mortgage-cases` | New | Listado, alta y detalle de expedientes desde UI |
+| `frontend-mortgage-cases` | Modified | Listado, alta y detalle de expedientes desde UI. StatusBadge compartido en listado y detalle. Detalle incluye dropdown inline para cambio de estado. |
 | `frontend-proxy` | New | Redirección de rutas protegidas en Next.js |
 
 ---
@@ -39,6 +39,9 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 | FR-14 | El sistema MUST mostrar "No encontrado" ante 404 en páginas de detalle |
 | FR-15 | El sistema MUST mostrar mensaje específico ante 409 ("RFC ya registrado" / "Email ya registrado") |
 | FR-16 | La asesora MUST poder navegar entre módulos desde una barra lateral en el dashboard |
+| FR-0512 | P0 | Listado de expedientes MUST renderizar columna de estado vía `StatusBadge` compartido con color correcto por estado |
+| FR-0513 | P0 | Detalle de expediente MUST mostrar dropdown poblado desde `GET /case-statuses` con los 8 estados, pre-seleccionando el actual |
+| FR-0514 | P0 | Botón "Cambiar" MUST llamar `updateCaseStatus` server action, revalidar página de detalle en éxito, mostrar error inline en falla |
 
 ### Non-Functional
 
@@ -100,7 +103,7 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 
 ### FR-09: Listado de expedientes
 
-- **GIVEN** expedientes registrados → **WHEN** accede a `/dashboard/expedientes` → **THEN** tabla con cliente, tipo crédito, estado, monto, fecha, acción "Ver"
+- **GIVEN** expedientes registrados → **WHEN** accede a `/dashboard/expedientes` → **THEN** tabla con cliente, tipo crédito, estado (badge con color), monto, fecha, acción "Ver"
 - **GIVEN** más de 10 expedientes → **WHEN** navega página 2 → **THEN** `GET /mortgage-cases?page=2&limit=10`
 - **GIVEN** cero expedientes → **WHEN** accede → **THEN** "No hay expedientes registrados"
 
@@ -112,7 +115,8 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 
 ### FR-11: Detalle de expediente
 
-- **GIVEN** expediente existente → **WHEN** accede a `/dashboard/expedientes/:id` → **THEN** muestra cliente, asesor, tipo crédito, estado, monto, ubicación, plazo, notas
+- **GIVEN** expediente existente → **WHEN** accede a `/dashboard/expedientes/:id` → **THEN** muestra cliente, asesor, tipo crédito, estado (badge con color), monto, ubicación, plazo, notas
+- **GIVEN** advisor en detalle de expediente → **WHEN** selecciona nuevo estado en dropdown y clickea "Cambiar" → **THEN** se actualiza el estado, se revalida la página, el badge muestra el nuevo color
 - **GIVEN** id inexistente → **WHEN** accede → **THEN** 404, "Expediente no encontrado"
 
 ### FR-12 a FR-15: Manejo de errores — ver Sección 5
@@ -136,6 +140,7 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 | Listado expedientes | GET | `/mortgage-cases?page=&limit=` | — | `{ data: MortgageCase[], meta }` |
 | Crear expediente | POST | `/mortgage-cases` | `{ clientId, creditTypeId, personType?, propertyLocation?, requestedAmount?, propertyValue?, estimatedTermMonths?, notes? }` | `MortgageCase` (201) |
 | Detalle expediente | GET | `/mortgage-cases/:id` | — | `MortgageCase` con `client`, `advisor`, `creditType`, `status` |
+| Cambiar estado expediente | PATCH | `/mortgage-cases/:id` | `{ statusCode }` | `MortgageCase` con includes (200) |
 | Tipos de crédito | GET | `/credit-types` | — | `{ data: { id, code, name }[] }` |
 | Estados de expediente | GET | `/case-statuses` | — | `{ data: { id, code, name, order }[] }` |
 
@@ -155,7 +160,7 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 | `/dashboard/clientes/[id]` | Requerida | Detalle read-only |
 | `/dashboard/expedientes` | Requerida | Tabla paginada |
 | `/dashboard/expedientes/nuevo` | Requerida | Formulario con selectores de catálogo |
-| `/dashboard/expedientes/[id]` | Requerida | Detalle read-only |
+| `/dashboard/expedientes/[id]` | Requerida | Detalle con badge de estado y dropdown inline para cambio de estado |
 
 **Proxy rules (`proxy.ts`):**
 - `startsWith('/dashboard')` sin cookie `token` → 307 `/login`

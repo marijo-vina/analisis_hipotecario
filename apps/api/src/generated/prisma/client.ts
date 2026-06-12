@@ -60,6 +60,16 @@ export type MortgageCase = Prisma.MortgageCaseModel
  */
 export type Document = Prisma.DocumentModel
 /**
+ * Model DocumentType
+ * 
+ */
+export type DocumentType = Prisma.DocumentTypeModel
+/**
+ * Model DocumentStatus
+ * 
+ */
+export type DocumentStatus = Prisma.DocumentStatusModel
+/**
  * Model CreditType
  * 
  */

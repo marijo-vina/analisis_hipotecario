@@ -34,9 +34,9 @@ Add `PATCH /mortgage-cases/:id` at the API layer with double validation (DTO `@I
 │    on ok → revalidatePath(`/dashboard/expedientes/${id}`)│
 │    on err → return { errors: { _form: msg } }        │   │
 └──────────────────────────────────────────────────────────┘
-                                                        │
-              ┌─────────────────────────────────────────┘
-              ▼
+                                                         │
+               ┌─────────────────────────────────────────┘
+               ▼
 ┌─ NestJS API ──────────────────────────────────────────────┐
 │  @Patch(':id')                                            │
 │   → DTO validates @IsIn([...8])                           │

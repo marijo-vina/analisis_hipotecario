@@ -388,6 +388,8 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   Document: 'Document',
+  DocumentType: 'DocumentType',
+  DocumentStatus: 'DocumentStatus',
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus'
 } as const
@@ -405,7 +407,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "client" | "mortgageCase" | "document" | "creditType" | "caseStatus"
+    modelProps: "user" | "client" | "mortgageCase" | "document" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -705,6 +707,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DocumentType: {
+      payload: Prisma.$DocumentTypePayload<ExtArgs>
+      fields: Prisma.DocumentTypeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DocumentTypeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DocumentTypeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        findFirst: {
+          args: Prisma.DocumentTypeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DocumentTypeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        findMany: {
+          args: Prisma.DocumentTypeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>[]
+        }
+        create: {
+          args: Prisma.DocumentTypeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        createMany: {
+          args: Prisma.DocumentTypeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DocumentTypeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>[]
+        }
+        delete: {
+          args: Prisma.DocumentTypeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        update: {
+          args: Prisma.DocumentTypeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        deleteMany: {
+          args: Prisma.DocumentTypeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DocumentTypeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DocumentTypeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>[]
+        }
+        upsert: {
+          args: Prisma.DocumentTypeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentTypePayload>
+        }
+        aggregate: {
+          args: Prisma.DocumentTypeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDocumentType>
+        }
+        groupBy: {
+          args: Prisma.DocumentTypeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentTypeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DocumentTypeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentTypeCountAggregateOutputType> | number
+        }
+      }
+    }
+    DocumentStatus: {
+      payload: Prisma.$DocumentStatusPayload<ExtArgs>
+      fields: Prisma.DocumentStatusFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DocumentStatusFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DocumentStatusFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        findFirst: {
+          args: Prisma.DocumentStatusFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DocumentStatusFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        findMany: {
+          args: Prisma.DocumentStatusFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>[]
+        }
+        create: {
+          args: Prisma.DocumentStatusCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        createMany: {
+          args: Prisma.DocumentStatusCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DocumentStatusCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>[]
+        }
+        delete: {
+          args: Prisma.DocumentStatusDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        update: {
+          args: Prisma.DocumentStatusUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        deleteMany: {
+          args: Prisma.DocumentStatusDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DocumentStatusUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DocumentStatusUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>[]
+        }
+        upsert: {
+          args: Prisma.DocumentStatusUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DocumentStatusPayload>
+        }
+        aggregate: {
+          args: Prisma.DocumentStatusAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDocumentStatus>
+        }
+        groupBy: {
+          args: Prisma.DocumentStatusGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentStatusGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DocumentStatusCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DocumentStatusCountAggregateOutputType> | number
+        }
+      }
+    }
     CreditType: {
       payload: Prisma.$CreditTypePayload<ExtArgs>
       fields: Prisma.CreditTypeFieldRefs
@@ -944,14 +1094,37 @@ export type MortgageCaseScalarFieldEnum = (typeof MortgageCaseScalarFieldEnum)[k
 export const DocumentScalarFieldEnum = {
   id: 'id',
   mortgageCaseId: 'mortgageCaseId',
-  documentType: 'documentType',
+  documentTypeId: 'documentTypeId',
+  documentStatusId: 'documentStatusId',
   fileUrl: 'fileUrl',
+  storagePath: 'storagePath',
   originalName: 'originalName',
   uploadedById: 'uploadedById',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 } as const
 
 export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
+
+
+export const DocumentTypeScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  name: 'name',
+  isActive: 'isActive'
+} as const
+
+export type DocumentTypeScalarFieldEnum = (typeof DocumentTypeScalarFieldEnum)[keyof typeof DocumentTypeScalarFieldEnum]
+
+
+export const DocumentStatusScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  name: 'name',
+  order: 'order'
+} as const
+
+export type DocumentStatusScalarFieldEnum = (typeof DocumentStatusScalarFieldEnum)[keyof typeof DocumentStatusScalarFieldEnum]
 
 
 export const CreditTypeScalarFieldEnum = {
@@ -1089,20 +1262,6 @@ export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMo
 
 
 /**
- * Reference to a field of type 'DocumentType'
- */
-export type EnumDocumentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DocumentType'>
-    
-
-
-/**
- * Reference to a field of type 'DocumentType[]'
- */
-export type ListEnumDocumentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DocumentType[]'>
-    
-
-
-/**
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
@@ -1236,6 +1395,8 @@ export type GlobalOmitConfig = {
   client?: Prisma.ClientOmit
   mortgageCase?: Prisma.MortgageCaseOmit
   document?: Prisma.DocumentOmit
+  documentType?: Prisma.DocumentTypeOmit
+  documentStatus?: Prisma.DocumentStatusOmit
   creditType?: Prisma.CreditTypeOmit
   caseStatus?: Prisma.CaseStatusOmit
 }

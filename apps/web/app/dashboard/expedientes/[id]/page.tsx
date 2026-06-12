@@ -3,6 +3,8 @@ import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
 import type { MortgageCase } from "@/app/lib/definitions";
+import StatusBadge from "@/app/ui/status-badge";
+import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
 
 interface CaseDetailPageProps {
   params: Promise<{ id: string }>;
@@ -64,6 +66,11 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
 
   // ---- Success ------------------------------------------------------------
   const c = result.data;
+
+  const statusesResult = await apiFetch<{
+    data: { code: string; name: string; order: number }[];
+  }>("/case-statuses");
+  const statuses = statusesResult.ok ? statusesResult.data.data : [];
 
   return (
     <div>
@@ -131,6 +138,12 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             value={new Date(c.createdAt).toLocaleDateString("es-MX")}
           />
         </dl>
+
+        <CaseStatusDropdown
+          caseId={c.id}
+          currentCode={c.status.code}
+          statuses={statuses}
+        />
       </div>
     </div>
   );
@@ -160,59 +173,4 @@ function Field({
       </dd>
     </div>
   );
-}
-
-/** Color-coded status pill for the detail card. */
-function StatusBadge({
-  code,
-  name,
-}: {
-  code: string;
-  name: string;
-}) {
-  const palette = getStatusColor(code);
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${palette}`}
-    >
-      {name}
-    </span>
-  );
-}
-
-/** Map a status code to Tailwind badge classes. */
-function getStatusColor(code: string): string {
-  const lower = code.toLowerCase();
-  if (lower.includes("pending") || lower.includes("pendiente")) {
-    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  }
-  if (
-    lower.includes("approved") ||
-    lower.includes("aprobado") ||
-    lower.includes("aprobada")
-  ) {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
-  }
-  if (
-    lower.includes("rejected") ||
-    lower.includes("rechazado") ||
-    lower.includes("rechazada")
-  ) {
-    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  }
-  if (
-    lower.includes("review") ||
-    lower.includes("revisión") ||
-    lower.includes("revision")
-  ) {
-    return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20";
-  }
-  if (
-    lower.includes("closed") ||
-    lower.includes("cerrado") ||
-    lower.includes("cerrada")
-  ) {
-    return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-600/20";
-  }
-  return "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-500/20";
 }

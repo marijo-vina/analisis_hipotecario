@@ -3,6 +3,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 import Pagination from "@/app/ui/pagination";
 import ErrorMessage from "@/app/ui/error-message";
+import StatusBadge from "@/app/ui/status-badge";
 
 interface CasesPageProps {
   searchParams: Promise<{ page?: string; limit?: string }>;
@@ -105,7 +106,7 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
                   {c.creditType.name}
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={c.status} />
+                  <StatusBadge code={c.status.code} name={c.status.name} />
                 </td>
                 <td className="px-4 py-3 text-right text-slate-600 hidden sm:table-cell">
                   {c.requestedAmount != null
@@ -138,56 +139,3 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Color-coded status pill rendered inline in the table. */
-function StatusBadge({ status }: { status: { code: string; name: string } }) {
-  const palette = getStatusColor(status.code);
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${palette}`}
-    >
-      {status.name}
-    </span>
-  );
-}
-
-/** Map a status code to Tailwind badge classes. */
-function getStatusColor(code: string): string {
-  const lower = code.toLowerCase();
-  if (lower.includes("pending") || lower.includes("pendiente")) {
-    return "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20";
-  }
-  if (
-    lower.includes("approved") ||
-    lower.includes("aprobado") ||
-    lower.includes("aprobada")
-  ) {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20";
-  }
-  if (
-    lower.includes("rejected") ||
-    lower.includes("rechazado") ||
-    lower.includes("rechazada")
-  ) {
-    return "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20";
-  }
-  if (
-    lower.includes("review") ||
-    lower.includes("revisión") ||
-    lower.includes("revision")
-  ) {
-    return "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20";
-  }
-  if (
-    lower.includes("closed") ||
-    lower.includes("cerrado") ||
-    lower.includes("cerrada")
-  ) {
-    return "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-600/20";
-  }
-  // Default — grey neutral pill
-  return "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-500/20";
-}

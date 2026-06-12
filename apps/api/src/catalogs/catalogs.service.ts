@@ -17,4 +17,17 @@ export class CatalogsService {
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
     });
   }
+
+  getDocumentTypes() {
+    return this.prisma.documentType.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  getDocumentStatuses() {
+    return this.prisma.documentStatus.findMany({
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+    });
+  }
 }

@@ -20,70 +20,110 @@ export type DocumentModel = runtime.Types.Result.DefaultSelection<Prisma.$Docume
 
 export type AggregateDocument = {
   _count: DocumentCountAggregateOutputType | null
+  _avg: DocumentAvgAggregateOutputType | null
+  _sum: DocumentSumAggregateOutputType | null
   _min: DocumentMinAggregateOutputType | null
   _max: DocumentMaxAggregateOutputType | null
+}
+
+export type DocumentAvgAggregateOutputType = {
+  documentTypeId: number | null
+  documentStatusId: number | null
+}
+
+export type DocumentSumAggregateOutputType = {
+  documentTypeId: number | null
+  documentStatusId: number | null
 }
 
 export type DocumentMinAggregateOutputType = {
   id: string | null
   mortgageCaseId: string | null
-  documentType: $Enums.DocumentType | null
+  documentTypeId: number | null
+  documentStatusId: number | null
   fileUrl: string | null
+  storagePath: string | null
   originalName: string | null
   uploadedById: string | null
   createdAt: Date | null
+  updatedAt: Date | null
 }
 
 export type DocumentMaxAggregateOutputType = {
   id: string | null
   mortgageCaseId: string | null
-  documentType: $Enums.DocumentType | null
+  documentTypeId: number | null
+  documentStatusId: number | null
   fileUrl: string | null
+  storagePath: string | null
   originalName: string | null
   uploadedById: string | null
   createdAt: Date | null
+  updatedAt: Date | null
 }
 
 export type DocumentCountAggregateOutputType = {
   id: number
   mortgageCaseId: number
-  documentType: number
+  documentTypeId: number
+  documentStatusId: number
   fileUrl: number
+  storagePath: number
   originalName: number
   uploadedById: number
   createdAt: number
+  updatedAt: number
   _all: number
 }
 
 
+export type DocumentAvgAggregateInputType = {
+  documentTypeId?: true
+  documentStatusId?: true
+}
+
+export type DocumentSumAggregateInputType = {
+  documentTypeId?: true
+  documentStatusId?: true
+}
+
 export type DocumentMinAggregateInputType = {
   id?: true
   mortgageCaseId?: true
-  documentType?: true
+  documentTypeId?: true
+  documentStatusId?: true
   fileUrl?: true
+  storagePath?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
+  updatedAt?: true
 }
 
 export type DocumentMaxAggregateInputType = {
   id?: true
   mortgageCaseId?: true
-  documentType?: true
+  documentTypeId?: true
+  documentStatusId?: true
   fileUrl?: true
+  storagePath?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
+  updatedAt?: true
 }
 
 export type DocumentCountAggregateInputType = {
   id?: true
   mortgageCaseId?: true
-  documentType?: true
+  documentTypeId?: true
+  documentStatusId?: true
   fileUrl?: true
+  storagePath?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
+  updatedAt?: true
   _all?: true
 }
 
@@ -125,6 +165,18 @@ export type DocumentAggregateArgs<ExtArgs extends runtime.Types.Extensions.Inter
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: DocumentAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: DocumentSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: DocumentMinAggregateInputType
@@ -155,6 +207,8 @@ export type DocumentGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   _count?: DocumentCountAggregateInputType | true
+  _avg?: DocumentAvgAggregateInputType
+  _sum?: DocumentSumAggregateInputType
   _min?: DocumentMinAggregateInputType
   _max?: DocumentMaxAggregateInputType
 }
@@ -162,12 +216,17 @@ export type DocumentGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
 export type DocumentGroupByOutputType = {
   id: string
   mortgageCaseId: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl: string | null
+  storagePath: string | null
   originalName: string
   uploadedById: string
   createdAt: Date
+  updatedAt: Date
   _count: DocumentCountAggregateOutputType | null
+  _avg: DocumentAvgAggregateOutputType | null
+  _sum: DocumentSumAggregateOutputType | null
   _min: DocumentMinAggregateOutputType | null
   _max: DocumentMaxAggregateOutputType | null
 }
@@ -193,24 +252,34 @@ export type DocumentWhereInput = {
   NOT?: Prisma.DocumentWhereInput | Prisma.DocumentWhereInput[]
   id?: Prisma.StringFilter<"Document"> | string
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
-  documentType?: Prisma.EnumDocumentTypeFilter<"Document"> | $Enums.DocumentType
-  fileUrl?: Prisma.StringFilter<"Document"> | string
+  documentTypeId?: Prisma.IntFilter<"Document"> | number
+  documentStatusId?: Prisma.IntFilter<"Document"> | number
+  fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
+  storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   mortgageCase?: Prisma.XOR<Prisma.MortgageCaseScalarRelationFilter, Prisma.MortgageCaseWhereInput>
+  documentType?: Prisma.XOR<Prisma.DocumentTypeScalarRelationFilter, Prisma.DocumentTypeWhereInput>
+  documentStatus?: Prisma.XOR<Prisma.DocumentStatusScalarRelationFilter, Prisma.DocumentStatusWhereInput>
   uploadedBy?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
 
 export type DocumentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   mortgageCaseId?: Prisma.SortOrder
-  documentType?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrder
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
+  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
   mortgageCase?: Prisma.MortgageCaseOrderByWithRelationInput
+  documentType?: Prisma.DocumentTypeOrderByWithRelationInput
+  documentStatus?: Prisma.DocumentStatusOrderByWithRelationInput
   uploadedBy?: Prisma.UserOrderByWithRelationInput
 }
 
@@ -220,26 +289,36 @@ export type DocumentWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.DocumentWhereInput[]
   NOT?: Prisma.DocumentWhereInput | Prisma.DocumentWhereInput[]
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
-  documentType?: Prisma.EnumDocumentTypeFilter<"Document"> | $Enums.DocumentType
-  fileUrl?: Prisma.StringFilter<"Document"> | string
+  documentTypeId?: Prisma.IntFilter<"Document"> | number
+  documentStatusId?: Prisma.IntFilter<"Document"> | number
+  fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
+  storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   mortgageCase?: Prisma.XOR<Prisma.MortgageCaseScalarRelationFilter, Prisma.MortgageCaseWhereInput>
+  documentType?: Prisma.XOR<Prisma.DocumentTypeScalarRelationFilter, Prisma.DocumentTypeWhereInput>
+  documentStatus?: Prisma.XOR<Prisma.DocumentStatusScalarRelationFilter, Prisma.DocumentStatusWhereInput>
   uploadedBy?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id">
 
 export type DocumentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   mortgageCaseId?: Prisma.SortOrder
-  documentType?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrder
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
+  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
   _count?: Prisma.DocumentCountOrderByAggregateInput
+  _avg?: Prisma.DocumentAvgOrderByAggregateInput
   _max?: Prisma.DocumentMaxOrderByAggregateInput
   _min?: Prisma.DocumentMinOrderByAggregateInput
+  _sum?: Prisma.DocumentSumOrderByAggregateInput
 }
 
 export type DocumentScalarWhereWithAggregatesInput = {
@@ -248,79 +327,101 @@ export type DocumentScalarWhereWithAggregatesInput = {
   NOT?: Prisma.DocumentScalarWhereWithAggregatesInput | Prisma.DocumentScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"Document"> | string
   mortgageCaseId?: Prisma.StringWithAggregatesFilter<"Document"> | string
-  documentType?: Prisma.EnumDocumentTypeWithAggregatesFilter<"Document"> | $Enums.DocumentType
-  fileUrl?: Prisma.StringWithAggregatesFilter<"Document"> | string
+  documentTypeId?: Prisma.IntWithAggregatesFilter<"Document"> | number
+  documentStatusId?: Prisma.IntWithAggregatesFilter<"Document"> | number
+  fileUrl?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
+  storagePath?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   originalName?: Prisma.StringWithAggregatesFilter<"Document"> | string
   uploadedById?: Prisma.StringWithAggregatesFilter<"Document"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
+  updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
 }
 
 export type DocumentCreateInput = {
   id?: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   createdAt?: Date | string
+  updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
+  documentType: Prisma.DocumentTypeCreateNestedOneWithoutDocumentsInput
+  documentStatus: Prisma.DocumentStatusCreateNestedOneWithoutDocumentsInput
   uploadedBy: Prisma.UserCreateNestedOneWithoutDocumentsInput
 }
 
 export type DocumentUncheckedCreateInput = {
   id?: string
   mortgageCaseId: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
+  documentType?: Prisma.DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput
+  documentStatus?: Prisma.DocumentStatusUpdateOneRequiredWithoutDocumentsNestedInput
   uploadedBy?: Prisma.UserUpdateOneRequiredWithoutDocumentsNestedInput
 }
 
 export type DocumentUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentCreateManyInput = {
   id?: string
   mortgageCaseId: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentListRelationFilter = {
@@ -336,31 +437,50 @@ export type DocumentOrderByRelationAggregateInput = {
 export type DocumentCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mortgageCaseId?: Prisma.SortOrder
-  documentType?: Prisma.SortOrder
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
+  storagePath?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
+}
+
+export type DocumentAvgOrderByAggregateInput = {
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
 }
 
 export type DocumentMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mortgageCaseId?: Prisma.SortOrder
-  documentType?: Prisma.SortOrder
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
+  storagePath?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
 }
 
 export type DocumentMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   mortgageCaseId?: Prisma.SortOrder
-  documentType?: Prisma.SortOrder
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
+  storagePath?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
+}
+
+export type DocumentSumOrderByAggregateInput = {
+  documentTypeId?: Prisma.SortOrder
+  documentStatusId?: Prisma.SortOrder
 }
 
 export type DocumentCreateNestedManyWithoutUploadedByInput = {
@@ -447,26 +567,112 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput = {
   deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
 }
 
-export type EnumDocumentTypeFieldUpdateOperationsInput = {
-  set?: $Enums.DocumentType
+export type DocumentCreateNestedManyWithoutDocumentTypeInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentTypeInputEnvelope
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+}
+
+export type DocumentUncheckedCreateNestedManyWithoutDocumentTypeInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentTypeInputEnvelope
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+}
+
+export type DocumentUpdateManyWithoutDocumentTypeNestedInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
+  upsert?: Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentTypeInput | Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentTypeInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentTypeInputEnvelope
+  set?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  disconnect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  delete?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  update?: Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentTypeInput | Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentTypeInput[]
+  updateMany?: Prisma.DocumentUpdateManyWithWhereWithoutDocumentTypeInput | Prisma.DocumentUpdateManyWithWhereWithoutDocumentTypeInput[]
+  deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
+}
+
+export type DocumentUncheckedUpdateManyWithoutDocumentTypeNestedInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
+  upsert?: Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentTypeInput | Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentTypeInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentTypeInputEnvelope
+  set?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  disconnect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  delete?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  update?: Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentTypeInput | Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentTypeInput[]
+  updateMany?: Prisma.DocumentUpdateManyWithWhereWithoutDocumentTypeInput | Prisma.DocumentUpdateManyWithWhereWithoutDocumentTypeInput[]
+  deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
+}
+
+export type DocumentCreateNestedManyWithoutDocumentStatusInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput> | Prisma.DocumentCreateWithoutDocumentStatusInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput | Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentStatusInputEnvelope
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+}
+
+export type DocumentUncheckedCreateNestedManyWithoutDocumentStatusInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput> | Prisma.DocumentCreateWithoutDocumentStatusInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput | Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentStatusInputEnvelope
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+}
+
+export type DocumentUpdateManyWithoutDocumentStatusNestedInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput> | Prisma.DocumentCreateWithoutDocumentStatusInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput | Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput[]
+  upsert?: Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentStatusInput | Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentStatusInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentStatusInputEnvelope
+  set?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  disconnect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  delete?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  update?: Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentStatusInput | Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentStatusInput[]
+  updateMany?: Prisma.DocumentUpdateManyWithWhereWithoutDocumentStatusInput | Prisma.DocumentUpdateManyWithWhereWithoutDocumentStatusInput[]
+  deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
+}
+
+export type DocumentUncheckedUpdateManyWithoutDocumentStatusNestedInput = {
+  create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput> | Prisma.DocumentCreateWithoutDocumentStatusInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput[]
+  connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput | Prisma.DocumentCreateOrConnectWithoutDocumentStatusInput[]
+  upsert?: Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentStatusInput | Prisma.DocumentUpsertWithWhereUniqueWithoutDocumentStatusInput[]
+  createMany?: Prisma.DocumentCreateManyDocumentStatusInputEnvelope
+  set?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  disconnect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  delete?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  connect?: Prisma.DocumentWhereUniqueInput | Prisma.DocumentWhereUniqueInput[]
+  update?: Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentStatusInput | Prisma.DocumentUpdateWithWhereUniqueWithoutDocumentStatusInput[]
+  updateMany?: Prisma.DocumentUpdateManyWithWhereWithoutDocumentStatusInput | Prisma.DocumentUpdateManyWithWhereWithoutDocumentStatusInput[]
+  deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
 }
 
 export type DocumentCreateWithoutUploadedByInput = {
   id?: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   createdAt?: Date | string
+  updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
+  documentType: Prisma.DocumentTypeCreateNestedOneWithoutDocumentsInput
+  documentStatus: Prisma.DocumentStatusCreateNestedOneWithoutDocumentsInput
 }
 
 export type DocumentUncheckedCreateWithoutUploadedByInput = {
   id?: string
   mortgageCaseId: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentCreateOrConnectWithoutUploadedByInput = {
@@ -501,29 +707,38 @@ export type DocumentScalarWhereInput = {
   NOT?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
   id?: Prisma.StringFilter<"Document"> | string
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
-  documentType?: Prisma.EnumDocumentTypeFilter<"Document"> | $Enums.DocumentType
-  fileUrl?: Prisma.StringFilter<"Document"> | string
+  documentTypeId?: Prisma.IntFilter<"Document"> | number
+  documentStatusId?: Prisma.IntFilter<"Document"> | number
+  fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
+  storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
 }
 
 export type DocumentCreateWithoutMortgageCaseInput = {
   id?: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   createdAt?: Date | string
+  updatedAt?: Date | string
+  documentType: Prisma.DocumentTypeCreateNestedOneWithoutDocumentsInput
+  documentStatus: Prisma.DocumentStatusCreateNestedOneWithoutDocumentsInput
   uploadedBy: Prisma.UserCreateNestedOneWithoutDocumentsInput
 }
 
 export type DocumentUncheckedCreateWithoutMortgageCaseInput = {
   id?: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentCreateOrConnectWithoutMortgageCaseInput = {
@@ -552,76 +767,296 @@ export type DocumentUpdateManyWithWhereWithoutMortgageCaseInput = {
   data: Prisma.XOR<Prisma.DocumentUpdateManyMutationInput, Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseInput>
 }
 
+export type DocumentCreateWithoutDocumentTypeInput = {
+  id?: string
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
+  documentStatus: Prisma.DocumentStatusCreateNestedOneWithoutDocumentsInput
+  uploadedBy: Prisma.UserCreateNestedOneWithoutDocumentsInput
+}
+
+export type DocumentUncheckedCreateWithoutDocumentTypeInput = {
+  id?: string
+  mortgageCaseId: string
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  uploadedById: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type DocumentCreateOrConnectWithoutDocumentTypeInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput>
+}
+
+export type DocumentCreateManyDocumentTypeInputEnvelope = {
+  data: Prisma.DocumentCreateManyDocumentTypeInput | Prisma.DocumentCreateManyDocumentTypeInput[]
+  skipDuplicates?: boolean
+}
+
+export type DocumentUpsertWithWhereUniqueWithoutDocumentTypeInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  update: Prisma.XOR<Prisma.DocumentUpdateWithoutDocumentTypeInput, Prisma.DocumentUncheckedUpdateWithoutDocumentTypeInput>
+  create: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput>
+}
+
+export type DocumentUpdateWithWhereUniqueWithoutDocumentTypeInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  data: Prisma.XOR<Prisma.DocumentUpdateWithoutDocumentTypeInput, Prisma.DocumentUncheckedUpdateWithoutDocumentTypeInput>
+}
+
+export type DocumentUpdateManyWithWhereWithoutDocumentTypeInput = {
+  where: Prisma.DocumentScalarWhereInput
+  data: Prisma.XOR<Prisma.DocumentUpdateManyMutationInput, Prisma.DocumentUncheckedUpdateManyWithoutDocumentTypeInput>
+}
+
+export type DocumentCreateWithoutDocumentStatusInput = {
+  id?: string
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
+  documentType: Prisma.DocumentTypeCreateNestedOneWithoutDocumentsInput
+  uploadedBy: Prisma.UserCreateNestedOneWithoutDocumentsInput
+}
+
+export type DocumentUncheckedCreateWithoutDocumentStatusInput = {
+  id?: string
+  mortgageCaseId: string
+  documentTypeId: number
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  uploadedById: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type DocumentCreateOrConnectWithoutDocumentStatusInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput>
+}
+
+export type DocumentCreateManyDocumentStatusInputEnvelope = {
+  data: Prisma.DocumentCreateManyDocumentStatusInput | Prisma.DocumentCreateManyDocumentStatusInput[]
+  skipDuplicates?: boolean
+}
+
+export type DocumentUpsertWithWhereUniqueWithoutDocumentStatusInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  update: Prisma.XOR<Prisma.DocumentUpdateWithoutDocumentStatusInput, Prisma.DocumentUncheckedUpdateWithoutDocumentStatusInput>
+  create: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentStatusInput, Prisma.DocumentUncheckedCreateWithoutDocumentStatusInput>
+}
+
+export type DocumentUpdateWithWhereUniqueWithoutDocumentStatusInput = {
+  where: Prisma.DocumentWhereUniqueInput
+  data: Prisma.XOR<Prisma.DocumentUpdateWithoutDocumentStatusInput, Prisma.DocumentUncheckedUpdateWithoutDocumentStatusInput>
+}
+
+export type DocumentUpdateManyWithWhereWithoutDocumentStatusInput = {
+  where: Prisma.DocumentScalarWhereInput
+  data: Prisma.XOR<Prisma.DocumentUpdateManyMutationInput, Prisma.DocumentUncheckedUpdateManyWithoutDocumentStatusInput>
+}
+
 export type DocumentCreateManyUploadedByInput = {
   id?: string
   mortgageCaseId: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentUpdateWithoutUploadedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
+  documentType?: Prisma.DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput
+  documentStatus?: Prisma.DocumentStatusUpdateOneRequiredWithoutDocumentsNestedInput
 }
 
 export type DocumentUncheckedUpdateWithoutUploadedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentUncheckedUpdateManyWithoutUploadedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentCreateManyMortgageCaseInput = {
   id?: string
-  documentType: $Enums.DocumentType
-  fileUrl: string
+  documentTypeId: number
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export type DocumentUpdateWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  documentType?: Prisma.DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput
+  documentStatus?: Prisma.DocumentStatusUpdateOneRequiredWithoutDocumentsNestedInput
   uploadedBy?: Prisma.UserUpdateOneRequiredWithoutDocumentsNestedInput
 }
 
 export type DocumentUncheckedUpdateWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  documentType?: Prisma.EnumDocumentTypeFieldUpdateOperationsInput | $Enums.DocumentType
-  fileUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DocumentCreateManyDocumentTypeInput = {
+  id?: string
+  mortgageCaseId: string
+  documentStatusId: number
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  uploadedById: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type DocumentUpdateWithoutDocumentTypeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
+  documentStatus?: Prisma.DocumentStatusUpdateOneRequiredWithoutDocumentsNestedInput
+  uploadedBy?: Prisma.UserUpdateOneRequiredWithoutDocumentsNestedInput
+}
+
+export type DocumentUncheckedUpdateWithoutDocumentTypeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DocumentUncheckedUpdateManyWithoutDocumentTypeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DocumentCreateManyDocumentStatusInput = {
+  id?: string
+  mortgageCaseId: string
+  documentTypeId: number
+  fileUrl?: string | null
+  storagePath?: string | null
+  originalName: string
+  uploadedById: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type DocumentUpdateWithoutDocumentStatusInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
+  documentType?: Prisma.DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput
+  uploadedBy?: Prisma.UserUpdateOneRequiredWithoutDocumentsNestedInput
+}
+
+export type DocumentUncheckedUpdateWithoutDocumentStatusInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DocumentUncheckedUpdateManyWithoutDocumentStatusInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
+  documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 
@@ -629,60 +1064,84 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
 export type DocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mortgageCaseId?: boolean
-  documentType?: boolean
+  documentTypeId?: boolean
+  documentStatusId?: boolean
   fileUrl?: boolean
+  storagePath?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
+  updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["document"]>
 
 export type DocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mortgageCaseId?: boolean
-  documentType?: boolean
+  documentTypeId?: boolean
+  documentStatusId?: boolean
   fileUrl?: boolean
+  storagePath?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
+  updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["document"]>
 
 export type DocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   mortgageCaseId?: boolean
-  documentType?: boolean
+  documentTypeId?: boolean
+  documentStatusId?: boolean
   fileUrl?: boolean
+  storagePath?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
+  updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["document"]>
 
 export type DocumentSelectScalar = {
   id?: boolean
   mortgageCaseId?: boolean
-  documentType?: boolean
+  documentTypeId?: boolean
+  documentStatusId?: boolean
   fileUrl?: boolean
+  storagePath?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
+  updatedAt?: boolean
 }
 
-export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentType" | "fileUrl" | "originalName" | "uploadedById" | "createdAt", ExtArgs["result"]["document"]>
+export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "originalName" | "uploadedById" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
 export type DocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 export type DocumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 export type DocumentIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
+  documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
+  documentStatus?: boolean | Prisma.DocumentStatusDefaultArgs<ExtArgs>
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 
@@ -690,16 +1149,21 @@ export type $DocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   name: "Document"
   objects: {
     mortgageCase: Prisma.$MortgageCasePayload<ExtArgs>
+    documentType: Prisma.$DocumentTypePayload<ExtArgs>
+    documentStatus: Prisma.$DocumentStatusPayload<ExtArgs>
     uploadedBy: Prisma.$UserPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     mortgageCaseId: string
-    documentType: $Enums.DocumentType
-    fileUrl: string
+    documentTypeId: number
+    documentStatusId: number
+    fileUrl: string | null
+    storagePath: string | null
     originalName: string
     uploadedById: string
     createdAt: Date
+    updatedAt: Date
   }, ExtArgs["result"]["document"]>
   composites: {}
 }
@@ -1095,6 +1559,8 @@ readonly fields: DocumentFieldRefs;
 export interface Prisma__DocumentClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   mortgageCase<T extends Prisma.MortgageCaseDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MortgageCaseDefaultArgs<ExtArgs>>): Prisma.Prisma__MortgageCaseClient<runtime.Types.Result.GetResult<Prisma.$MortgageCasePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  documentType<T extends Prisma.DocumentTypeDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DocumentTypeDefaultArgs<ExtArgs>>): Prisma.Prisma__DocumentTypeClient<runtime.Types.Result.GetResult<Prisma.$DocumentTypePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  documentStatus<T extends Prisma.DocumentStatusDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DocumentStatusDefaultArgs<ExtArgs>>): Prisma.Prisma__DocumentStatusClient<runtime.Types.Result.GetResult<Prisma.$DocumentStatusPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   uploadedBy<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1127,11 +1593,14 @@ export interface Prisma__DocumentClient<T, Null = never, ExtArgs extends runtime
 export interface DocumentFieldRefs {
   readonly id: Prisma.FieldRef<"Document", 'String'>
   readonly mortgageCaseId: Prisma.FieldRef<"Document", 'String'>
-  readonly documentType: Prisma.FieldRef<"Document", 'DocumentType'>
+  readonly documentTypeId: Prisma.FieldRef<"Document", 'Int'>
+  readonly documentStatusId: Prisma.FieldRef<"Document", 'Int'>
   readonly fileUrl: Prisma.FieldRef<"Document", 'String'>
+  readonly storagePath: Prisma.FieldRef<"Document", 'String'>
   readonly originalName: Prisma.FieldRef<"Document", 'String'>
   readonly uploadedById: Prisma.FieldRef<"Document", 'String'>
   readonly createdAt: Prisma.FieldRef<"Document", 'DateTime'>
+  readonly updatedAt: Prisma.FieldRef<"Document", 'DateTime'>
 }
     
 

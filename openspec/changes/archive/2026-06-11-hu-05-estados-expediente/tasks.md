@@ -24,19 +24,19 @@
 
 ## Phase 4: Frontend Foundation (Shared Components)
 
-- [ ] 4.1 Create `apps/web/app/ui/status-badge.tsx` — `StatusBadge` component with explicit `Record<string, string>` color map (8 entries), grey fallback for unexpected codes only — FR-0511
-- [ ] 4.2 Add `updateCaseStatus(caseId, statusCode)` to `apps/web/app/actions/cases.ts` — calls `PATCH /mortgage-cases/:id`, revalidates path on success, returns `{ errors: { _form } }` on failure — FR-0514
+- [x] 4.1 Create `apps/web/app/ui/status-badge.tsx` — `StatusBadge` component with explicit `Record<string, string>` color map (8 entries), grey fallback for unexpected codes only — FR-0511
+- [x] 4.2 Add `updateCaseStatus(caseId, statusCode)` to `apps/web/app/actions/cases.ts` — calls `PATCH /mortgage-cases/:id`, revalidates path on success, returns `{ errors: { _form } }` on failure — FR-0514
 
 ## Phase 5: Frontend Integration (Pages)
 
-- [ ] 5.1 Update `apps/web/app/dashboard/expedientes/page.tsx` — remove inline StatusBadge/getStatusColor, import shared `StatusBadge` from `@/app/ui/status-badge` — FR-0512
-- [ ] 5.2 Create `apps/web/app/ui/case-status-dropdown.tsx` — client component with `<select>` pre-selected to current status + "Cambiar" button calling `updateCaseStatus` — props: `{ caseId, currentCode, statuses[] }` — FR-0513
-- [ ] 5.3 Update `apps/web/app/dashboard/expedientes/[id]/page.tsx` — remove inline helpers, import shared `StatusBadge`, fetch `GET /case-statuses`, add `<CaseStatusDropdown>` — FR-0513, FR-0514
+- [x] 5.1 Update `apps/web/app/dashboard/expedientes/page.tsx` — remove inline StatusBadge/getStatusColor, import shared `StatusBadge` from `@/app/ui/status-badge` — FR-0512
+- [x] 5.2 Create `apps/web/app/ui/case-status-dropdown.tsx` — client component with `<select>` pre-selected to current status + "Cambiar" button calling `updateCaseStatus` — props: `{ caseId, currentCode, statuses[] }` — FR-0513
+- [x] 5.3 Update `apps/web/app/dashboard/expedientes/[id]/page.tsx` — remove inline helpers, import shared `StatusBadge`, fetch `GET /case-statuses`, add `<CaseStatusDropdown>` — FR-0513, FR-0514
 
 ## Phase 6: Verification
 
-- [ ] 6.1 Manual: PATCH valid status → 200 with full includes, badge updates on detail page — FR-0503, FR-0509
-- [ ] 6.2 Manual: PATCH unknown code → 400, PATCH missing case → 404, unauthenticated → 401 — FR-0504, FR-0505, FR-0506
-- [ ] 6.3 Manual: dropdown on detail page shows all 8 statuses, "Cambiar" revalidates and shows new badge color — FR-0513, FR-0514
-- [ ] 6.4 Verify `GET /case-statuses` returns exactly 8 statuses ordered 1-8 (PENDING_DOCUMENTS → CLOSED) — FR-0516
-- [ ] 6.5 Run `npm test` (api) + `npm run build` (web) — zero regressions — NFR-0502, NFR-0503
+- [x] 6.1 Manual: PATCH valid status → 200 with full includes, badge updates on detail page — FR-0503, FR-0509
+- [x] 6.2 Manual: PATCH unknown code → 400, PATCH missing case → 404, unauthenticated → 401 — FR-0504, FR-0505, FR-0506
+- [x] 6.3 Manual: dropdown on detail page shows all 8 statuses, "Cambiar" revalidates and shows new badge color — FR-0513, FR-0514
+- [x] 6.4 Verify `GET /case-statuses` returns exactly 8 statuses ordered 1-8 (PENDING_DOCUMENTS → CLOSED) — FR-0516
+- [x] 6.5 Run `npm test` (api) + `npm run build` (web) — zero regressions — NFR-0502, NFR-0503

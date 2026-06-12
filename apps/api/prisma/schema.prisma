@@ -68,23 +68,36 @@ enum PersonType {
 }
 
 model Document {
-  id             String       @id @default(uuid())
-  mortgageCaseId String
-  mortgageCase   MortgageCase @relation(fields: [mortgageCaseId], references: [id])
-  documentType   DocumentType
-  fileUrl        String
-  originalName   String
-  uploadedById   String
-  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
-  createdAt      DateTime     @default(now())
+  id               String         @id @default(uuid())
+  mortgageCaseId   String
+  mortgageCase     MortgageCase   @relation(fields: [mortgageCaseId], references: [id])
+  documentTypeId   Int
+  documentType     DocumentType   @relation(fields: [documentTypeId], references: [id])
+  documentStatusId Int
+  documentStatus   DocumentStatus @relation(fields: [documentStatusId], references: [id])
+  fileUrl          String?
+  storagePath      String?
+  originalName     String
+  uploadedById     String
+  uploadedBy       User           @relation(fields: [uploadedById], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
-enum DocumentType {
-  NOMINA
-  ESTADO_CUENTA
-  BURO
-  INE
-  COMPROBANTE_DOMICILIO
+model DocumentType {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique
+  name      String
+  isActive  Boolean    @default(true)
+  documents Document[]
+}
+
+model DocumentStatus {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique
+  name      String
+  order     Int        @default(0)
+  documents Document[]
 }
 
 model CreditType {

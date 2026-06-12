@@ -20,4 +20,18 @@ export class CatalogsController {
 
     return { data };
   }
+
+  @Get('document-types')
+  async findDocumentTypes() {
+    const data = await this.catalogsService.getDocumentTypes();
+
+    return { data };
+  }
+
+  @Get('document-statuses')
+  async findDocumentStatuses() {
+    const data = await this.catalogsService.getDocumentStatuses();
+
+    return { data };
+  }
 }

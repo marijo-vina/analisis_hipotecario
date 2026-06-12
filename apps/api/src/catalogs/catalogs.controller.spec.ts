@@ -10,6 +10,8 @@ describe('CatalogsController', () => {
   const mockCatalogsService = {
     getCreditTypes: jest.fn(),
     getCaseStatuses: jest.fn(),
+    getDocumentTypes: jest.fn(),
+    getDocumentStatuses: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -85,6 +87,56 @@ describe('CatalogsController', () => {
 
       expect(result).toEqual({ data: [] });
       expect(mockCatalogsService.getCaseStatuses).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findDocumentTypes', () => {
+    it('should return active document types from service', async () => {
+      const types = [
+        { id: 1, code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
+        { id: 2, code: 'BANK_STATEMENT', name: 'Estado de cuenta', isActive: true },
+      ];
+
+      mockCatalogsService.getDocumentTypes.mockResolvedValue(types);
+
+      const result = await controller.findDocumentTypes();
+
+      expect(result).toEqual({ data: types });
+      expect(mockCatalogsService.getDocumentTypes).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array wrapped in data key', async () => {
+      mockCatalogsService.getDocumentTypes.mockResolvedValue([]);
+
+      const result = await controller.findDocumentTypes();
+
+      expect(result).toEqual({ data: [] });
+      expect(mockCatalogsService.getDocumentTypes).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findDocumentStatuses', () => {
+    it('should return document statuses from service', async () => {
+      const statuses = [
+        { id: 1, code: 'UPLOADED', name: 'Cargado', order: 1 },
+        { id: 2, code: 'PENDING_REVIEW', name: 'Pendiente de revisión', order: 2 },
+      ];
+
+      mockCatalogsService.getDocumentStatuses.mockResolvedValue(statuses);
+
+      const result = await controller.findDocumentStatuses();
+
+      expect(result).toEqual({ data: statuses });
+      expect(mockCatalogsService.getDocumentStatuses).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array wrapped in data key', async () => {
+      mockCatalogsService.getDocumentStatuses.mockResolvedValue([]);
+
+      const result = await controller.findDocumentStatuses();
+
+      expect(result).toEqual({ data: [] });
+      expect(mockCatalogsService.getDocumentStatuses).toHaveBeenCalledTimes(1);
     });
   });
 });

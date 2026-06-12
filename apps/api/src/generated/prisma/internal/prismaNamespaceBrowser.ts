@@ -55,6 +55,8 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   Document: 'Document',
+  DocumentType: 'DocumentType',
+  DocumentStatus: 'DocumentStatus',
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus'
 } as const
@@ -127,14 +129,37 @@ export type MortgageCaseScalarFieldEnum = (typeof MortgageCaseScalarFieldEnum)[k
 export const DocumentScalarFieldEnum = {
   id: 'id',
   mortgageCaseId: 'mortgageCaseId',
-  documentType: 'documentType',
+  documentTypeId: 'documentTypeId',
+  documentStatusId: 'documentStatusId',
   fileUrl: 'fileUrl',
+  storagePath: 'storagePath',
   originalName: 'originalName',
   uploadedById: 'uploadedById',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 } as const
 
 export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
+
+
+export const DocumentTypeScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  name: 'name',
+  isActive: 'isActive'
+} as const
+
+export type DocumentTypeScalarFieldEnum = (typeof DocumentTypeScalarFieldEnum)[keyof typeof DocumentTypeScalarFieldEnum]
+
+
+export const DocumentStatusScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  name: 'name',
+  order: 'order'
+} as const
+
+export type DocumentStatusScalarFieldEnum = (typeof DocumentStatusScalarFieldEnum)[keyof typeof DocumentStatusScalarFieldEnum]
 
 
 export const CreditTypeScalarFieldEnum = {

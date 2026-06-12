@@ -6,6 +6,7 @@ import { ClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
 import { MortgageCasesModule } from './mortgage-cases/mortgage-cases.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MortgageCasesModule } from './mortgage-cases/mortgage-cases.module';
     ClientsModule,
     CatalogsModule,
     MortgageCasesModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -22,14 +22,3 @@ export const PersonType = {
 } as const
 
 export type PersonType = (typeof PersonType)[keyof typeof PersonType]
-
-
-export const DocumentType = {
-  NOMINA: 'NOMINA',
-  ESTADO_CUENTA: 'ESTADO_CUENTA',
-  BURO: 'BURO',
-  INE: 'INE',
-  COMPROBANTE_DOMICILIO: 'COMPROBANTE_DOMICILIO'
-} as const
-
-export type DocumentType = (typeof DocumentType)[keyof typeof DocumentType]
