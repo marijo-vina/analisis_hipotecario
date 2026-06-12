@@ -168,25 +168,73 @@ Para simplificar el frontend, podemos tener rutas específicas o agruparlos. Man
 }
 ```
 
+### `GET /document-types`
+**Response (200 OK):**
+```json
+{
+  "data": [
+    { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina", "isActive": true },
+    { "id": 2, "code": "BANK_STATEMENT", "name": "Estado de Cuenta", "isActive": true }
+  ]
+}
+```
+
+### `GET /document-statuses`
+**Response (200 OK):**
+```json
+{
+  "data": [
+    { "id": 1, "code": "UPLOADED", "name": "Subido", "order": 10 },
+    { "id": 2, "code": "PROCESSING", "name": "Procesando", "order": 20 }
+  ]
+}
+```
+
 ---
 
 ## 4. Documentos (Metadata)
 
 *Nota: Estos endpoints gestionan la metadata; la subida real (multipart) interactuará de otra forma o usará URLs prefirmadas en el futuro, pero la metadata en base de datos responde a estos contratos.*
 
-### `POST /mortgage-cases/:id/documents`
+*Nota de HU-06: `documentType` ahora es `documentTypeId` (FK a catalogo). `fileUrl` inicia nulo y se asigna en HU-07. `uploadedById` se obtiene del JWT, no del body.*
+
+### `POST /mortgage-cases/:caseId/documents`
 Registra la metadata de un documento que pertenece a un expediente.
 **Request Body:**
 ```json
 {
-  "documentType": "NOMINA",
-  "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
-  "originalName": "recibo_nomina_mayo.pdf",
-  "uploadedById": "uuid-user-1"
+  "documentTypeId": 1,
+  "originalName": "recibo_nomina_mayo.pdf"
 }
 ```
 
-### `GET /mortgage-cases/:id/documents`
+Notas de contrato:
+- `uploadedById` **NO** se acepta en body. Se toma del JWT autenticado.
+- `fileUrl` **NO** se acepta en body. Inicia `null` y se asigna en HU-07.
+- `documentStatusId` **NO** se acepta en body. Se asigna internamente como `UPLOADED`.
+- Body requerido: `documentTypeId` (Int ≥ 1), `originalName` (String no vacío).
+
+**Response (201 Created):**
+```json
+{
+  "data": {
+    "id": "uuid-doc-1",
+    "documentType": { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina" },
+    "documentStatus": { "id": 1, "code": "UPLOADED", "name": "Subido" },
+    "originalName": "recibo_nomina_mayo.pdf",
+    "fileUrl": null,
+    "storagePath": null,
+    "uploadedBy": {
+      "id": "uuid-user-1",
+      "name": "María Asesora"
+    },
+    "createdAt": "2026-06-03T10:15:00Z",
+    "updatedAt": "2026-06-03T10:15:00Z"
+  }
+}
+```
+
+### `GET /mortgage-cases/:caseId/documents`
 Obtiene los documentos de un expediente.
 **Response (200 OK):**
 ```json
@@ -194,33 +242,37 @@ Obtiene los documentos de un expediente.
   "data": [
     {
       "id": "uuid-doc-1",
-      "documentType": "NOMINA",
+      "documentType": { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina" },
+      "documentStatus": { "id": 1, "code": "UPLOADED", "name": "Subido" },
       "originalName": "recibo_nomina_mayo.pdf",
-      "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
-      "createdAt": "2026-06-03T10:15:00Z"
+      "fileUrl": null,
+      "storagePath": null,
+      "createdAt": "2026-06-03T10:15:00Z",
+      "updatedAt": "2026-06-03T10:15:00Z"
     }
   ]
 }
 ```
 
-### `GET /documents/:id`
-Obtiene el detalle de un documento específico. Ideal para cuando el frontend necesita solicitar un Signed URL para descargar/visualizar sin tener que iterar todo el expediente.
+### `GET /mortgage-cases/:caseId/documents/:documentId`
+Obtiene el detalle de un documento específico dentro de un expediente. La búsqueda está acotada por `caseId`.
 **Response (200 OK):**
 ```json
 {
-  "id": "uuid-doc-1",
-  "mortgageCaseId": "uuid-case-1",
-  "documentType": "NOMINA",
-  "originalName": "recibo_nomina_mayo.pdf",
-  "fileUrl": "gs://bucket-hipotecario/cases/uuid-case/nomina-1.pdf",
-  "uploadedBy": {
-    "id": "uuid-user-1",
-    "name": "María Asesora"
-  },
-  "createdAt": "2026-06-03T10:15:00Z"
+  "data": {
+    "id": "uuid-doc-1",
+    "mortgageCaseId": "uuid-case-1",
+    "documentType": { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina" },
+    "documentStatus": { "id": 1, "code": "UPLOADED", "name": "Subido" },
+    "originalName": "recibo_nomina_mayo.pdf",
+    "fileUrl": null,
+    "storagePath": null,
+    "uploadedBy": {
+      "id": "uuid-user-1",
+      "name": "María Asesora"
+    },
+    "createdAt": "2026-06-03T10:15:00Z",
+    "updatedAt": "2026-06-03T10:15:00Z"
+  }
 }
 ```
-
-### `DELETE /documents/:id` (Opcional recomendado)
-Elimina la metadata (y lógicamente el archivo de GCS a nivel servicio) en caso de subida errónea.
-**Response (204 No Content)**

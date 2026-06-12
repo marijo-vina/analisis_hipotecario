@@ -44,11 +44,14 @@ El expediente de crédito hipotecario asociado a un cliente.
 Metadatos de los documentos cargados al expediente. El archivo físico vive en Google Cloud Storage.
 - `id`: UUID (PK)
 - `mortgageCaseId`: UUID (FK -> MortgageCase)
-- `documentType`: Enum (NOMINA, ESTADO_CUENTA, BURO, INE, COMPROBANTE_DOMICILIO)
-- `fileUrl`: String (URL o Path en GCS)
+- `documentTypeId`: Int (FK -> DocumentType)
+- `documentStatusId`: Int (FK -> DocumentStatus)
+- `fileUrl`: String (URL o Path en GCS, nullable — se asigna en HU-07)
+- `storagePath`: String (ruta interna en GCS generada por StoragePathService)
 - `originalName`: String
 - `uploadedById`: UUID (FK -> User)
 - `createdAt`: DateTime
+- `updatedAt`: DateTime (@updatedAt)
 
 ## Catálogos (Tablas de referencia)
 
@@ -65,6 +68,20 @@ Catálogo de los estados por los que pasa un expediente.
 - `code`: String (Unique, ej: 'DRAFT', 'INTEGRATION', 'ANALYSIS', 'COMPLETED')
 - `name`: String (ej: 'Borrador', 'Integración Documental')
 - `order`: Int (para organizar visualmente el pipeline)
+
+### 7. DocumentType
+Catálogo de los tipos de documento soportados. Reemplaza el enum nativo de PostgreSQL para consistencia con CreditType/CaseStatus.
+- `id`: Int (PK, AutoIncrement)
+- `code`: String (Unique, ej: 'PAYROLL_RECEIPT', 'BANK_STATEMENT', 'CREDIT_BUREAU_REPORT', 'INE', 'PROOF_OF_ADDRESS')
+- `name`: String (ej: 'Recibo de Nómina')
+- `isActive`: Boolean (para habilitar/deshabilitar tipos sin borrar datos)
+
+### 8. DocumentStatus
+Catálogo del pipeline de procesamiento de un documento.
+- `id`: Int (PK, AutoIncrement)
+- `code`: String (Unique, ej: 'UPLOADED', 'PENDING_REVIEW', 'PROCESSING', 'PROCESSED', 'ERROR')
+- `name`: String (ej: 'Subido')
+- `order`: Int (para ordenar visualmente el pipeline)
 
 ## Relaciones
 
