@@ -77,6 +77,8 @@ model Document {
   documentStatus   DocumentStatus @relation(fields: [documentStatusId], references: [id])
   fileUrl          String?
   storagePath      String?
+  mimeType         String?
+  sizeBytes        Int?
   originalName     String
   uploadedById     String
   uploadedBy       User           @relation(fields: [uploadedById], references: [id])

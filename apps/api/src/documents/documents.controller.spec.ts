@@ -1,3 +1,4 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,6 +13,7 @@ describe('DocumentsController', () => {
     create: jest.fn(),
     findAllByCase: jest.fn(),
     findOneByCase: jest.fn(),
+    uploadAndCreate: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -102,6 +104,82 @@ describe('DocumentsController', () => {
 
       expect(result).toEqual({ data: document });
       expect(mockDocumentsService.findOneByCase).toHaveBeenCalledWith('case-uuid-1', 'doc-1');
+    });
+  });
+
+  describe('upload', () => {
+    const caseId = 'case-uuid-1';
+    const documentTypeId = 1;
+    const req = { user: { id: 'advisor-1' } };
+
+    const mockFile: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: 'nomina_ene.pdf',
+      encoding: '7bit',
+      mimetype: 'application/pdf',
+      buffer: Buffer.from('test'),
+      size: 12345,
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    const createdDocument = {
+      id: 'doc-1',
+      mortgageCaseId: caseId,
+      documentType: { id: 1, code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina' },
+      documentStatus: { id: 1, code: 'UPLOADED', name: 'Cargado' },
+      originalName: 'nomina_ene.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 12345,
+      storagePath: 'case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf',
+      fileUrl: 'gs://bucket/case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf',
+    };
+
+    it('should delegate to service and return 201 { data }', async () => {
+      mockDocumentsService.uploadAndCreate.mockResolvedValue(createdDocument);
+
+      const result = await controller.upload(
+        caseId,
+        mockFile,
+        documentTypeId,
+        req,
+      );
+
+      expect(mockDocumentsService.uploadAndCreate).toHaveBeenCalledWith(
+        caseId,
+        'advisor-1',
+        mockFile,
+        documentTypeId,
+      );
+      expect(result).toEqual({ data: createdDocument });
+    });
+
+    it('should throw BadRequestException when file is missing (null)', async () => {
+      await expect(
+        controller.upload(caseId, null as any, documentTypeId, req),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDocumentsService.uploadAndCreate).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when file is missing (undefined)', async () => {
+      await expect(
+        controller.upload(caseId, undefined as any, documentTypeId, req),
+      ).rejects.toThrow('File is required');
+
+      expect(mockDocumentsService.uploadAndCreate).not.toHaveBeenCalled();
+    });
+
+    it('should propagate NotFounException from service', async () => {
+      mockDocumentsService.uploadAndCreate.mockRejectedValue(
+        new NotFoundException('Mortgage case not found'),
+      );
+
+      await expect(
+        controller.upload(caseId, mockFile, documentTypeId, req),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
