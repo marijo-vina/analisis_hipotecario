@@ -29,11 +29,13 @@ export type AggregateDocument = {
 export type DocumentAvgAggregateOutputType = {
   documentTypeId: number | null
   documentStatusId: number | null
+  sizeBytes: number | null
 }
 
 export type DocumentSumAggregateOutputType = {
   documentTypeId: number | null
   documentStatusId: number | null
+  sizeBytes: number | null
 }
 
 export type DocumentMinAggregateOutputType = {
@@ -43,6 +45,8 @@ export type DocumentMinAggregateOutputType = {
   documentStatusId: number | null
   fileUrl: string | null
   storagePath: string | null
+  mimeType: string | null
+  sizeBytes: number | null
   originalName: string | null
   uploadedById: string | null
   createdAt: Date | null
@@ -56,6 +60,8 @@ export type DocumentMaxAggregateOutputType = {
   documentStatusId: number | null
   fileUrl: string | null
   storagePath: string | null
+  mimeType: string | null
+  sizeBytes: number | null
   originalName: string | null
   uploadedById: string | null
   createdAt: Date | null
@@ -69,6 +75,8 @@ export type DocumentCountAggregateOutputType = {
   documentStatusId: number
   fileUrl: number
   storagePath: number
+  mimeType: number
+  sizeBytes: number
   originalName: number
   uploadedById: number
   createdAt: number
@@ -80,11 +88,13 @@ export type DocumentCountAggregateOutputType = {
 export type DocumentAvgAggregateInputType = {
   documentTypeId?: true
   documentStatusId?: true
+  sizeBytes?: true
 }
 
 export type DocumentSumAggregateInputType = {
   documentTypeId?: true
   documentStatusId?: true
+  sizeBytes?: true
 }
 
 export type DocumentMinAggregateInputType = {
@@ -94,6 +104,8 @@ export type DocumentMinAggregateInputType = {
   documentStatusId?: true
   fileUrl?: true
   storagePath?: true
+  mimeType?: true
+  sizeBytes?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
@@ -107,6 +119,8 @@ export type DocumentMaxAggregateInputType = {
   documentStatusId?: true
   fileUrl?: true
   storagePath?: true
+  mimeType?: true
+  sizeBytes?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
@@ -120,6 +134,8 @@ export type DocumentCountAggregateInputType = {
   documentStatusId?: true
   fileUrl?: true
   storagePath?: true
+  mimeType?: true
+  sizeBytes?: true
   originalName?: true
   uploadedById?: true
   createdAt?: true
@@ -220,6 +236,8 @@ export type DocumentGroupByOutputType = {
   documentStatusId: number
   fileUrl: string | null
   storagePath: string | null
+  mimeType: string | null
+  sizeBytes: number | null
   originalName: string
   uploadedById: string
   createdAt: Date
@@ -256,6 +274,8 @@ export type DocumentWhereInput = {
   documentStatusId?: Prisma.IntFilter<"Document"> | number
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
+  mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
+  sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -273,6 +293,8 @@ export type DocumentOrderByWithRelationInput = {
   documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
+  mimeType?: Prisma.SortOrderInput | Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -293,6 +315,8 @@ export type DocumentWhereUniqueInput = Prisma.AtLeast<{
   documentStatusId?: Prisma.IntFilter<"Document"> | number
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
+  mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
+  sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -310,6 +334,8 @@ export type DocumentOrderByWithAggregationInput = {
   documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
+  mimeType?: Prisma.SortOrderInput | Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -331,6 +357,8 @@ export type DocumentScalarWhereWithAggregatesInput = {
   documentStatusId?: Prisma.IntWithAggregatesFilter<"Document"> | number
   fileUrl?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
+  mimeType?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
+  sizeBytes?: Prisma.IntNullableWithAggregatesFilter<"Document"> | number | null
   originalName?: Prisma.StringWithAggregatesFilter<"Document"> | string
   uploadedById?: Prisma.StringWithAggregatesFilter<"Document"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
@@ -341,6 +369,8 @@ export type DocumentCreateInput = {
   id?: string
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -357,6 +387,8 @@ export type DocumentUncheckedCreateInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -367,6 +399,8 @@ export type DocumentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -383,6 +417,8 @@ export type DocumentUncheckedUpdateInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -396,6 +432,8 @@ export type DocumentCreateManyInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -406,6 +444,8 @@ export type DocumentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -418,6 +458,8 @@ export type DocumentUncheckedUpdateManyInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -441,6 +483,8 @@ export type DocumentCountOrderByAggregateInput = {
   documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
+  mimeType?: Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -450,6 +494,7 @@ export type DocumentCountOrderByAggregateInput = {
 export type DocumentAvgOrderByAggregateInput = {
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrder
 }
 
 export type DocumentMaxOrderByAggregateInput = {
@@ -459,6 +504,8 @@ export type DocumentMaxOrderByAggregateInput = {
   documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
+  mimeType?: Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -472,6 +519,8 @@ export type DocumentMinOrderByAggregateInput = {
   documentStatusId?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
+  mimeType?: Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -481,6 +530,7 @@ export type DocumentMinOrderByAggregateInput = {
 export type DocumentSumOrderByAggregateInput = {
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  sizeBytes?: Prisma.SortOrder
 }
 
 export type DocumentCreateNestedManyWithoutUploadedByInput = {
@@ -655,6 +705,8 @@ export type DocumentCreateWithoutUploadedByInput = {
   id?: string
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -670,6 +722,8 @@ export type DocumentUncheckedCreateWithoutUploadedByInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -711,6 +765,8 @@ export type DocumentScalarWhereInput = {
   documentStatusId?: Prisma.IntFilter<"Document"> | number
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
+  mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
+  sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -721,6 +777,8 @@ export type DocumentCreateWithoutMortgageCaseInput = {
   id?: string
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -735,6 +793,8 @@ export type DocumentUncheckedCreateWithoutMortgageCaseInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -771,6 +831,8 @@ export type DocumentCreateWithoutDocumentTypeInput = {
   id?: string
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -785,6 +847,8 @@ export type DocumentUncheckedCreateWithoutDocumentTypeInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -821,6 +885,8 @@ export type DocumentCreateWithoutDocumentStatusInput = {
   id?: string
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -835,6 +901,8 @@ export type DocumentUncheckedCreateWithoutDocumentStatusInput = {
   documentTypeId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -874,6 +942,8 @@ export type DocumentCreateManyUploadedByInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -883,6 +953,8 @@ export type DocumentUpdateWithoutUploadedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -898,6 +970,8 @@ export type DocumentUncheckedUpdateWithoutUploadedByInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -910,6 +984,8 @@ export type DocumentUncheckedUpdateManyWithoutUploadedByInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -921,6 +997,8 @@ export type DocumentCreateManyMortgageCaseInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -931,6 +1009,8 @@ export type DocumentUpdateWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -945,6 +1025,8 @@ export type DocumentUncheckedUpdateWithoutMortgageCaseInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -957,6 +1039,8 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -969,6 +1053,8 @@ export type DocumentCreateManyDocumentTypeInput = {
   documentStatusId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -979,6 +1065,8 @@ export type DocumentUpdateWithoutDocumentTypeInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -993,6 +1081,8 @@ export type DocumentUncheckedUpdateWithoutDocumentTypeInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1005,6 +1095,8 @@ export type DocumentUncheckedUpdateManyWithoutDocumentTypeInput = {
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1017,6 +1109,8 @@ export type DocumentCreateManyDocumentStatusInput = {
   documentTypeId: number
   fileUrl?: string | null
   storagePath?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
   originalName: string
   uploadedById: string
   createdAt?: Date | string
@@ -1027,6 +1121,8 @@ export type DocumentUpdateWithoutDocumentStatusInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1041,6 +1137,8 @@ export type DocumentUncheckedUpdateWithoutDocumentStatusInput = {
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1053,6 +1151,8 @@ export type DocumentUncheckedUpdateManyWithoutDocumentStatusInput = {
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1068,6 +1168,8 @@ export type DocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   documentStatusId?: boolean
   fileUrl?: boolean
   storagePath?: boolean
+  mimeType?: boolean
+  sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
@@ -1085,6 +1187,8 @@ export type DocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   documentStatusId?: boolean
   fileUrl?: boolean
   storagePath?: boolean
+  mimeType?: boolean
+  sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
@@ -1102,6 +1206,8 @@ export type DocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   documentStatusId?: boolean
   fileUrl?: boolean
   storagePath?: boolean
+  mimeType?: boolean
+  sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
@@ -1119,13 +1225,15 @@ export type DocumentSelectScalar = {
   documentStatusId?: boolean
   fileUrl?: boolean
   storagePath?: boolean
+  mimeType?: boolean
+  sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "originalName" | "uploadedById" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
+export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
 export type DocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
   documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
@@ -1160,6 +1268,8 @@ export type $DocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     documentStatusId: number
     fileUrl: string | null
     storagePath: string | null
+    mimeType: string | null
+    sizeBytes: number | null
     originalName: string
     uploadedById: string
     createdAt: Date
@@ -1597,6 +1707,8 @@ export interface DocumentFieldRefs {
   readonly documentStatusId: Prisma.FieldRef<"Document", 'Int'>
   readonly fileUrl: Prisma.FieldRef<"Document", 'String'>
   readonly storagePath: Prisma.FieldRef<"Document", 'String'>
+  readonly mimeType: Prisma.FieldRef<"Document", 'String'>
+  readonly sizeBytes: Prisma.FieldRef<"Document", 'Int'>
   readonly originalName: Prisma.FieldRef<"Document", 'String'>
   readonly uploadedById: Prisma.FieldRef<"Document", 'String'>
   readonly createdAt: Prisma.FieldRef<"Document", 'DateTime'>

@@ -1098,6 +1098,8 @@ export const DocumentScalarFieldEnum = {
   documentStatusId: 'documentStatusId',
   fileUrl: 'fileUrl',
   storagePath: 'storagePath',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
   originalName: 'originalName',
   uploadedById: 'uploadedById',
   createdAt: 'createdAt',

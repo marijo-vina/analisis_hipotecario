@@ -1,8 +1,10 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DocumentsService } from './documents.service';
+import { GcsService } from './gcs.service';
+import { StoragePathService } from './storage-path.service';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;
@@ -38,6 +40,14 @@ describe('DocumentsService', () => {
     },
   };
 
+  const mockGcsService = {
+    uploadFile: jest.fn(),
+  };
+
+  const mockStoragePathService = {
+    buildPath: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -47,6 +57,14 @@ describe('DocumentsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: GcsService,
+          useValue: mockGcsService,
+        },
+        {
+          provide: StoragePathService,
+          useValue: mockStoragePathService,
         },
       ],
     }).compile();
@@ -251,6 +269,194 @@ describe('DocumentsService', () => {
       await expect(service.findOneByCase(caseId, documentId)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('uploadAndCreate', () => {
+    const caseId = 'case-uuid-1';
+    const advisorId = 'advisor-uuid-1';
+    const documentTypeId = 1;
+    const storagePath = 'case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf';
+    const fileUrl = 'gs://test-bucket/case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf';
+
+    const mockFile: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: 'nomina_ene.pdf',
+      encoding: '7bit',
+      mimetype: 'application/pdf',
+      buffer: Buffer.from('fake-pdf-content'),
+      size: 12345,
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    const createdDocument = {
+      id: 'doc-uuid-1',
+      mortgageCaseId: caseId,
+      documentTypeId,
+      documentStatusId: 1,
+      fileUrl,
+      storagePath,
+      mimeType: 'application/pdf',
+      sizeBytes: 12345,
+      originalName: 'nomina_ene.pdf',
+      uploadedById: advisorId,
+      documentType: { id: 1, code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
+      documentStatus: { id: 1, code: 'UPLOADED', name: 'Cargado', order: 1 },
+      uploadedBy: { id: advisorId, name: 'Test Advisor', email: 'advisor@test.com', role: 'ADVISOR' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should upload file and create Document with metadata', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(mockDocumentType);
+      mockStoragePathService.buildPath.mockReturnValue(storagePath);
+      mockGcsService.uploadFile.mockResolvedValue(fileUrl);
+      mockPrismaService.document.create.mockResolvedValue(createdDocument);
+
+      const result = await service.uploadAndCreate(
+        caseId,
+        advisorId,
+        mockFile,
+        documentTypeId,
+      );
+
+      // Validation calls
+      expect(mockPrismaService.mortgageCase.findUnique).toHaveBeenCalledWith({
+        where: { id: caseId },
+      });
+      expect(mockPrismaService.documentType.findUnique).toHaveBeenCalledWith({
+        where: { id: documentTypeId },
+      });
+
+      // Path building
+      expect(mockStoragePathService.buildPath).toHaveBeenCalledWith(
+        caseId,
+        mockDocumentType.code,
+        mockFile.originalname,
+      );
+
+      // GCS upload
+      expect(mockGcsService.uploadFile).toHaveBeenCalledWith(
+        storagePath,
+        mockFile.buffer,
+        mockFile.mimetype,
+      );
+
+      // Document creation with full metadata
+      expect(mockPrismaService.document.create).toHaveBeenCalledWith({
+        data: {
+          mortgageCaseId: caseId,
+          documentTypeId,
+          documentStatusId: mockDocumentStatus.id,
+          uploadedById: advisorId,
+          originalName: mockFile.originalname,
+          mimeType: mockFile.mimetype,
+          sizeBytes: mockFile.size,
+          storagePath,
+          fileUrl,
+        },
+        include: {
+          documentType: true,
+          documentStatus: true,
+          uploadedBy: true,
+        },
+      });
+
+      expect(result).toEqual(createdDocument);
+    });
+
+    it('should return Document with JPEG mimeType for image upload', async () => {
+      const jpegFile = { ...mockFile, mimetype: 'image/jpeg', originalname: 'foto.jpg' };
+      const jpegPath = 'case-uuid-1/PAYROLL_RECEIPT/foto.jpg';
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(mockDocumentType);
+      mockStoragePathService.buildPath.mockReturnValue(jpegPath);
+      mockGcsService.uploadFile.mockResolvedValue(`gs://test-bucket/${jpegPath}`);
+      mockPrismaService.document.create.mockResolvedValue({
+        ...createdDocument,
+        mimeType: 'image/jpeg',
+        originalName: 'foto.jpg',
+      });
+
+      await service.uploadAndCreate(caseId, advisorId, jpegFile, documentTypeId);
+
+      expect(mockGcsService.uploadFile).toHaveBeenCalledWith(
+        jpegPath,
+        jpegFile.buffer,
+        'image/jpeg',
+      );
+    });
+
+    it('should throw NotFoundException when case does not exist', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.uploadAndCreate(caseId, advisorId, mockFile, documentTypeId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockGcsService.uploadFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when documentTypeId is not found', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.uploadAndCreate(caseId, advisorId, mockFile, documentTypeId),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockGcsService.uploadFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when document type is inactive', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue({
+        ...mockDocumentType,
+        isActive: false,
+      });
+
+      await expect(
+        service.uploadAndCreate(caseId, advisorId, mockFile, documentTypeId),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockGcsService.uploadFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when file is empty (size = 0)', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(mockDocumentType);
+      mockStoragePathService.buildPath.mockReturnValue(storagePath);
+
+      const emptyFile = { ...mockFile, size: 0 };
+
+      await expect(
+        service.uploadAndCreate(caseId, advisorId, emptyFile, documentTypeId),
+      ).rejects.toThrow('File is empty');
+
+      expect(mockGcsService.uploadFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadGatewayException when GCS upload fails and NOT create Document', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(mockDocumentType);
+      mockStoragePathService.buildPath.mockReturnValue(storagePath);
+      mockGcsService.uploadFile.mockRejectedValue(new BadGatewayException('File storage service unavailable'));
+
+      await expect(
+        service.uploadAndCreate(caseId, advisorId, mockFile, documentTypeId),
+      ).rejects.toThrow(BadGatewayException);
+
+      // CRITICAL: Document must NOT be created if GCS upload fails
+      expect(mockPrismaService.document.create).not.toHaveBeenCalled();
     });
   });
 });
