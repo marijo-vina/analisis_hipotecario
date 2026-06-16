@@ -2,9 +2,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
-import type { MortgageCase } from "@/app/lib/definitions";
+import type { MortgageCase, DocumentType, Document } from "@/app/lib/definitions";
 import StatusBadge from "@/app/ui/status-badge";
 import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
+import DocumentUpload from "@/app/ui/documents/document-upload";
+import DocumentList from "@/app/ui/documents/document-list";
+import { DocumentsClientSection } from "@/app/ui/documents/documents-client-section";
 
 interface CaseDetailPageProps {
   params: Promise<{ id: string }>;
@@ -71,6 +74,19 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     data: { code: string; name: string; order: number }[];
   }>("/case-statuses");
   const statuses = statusesResult.ok ? statusesResult.data.data : [];
+
+  // Fetch document types and documents for this case
+  const docTypesResult = await apiFetch<{
+    data: DocumentType[];
+  }>("/document-types");
+  const documentTypes: DocumentType[] = docTypesResult.ok
+    ? docTypesResult.data.data
+    : [];
+
+  const docsResult = await apiFetch<{ data: Document[] }>(
+    `/mortgage-cases/${id}/documents`,
+  );
+  const documents: Document[] = docsResult.ok ? docsResult.data.data : [];
 
   return (
     <div>
@@ -145,6 +161,13 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           statuses={statuses}
         />
       </div>
+
+      {/* ---- Documents section ----------------------------------------------------- */}
+      <DocumentsClientSection
+        caseId={c.id}
+        documentTypes={documentTypes}
+        initialDocuments={documents}
+      />
     </div>
   );
 }
