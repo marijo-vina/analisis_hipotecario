@@ -3,6 +3,42 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ── Gestión Financiera design tokens ─────────────────────── */
+  /* Brand colors */
+  --gf-red: #B0002A;
+  --gf-red-dark: #8F0022;
+  --gf-red-soft: #FDE8EC;
+  --gf-black: #101010;
+  --gf-sidebar: #111111;
+
+  /* Surfaces */
+  --gf-bg: #FFF7F7;
+  --gf-surface: #FFFFFF;
+  --gf-border: #F0C9CF;
+
+  /* Text */
+  --gf-text: #111827;
+  --gf-text-muted: #6B7280;
+  --gf-text-soft: #9CA3AF;
+
+  /* Semantic */
+  --gf-success: #059669;
+  --gf-warning: #D97706;
+  --gf-info: #2563EB;
+  --gf-danger: #DC2626;
+  --gf-neutral: #6B7280;
+
+  /* Spacing */
+  --sidebar-width: 260px;
+  --topbar-height: 72px;
+  --content-padding: 32px;
+  --card-padding: 24px;
+  --input-height: 42px;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
 }
 
 @theme inline {
@@ -10,6 +46,41 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* GF brand colors → Tailwind utilities (bg-gf-red, text-gf-red, border-gf-red, etc.) */
+  --color-gf-red: var(--gf-red);
+  --color-gf-red-dark: var(--gf-red-dark);
+  --color-gf-red-soft: var(--gf-red-soft);
+  --color-gf-black: var(--gf-black);
+  --color-gf-sidebar: var(--gf-sidebar);
+
+  /* GF surfaces */
+  --color-gf-bg: var(--gf-bg);
+  --color-gf-surface: var(--gf-surface);
+  --color-gf-border: var(--gf-border);
+
+  /* GF text */
+  --color-gf-text: var(--gf-text);
+  --color-gf-text-muted: var(--gf-text-muted);
+  --color-gf-text-soft: var(--gf-text-soft);
+
+  /* GF semantic */
+  --color-gf-success: var(--gf-success);
+  --color-gf-warning: var(--gf-warning);
+  --color-gf-info: var(--gf-info);
+  --color-gf-danger: var(--gf-danger);
+  --color-gf-neutral: var(--gf-neutral);
+
+  /* GF spacing → Tailwind utilities (w-sidebar, h-topbar, p-content, p-card, h-input) */
+  --spacing-sidebar: var(--sidebar-width);
+  --spacing-topbar: var(--topbar-height);
+  --spacing-content: var(--content-padding);
+  --spacing-card: var(--card-padding);
+  --spacing-input: var(--input-height);
+
+  /* GF radii → Tailwind utilities (rounded-sm = 8px, rounded-md = 12px) */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
 }
 
 @media (prefers-color-scheme: dark) {
