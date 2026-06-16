@@ -8,8 +8,8 @@ import type { Client, ActionState } from "@/app/lib/definitions";
 // Shared validation helper — used by both createClient and updateClient
 // ---------------------------------------------------------------------------
 
-function validateClientFields(formData: FormData): Partial<Record<string, string>> {
-  const errors: Partial<Record<string, string>> = {};
+function validateClientFields(formData: FormData): Record<string, string> {
+  const errors: Record<string, string> = {};
 
   const firstName = (formData.get("firstName") as string)?.trim();
   const paternalLastName = (formData.get("paternalLastName") as string)?.trim();
