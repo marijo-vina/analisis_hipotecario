@@ -1,4 +1,4 @@
-import { BadGatewayException } from '@nestjs/common';
+import { BadGatewayException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -7,12 +7,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 // ---------------------------------------------------------------------------
 
 const mockFileSave = jest.fn();
+const mockFileGetSignedUrl = jest.fn();
+const mockFileDelete = jest.fn();
 
 jest.mock('@google-cloud/storage', () => ({
   Storage: jest.fn().mockImplementation(() => ({
     bucket: jest.fn().mockReturnValue({
       file: jest.fn().mockReturnValue({
         save: mockFileSave,
+        getSignedUrl: mockFileGetSignedUrl,
+        delete: mockFileDelete,
       }),
     }),
   })),
@@ -92,6 +96,76 @@ describe('GcsService', () => {
         .catch((err) => err.message);
 
       await expect(result).resolves.toBe('File storage service unavailable');
+    });
+  });
+
+  describe('generateSignedUrl', () => {
+    const storagePath = 'case-123/PAYROLL_RECEIPT/doc.pdf';
+
+    it('should generate and return a signed URL string', async () => {
+      const signedUrl =
+        'https://storage.googleapis.com/test-bucket/case-123/PAYROLL_RECEIPT/doc.pdf?signature=abc&expires=123';
+      mockFileGetSignedUrl.mockResolvedValue([signedUrl]);
+
+      const result = await service.generateSignedUrl(storagePath);
+
+      expect(mockFileGetSignedUrl).toHaveBeenCalledWith({
+        action: 'read',
+        expires: expect.any(Number),
+      });
+      expect(result).toBe(signedUrl);
+    });
+
+    it('should throw NotFoundException when GCS file does not exist', async () => {
+      mockFileGetSignedUrl.mockRejectedValue(new Error('File not found'));
+
+      await expect(service.generateSignedUrl(storagePath)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw user-friendly message when GCS file does not exist', async () => {
+      mockFileGetSignedUrl.mockRejectedValue(new Error('No such object'));
+
+      await expect(service.generateSignedUrl(storagePath)).rejects.toThrow(
+        'El documento no está disponible',
+      );
+    });
+  });
+
+  describe('deleteFile', () => {
+    const storagePath = 'case-123/PAYROLL_RECEIPT/doc.pdf';
+
+    it('should delete file from GCS with ignoreNotFound option', async () => {
+      mockFileDelete.mockResolvedValue(undefined);
+
+      await service.deleteFile(storagePath);
+
+      expect(mockFileDelete).toHaveBeenCalledWith({ ignoreNotFound: true });
+    });
+
+    it('should silently succeed when GCS returns 404 (file not found)', async () => {
+      const notFoundError = new Error('Not Found') as Error & { code: number };
+      notFoundError.code = 404;
+      mockFileDelete.mockRejectedValue(notFoundError);
+
+      await expect(service.deleteFile(storagePath)).resolves.toBeUndefined();
+    });
+
+    it('should throw BadGatewayException on non-404 GCS errors', async () => {
+      mockFileDelete.mockRejectedValue(new Error('Connection refused'));
+
+      await expect(service.deleteFile(storagePath)).rejects.toThrow(
+        BadGatewayException,
+      );
+    });
+
+    it('should throw user-friendly message on non-404 GCS errors', async () => {
+      mockFileDelete.mockRejectedValue(new Error('Internal server error'));
+
+      await expect(service.deleteFile(storagePath)).rejects.toThrow(
+        'Error al eliminar el archivo del almacenamiento',
+      );
     });
   });
 });

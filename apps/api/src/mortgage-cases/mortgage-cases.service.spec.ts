@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
+import { UpdateMortgageCaseDto } from './dto/update-mortgage-case.dto';
 import { MortgageCasesService } from './mortgage-cases.service';
 
 describe('MortgageCasesService', () => {
@@ -210,6 +211,61 @@ describe('MortgageCasesService', () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne('unknown')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('update', () => {
+    it('should update case fields and return with includes', async () => {
+      const caseId = 'mc-1';
+      const dto: UpdateMortgageCaseDto = {
+        creditTypeId: 3,
+        propertyLocation: 'Nueva CABA',
+        requestedAmount: 2000000,
+        propertyValue: 3000000,
+        estimatedTermMonths: 180,
+        notes: 'Reevaluado con nueva propiedad',
+      };
+
+      const existingCase = { id: caseId, statusId: 1 };
+      const creditType = { id: 3, code: 'MEJORA_HIPOTECA', name: 'Mejora Hipoteca', isActive: true };
+      const updatedCase = { ...existingCase, ...dto, status: { code: 'PENDING_DOCUMENTS' } };
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(existingCase);
+      mockPrismaService.creditType.findUnique.mockResolvedValue(creditType);
+      mockPrismaService.mortgageCase.update.mockResolvedValue(updatedCase);
+
+      const result = await service.update(caseId, dto);
+
+      expect(mockPrismaService.mortgageCase.findUnique).toHaveBeenCalledWith({ where: { id: caseId } });
+      expect(mockPrismaService.creditType.findUnique).toHaveBeenCalledWith({ where: { id: dto.creditTypeId } });
+      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith({
+        where: { id: caseId },
+        data: { ...dto },
+        include: {
+          client: true,
+          advisor: true,
+          creditType: true,
+          status: true,
+        },
+      });
+      expect(result).toEqual(updatedCase);
+    });
+
+    it('should throw NotFoundException when case does not exist', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update('nonexistent', { creditTypeId: 2 }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when creditType does not exist', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: 'mc-1', statusId: 1 });
+      mockPrismaService.creditType.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update('mc-1', { creditTypeId: 999 }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

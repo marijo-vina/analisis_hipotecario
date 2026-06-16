@@ -1,6 +1,8 @@
 import type { Document } from "@/app/lib/definitions";
+import DocumentActions from "./document-actions";
 
 interface DocumentListProps {
+  caseId: string;
   documents: Document[];
 }
 
@@ -16,11 +18,13 @@ const FALLBACK_COLOR = "bg-gray-50 text-gray-700 ring-gray-600/20";
 
 /**
  * Server component that renders the document table for a mortgage case.
- * Shows document type, original filename, upload date, and status badge.
+ * Shows document type, original filename, upload date, status badge, and
+ * action buttons (View / Delete) via the DocumentActions client component.
  *
- * NO download buttons, NO preview links, NO signed URLs (per HU-07 scope).
+ * View opens a signed URL in a new tab. Delete shows a confirmation modal
+ * and is only available for documents in UPLOADED status.
  */
-export default function DocumentList({ documents }: DocumentListProps) {
+export default function DocumentList({ caseId, documents }: DocumentListProps) {
   if (documents.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
@@ -46,6 +50,7 @@ export default function DocumentList({ documents }: DocumentListProps) {
               <th className="px-3 py-2">Nombre original</th>
               <th className="px-3 py-2">Fecha de carga</th>
               <th className="px-3 py-2">Estado</th>
+              <th className="px-3 py-2">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -72,6 +77,9 @@ export default function DocumentList({ documents }: DocumentListProps) {
                   >
                     {doc.documentStatus.name}
                   </span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <DocumentActions caseId={caseId} document={doc} />
                 </td>
               </tr>
             ))}

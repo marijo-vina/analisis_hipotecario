@@ -136,7 +136,34 @@ Notas de contrato:
 ```
 
 ### `PATCH /mortgage-cases/:id`
-**Diferido a HU-04**. No forma parte del alcance de HU-03.
+Actualiza el estado del expediente (vía `CaseStatusDropdown`). Solo acepta `statusCode`.
+**Request Body:**
+```json
+{
+  "statusCode": "INTEGRATION"
+}
+```
+
+### `PUT /mortgage-cases/:id`
+Actualiza campos generales del expediente. **Agregado en HU-07 hardening (post-HU-07).**
+**Request Body (solo creditTypeId requerido):**
+```json
+{
+  "creditTypeId": 2,
+  "propertyLocation": "Guadalajara",
+  "requestedAmount": 2000000,
+  "propertyValue": 2500000,
+  "estimatedTermMonths": 180,
+  "notes": "Cliente cambió de propiedad."
+}
+```
+**Validaciones:**
+- `creditTypeId` debe ser un entero positivo y existir en el catálogo
+- `requestedAmount`, `propertyValue` deben ser positivos
+- `estimatedTermMonths` debe ser ≥ 1
+- `notes` opcional (string)
+**Response (200 OK):** Objeto MortgageCase completo con includes (client, advisor, creditType, status).
+**Errores:** 400 (validación), 404 (case o creditType no encontrado).
 
 ---
 
@@ -331,3 +358,50 @@ Sube un archivo real al expediente via multipart/form-data. El archivo se almace
 | 404 | Mortgage case not found | `"Mortgage case not found"` |
 | 413 | File excede MAX_UPLOAD_SIZE_MB | `"File exceeds maximum size of XMB"` |
 | 502 | GCS upload fails | `"File storage service unavailable"` |
+
+---
+
+## 5. Documentos — View & Delete (HU-07 hardening)
+
+*Endpoints agregados en post-HU-07 hardening. Permiten visualizar documentos vía URL firmada y eliminar documentos no procesados.*
+
+### `GET /mortgage-cases/:caseId/documents/:documentId/view`
+
+Obtiene una URL firmada temporal (5 minutos) para visualizar el documento en GCS sin exponer el bucket.
+**Auth:** Bearer JWT (requerido) — `401 Unauthorized` si falta.
+**Response (200 OK):**
+```json
+{
+  "data": {
+    "signedUrl": "https://storage.googleapis.com/hipotecario-documentos-dev/abc-123/PAYROLL_RECEIPT/file.pdf?X-Goog-Signature=..."
+  }
+}
+```
+**Errores:**
+| Status | Condición | `message` |
+|--------|-----------|-----------|
+| 400 | Documento sin storagePath | `"El documento no tiene un archivo asociado"` |
+| 401 | JWT inválido | `"Unauthorized"` |
+| 404 | Documento o case no encontrado | `"Documento no encontrado"` |
+| 404 | Archivo no existe en GCS | `"El documento no está disponible"` |
+
+**Uso en frontend:** `window.open(signedUrl, '_blank')` — abre en nueva pestaña. La URL expira en 5 minutos.
+**Prerrequisito GCP:** Service account necesita permiso IAM `storage.objects.get`.
+
+### `DELETE /mortgage-cases/:caseId/documents/:documentId`
+
+Elimina un documento y su archivo en GCS. Solo permite eliminar documentos con status `UPLOADED` (no procesados).
+**Auth:** Bearer JWT (requerido).
+**Response:** `204 No Content` (sin body).
+**Estrategia de atomicidad:** Elimina archivo GCS primero → si falla, aborta (DB intacto) → si GCS OK, elimina registro DB.
+
+**Errores:**
+| Status | Condición | `message` |
+|--------|-----------|-----------|
+| 400 | Documento con status ≠ UPLOADED | `"Solo se pueden eliminar documentos no procesados"` |
+| 400 | Documento sin storagePath | `"El documento no tiene un archivo asociado"` |
+| 401 | JWT inválido | `"Unauthorized"` |
+| 404 | Documento no encontrado | `"Documento no encontrado"` |
+| 502 | Error al eliminar de GCS | `"Error al eliminar el archivo del almacenamiento"` |
+
+**Prerrequisito GCP:** Service account necesita permiso IAM `storage.objects.delete`.

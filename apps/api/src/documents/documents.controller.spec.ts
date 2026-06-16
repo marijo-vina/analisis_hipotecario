@@ -14,6 +14,8 @@ describe('DocumentsController', () => {
     findAllByCase: jest.fn(),
     findOneByCase: jest.fn(),
     uploadAndCreate: jest.fn(),
+    getSignedUrl: jest.fn(),
+    delete: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -107,6 +109,41 @@ describe('DocumentsController', () => {
     });
   });
 
+  describe('viewDocument', () => {
+    it('should return signed URL wrapped in data envelope', async () => {
+      const signedUrl = 'https://storage.googleapis.com/signed-url';
+      mockDocumentsService.getSignedUrl.mockResolvedValue(signedUrl);
+
+      const result = await controller.viewDocument('case-uuid-1', 'doc-1');
+
+      expect(mockDocumentsService.getSignedUrl).toHaveBeenCalledWith(
+        'case-uuid-1',
+        'doc-1',
+      );
+      expect(result).toEqual({ data: { signedUrl } });
+    });
+
+    it('should propagate NotFoundException from service', async () => {
+      mockDocumentsService.getSignedUrl.mockRejectedValue(
+        new NotFoundException('Document not found'),
+      );
+
+      await expect(
+        controller.viewDocument('case-uuid-1', 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should propagate BadRequestException from service', async () => {
+      mockDocumentsService.getSignedUrl.mockRejectedValue(
+        new BadRequestException('El documento no tiene un archivo asociado'),
+      );
+
+      await expect(
+        controller.viewDocument('case-uuid-1', 'doc-no-file'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('upload', () => {
     const caseId = 'case-uuid-1';
     const documentTypeId = 1;
@@ -180,6 +217,40 @@ describe('DocumentsController', () => {
       await expect(
         controller.upload(caseId, mockFile, documentTypeId, req),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteDocument', () => {
+    it('should delegate to service and return void (204 via @HttpCode)', async () => {
+      mockDocumentsService.delete.mockResolvedValue(undefined);
+
+      const result = await controller.deleteDocument('case-uuid-1', 'doc-1');
+
+      expect(mockDocumentsService.delete).toHaveBeenCalledWith(
+        'case-uuid-1',
+        'doc-1',
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it('should propagate NotFoundException from service', async () => {
+      mockDocumentsService.delete.mockRejectedValue(
+        new NotFoundException('Document not found'),
+      );
+
+      await expect(
+        controller.deleteDocument('case-uuid-1', 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should propagate BadRequestException from service', async () => {
+      mockDocumentsService.delete.mockRejectedValue(
+        new BadRequestException('Solo se pueden eliminar documentos no procesados'),
+      );
+
+      await expect(
+        controller.deleteDocument('case-uuid-1', 'doc-validated'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

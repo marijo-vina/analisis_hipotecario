@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
+import { UpdateMortgageCaseDto } from './dto/update-mortgage-case.dto';
 import { UpdateMortgageCaseStatusDto } from './dto/update-mortgage-case-status.dto';
 import { MortgageCasesController } from './mortgage-cases.controller';
 import { MortgageCasesService } from './mortgage-cases.service';
@@ -13,6 +14,7 @@ describe('MortgageCasesController', () => {
     create: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
+    update: jest.fn(),
     updateStatus: jest.fn(),
   };
 
@@ -84,6 +86,26 @@ describe('MortgageCasesController', () => {
 
       expect(result).toEqual(response);
       expect(mockMortgageCasesService.findOne).toHaveBeenCalledWith('mc-1');
+    });
+  });
+
+  describe('update', () => {
+    it('should call service.update with id and dto', async () => {
+      const dto: UpdateMortgageCaseDto = {
+        creditTypeId: 2,
+        propertyLocation: 'CABA',
+        requestedAmount: 1500000,
+        propertyValue: 2500000,
+        estimatedTermMonths: 240,
+        notes: 'Updated via API',
+      };
+      const mockResult = { id: 'mc-1', ...dto };
+      mockMortgageCasesService.update.mockResolvedValue(mockResult);
+
+      const result = await controller.update('mc-1', dto);
+
+      expect(mockMortgageCasesService.update).toHaveBeenCalledWith('mc-1', dto);
+      expect(result).toEqual(mockResult);
     });
   });
 

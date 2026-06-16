@@ -99,7 +99,15 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         </Link>
       </div>
 
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">Expediente</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-slate-900">Expediente</h2>
+        <Link
+          href={`/dashboard/expedientes/${id}/editar`}
+          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
+        >
+          Editar expediente
+        </Link>
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <dl className="space-y-4">
@@ -107,7 +115,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <Field label="Asesor" value={c.advisor.name} />
           <Field
             label="Tipo de cr&eacute;dito"
-            value={`${c.creditType.name} (${c.creditType.code})`}
+            value={c.creditType.name}
           />
           <Field
             label="Estado"
@@ -119,7 +127,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             label="Tipo de persona"
             value={
               c.personType === "SALARIED"
-                ? "Asalariado (SALARIED)"
+                ? "Asalariado"
                 : c.personType
             }
           />
