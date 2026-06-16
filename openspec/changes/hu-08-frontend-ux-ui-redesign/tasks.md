@@ -60,25 +60,25 @@
 
 ## Batch 3: Data Components
 
-- [ ] T010 — Create DataTable server component
+- [x] T010 — Create DataTable server component
   Files: `apps/web/app/ui/common/data-table.tsx` (NEW)
   Depends on: T001, T007
   Acceptance: Server component by default; generic props: `columns` ({key, header, render?}[]), `rows` (T[]), `emptyMessage` (string); renders column headers, row hover states, text ≥14px; wraps content in `overflow-x-auto` div for internal horizontal scroll (not global page scroll)
   REQ: UI-04
 
-- [ ] T011 — Create EmptyState server component
+- [x] T011 — Create EmptyState server component
   Files: `apps/web/app/ui/common/empty-state.tsx` (NEW)
   Depends on: T001, T006
   Acceptance: Server component; props: `icon` (ReactNode), `message` (string), `ctaLabel?` (string), `ctaHref?` (string); renders centered icon, Spanish message, optional primary CTA button
   REQ: UI-05
 
-- [ ] T012 — Create PageHeader server component
+- [x] T012 — Create PageHeader server component
   Files: `apps/web/app/ui/common/page-header.tsx` (NEW)
   Depends on: T001, T006, T008
   Acceptance: Server component; props: `breadcrumbs` ({label, href?}[]), `title` (string), `action?` (ReactNode), `statusBadge?` (ReactNode); renders breadcrumb navigation, title, optional action button slot, optional status badge
   REQ: UI-08
 
-- [ ] T013 — Create ConfirmDialog client component
+- [x] T013 — Create ConfirmDialog client component
   Files: `apps/web/app/ui/common/confirm-dialog.tsx` (NEW)
   Depends on: T001, T006
   Acceptance: Client component (`use client`); props: `open`, `onClose`, `title`, `message`, `confirmLabel`, `confirmVariant` (primary|destructive), `onConfirm` (() => Promise<void>); renders centered modal with dark overlay (bg-black/40), Cancelar (secondary) and Confirmar buttons; shows loading state during async action; clicking backdrop closes dialog
@@ -86,13 +86,13 @@
 
 ## Batch 4: Login Page
 
-- [ ] T014 — Redesign login page layout with warm background and centered card
+- [x] T014 — Redesign login page layout with warm background and centered card
   Files: `apps/web/app/login/page.tsx`
   Depends on: T001, T007
   Acceptance: Warm background (#FFF7F7), centered brand logo "Gestión Financiera", white Card with #F0C9CF border and radius 12px wrapping the login form; existing server action imports preserved
   REQ: Login page visual redesign (frontend-ui-shell spec)
 
-- [ ] T015 — Update login-form.tsx to use FormField and Button components
+- [x] T015 — Update login-form.tsx to use FormField and Button components
   Files: `apps/web/app/ui/login-form.tsx`
   Depends on: T009, T006, T014
   Acceptance: Email and password fields wrapped in FormField with inline error display; submit button uses Button primary variant with loading state; error messages in Spanish (not raw technical); existing `useActionState` and server action call preserved verbatim
