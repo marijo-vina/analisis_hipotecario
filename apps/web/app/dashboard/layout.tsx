@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/app/lib/session";
-import Sidebar from "@/app/ui/sidebar";
+import AppShell from "@/app/ui/layout/app-shell";
 
 /**
  * Dashboard layout — wraps every route under /dashboard/*.
@@ -19,12 +19,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <main className="flex-1 overflow-auto p-6 bg-slate-100 ml-64">
-        {children}
-      </main>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }
