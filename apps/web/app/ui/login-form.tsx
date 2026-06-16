@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { login } from "@/app/actions/auth";
 import type { ActionState } from "@/app/lib/definitions";
+import FormField from "@/app/ui/common/form-field";
+import Button from "@/app/ui/common/button";
 
 const initialState: ActionState = { errors: {} };
 
@@ -11,65 +13,58 @@ export default function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-4">
-      {/* General form error */}
+      {/* General form error banner */}
       {state?.errors?._form && (
-        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <div className="rounded-[var(--radius-sm)] bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">
           {state.errors._form}
         </div>
       )}
 
       {/* Email field */}
-      <div>
-        <label
-          htmlFor="email"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Email
-        </label>
+      <FormField
+        label="Correo electrónico"
+        name="email"
+        error={state?.errors?.email}
+        required
+      >
         <input
           id="email"
           name="email"
           type="email"
           required
           autoComplete="email"
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          className="block w-full h-[var(--input-height)] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text shadow-sm placeholder-gray-400 focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
           placeholder="correo@ejemplo.com"
         />
-        {state?.errors?.email && (
-          <p className="mt-1 text-sm text-red-600">{state.errors.email}</p>
-        )}
-      </div>
+      </FormField>
 
       {/* Password field */}
-      <div>
-        <label
-          htmlFor="password"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Contraseña
-        </label>
+      <FormField
+        label="Contraseña"
+        name="password"
+        error={state?.errors?.password}
+        required
+      >
         <input
           id="password"
           name="password"
           type="password"
           required
           autoComplete="current-password"
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          className="block w-full h-[var(--input-height)] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text shadow-sm placeholder-gray-400 focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
           placeholder="••••••••"
         />
-        {state?.errors?.password && (
-          <p className="mt-1 text-sm text-red-600">{state.errors.password}</p>
-        )}
-      </div>
+      </FormField>
 
       {/* Submit button */}
-      <button
+      <Button
+        variant="primary"
         type="submit"
+        loading={pending}
         disabled={pending}
-        className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
       >
-        {pending ? "Ingresando..." : "Ingresar"}
-      </button>
+        Iniciar sesión
+      </Button>
     </form>
   );
 }

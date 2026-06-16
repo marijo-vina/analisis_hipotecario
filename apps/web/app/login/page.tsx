@@ -1,6 +1,7 @@
 import { getSession } from "@/app/lib/session";
 import { redirect } from "next/navigation";
 import LoginForm from "@/app/ui/login-form";
+import Card from "@/app/ui/common/card";
 
 export default async function LoginPage() {
   const token = await getSession();
@@ -10,13 +11,29 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6 text-center">
-          Iniciar sesión
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gf-bg px-4">
+      {/* Brand header */}
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-gf-text">
+          Gestión Financiera
         </h1>
-        <LoginForm />
+        <p className="mt-1 text-gf-text-muted text-sm">
+          Operaciones Hipotecarias
+        </p>
       </div>
+
+      {/* Login card */}
+      <Card className="w-full max-w-md">
+        <h2 className="text-xl font-semibold text-gf-text mb-6 text-center">
+          Acceso interno
+        </h2>
+        <LoginForm />
+      </Card>
+
+      {/* Footer */}
+      <p className="mt-6 text-gf-text-muted text-xs text-center">
+        Plataforma de uso exclusivo interno
+      </p>
     </main>
   );
 }
