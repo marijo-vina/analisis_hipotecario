@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
 import { QueryMortgageCaseDto } from './dto/query-mortgage-case.dto';
+import { UpdateMortgageCaseDto } from './dto/update-mortgage-case.dto';
 
 const MORTGAGE_CASE_INCLUDE = {
   client: true,
@@ -80,6 +81,24 @@ export class MortgageCasesService {
     }
 
     return mortgageCase;
+  }
+
+  async update(id: string, dto: UpdateMortgageCaseDto) {
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({ where: { id } });
+    if (!mortgageCase) {
+      throw new NotFoundException(`Mortgage case with ID ${id} not found`);
+    }
+
+    const creditType = await this.prisma.creditType.findUnique({ where: { id: dto.creditTypeId } });
+    if (!creditType) {
+      throw new NotFoundException(`CreditType with ID ${dto.creditTypeId} not found`);
+    }
+
+    return this.prisma.mortgageCase.update({
+      where: { id },
+      data: { ...dto },
+      include: MORTGAGE_CASE_INCLUDE,
+    });
   }
 
   async updateStatus(id: string, statusCode: string) {

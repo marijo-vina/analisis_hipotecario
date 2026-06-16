@@ -28,6 +28,7 @@ describe('DocumentsService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      delete: jest.fn(),
     },
     documentType: {
       findUnique: jest.fn(),
@@ -42,6 +43,8 @@ describe('DocumentsService', () => {
 
   const mockGcsService = {
     uploadFile: jest.fn(),
+    generateSignedUrl: jest.fn(),
+    deleteFile: jest.fn(),
   };
 
   const mockStoragePathService = {
@@ -457,6 +460,177 @@ describe('DocumentsService', () => {
 
       // CRITICAL: Document must NOT be created if GCS upload fails
       expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSignedUrl', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+    const storagePath = 'case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf';
+
+    const mockDocument = {
+      id: documentId,
+      mortgageCaseId: caseId,
+      documentType: mockDocumentType,
+      documentStatus: mockDocumentStatus,
+      originalName: 'nomina_ene.pdf',
+      storagePath,
+      fileUrl: 'gs://bucket/case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should return signed URL for a valid document with storagePath', async () => {
+      const signedUrl = 'https://storage.googleapis.com/signed-url';
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockGcsService.generateSignedUrl.mockResolvedValue(signedUrl);
+
+      const result = await service.getSignedUrl(caseId, documentId);
+
+      expect(mockPrismaService.document.findUnique).toHaveBeenCalledWith({
+        where: { id: documentId },
+        include: {
+          documentType: true,
+          documentStatus: true,
+          uploadedBy: true,
+        },
+      });
+      expect(mockGcsService.generateSignedUrl).toHaveBeenCalledWith(storagePath);
+      expect(result).toBe(signedUrl);
+    });
+
+    it('should throw NotFoundException when document does not exist', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(null);
+
+      await expect(service.getSignedUrl(caseId, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockGcsService.generateSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when document belongs to different case', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        mortgageCaseId: 'other-case',
+      });
+
+      await expect(service.getSignedUrl(caseId, documentId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockGcsService.generateSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when document has no storagePath', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        storagePath: null,
+      });
+
+      await expect(service.getSignedUrl(caseId, documentId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.getSignedUrl(caseId, documentId)).rejects.toThrow(
+        'El documento no tiene un archivo asociado',
+      );
+      expect(mockGcsService.generateSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('delete', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+    const storagePath = 'case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf';
+
+    const mockDocument = {
+      id: documentId,
+      mortgageCaseId: caseId,
+      documentType: mockDocumentType,
+      documentStatus: mockDocumentStatus,
+      originalName: 'nomina_ene.pdf',
+      storagePath,
+      fileUrl: 'gs://bucket/case-uuid-1/PAYROLL_RECEIPT/nomina_ene.pdf',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should delete GCS file and DB record for UPLOADED document', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockGcsService.deleteFile.mockResolvedValue(undefined);
+      mockPrismaService.document.delete.mockResolvedValue(mockDocument);
+
+      await service.delete(caseId, documentId);
+
+      expect(mockGcsService.deleteFile).toHaveBeenCalledWith(storagePath);
+      expect(mockPrismaService.document.delete).toHaveBeenCalledWith({
+        where: { id: documentId },
+      });
+    });
+
+    it('should abort if GCS delete fails — DB record must stay', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockGcsService.deleteFile.mockRejectedValue(
+        new BadGatewayException('Error al eliminar el archivo del almacenamiento'),
+      );
+
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        BadGatewayException,
+      );
+      expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when document does not exist', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(null);
+
+      await expect(service.delete(caseId, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when document belongs to different case', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        mortgageCaseId: 'other-case',
+      });
+
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when document status is not UPLOADED', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        documentStatus: { id: 2, code: 'VALIDATED', name: 'Validado', order: 3 },
+      });
+
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        'Solo se pueden eliminar documentos no procesados',
+      );
+      expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when document has no storagePath', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        storagePath: null,
+      });
+
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.delete(caseId, documentId)).rejects.toThrow(
+        'El documento no tiene un archivo asociado',
+      );
+      expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
+      expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
     });
   });
 });

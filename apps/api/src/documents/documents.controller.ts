@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -79,6 +80,15 @@ export class DocumentsController {
     return { data };
   }
 
+  @Get(':documentId/view')
+  async viewDocument(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const signedUrl = await this.documentsService.getSignedUrl(caseId, documentId);
+    return { data: { signedUrl } };
+  }
+
   @Get(':documentId')
   async findOneByCase(
     @Param('caseId') caseId: string,
@@ -87,5 +97,14 @@ export class DocumentsController {
     const data = await this.documentsService.findOneByCase(caseId, documentId);
 
     return { data };
+  }
+
+  @Delete(':documentId')
+  @HttpCode(204)
+  async deleteDocument(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    await this.documentsService.delete(caseId, documentId);
   }
 }

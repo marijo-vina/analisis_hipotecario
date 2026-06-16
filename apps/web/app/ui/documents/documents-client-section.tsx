@@ -37,7 +37,7 @@ export function DocumentsClientSection({
         documentTypes={documentTypes}
         onSuccess={handleUploadSuccess}
       />
-      <DocumentList documents={initialDocuments} />
+      <DocumentList caseId={caseId} documents={initialDocuments} />
     </>
   );
 }

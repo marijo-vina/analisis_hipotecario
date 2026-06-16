@@ -75,9 +75,17 @@ export default async function ClientDetailPage({
         </Link>
       </div>
 
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">
-        {client.fullName}
-      </h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-slate-900">
+          {client.fullName}
+        </h2>
+        <Link
+          href={`/dashboard/clientes/${id}/editar`}
+          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
+        >
+          Editar cliente
+        </Link>
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <dl className="space-y-4">

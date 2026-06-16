@@ -72,7 +72,7 @@ export default function CaseForm({ creditTypes, clients }: CaseFormProps) {
       {/* Person type — hidden, MVP only supports SALARIED */}
       <input type="hidden" name="personType" value="SALARIED" />
       <div className="text-sm text-slate-500">
-        Tipo de persona: Asalariado (SALARIED)
+        Tipo de persona: Asalariado
       </div>
 
       {/* Property location */}

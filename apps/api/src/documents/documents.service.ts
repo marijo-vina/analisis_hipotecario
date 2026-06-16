@@ -148,4 +148,39 @@ export class DocumentsService {
 
     return document;
   }
+
+  async getSignedUrl(caseId: string, documentId: string): Promise<string> {
+    const document = await this.findOneByCase(caseId, documentId);
+
+    if (!document.storagePath) {
+      throw new BadRequestException('El documento no tiene un archivo asociado');
+    }
+
+    return this.gcsService.generateSignedUrl(document.storagePath);
+  }
+
+  async delete(caseId: string, documentId: string): Promise<void> {
+    // 1. Find document — 404 if not found or wrong case
+    const document = await this.findOneByCase(caseId, documentId);
+
+    // 2. Status gate: only UPLOADED documents are deletable
+    if (document.documentStatus.code !== 'UPLOADED') {
+      throw new BadRequestException(
+        'Solo se pueden eliminar documentos no procesados',
+      );
+    }
+
+    // 3. Storage path guard
+    if (!document.storagePath) {
+      throw new BadRequestException(
+        'El documento no tiene un archivo asociado',
+      );
+    }
+
+    // 4. Delete GCS file FIRST — if throws, abort (DB record stays)
+    await this.gcsService.deleteFile(document.storagePath);
+
+    // 5. Delete DB record only after GCS succeeds
+    await this.prisma.document.delete({ where: { id: documentId } });
+  }
 }

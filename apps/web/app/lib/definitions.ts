@@ -51,7 +51,7 @@ export interface MortgageCase {
   clientId: string;
   client: { fullName: string };
   advisor: { name: string };
-  creditType: { code: string; name: string };
+  creditType: { id: number; code: string; name: string };
   status: { code: string; name: string };
   personType: string;
   propertyLocation?: string;
