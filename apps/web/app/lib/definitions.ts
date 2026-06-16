@@ -91,3 +91,29 @@ export type ApiResult<T> =
       notFound?: boolean;
       status?: number;
     };
+
+// ---- Document (HU-07) ------------------------------------------------------
+export interface DocumentType {
+  id: number;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface Document {
+  id: string;
+  mortgageCaseId: string;
+  documentTypeId: number;
+  documentType: DocumentType;
+  documentStatusId: number;
+  documentStatus: { id: number; code: string; name: string; order: number };
+  fileUrl: string | null;
+  storagePath: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  originalName: string;
+  uploadedById: string;
+  uploadedBy?: { id: string; name: string };
+  createdAt: string;
+  updatedAt: string;
+}

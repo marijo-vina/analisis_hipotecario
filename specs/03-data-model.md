@@ -49,6 +49,8 @@ Metadatos de los documentos cargados al expediente. El archivo físico vive en G
 - `fileUrl`: String (URL o Path en GCS, nullable — se asigna en HU-07)
 - `storagePath`: String (ruta interna en GCS generada por StoragePathService)
 - `originalName`: String
+- `mimeType`: String? (MIME type del archivo subido, e.g. application/pdf — se asigna en HU-07)
+- `sizeBytes`: Int? (tamaño del archivo en bytes — se asigna en HU-07)
 - `uploadedById`: UUID (FK -> User)
 - `createdAt`: DateTime
 - `updatedAt`: DateTime (@updatedAt)

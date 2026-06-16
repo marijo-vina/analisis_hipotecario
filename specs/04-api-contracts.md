@@ -267,6 +267,8 @@ Obtiene el detalle de un documento específico dentro de un expediente. La búsq
     "originalName": "recibo_nomina_mayo.pdf",
     "fileUrl": null,
     "storagePath": null,
+    "mimeType": null,
+    "sizeBytes": null,
     "uploadedBy": {
       "id": "uuid-user-1",
       "name": "María Asesora"
@@ -276,3 +278,56 @@ Obtiene el detalle de un documento específico dentro de un expediente. La búsq
   }
 }
 ```
+
+### `POST /mortgage-cases/:caseId/documents/upload`
+Sube un archivo real al expediente via multipart/form-data. El archivo se almacena en Google Cloud Storage y se crea un registro Document con todos los metadatos.
+**Auth:** Bearer JWT (requerido) — `401 Unauthorized` si falta o es inválido.
+**Content-Type:** multipart/form-data
+**Fields:**
+- `file` (binary, required) — archivo PDF, JPEG o PNG
+- `documentTypeId` (number, required) — ID del tipo de documento del catálogo
+
+**Validaciones:**
+- MIME type whitelist: `application/pdf`, `image/jpeg`, `image/png`
+- Tamaño máximo: `MAX_UPLOAD_SIZE_MB` (default 10 MB) — `413 Payload Too Large` si excede
+- Archivo vacío (0 bytes) → `400 Bad Request`
+- `documentTypeId` debe existir y estar activo → `400 Bad Request`
+- `caseId` debe existir → `404 Not Found`
+- GCS no disponible → `502 Bad Gateway`
+
+**Response (201 Created):**
+```json
+{
+  "data": {
+    "id": "uuid-doc-1",
+    "documentType": { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina" },
+    "documentStatus": { "id": 1, "code": "UPLOADED", "name": "Subido" },
+    "originalName": "recibo_nomina_mayo.pdf",
+    "fileUrl": "gs://hipotecario-documentos-dev/abc-123/PAYROLL_RECEIPT/recibo_nomina_mayo.pdf",
+    "storagePath": "abc-123/PAYROLL_RECEIPT/recibo_nomina_mayo.pdf",
+    "mimeType": "application/pdf",
+    "sizeBytes": 245760,
+    "uploadedBy": {
+      "id": "uuid-user-1",
+      "name": "María Asesora"
+    },
+    "createdAt": "2026-06-03T10:15:00Z",
+    "updatedAt": "2026-06-03T10:15:00Z"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condición | `message` |
+|--------|-----------|-----------|
+| 400 | No file attached | `"File is required"` |
+| 400 | MIME no en whitelist | `"File type not allowed. Allowed: application/pdf, image/jpeg, image/png"` |
+| 400 | File 0 bytes | `"File is empty"` |
+| 400 | `documentTypeId` no es número | `"documentTypeId must be a number"` |
+| 400 | Document type not found | `"Document type not found"` |
+| 400 | Document type inactive | `"Document type is not active"` |
+| 401 | JWT missing/invalid/expired | `"Unauthorized"` |
+| 404 | Mortgage case not found | `"Mortgage case not found"` |
+| 413 | File excede MAX_UPLOAD_SIZE_MB | `"File exceeds maximum size of XMB"` |
+| 502 | GCS upload fails | `"File storage service unavailable"` |
