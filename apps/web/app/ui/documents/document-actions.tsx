@@ -4,6 +4,9 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
 import { getDocumentViewUrl, deleteDocument } from "@/app/actions/documents";
+import Button from "@/app/ui/common/button";
+import ConfirmDialog from "@/app/ui/common/confirm-dialog";
+import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
 
 interface DocumentActionsProps {
   caseId: string;
@@ -11,15 +14,19 @@ interface DocumentActionsProps {
 }
 
 /**
- * Client component que renderiza los botones "Ver" y "Eliminar" por fila
- * de la tabla de documentos.
+ * Client component that renders "Ver" and "Eliminar" action buttons per
+ * document row in the table.
  *
- * - "Ver": obtiene una signed URL via server action y la abre en pestaña nueva.
- * - "Eliminar": visible solo cuando `documentStatus.code === 'UPLOADED'`.
- *   Muestra modal de confirmación antes de ejecutar el delete.
+ * - **Ver**: calls the existing `getDocumentViewUrl` server action to
+ *   obtain a signed URL, then opens the `DocumentPreviewDialog` with the
+ *   URL and document metadata (embedded viewer — no `window.open`).
+ * - **Eliminar**: visible only when `documentStatus.code === 'UPLOADED'`.
+ *   Opens `ConfirmDialog` with file name highlighted, Spanish messages,
+ *   and Cancelar/Eliminar buttons. Calls the existing `deleteDocument`
+ *   server action. On error the dialog stays open with the error message.
  *
- * Todas las llamadas al backend pasan por server actions — nunca se expone
- * `apiFetch` del lado del cliente.
+ * All backend calls go through server actions — `apiFetch` is never
+ * exposed on the client side.
  */
 export default function DocumentActions({
   caseId,
@@ -27,124 +34,105 @@ export default function DocumentActions({
 }: DocumentActionsProps) {
   const router = useRouter();
 
+  // ── View state ───────────────────────────────────────────────────────
   const [viewLoading, setViewLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // ---- View handler --------------------------------------------------------
+  // ── Delete state ─────────────────────────────────────────────────────
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ── View handler ─────────────────────────────────────────────────────
   const handleView = useCallback(async () => {
-    setError(null);
     setViewLoading(true);
+    setPreviewUrl(null);
+
     try {
       const signedUrl = await getDocumentViewUrl(caseId, document.id);
-      window.open(signedUrl, "_blank");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al obtener el documento",
-      );
+      setPreviewUrl(signedUrl);
+      setPreviewOpen(true);
+    } catch {
+      // signedUrl stays null — dialog will show error state
+      setPreviewOpen(true);
     } finally {
       setViewLoading(false);
     }
   }, [caseId, document.id]);
 
-  // ---- Delete handler ------------------------------------------------------
+  const handleClosePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewUrl(null);
+  }, []);
+
+  // ── Delete handler (passed to ConfirmDialog.onConfirm) ───────────────
   const handleDelete = useCallback(async () => {
-    setError(null);
-    setShowConfirm(false);
-    setDeleteLoading(true);
+    setDeleteError(null);
     try {
       await deleteDocument(caseId, document.id);
       router.refresh();
+      // Success — ConfirmDialog will call onClose
     } catch (err) {
-      setError(
+      const msg =
         err instanceof Error
           ? err.message
-          : "Error al eliminar el documento",
-      );
-    } finally {
-      setDeleteLoading(false);
+          : "Error al eliminar el documento";
+      setDeleteError(msg);
+      throw err; // Re-throw so ConfirmDialog keeps the dialog open
     }
   }, [caseId, document.id, router]);
 
+  const handleCloseDeleteDialog = useCallback(() => {
+    setDeleteConfirmOpen(false);
+    setDeleteError(null);
+  }, []);
+
+  // ── Visibility ───────────────────────────────────────────────────────
   const isUploaded = document.documentStatus.code === "UPLOADED";
 
   return (
     <>
-      {/* ---- Error banner (inline, per row) -------------------------------- */}
-      {error && (
-        <div
-          role="alert"
-          className="mb-2 rounded-md bg-red-50 border border-red-200 p-2 text-xs text-red-700"
-        >
-          {error}
-        </div>
-      )}
-
-      {/* ---- Action buttons ------------------------------------------------- */}
+      {/* ── Action buttons ───────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
-        {/* Ver */}
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={handleView}
           disabled={viewLoading}
-          className="inline-flex items-center rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          loading={viewLoading}
         >
           {viewLoading ? "Abriendo..." : "Ver"}
-        </button>
+        </Button>
 
-        {/* Eliminar — only for UPLOADED docs */}
         {isUploaded && (
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              setShowConfirm(true);
-            }}
-            disabled={deleteLoading}
-            className="inline-flex items-center rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 shadow-sm ring-1 ring-inset ring-red-300 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteConfirmOpen(true)}
           >
-            {deleteLoading ? "Eliminando..." : "Eliminar"}
-          </button>
+            Eliminar
+          </Button>
         )}
       </div>
 
-      {/* ---- Confirmation modal --------------------------------------------- */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/40 transition-opacity"
-            onClick={() => setShowConfirm(false)}
-          />
+      {/* ── Document preview dialog (T029) ────────────────────────────── */}
+      <DocumentPreviewDialog
+        open={previewOpen}
+        onClose={handleClosePreview}
+        fileName={document.originalName}
+        signedUrl={previewUrl}
+        mimeType={document.mimeType ?? ""}
+      />
 
-          {/* Dialog */}
-          <div className="relative z-10 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-slate-200">
-            <p className="text-sm text-slate-900 mb-4">
-              ¿Estás segura de que deseas eliminar este documento?
-            </p>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirm(false)}
-                disabled={deleteLoading}
-                className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleteLoading ? "Eliminando..." : "Eliminar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Delete confirmation dialog (T028) ─────────────────────────── */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={handleCloseDeleteDialog}
+        title="Eliminar documento"
+        message={`¿Estás segura de que deseas eliminar este documento? Esta acción no se puede deshacer y el archivo será removido del expediente.`}
+        confirmLabel="Eliminar"
+        confirmVariant="destructive"
+        onConfirm={handleDelete}
+        error={deleteError}
+      />
     </>
   );
 }

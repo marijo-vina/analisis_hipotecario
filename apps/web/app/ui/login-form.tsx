@@ -56,15 +56,17 @@ export default function LoginForm() {
         />
       </FormField>
 
-      {/* Submit button */}
-      <Button
-        variant="primary"
-        type="submit"
-        loading={pending}
-        disabled={pending}
-      >
-        Iniciar sesión
-      </Button>
+      {/* Submit button — centered */}
+      <div className="flex justify-center">
+        <Button
+          variant="primary"
+          type="submit"
+          loading={pending}
+          disabled={pending}
+        >
+          Iniciar sesión
+        </Button>
+      </div>
     </form>
   );
 }

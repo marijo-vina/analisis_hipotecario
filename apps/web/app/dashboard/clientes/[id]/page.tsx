@@ -162,7 +162,7 @@ export default async function ClientDetailPage({
             },
             {
               key: "creditType",
-              header: "Tipo cr\u00e9dito",
+              header: "Tipo crédito",
               render: (c: MortgageCase) => c.creditType.name,
             },
             {

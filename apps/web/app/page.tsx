@@ -1,6 +1,7 @@
 import { getSession } from "@/app/lib/session";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Card from "@/app/ui/common/card";
+import Button from "@/app/ui/common/button";
 
 export default async function Home() {
   const token = await getSession();
@@ -10,28 +11,27 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100">
-      <section className="bg-white p-8 rounded-xl shadow-md max-w-xl text-center">
-        <h1 className="text-3xl font-bold text-slate-900">
+    <main className="min-h-screen flex items-center justify-center bg-gf-bg">
+      <Card className="max-w-xl text-center">
+        <h1 className="text-3xl font-bold text-gf-text">
           Gestión Financiera
         </h1>
 
-        <p className="mt-4 text-slate-600">
+        <p className="mt-4 text-gf-text-muted">
           Plataforma interna de asistencia para análisis y precalificación
           hipotecaria.
         </p>
 
-        <p className="mt-2 text-sm text-slate-500">
-          Sprint 1 — Base del sistema y gestión de expedientes
+        <p className="mt-2 text-sm text-gf-text-soft">
+          Uso exclusivo interno
         </p>
 
-        <Link
-          href="/login"
-          className="mt-6 inline-block rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
-        >
-          Iniciar sesión
-        </Link>
-      </section>
+        <div className="mt-6 flex justify-center">
+          <Button variant="primary" href="/login">
+            Iniciar sesión
+          </Button>
+        </div>
+      </Card>
     </main>
   );
 }

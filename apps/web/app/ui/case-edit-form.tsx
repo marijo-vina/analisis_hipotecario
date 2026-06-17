@@ -66,7 +66,21 @@ export default function CaseEditForm({
           Datos del expediente
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+          {/* Cliente — read-only display (cannot change after creation) */}
+          <div className="lg:col-span-2">
+            <FormField label="Cliente" name="clientId">
+              <input
+                id="clientId"
+                type="text"
+                disabled
+                defaultValue={mortgageCase.client.fullName}
+                className={`${INPUT_CLASS} bg-gf-bg/50 disabled:cursor-not-allowed`}
+                aria-readonly="true"
+              />
+            </FormField>
+          </div>
+
           {/* Tipo de crédito */}
           <FormField
             label="Tipo de crédito"
@@ -104,6 +118,7 @@ export default function CaseEditForm({
                 {personTypeLabel(mortgageCase.personType)}
               </option>
             </select>
+            <input type="hidden" name="personType" value={mortgageCase.personType} />
           </FormField>
 
           {/* Ubicación de la propiedad */}

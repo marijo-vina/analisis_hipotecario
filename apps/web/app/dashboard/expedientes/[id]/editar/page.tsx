@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CreditType, MortgageCase } from "@/app/lib/definitions";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
@@ -36,12 +37,12 @@ export default async function CaseEditPage({ params }: CaseEditPageProps) {
           <p className="text-gf-text-muted mb-4">
             No se encontró un expediente con el ID especificado.
           </p>
-          <a
+          <Link
             href="/dashboard/expedientes"
             className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -61,12 +62,12 @@ export default async function CaseEditPage({ params }: CaseEditPageProps) {
         />
         <ErrorMessage message="Error al cargar el expediente" />
         <div className="mt-4">
-          <a
+          <Link
             href="/dashboard/expedientes"
             className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
-          </a>
+          </Link>
         </div>
       </div>
     );

@@ -5,39 +5,13 @@ import Link from "next/link";
 export default function Topbar() {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-topbar px-content bg-gf-surface border-b border-gf-border ml-sidebar">
-      {/* ── Left: search input (visual placeholder only) ──────── */}
-      <div className="relative w-full max-w-md">
-        {/* Search icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#9CA3AF"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Buscar expedientes, clientes..."
-          className="w-full h-input pl-10 pr-4 rounded-lg text-sm bg-gf-bg border border-gf-border text-gf-text placeholder:text-gf-text-soft focus:outline-none focus:border-gf-red focus:ring-2 focus:ring-gf-red/15 transition-colors"
-          readOnly
-          tabIndex={-1}
-          aria-label="Buscar (búsqueda global próximamente)"
-        />
-      </div>
+      {/* Spacer — left side intentionally empty */}
 
       {/* ── Right: quick actions ───────────────────────────────── */}
-      <div className="flex items-center gap-3 ml-4 shrink-0">
-        {/* Nuevo expediente button */}
+      <div className="flex items-center gap-3 ml-auto shrink-0">
+        {/* Nuevo cliente button */}
         <Link
-          href="/dashboard/expedientes/nuevo"
+          href="/dashboard/clientes/nuevo"
           className="inline-flex items-center gap-2 h-input px-4 rounded-lg text-sm font-semibold text-white bg-gf-red hover:bg-gf-red-dark transition-colors shadow-sm"
         >
           {/* Plus icon */}
@@ -55,7 +29,7 @@ export default function Topbar() {
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Nuevo expediente
+          <span className="hidden sm:inline">Nuevo cliente</span>
         </Link>
 
         {/* Notification bell (visual, non-functional) */}

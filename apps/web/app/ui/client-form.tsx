@@ -28,13 +28,13 @@ export default function ClientForm() {
       {/* General form error */}
       <ErrorMessage message={state?.errors?._form} />
 
-      {/* ── Secci\u00f3n: Datos personales ──────────────────────────────── */}
+      {/* ── Sección: Datos personales ──────────────────────────────── */}
       <Card>
         <h3 className="text-base font-semibold text-gf-text mb-4">
           Datos personales
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
           {/* Nombre */}
           <FormField
             label="Nombre"
@@ -65,7 +65,7 @@ export default function ClientForm() {
               type="text"
               required
               className={INPUT_CLASS}
-              placeholder="Ej. Garc\u00eda"
+              placeholder="Ej. García"
             />
           </FormField>
 
@@ -76,13 +76,13 @@ export default function ClientForm() {
               name="maternalLastName"
               type="text"
               className={INPUT_CLASS}
-              placeholder="Ej. L\u00f3pez"
+              placeholder="Ej. López"
             />
           </FormField>
 
-          {/* Correo electr\u00f3nico */}
+          {/* Correo electrónico */}
           <FormField
-            label="Correo electr\u00f3nico"
+            label="Correo electrónico"
             name="email"
             required
             error={state?.errors?.email}
@@ -97,9 +97,9 @@ export default function ClientForm() {
             />
           </FormField>
 
-          {/* Tel\u00e9fono */}
+          {/* Teléfono */}
           <FormField
-            label="Tel\u00e9fono"
+            label="Teléfono"
             name="phone"
             required
             error={state?.errors?.phone}
@@ -113,18 +113,18 @@ export default function ClientForm() {
               className={INPUT_CLASS}
               placeholder="5512345678"
             />
-            <p className="text-gf-text-soft text-xs mt-1">10 d\u00edgitos</p>
+            <p className="text-gf-text-soft text-xs mt-1">10 dígitos</p>
           </FormField>
         </div>
       </Card>
 
-      {/* ── Secci\u00f3n: Identificaci\u00f3n oficial ────────────────────── */}
+      {/* ── Sección: Identificación oficial ────────────────────── */}
       <Card>
         <h3 className="text-base font-semibold text-gf-text mb-4">
-          Identificaci\u00f3n oficial
+          Identificación oficial
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
           {/* RFC */}
           <FormField label="RFC" name="rfc" error={state?.errors?.rfc}>
             <input

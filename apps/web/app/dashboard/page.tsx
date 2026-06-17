@@ -153,11 +153,6 @@ export default async function DashboardPage() {
       <PageHeader
         title={`Hola, ${userName}`}
         subtitle="Resumen de operaciones hipotecarias"
-        action={
-          <Button variant="primary" href="/dashboard/expedientes/nuevo">
-            Nuevo expediente
-          </Button>
-        }
       />
 
       {/* ── Metric cards grid ──────────────────────────────────── */}

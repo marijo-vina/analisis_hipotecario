@@ -32,19 +32,6 @@ export default function CasesTable({ cases }: CasesTableProps) {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterCreditType, setFilterCreditType] = useState("");
 
-  // Derive unique filter options from current page data
-  const clientOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const c of cases) {
-      if (!seen.has(c.client.fullName)) {
-        seen.add(c.client.fullName);
-        result.push(c.client.fullName);
-      }
-    }
-    return result.sort((a, b) => a.localeCompare(b, "es"));
-  }, [cases]);
-
   const statusOptions = useMemo(() => {
     const seen = new Set<string>();
     const result: { code: string; name: string }[] = [];
@@ -95,23 +82,18 @@ export default function CasesTable({ cases }: CasesTableProps) {
     <>
       {/* Filter bar */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        {/* Cliente filter — select dropdown */}
-        <div className="min-w-[200px]">
+        {/* Cliente filter — text search input */}
+        <div className="min-w-[280px]">
           <label className="block text-sm font-medium text-gf-text mb-1">
             Cliente
           </label>
-          <select
+          <input
+            type="text"
+            placeholder="Buscar cliente por nombre, correo o RFC…"
             value={searchClient}
             onChange={(e) => setSearchClient(e.target.value)}
-            className="w-full h-[42px] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text bg-white focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red"
-          >
-            <option value="">Todos</option>
-            {clientOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            className="w-full h-[42px] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text placeholder:text-gf-text-soft bg-white focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red transition-colors"
+          />
         </div>
 
         {/* Estatus filter */}
@@ -165,7 +147,7 @@ export default function CasesTable({ cases }: CasesTableProps) {
                 header: "Expediente",
                 render: (c: MortgageCase) => (
                   <span className="font-mono text-xs">
-                    {c.id.slice(0, 12)}...
+                    {c.id.slice(0, 8).toUpperCase()}
                   </span>
                 ),
               },
