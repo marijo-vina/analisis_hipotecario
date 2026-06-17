@@ -55,7 +55,17 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Prisma generated client / generated artifacts
 /generated/prisma
+src/generated/prisma
+
+# TypeScript build cache and emitted JS from root config/scripts
+*.tsbuildinfo
+*.js.map
+prisma/*.js
+prisma/*.js.map
+prisma/*.d.ts
 
 # Google Cloud credentials
 gcp-credentials.json
+**/gcp-credentials.json
