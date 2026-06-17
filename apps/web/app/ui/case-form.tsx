@@ -53,9 +53,9 @@ export default function CaseForm({ creditTypes, clients }: CaseFormProps) {
           Datos del expediente
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
           {/* Cliente — searchable selector, full width */}
-          <div className="md:col-span-2 flex flex-col gap-1.5">
+          <div className="lg:col-span-2 flex flex-col gap-1.5">
             <label
               htmlFor="clientId"
               className="text-gf-text font-medium text-sm"

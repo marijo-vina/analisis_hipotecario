@@ -114,7 +114,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     : [];
   const documents: Document[] = docsResult.ok ? docsResult.data.data : [];
 
-  const expShort = id.slice(0, 12);
+  const expShort = id.slice(0, 8);
 
   return (
     <div>
@@ -122,9 +122,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Expedientes", href: "/dashboard/expedientes" },
-          { label: `EXP-${expShort.toUpperCase()}` },
+          { label: `Expediente ${expShort.toUpperCase()}` },
         ]}
-        title={`Expediente ${expShort}...`}
+        title={`Expediente ${expShort.toUpperCase()}`}
         statusBadge={
           <StatusBadge code={c.status.code} name={c.status.name} />
         }

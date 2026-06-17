@@ -18,6 +18,8 @@ interface ConfirmDialogProps {
   confirmVariant: 'primary' | 'destructive';
   /** Async action executed when the user confirms */
   onConfirm: () => Promise<void>;
+  /** Optional error message displayed inside the dialog (keeps dialog open) */
+  error?: string | null;
 }
 
 /**
@@ -38,6 +40,7 @@ export default function ConfirmDialog({
   confirmLabel,
   confirmVariant,
   onConfirm,
+  error,
 }: ConfirmDialogProps) {
   const [loading, setLoading] = useState(false);
 
@@ -48,6 +51,8 @@ export default function ConfirmDialog({
     try {
       await onConfirm();
       onClose();
+    } catch {
+      // Error is surfaced via the `error` prop — keep dialog open
     } finally {
       setLoading(false);
     }
@@ -75,10 +80,19 @@ export default function ConfirmDialog({
         </h2>
         <p
           id="confirm-dialog-message"
-          className="text-gf-text-muted text-sm mb-6"
+          className="text-gf-text-muted text-sm mb-4"
         >
           {message}
         </p>
+
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"
+          >
+            {error}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3">
           <Button

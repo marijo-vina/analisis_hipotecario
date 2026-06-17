@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { DocumentType } from "@/app/lib/definitions";
+import Card from "@/app/ui/common/card";
+import Button from "@/app/ui/common/button";
 
 interface DocumentUploadProps {
   caseId: string;
@@ -12,9 +14,12 @@ interface DocumentUploadProps {
 /**
  * Client component for uploading documents to a mortgage case.
  *
- * Renders a file input (accept PDF/JPEG/PNG), a document type dropdown,
- * and a submit button. Posts FormData to the Next.js Route Handler which
- * proxies to the NestJS upload endpoint.
+ * Renders a Card-wrapped form with a drag-and-drop zone (or browse file
+ * button), a document type selector dropdown, file info display, and a
+ * primary submit button. Posts FormData to the existing Next.js Route
+ * Handler which proxies to the NestJS upload endpoint.
+ *
+ * Preserves the existing upload API call — only the UI is redesigned.
  */
 export default function DocumentUpload({
   caseId,
@@ -25,6 +30,33 @@ export default function DocumentUpload({
   const [documentTypeId, setDocumentTypeId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ---- Drop handlers ------------------------------------------------------
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const dropped = e.dataTransfer.files?.[0] ?? null;
+    if (dropped) {
+      setFile(dropped);
+      setError(null);
+    }
+  }, []);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,17 +67,18 @@ export default function DocumentUpload({
     [],
   );
 
+  // ---- Submit -------------------------------------------------------------
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
 
       if (!file) {
-        setError("Seleccioná un archivo.");
+        setError("Seleccioná un archivo");
         return;
       }
       if (!documentTypeId) {
-        setError("Seleccioná un tipo de documento.");
+        setError("Seleccioná un tipo de documento");
         return;
       }
 
@@ -89,8 +122,8 @@ export default function DocumentUpload({
   );
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">
+    <Card>
+      <h3 className="text-lg font-semibold text-gf-text mb-4">
         Cargar documento
       </h3>
 
@@ -104,10 +137,11 @@ export default function DocumentUpload({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Document type selector */}
         <div>
           <label
             htmlFor="documentTypeId"
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-sm font-medium text-gf-text mb-1"
           >
             Tipo de documento
           </label>
@@ -119,7 +153,8 @@ export default function DocumentUpload({
               setError(null);
             }}
             disabled={loading}
-            className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 disabled:opacity-50"
+            className="block w-full rounded-[var(--radius-sm)] border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-sm focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50"
+            style={{ height: 'var(--input-height)' }}
           >
             <option value="">-- Seleccionar --</option>
             {documentTypes.map((dt) => (
@@ -130,34 +165,67 @@ export default function DocumentUpload({
           </select>
         </div>
 
+        {/* Drag-and-drop zone / file input */}
         <div>
-          <label
-            htmlFor="file"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
+          <label className="block text-sm font-medium text-gf-text mb-1">
             Archivo
           </label>
-          <input
-            id="file"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={handleFileChange}
-            disabled={loading}
-            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 disabled:opacity-50"
-          />
-          <p className="mt-1 text-xs text-slate-500">
-            Formatos aceptados: PDF, JPEG, PNG. Máx. 10 MB.
+
+          <div
+            className={`border-2 border-dashed rounded-[var(--radius-md)] p-6 text-center transition-colors cursor-pointer ${
+              dragOver
+                ? 'border-gf-red bg-gf-red-soft/50'
+                : 'border-gf-border bg-gf-bg/30 hover:border-gf-red hover:bg-gf-red-soft/20'
+            }`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              id="file"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              disabled={loading}
+              className="hidden"
+            />
+
+            {file ? (
+              <div className="text-sm text-gf-text">
+                <p className="font-medium break-all">{file.name}</p>
+                <p className="text-gf-text-muted text-xs mt-0.5">
+                  {(file.size / (1024 * 1024)).toFixed(2)} MB
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-gf-text-muted mb-1">
+                  Arrastrá el archivo aquí o
+                </p>
+                <span className="text-sm font-medium text-gf-red hover:text-gf-red-dark underline">
+                  seleccioná un archivo
+                </span>
+              </div>
+            )}
+          </div>
+
+          <p className="mt-1.5 text-xs text-gf-text-muted">
+            PDF, JPG, PNG hasta 10MB
           </p>
         </div>
 
-        <button
+        {/* Upload button */}
+        <Button
+          variant="primary"
           type="submit"
           disabled={loading || !file || !documentTypeId}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          loading={loading}
         >
           {loading ? "Subiendo..." : "Subir documento"}
-        </button>
+        </Button>
       </form>
-    </div>
+    </Card>
   );
 }

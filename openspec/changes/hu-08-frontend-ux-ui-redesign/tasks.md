@@ -34,25 +34,25 @@
 
 ## Batch 2: Common Components
 
-- [ ] T006 — Create Button component with primary/secondary/destructive variants
+- [x] T006 — Create Button component with primary/secondary/destructive variants
   Files: `apps/web/app/ui/common/button.tsx` (NEW)
   Depends on: T001
   Acceptance: Server component; props: `variant` (primary|secondary|destructive), `disabled?`, `loading?`, `type?`, `onClick?`, `children`; primary: #B0002A bg, white text; secondary: white bg, #111827 text, #F0C9CF border; destructive: #DC2626 bg, white text; all: radius 8px, hover states, disabled opacity + cursor-not-allowed; loading shows spinner or text
   REQ: UI-01
 
-- [ ] T007 — Create Card component with institutional styling
+- [x] T007 — Create Card component with institutional styling
   Files: `apps/web/app/ui/common/card.tsx` (NEW)
   Depends on: T001
   Acceptance: Server component; props: `children`, `className?`; renders with white bg, #F0C9CF border, radius 12px, shadow 0 2px 8px rgba(0,0,0,0.04), padding 24px
   REQ: UI-02
 
-- [ ] T008 — Rewrite StatusBadge (badge.tsx) with unified case + document status map
+- [x] T008 — Rewrite StatusBadge (badge.tsx) with unified case + document status map
   Files: `apps/web/app/ui/common/badge.tsx` (REWRITE existing; FIRST check current location — may be at `apps/web/app/ui/status-badge.tsx` or similar. If widely imported from current path, reuse that file or create a compatibility re-export to avoid breaking existing imports)
   Depends on: T001
   Acceptance: Server component; props: `code` (string), `name` (string); maps case statuses (Pendiente de documentos→amber, Documentos cargados→sky, En procesamiento→indigo, En revisión→blue, Observado→red, Cerrado→slate, Rechazado→red) and document statuses (Subido→sky, Validado→green, Rechazado→red, Procesado→teal, Error→red); neutral gray fallback for unknown codes; displays human-readable Spanish name, never technical code; existing imports across the codebase must not break
   REQ: UI-03, FR-0511
 
-- [ ] T009 — Create FormField server component
+- [x] T009 — Create FormField server component
   Files: `apps/web/app/ui/common/form-field.tsx` (NEW)
   Depends on: T001, T006
   Acceptance: Server component (NO `use client`); props: `label`, `name`, `error?`, `children`, `inputProps?`; renders label + input wrapper (height 42px, border #F0C9CF, radius 8px, focus border #B0002A) + inline error message in red text below field when `error` prop present
@@ -100,7 +100,7 @@
 
 ## Batch 5: Dashboard Page
 
-- [ ] T016 — Redesign dashboard page with greeting, metric cards, and recent activity
+- [x] T016 — Redesign dashboard page with greeting, metric cards, and recent activity
   Files: `apps/web/app/dashboard/page.tsx`
   Depends on: T005, T007, T010, T011
   Acceptance: Renders greeting "Hola, [nombre]", 4 metric cards (Activos, Pendientes, En revisión, Cerrados) using Card component with status-colored accents; recent cases table (last 5) using DataTable; pending tasks section; empty states use EmptyState with CTA; existing data fetching (apiFetch) preserved
@@ -160,31 +160,31 @@
 
 ## Batch 8: Document Pages + Delete Modal
 
-- [ ] T025 — Create DocumentPreviewDialog client component
+- [x] T025 — Create DocumentPreviewDialog client component
   Files: `apps/web/app/ui/common/document-preview-dialog.tsx` (NEW)
   Depends on: T001, T006
   Acceptance: Client component (`use client`); props: `open`, `onClose`, `fileName`, `signedUrl` (string | null), `mimeType`; renders centered modal with dark overlay, title "Vista previa del documento", file name display; `iframe` for PDF (application/pdf), `img` for images (image/jpeg, image/png); loading state while fetching; error state "El documento no está disponible" if signedUrl null; unsupported type message with "Abrir en nueva pestaña" secondary button always available; "Cerrar" secondary button; "Abrir en nueva pestaña" button MUST be disabled or hidden until a valid signedUrl is available — never attempt to open null
   REQ: UI-11, DOC-03, DOC-08
 
-- [ ] T026 — Redesign document upload zone with drag-and-drop
+- [x] T026 — Redesign document upload zone with drag-and-drop
   Files: `apps/web/app/ui/documents/document-upload.tsx`
   Depends on: T009, T006, T007
   Acceptance: Drag-and-drop zone or browse file selection; document type selector dropdown; file info display (name, size); upload progress/loading state; accepted formats: PDF, JPEG, PNG; max 10 MB validation; error messages in Spanish ("Selecciona un archivo", "Selecciona un un tipo de documento"); existing server action preserved; on success: form resets, list refreshes via router.refresh()
   REQ: DOC-01, DOC-07
 
-- [ ] T027 — Redesign document list table with StatusBadge and actions
+- [x] T027 — Redesign document list table with StatusBadge and actions
   Files: `apps/web/app/ui/documents/document-list.tsx`
   Depends on: T010, T008, T025, T013
   Acceptance: DataTable columns: Tipo, Archivo (original name), Estatus (StatusBadge with Spanish labels: Subido→sky, Validado→green, Rechazado→red, Procesado→teal, Error→red), Fecha de carga, Acciones (Ver, Eliminar); "Eliminar" button only visible for "Subido" status; "No hay documentos cargados" when zero documents; dates formatted in Spanish locale
   REQ: DOC-02
 
-- [ ] T028 — Wire up delete confirmation flow with ConfirmDialog
+- [x] T028 — Wire up delete confirmation flow with ConfirmDialog
   Files: `apps/web/app/ui/documents/document-actions.tsx`
   Depends on: T013, T027
   Acceptance: "Eliminar" button opens ConfirmDialog with file name in highlighted box, message "¿Estás segura de que deseas eliminar este documento?"; Cancelar (secondary) closes modal; Eliminar (destructive) shows loading state, calls existing delete server action, closes modal on success, triggers list refresh; both buttons disabled during execution
   REQ: DOC-04, DOC-05, DOC-06
 
-- [ ] T029 — Wire up document preview flow with DocumentPreviewDialog
+- [x] T029 — Wire up document preview flow with DocumentPreviewDialog
   Files: `apps/web/app/ui/documents/document-actions.tsx`, `apps/web/app/ui/documents/documents-client-section.tsx`
   Depends on: T025, T027
   Acceptance: "Ver" button calls existing signed URL server action, opens DocumentPreviewDialog with loading state; on success: modal shows iframe (PDF) or img (image); on failure: error message displayed; "Abrir en nueva pestaña" secondary button enabled only after valid signedUrl resolves; "Cerrar" closes modal
@@ -192,25 +192,25 @@
 
 ## Batch 9: Responsive Polish + Build Verification
 
-- [ ] T030 — Apply responsive fixes across all pages
+- [x] T030 — Apply responsive fixes across all pages
   Files: All modified page and component files
   Depends on: T001–T029 (all previous batches)
   Acceptance: Forms switch from 2-column to 1-column below 1024px; tables use internal horizontal scroll (overflow-x-auto), not global page scroll; no horizontal scrollbar on viewport at ≥1024px; sidebar and content fit within viewport; topbar does not overflow
   REQ: AC-11, FR-16 responsive scenario
 
-- [ ] T031 — Build verification
+- [x] T031 — Build verification
   Files: N/A (verification task)
   Depends on: T030
   Acceptance: `npm run build` in `apps/web` completes successfully with zero TypeScript errors and no new critical warnings introduced by HU-08.
   REQ: Testing strategy (build layer)
 
-- [ ] T032 — Lint verification
+- [x] T032 — Lint verification
   Files: N/A (verification task)
   Depends on: T031
   Acceptance: `npm run lint` in `apps/web` completes with zero lint errors. If no lint script is configured in `package.json`, document as N/A and continue — this must NOT block verification.
   REQ: Testing strategy (lint layer)
 
-- [ ] T033 — Manual functional flow verification
+- [x] T033 — Manual functional flow verification
   Files: N/A (verification task)
   Depends on: T032
   Acceptance: All flows verified manually:

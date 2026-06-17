@@ -93,7 +93,7 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
         columns={[
           { key: "fullName", header: "Nombre completo" },
           { key: "email", header: "Correo" },
-          { key: "phone", header: "Tel\u00e9fono" },
+          { key: "phone", header: "Teléfono" },
           { key: "rfc", header: "RFC" },
           {
             key: "actions",

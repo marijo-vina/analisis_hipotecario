@@ -58,11 +58,6 @@ export default async function ClientsPage({
           { label: "Clientes" },
         ]}
         title="Clientes"
-        action={
-          <Button variant="primary" href="/dashboard/clientes/nuevo">
-            Nuevo cliente
-          </Button>
-        }
       />
 
       {/* Search + table — client component for interactive filtering */}
