@@ -2,12 +2,27 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
-import type { MortgageCase, DocumentType, Document } from "@/app/lib/definitions";
+import PageHeader from "@/app/ui/common/page-header";
+import Button from "@/app/ui/common/button";
+import Card from "@/app/ui/common/card";
 import StatusBadge from "@/app/ui/status-badge";
 import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
-import DocumentUpload from "@/app/ui/documents/document-upload";
-import DocumentList from "@/app/ui/documents/document-list";
 import { DocumentsClientSection } from "@/app/ui/documents/documents-client-section";
+import type {
+  MortgageCase,
+  Client,
+  DocumentType,
+  Document,
+} from "@/app/lib/definitions";
+
+// ── Person type → human-readable Spanish label ─────────────────────────
+const PERSON_TYPE_LABELS: Record<string, string> = {
+  SALARIED: "Asalariado",
+};
+
+function personTypeLabel(code: string): string {
+  return PERSON_TYPE_LABELS[code] ?? code;
+}
 
 interface CaseDetailPageProps {
   params: Promise<{ id: string }>;
@@ -16,49 +31,61 @@ interface CaseDetailPageProps {
 /**
  * Mortgage case detail page — server component.
  *
- * Fetches a single mortgage case by ID and renders a detail card
- * with all relations (client, advisor, creditType, status).
- * Handles 404 (not found) and generic error states.
+ * Fetches a single mortgage case by ID and renders a 2-column layout:
+ * left column with case summary and client info, right column with
+ * documents, observations, and financial analysis placeholder.
+ * Status change dropdown uses the new institutional Button styling
+ * while preserving the existing server action logic.
  */
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { id } = await params;
 
   const result = await apiFetch<MortgageCase>(`/mortgage-cases/${id}`);
 
-  // ---- Not found ----------------------------------------------------------
+  // ── Not found ───────────────────────────────────────────────────────────
   if (!result.ok && result.notFound) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">
-          Expediente no encontrado
-        </h2>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <p className="text-slate-600 mb-4">
-            No se encontr&oacute; un expediente con el ID especificado.
+        <PageHeader
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Expedientes", href: "/dashboard/expedientes" },
+            { label: "No encontrado" },
+          ]}
+          title="Expediente no encontrado"
+        />
+        <Card>
+          <p className="text-gf-text-muted mb-4">
+            No se encontró un expediente con el ID especificado.
           </p>
           <Link
             href="/dashboard/expedientes"
-            className="text-slate-900 font-medium hover:underline"
+            className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
           </Link>
-        </div>
+        </Card>
       </div>
     );
   }
 
-  // ---- Generic error ------------------------------------------------------
+  // ── Generic error ───────────────────────────────────────────────────────
   if (!result.ok) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">
-          Expediente
-        </h2>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Expedientes", href: "/dashboard/expedientes" },
+            { label: "Error" },
+          ]}
+          title="Expediente"
+        />
         <ErrorMessage message="Error al cargar el expediente" />
         <div className="mt-4">
           <Link
             href="/dashboard/expedientes"
-            className="text-slate-900 font-medium hover:underline"
+            className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
           </Link>
@@ -67,122 +94,171 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     );
   }
 
-  // ---- Success ------------------------------------------------------------
+  // ── Success — fetch related data in parallel ────────────────────────────
   const c = result.data;
 
-  const statusesResult = await apiFetch<{
-    data: { code: string; name: string; order: number }[];
-  }>("/case-statuses");
-  const statuses = statusesResult.ok ? statusesResult.data.data : [];
+  const [statusesResult, clientResult, docTypesResult, docsResult] =
+    await Promise.all([
+      apiFetch<{
+        data: { code: string; name: string; order: number }[];
+      }>("/case-statuses"),
+      apiFetch<Client>(`/clients/${c.clientId}`),
+      apiFetch<{ data: DocumentType[] }>("/document-types"),
+      apiFetch<{ data: Document[] }>(`/mortgage-cases/${id}/documents`),
+    ]);
 
-  // Fetch document types and documents for this case
-  const docTypesResult = await apiFetch<{
-    data: DocumentType[];
-  }>("/document-types");
+  const statuses = statusesResult.ok ? statusesResult.data.data : [];
+  const client = clientResult.ok ? clientResult.data : null;
   const documentTypes: DocumentType[] = docTypesResult.ok
     ? docTypesResult.data.data
     : [];
-
-  const docsResult = await apiFetch<{ data: Document[] }>(
-    `/mortgage-cases/${id}/documents`,
-  );
   const documents: Document[] = docsResult.ok ? docsResult.data.data : [];
+
+  const expShort = id.slice(0, 12);
 
   return (
     <div>
-      <div className="mb-6">
-        <Link
-          href="/dashboard/expedientes"
-          className="text-sm text-slate-600 hover:text-slate-900 hover:underline transition-colors"
-        >
-          &larr; Volver al listado
-        </Link>
-      </div>
-
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">Expediente</h2>
-        <Link
-          href={`/dashboard/expedientes/${id}/editar`}
-          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
-        >
-          Editar expediente
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <dl className="space-y-4">
-          <Field label="Cliente" value={c.client.fullName} />
-          <Field label="Asesor" value={c.advisor.name} />
-          <Field
-            label="Tipo de cr&eacute;dito"
-            value={c.creditType.name}
-          />
-          <Field
-            label="Estado"
-            value={
-              <StatusBadge code={c.status.code} name={c.status.name} />
-            }
-          />
-          <Field
-            label="Tipo de persona"
-            value={
-              c.personType === "SALARIED"
-                ? "Asalariado"
-                : c.personType
-            }
-          />
-          <Field label="Ubicaci&oacute;n" value={c.propertyLocation} />
-          <Field
-            label="Monto solicitado"
-            value={
-              c.requestedAmount != null
-                ? `$${Number(c.requestedAmount).toLocaleString("es-MX")}`
-                : undefined
-            }
-          />
-          <Field
-            label="Valor propiedad"
-            value={
-              c.propertyValue != null
-                ? `$${Number(c.propertyValue).toLocaleString("es-MX")}`
-                : undefined
-            }
-          />
-          <Field
-            label="Plazo estimado"
-            value={
-              c.estimatedTermMonths != null
-                ? `${c.estimatedTermMonths} meses`
-                : undefined
-            }
-          />
-          <Field label="Notas" value={c.notes} />
-          <Field
-            label="Creado"
-            value={new Date(c.createdAt).toLocaleDateString("es-MX")}
-          />
-        </dl>
-
-        <CaseStatusDropdown
-          caseId={c.id}
-          currentCode={c.status.code}
-          statuses={statuses}
-        />
-      </div>
-
-      {/* ---- Documents section ----------------------------------------------------- */}
-      <DocumentsClientSection
-        caseId={c.id}
-        documentTypes={documentTypes}
-        initialDocuments={documents}
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Expedientes", href: "/dashboard/expedientes" },
+          { label: `EXP-${expShort.toUpperCase()}` },
+        ]}
+        title={`Expediente ${expShort}...`}
+        statusBadge={
+          <StatusBadge code={c.status.code} name={c.status.name} />
+        }
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              href={`/dashboard/expedientes/${id}/editar`}
+            >
+              Editar expediente
+            </Button>
+            <Button variant="secondary" href="#documentos">
+              Subir documento
+            </Button>
+          </div>
+        }
       />
+
+      {/* ── 2-column layout ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column — spans 2/3 */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Resumen del expediente Card */}
+          <Card>
+            <h3 className="text-base font-semibold text-gf-text mb-4">
+              Resumen del expediente
+            </h3>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Monto solicitado"
+                value={
+                  c.requestedAmount != null
+                    ? `$${Number(c.requestedAmount).toLocaleString("es-MX")}`
+                    : undefined
+                }
+              />
+              <Field label="Ubicación" value={c.propertyLocation} />
+              <Field
+                label="Valor propiedad"
+                value={
+                  c.propertyValue != null
+                    ? `$${Number(c.propertyValue).toLocaleString("es-MX")}`
+                    : undefined
+                }
+              />
+              <Field
+                label="Plazo estimado"
+                value={
+                  c.estimatedTermMonths != null
+                    ? `${c.estimatedTermMonths} meses`
+                    : undefined
+                }
+              />
+              <Field label="Tipo crédito" value={c.creditType.name} />
+              <Field
+                label="Tipo persona"
+                value={personTypeLabel(c.personType)}
+              />
+            </dl>
+          </Card>
+
+          {/* Cliente asociado Card */}
+          <Card>
+            <h3 className="text-base font-semibold text-gf-text mb-4">
+              Cliente asociado
+            </h3>
+            {client ? (
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Nombre" value={client.fullName} />
+                <Field label="RFC" value={client.rfc} />
+                <Field
+                  label="Tipo persona"
+                  value={personTypeLabel(c.personType)}
+                />
+                <Field label="Correo" value={client.email} />
+                <Field label="Teléfono" value={client.phone} />
+              </dl>
+            ) : (
+              <p className="text-sm text-gf-text-muted">
+                No se pudo cargar la información del cliente.
+              </p>
+            )}
+          </Card>
+
+          {/* Status change dropdown */}
+          <CaseStatusDropdown
+            caseId={c.id}
+            currentCode={c.status.code}
+            statuses={statuses}
+          />
+        </div>
+
+        {/* Right column — spans 1/3 */}
+        <div className="space-y-6">
+          {/* Documentos section */}
+          <div id="documentos">
+            <DocumentsClientSection
+              caseId={c.id}
+              documentTypes={documentTypes}
+              initialDocuments={documents}
+            />
+          </div>
+
+          {/* Observaciones Card */}
+          <Card>
+            <h3 className="text-base font-semibold text-gf-text mb-2">
+              Observaciones
+            </h3>
+            {c.notes ? (
+              <p className="text-sm text-gf-text whitespace-pre-wrap">
+                {c.notes}
+              </p>
+            ) : (
+              <p className="text-sm text-gf-text-muted">Sin observaciones</p>
+            )}
+          </Card>
+
+          {/* Análisis financiero placeholder */}
+          <Card>
+            <h3 className="text-base font-semibold text-gf-text mb-2">
+              Análisis financiero
+            </h3>
+            <p className="text-sm text-gf-text-muted">
+              El análisis financiero estará disponible cuando se procesen todos
+              los documentos requeridos.
+            </p>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 /** Renders a read-only field in a detail card. */
 function Field({
@@ -194,10 +270,10 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-slate-900">
+      <dd className="mt-1 text-sm text-gf-text">
         {value && typeof value === "string" && value.length > 0
           ? value
           : (value ?? "\u2014")}

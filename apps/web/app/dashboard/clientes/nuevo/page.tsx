@@ -1,3 +1,4 @@
+import PageHeader from "@/app/ui/common/page-header";
 import ClientForm from "@/app/ui/client-form";
 
 /**
@@ -8,9 +9,14 @@ import ClientForm from "@/app/ui/client-form";
 export default function NuevoClientePage() {
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">
-        Nuevo cliente
-      </h2>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Clientes", href: "/dashboard/clientes" },
+          { label: "Nuevo cliente" },
+        ]}
+        title="Nuevo cliente"
+      />
       <ClientForm />
     </div>
   );

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/app/lib/api";
 import type { Client, CreditType, PaginatedResponse } from "@/app/lib/definitions";
+import PageHeader from "@/app/ui/common/page-header";
 import CaseForm from "@/app/ui/case-form";
 
 /**
@@ -35,12 +36,15 @@ export default async function NuevoExpedientePage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">
-        Nuevo expediente
-      </h2>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <CaseForm creditTypes={creditTypes} clients={clients} />
-      </div>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Expedientes", href: "/dashboard/expedientes" },
+          { label: "Nuevo expediente" },
+        ]}
+        title="Nuevo expediente"
+      />
+      <CaseForm creditTypes={creditTypes} clients={clients} />
     </div>
   );
 }

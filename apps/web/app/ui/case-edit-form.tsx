@@ -1,19 +1,54 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 import { updateCase } from "@/app/actions/cases";
 import ErrorMessage from "@/app/ui/error-message";
+import FormField from "@/app/ui/common/form-field";
+import Button from "@/app/ui/common/button";
+import Card from "@/app/ui/common/card";
 import type { ActionState, CreditType, MortgageCase } from "@/app/lib/definitions";
 
 const initialState: ActionState = { errors: {} };
+
+/** Shared input styling matching the design tokens. */
+const INPUT_CLASS =
+  "block w-full h-[42px] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text " +
+  "placeholder-gf-text-soft bg-white " +
+  "focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red " +
+  "transition-colors duration-150";
+
+const TEXTAREA_CLASS =
+  "block w-full rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text " +
+  "placeholder-gf-text-soft bg-white " +
+  "focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red " +
+  "transition-colors duration-150";
+
+// ── Person type → human-readable Spanish label ─────────────────────────
+const PERSON_TYPE_LABELS: Record<string, string> = {
+  SALARIED: "Asalariado",
+};
+
+function personTypeLabel(code: string): string {
+  return PERSON_TYPE_LABELS[code] ?? code;
+}
 
 interface CaseEditFormProps {
   mortgageCase: MortgageCase;
   creditTypes: CreditType[];
 }
 
-export default function CaseEditForm({ mortgageCase, creditTypes }: CaseEditFormProps) {
+/**
+ * Edit mortgage case form — client component.
+ *
+ * Uses `useActionState` with `updateCase.bind(null, mortgageCase.id)`.
+ * Fields are pre-filled with existing case values via `defaultValue`.
+ * Labels are in Spanish with business meaning — never technical codes.
+ * Preserves the existing pre-fill logic and server action.
+ */
+export default function CaseEditForm({
+  mortgageCase,
+  creditTypes,
+}: CaseEditFormProps) {
   const [state, formAction, pending] = useActionState(
     updateCase.bind(null, mortgageCase.id),
     initialState,
@@ -22,167 +57,153 @@ export default function CaseEditForm({ mortgageCase, creditTypes }: CaseEditForm
   const defaultCreditTypeId = mortgageCase.creditType.id;
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-6">
       {/* General form error */}
       <ErrorMessage message={state?.errors?._form} />
 
-      {/* Credit type */}
-      <div>
-        <label
-          htmlFor="creditTypeId"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Tipo de cr&eacute;dito *
-        </label>
-        <select
-          id="creditTypeId"
-          name="creditTypeId"
-          required
-          defaultValue={defaultCreditTypeId ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-        >
-          <option value="" disabled>
-            Seleccionar...
-          </option>
-          {creditTypes.map((ct) => (
-            <option key={ct.id} value={ct.id}>
-              {ct.name}
-            </option>
-          ))}
-        </select>
-        {state?.errors?.creditTypeId && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.errors.creditTypeId}
-          </p>
-        )}
-      </div>
+      <Card>
+        <h3 className="text-base font-semibold text-gf-text mb-4">
+          Datos del expediente
+        </h3>
 
-      {/* Property location */}
-      <div>
-        <label
-          htmlFor="propertyLocation"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Ubicaci&oacute;n de la propiedad
-        </label>
-        <input
-          id="propertyLocation"
-          name="propertyLocation"
-          type="text"
-          defaultValue={mortgageCase.propertyLocation ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="Ej. Av. Reforma 222, CDMX"
-        />
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          {/* Tipo de crédito */}
+          <FormField
+            label="Tipo de crédito"
+            name="creditTypeId"
+            required
+            error={state?.errors?.creditTypeId}
+          >
+            <select
+              id="creditTypeId"
+              name="creditTypeId"
+              required
+              defaultValue={defaultCreditTypeId ?? ""}
+              className={INPUT_CLASS}
+            >
+              <option value="" disabled>
+                Seleccionar...
+              </option>
+              {creditTypes.map((ct) => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
 
-      {/* Requested amount */}
-      <div>
-        <label
-          htmlFor="requestedAmount"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Monto solicitado
-        </label>
-        <input
-          id="requestedAmount"
-          name="requestedAmount"
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={mortgageCase.requestedAmount ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="1500000"
-        />
-        {state?.errors?.requestedAmount && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.errors.requestedAmount}
-          </p>
-        )}
-      </div>
+          {/* Tipo de persona — disabled, read-only display */}
+          <FormField label="Tipo de persona" name="personTypeDisplay">
+            <select
+              disabled
+              defaultValue={mortgageCase.personType}
+              className={`${INPUT_CLASS} bg-gf-bg/50 disabled:cursor-not-allowed`}
+              aria-readonly="true"
+            >
+              <option value={mortgageCase.personType}>
+                {personTypeLabel(mortgageCase.personType)}
+              </option>
+            </select>
+          </FormField>
 
-      {/* Property value */}
-      <div>
-        <label
-          htmlFor="propertyValue"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Valor de la propiedad
-        </label>
-        <input
-          id="propertyValue"
-          name="propertyValue"
-          type="number"
-          min="0"
-          step="0.01"
-          defaultValue={mortgageCase.propertyValue ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="2000000"
-        />
-        {state?.errors?.propertyValue && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.errors.propertyValue}
-          </p>
-        )}
-      </div>
+          {/* Ubicación de la propiedad */}
+          <FormField
+            label="Ubicación de la propiedad"
+            name="propertyLocation"
+            error={state?.errors?.propertyLocation}
+          >
+            <input
+              id="propertyLocation"
+              name="propertyLocation"
+              type="text"
+              defaultValue={mortgageCase.propertyLocation ?? ""}
+              className={INPUT_CLASS}
+              placeholder="Ej. Av. Reforma 222, CDMX"
+            />
+          </FormField>
 
-      {/* Estimated term (months) */}
-      <div>
-        <label
-          htmlFor="estimatedTermMonths"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Plazo estimado (meses)
-        </label>
-        <input
-          id="estimatedTermMonths"
-          name="estimatedTermMonths"
-          type="number"
-          min="1"
-          step="1"
-          defaultValue={mortgageCase.estimatedTermMonths ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="240"
-        />
-        {state?.errors?.estimatedTermMonths && (
-          <p className="mt-1 text-sm text-red-600">
-            {state.errors.estimatedTermMonths}
-          </p>
-        )}
-      </div>
+          {/* Monto solicitado */}
+          <FormField
+            label="Monto solicitado"
+            name="requestedAmount"
+            error={state?.errors?.requestedAmount}
+          >
+            <input
+              id="requestedAmount"
+              name="requestedAmount"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={mortgageCase.requestedAmount ?? ""}
+              className={INPUT_CLASS}
+              placeholder="1500000"
+            />
+          </FormField>
 
-      {/* Notes */}
-      <div>
-        <label
-          htmlFor="notes"
-          className="block text-sm font-medium text-slate-700 mb-1"
-        >
-          Notas
-        </label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows={3}
-          defaultValue={mortgageCase.notes ?? ""}
-          className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="Informaci&oacute;n adicional del expediente"
-        />
-      </div>
+          {/* Valor de la propiedad */}
+          <FormField
+            label="Valor de la propiedad"
+            name="propertyValue"
+            error={state?.errors?.propertyValue}
+          >
+            <input
+              id="propertyValue"
+              name="propertyValue"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={mortgageCase.propertyValue ?? ""}
+              className={INPUT_CLASS}
+              placeholder="2000000"
+            />
+          </FormField>
+
+          {/* Plazo estimado (meses) */}
+          <FormField
+            label="Plazo estimado (meses)"
+            name="estimatedTermMonths"
+            error={state?.errors?.estimatedTermMonths}
+          >
+            <input
+              id="estimatedTermMonths"
+              name="estimatedTermMonths"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue={mortgageCase.estimatedTermMonths ?? ""}
+              className={INPUT_CLASS}
+              placeholder="240"
+            />
+          </FormField>
+        </div>
+
+        {/* Observaciones — full width */}
+        <div className="mt-4">
+          <FormField
+            label="Observaciones"
+            name="notes"
+            error={state?.errors?.notes}
+          >
+            <textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              defaultValue={mortgageCase.notes ?? ""}
+              className={TEXTAREA_CLASS}
+              placeholder="Información adicional del expediente"
+            />
+          </FormField>
+        </div>
+      </Card>
 
       {/* Buttons */}
       <div className="flex items-center gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-        >
+        <Button variant="primary" type="submit" loading={pending}>
           {pending ? "Guardando..." : "Actualizar expediente"}
-        </button>
-        <Link
-          href={`/dashboard/expedientes/${mortgageCase.id}`}
-          className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-        >
+        </Button>
+        <Button variant="secondary" href={`/dashboard/expedientes/${mortgageCase.id}`}>
           Cancelar
-        </Link>
+        </Button>
       </div>
     </form>
   );
