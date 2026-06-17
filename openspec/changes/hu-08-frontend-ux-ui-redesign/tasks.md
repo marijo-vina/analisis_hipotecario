@@ -108,25 +108,25 @@
 
 ## Batch 6: Client Pages
 
-- [ ] T017 — Redesign client list page with PageHeader, DataTable, and search
+- [x] T017 — Redesign client list page with PageHeader, DataTable, and search
   Files: `apps/web/app/dashboard/clientes/page.tsx`
   Depends on: T005, T010, T011, T012
   Acceptance: PageHeader with breadcrumb + "Nuevo cliente" primary button; search input filtering by name/email (preserve existing behavior); DataTable with columns (Nombre completo, Email, Teléfono, RFC, Acciones); pagination preserved; EmptyState with "No hay clientes registrados" + "Crear primer cliente" CTA when zero clients; text ≥14px
   REQ: FR-06
 
-- [ ] T018 — Redesign client detail page with personal info card and associated cases
+- [x] T018 — Redesign client detail page with personal info card and associated cases
   Files: `apps/web/app/dashboard/clientes/[id]/page.tsx`
   Depends on: T005, T007, T010, T012, T008
   Acceptance: PageHeader with breadcrumb (Dashboard > Clientes > [Nombre]); Card with personal info (full name, RFC, CURP, email, phone, dates); associated cases DataTable with columns (expediente ID, credit type, StatusBadge, amount, "Ver" link); "Sin expedientes vinculados" when no cases; "Cliente no encontrado" for non-existent ID
   REQ: FR-08
 
-- [ ] T019 — Redesign client create form with FormField components
+- [x] T019 — Redesign client create form with FormField components
   Files: `apps/web/app/dashboard/clientes/nuevo/page.tsx`, `apps/web/app/ui/client-form.tsx`
   Depends on: T009, T006, T012
   Acceptance: Two sections (Datos personales: Nombre, Apellido paterno, Apellido materno, Correo, Teléfono; Identificación: RFC, CURP); each field uses FormField; submit button is primary; Cancel button routes to `/dashboard/clientes` via href prop; existing `useActionState` and server action preserved; validation errors display inline via FormField error prop
   REQ: FR-07
 
-- [ ] T020 — Redesign client edit form with FormField components
+- [x] T020 — Redesign client edit form with FormField components
   Files: `apps/web/app/dashboard/clientes/[id]/editar/page.tsx`, `apps/web/app/ui/client-edit-form.tsx`
   Depends on: T009, T006, T012, T019
   Acceptance: Same structure as T019; fields pre-filled with existing client values; title shows "Editar cliente"; Cancel button routes to `/dashboard/clientes/[id]` via href prop; existing pre-fill logic and server action preserved
@@ -134,25 +134,25 @@
 
 ## Batch 7: Case Pages + StatusBadge
 
-- [ ] T021 — Redesign case list page with filters, DataTable, and StatusBadge
+- [x] T021 — Redesign case list page with filters, DataTable, and StatusBadge
   Files: `apps/web/app/dashboard/expedientes/page.tsx`
   Depends on: T005, T010, T011, T012, T008
   Acceptance: PageHeader with "Nuevo expediente" primary button; filter bar with dropdowns (Cliente, Estatus, Tipo de crédito); DataTable with columns (Cliente, Tipo crédito, Estado with StatusBadge, Monto, Avance docs, Fecha, Acciones); StatusBadge shows Spanish labels (never technical codes); EmptyState with "No hay expedientes" + "Crear primer expediente" CTA; existing filter/pagination behavior preserved
   REQ: FR-09, FR-0511
 
-- [ ] T022 — Redesign case detail page with 2-column layout
+- [x] T022 — Redesign case detail page with 2-column layout
   Files: `apps/web/app/dashboard/expedientes/[id]/page.tsx`
   Depends on: T005, T007, T010, T012, T008, T013
   Acceptance: PageHeader with breadcrumb, title, status badge; 2-column layout: left column has summary Card (monto, tipo crédito, ubicación, plazo) + client Card (name, email, phone); right column has documents section + observations Card + "Análisis financiero próximamente" placeholder; status change dropdown + "Cambiar" button functional with new Button styling; existing status change logic preserved
   REQ: FR-11, FR-0513, FR-0514
 
-- [ ] T023 — Redesign case create form with FormField and human-readable labels
+- [x] T023 — Redesign case create form with FormField and human-readable labels
   Files: `apps/web/app/dashboard/expedientes/nuevo/page.tsx`, `apps/web/app/ui/case-form.tsx`
   Depends on: T009, T006, T012, T021
   Acceptance: Fields: Cliente (searchable selector), Tipo de crédito (dropdown: "Crédito Hipotecario", "Mejora de Hipoteca", etc.), Tipo de persona (default "Asalariado", human labels), Ubicación de la propiedad, Monto solicitado, Valor de la propiedad, Plazo estimado (meses), Observaciones; all labels in Spanish with business meaning (no technical codes); FormField for each field; submit primary button; Cancel routes to `/dashboard/expedientes`; existing `useActionState` and server action preserved
   REQ: FR-10
 
-- [ ] T024 — Redesign case edit form with FormField and human-readable labels
+- [x] T024 — Redesign case edit form with FormField and human-readable labels
   Files: `apps/web/app/dashboard/expedientes/[id]/editar/page.tsx`, `apps/web/app/ui/case-edit-form.tsx`
   Depends on: T009, T006, T012, T023
   Acceptance: Same structure as T023; fields pre-filled with existing case values; title shows "Editar expediente"; Cancel button routes to `/dashboard/expedientes/[id]` via href prop; existing pre-fill logic and server action preserved

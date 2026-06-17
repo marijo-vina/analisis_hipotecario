@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { updateCaseStatus } from '@/app/actions/cases';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { updateCaseStatus } from "@/app/actions/cases";
+import Button from "@/app/ui/common/button";
 
 interface CaseStatus {
   code: string;
@@ -15,6 +16,13 @@ interface CaseStatusDropdownProps {
   statuses: CaseStatus[];
 }
 
+/**
+ * Client component for changing mortgage case status.
+ *
+ * Renders a status dropdown with a "Cambiar" submit button using
+ * the institutional Button component. Calls the existing `updateCaseStatus`
+ * server action and refreshes the page on success.
+ */
 export default function CaseStatusDropdown({
   caseId,
   currentCode,
@@ -43,20 +51,20 @@ export default function CaseStatusDropdown({
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 pt-4 border-t border-gf-border">
       <label
         htmlFor="status-select"
-        className="block text-sm font-medium text-slate-700"
+        className="block text-sm font-medium text-gf-text mb-2"
       >
         Cambiar estado
       </label>
-      <div className="mt-1 flex gap-2">
+      <div className="flex gap-2">
         <select
           id="status-select"
           value={selectedCode}
           onChange={(e) => setSelectedCode(e.target.value)}
-          className="block w-full rounded-md border-slate-300 text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           disabled={isPending}
+          className="block w-full h-[42px] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text bg-white focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red disabled:opacity-50"
         >
           {statuses.map((s) => (
             <option key={s.code} value={s.code}>
@@ -64,18 +72,16 @@ export default function CaseStatusDropdown({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={handleChange}
+        <Button
+          variant="primary"
           disabled={isPending || selectedCode === currentCode}
-          className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          onClick={handleChange}
+          loading={isPending}
         >
-          {isPending ? 'Cambiando...' : 'Cambiar'}
-        </button>
+          Cambiar
+        </Button>
       </div>
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

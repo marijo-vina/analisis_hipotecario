@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
-import type { Client } from "@/app/lib/definitions";
+import PageHeader from "@/app/ui/common/page-header";
+import Button from "@/app/ui/common/button";
+import Card from "@/app/ui/common/card";
+import DataTable from "@/app/ui/common/data-table";
+import StatusBadge from "@/app/ui/status-badge";
+import type { Client, MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 
 interface ClientDetailPageProps {
   params: Promise<{ id: string }>;
@@ -10,49 +15,69 @@ interface ClientDetailPageProps {
 /**
  * Client detail page — server component.
  *
- * Fetches a single client by ID and renders a detail card.
- * Handles 404 (not found) and generic error states.
- * Linked mortgage cases are OUT OF SCOPE for HU-04.
+ * Fetches a single client by ID and renders a detail card with
+ * personal information plus a table of associated mortgage cases.
+ * Cases are fetched from the mortgage-cases endpoint and filtered
+ * by clientId on the server side (backend does not yet support
+ * clientId query param — see HU-08 design).
  */
 export default async function ClientDetailPage({
   params,
 }: ClientDetailPageProps) {
   const { id } = await params;
 
-  const result = await apiFetch<Client>(`/clients/${id}`);
+  // Fetch client and cases in parallel
+  const [clientResult, casesResult] = await Promise.all([
+    apiFetch<Client>(`/clients/${id}`),
+    // Fetch all cases with high limit to filter by clientId client-side.
+    // Known limitation: clients with >100 cases will be truncated.
+    apiFetch<PaginatedResponse<MortgageCase>>("/mortgage-cases?page=1&limit=100"),
+  ]);
 
   // ---- Not found ----------------------------------------------------------
-  if (!result.ok && result.notFound) {
+  if (!clientResult.ok && clientResult.notFound) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">
-          Cliente no encontrado
-        </h2>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <PageHeader
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Clientes", href: "/dashboard/clientes" },
+            { label: "Cliente no encontrado" },
+          ]}
+          title="Cliente no encontrado"
+        />
+        <Card>
           <p className="text-slate-600 mb-4">
             No se encontr&oacute; un cliente con el ID especificado.
           </p>
           <Link
             href="/dashboard/clientes"
-            className="text-slate-900 font-medium hover:underline"
+            className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
           </Link>
-        </div>
+        </Card>
       </div>
     );
   }
 
   // ---- Generic error ------------------------------------------------------
-  if (!result.ok) {
+  if (!clientResult.ok) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-6">Cliente</h2>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Clientes", href: "/dashboard/clientes" },
+            { label: "Cliente" },
+          ]}
+          title="Cliente"
+        />
         <ErrorMessage message="Error al cargar el cliente" />
         <div className="mt-4">
           <Link
             href="/dashboard/clientes"
-            className="text-slate-900 font-medium hover:underline"
+            className="text-gf-text font-medium hover:underline"
           >
             &larr; Volver al listado
           </Link>
@@ -62,37 +87,46 @@ export default async function ClientDetailPage({
   }
 
   // ---- Success ------------------------------------------------------------
-  const client = result.data;
+  const client = clientResult.data;
+
+  // Derive associated cases from the full case list
+  const allCases: MortgageCase[] =
+    casesResult.ok ? casesResult.data.data : [];
+  const associatedCases = allCases.filter((c) => c.clientId === id);
 
   return (
     <div>
-      <div className="mb-6">
-        <Link
-          href="/dashboard/clientes"
-          className="text-sm text-slate-600 hover:text-slate-900 hover:underline transition-colors"
-        >
-          &larr; Volver al listado
-        </Link>
-      </div>
+      {/* Page header with breadcrumb + actions */}
+      <PageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Clientes", href: "/dashboard/clientes" },
+          { label: client.fullName },
+        ]}
+        title={client.fullName}
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              href={`/dashboard/clientes/${id}/editar`}
+            >
+              Editar cliente
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">
-          {client.fullName}
-        </h2>
-        <Link
-          href={`/dashboard/clientes/${id}/editar`}
-          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
-        >
-          Editar cliente
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <dl className="space-y-4">
+      {/* ── Datos personales card ─────────────────────────────────────── */}
+      <Card className="mb-6">
+        <h3 className="text-base font-semibold text-gf-text mb-4">
+          Datos personales
+        </h3>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nombre completo" value={client.fullName} />
+          <Field label="Correo electr&oacute;nico" value={client.email} />
+          <Field label="Tel&eacute;fono" value={client.phone} />
           <Field label="RFC" value={client.rfc} />
           <Field label="CURP" value={client.curp} />
-          <Field label="Email" value={client.email} />
-          <Field label="Tel&eacute;fono" value={client.phone} />
           <Field
             label="Registrado"
             value={new Date(client.createdAt).toLocaleDateString("es-MX")}
@@ -102,7 +136,67 @@ export default async function ClientDetailPage({
             value={new Date(client.updatedAt).toLocaleDateString("es-MX")}
           />
         </dl>
+      </Card>
+
+      {/* ── Expedientes vinculados section ──────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gf-text">
+          Expedientes vinculados
+        </h2>
+        <Button variant="primary" href="/dashboard/expedientes/nuevo">
+          Crear expediente
+        </Button>
       </div>
+
+      {!casesResult.ok ? (
+        <ErrorMessage message="Error al cargar expedientes" />
+      ) : (
+        <DataTable
+          columns={[
+            {
+              key: "id",
+              header: "ID expediente",
+              render: (c: MortgageCase) => (
+                <span className="font-mono text-xs">{c.id.slice(0, 8)}...</span>
+              ),
+            },
+            {
+              key: "creditType",
+              header: "Tipo cr\u00e9dito",
+              render: (c: MortgageCase) => c.creditType.name,
+            },
+            {
+              key: "amount",
+              header: "Monto",
+              render: (c: MortgageCase) =>
+                c.requestedAmount != null
+                  ? `$${Number(c.requestedAmount).toLocaleString("es-MX")}`
+                  : "\u2014",
+            },
+            {
+              key: "status",
+              header: "Estado",
+              render: (c: MortgageCase) => (
+                <StatusBadge code={c.status.code} name={c.status.name} />
+              ),
+            },
+            {
+              key: "actions",
+              header: "Acciones",
+              render: (c: MortgageCase) => (
+                <Link
+                  href={`/dashboard/expedientes/${c.id}`}
+                  className="text-gf-text font-medium hover:underline"
+                >
+                  Ver
+                </Link>
+              ),
+            },
+          ]}
+          rows={associatedCases}
+          emptyMessage="Sin expedientes vinculados"
+        />
+      )}
     </div>
   );
 }
@@ -111,10 +205,10 @@ export default async function ClientDetailPage({
 function Field({ label, value }: { label: string; value?: string }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-slate-900">{value || "\u2014"}</dd>
+      <dd className="mt-1 text-sm text-gf-text">{value || "\u2014"}</dd>
     </div>
   );
 }
