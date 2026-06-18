@@ -82,6 +82,9 @@ model Document {
   originalName     String
   uploadedById     String
   uploadedBy       User           @relation(fields: [uploadedById], references: [id])
+  ocrText          String?
+  processedAt      DateTime?
+  processingError  String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }

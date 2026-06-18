@@ -1,6 +1,7 @@
-import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DocumentAiService } from './document-ai.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
 
@@ -12,10 +13,13 @@ const DOCUMENT_INCLUDE = {
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storagePathService: StoragePathService,
     private readonly gcsService: GcsService,
+    private readonly documentAiService: DocumentAiService,
   ) {}
 
   async create(caseId: string, advisorId: string, dto: CreateDocumentDto) {
@@ -182,5 +186,109 @@ export class DocumentsService {
 
     // 5. Delete DB record only after GCS succeeds
     await this.prisma.document.delete({ where: { id: documentId } });
+  }
+
+  async processDocument(caseId: string, documentId: string) {
+    // 1. Fetch document with status include — 404 if not found or wrong case
+    const document = await this.findOneByCase(caseId, documentId);
+
+    // 2. Status gate: reject PROCESSING and PROCESSED
+    if (document.documentStatus.code === 'PROCESSING') {
+      throw new BadRequestException('Document is already being processed');
+    }
+    if (document.documentStatus.code === 'PROCESSED') {
+      throw new BadRequestException('Document has already been processed');
+    }
+
+    // 3. Metadata guard: reject null fileUrl or mimeType
+    if (!document.fileUrl) {
+      throw new BadRequestException('Document has no file to process');
+    }
+    if (!document.mimeType) {
+      throw new BadRequestException('Document has no MIME type');
+    }
+
+    // 4. Resolve status IDs
+    const processingStatusId = await this.resolveStatusId('PROCESSING');
+    const processedStatusId = await this.resolveStatusId('PROCESSED');
+    const errorStatusId = await this.resolveStatusId('ERROR');
+
+    // 5. Update status to PROCESSING
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { documentStatusId: processingStatusId },
+    });
+
+    // 6. Call Document AI — catch failures here
+    let ocrText: string;
+    try {
+      ocrText = await this.documentAiService.extractText(
+        document.fileUrl,
+        document.mimeType,
+      );
+    } catch (aiError) {
+      this.logger.error(
+        `Document AI processing failed for document ${documentId}: ${(aiError as Error).message}`,
+      );
+      // Persist error on document
+      try {
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            processingError: (aiError as Error).message,
+            documentStatusId: errorStatusId,
+          },
+        });
+      } catch (dbError) {
+        this.logger.error(
+          `Failed to set ERROR status for document ${documentId}: ${(dbError as Error).message}`,
+        );
+      }
+      throw new BadGatewayException('Document processing service unavailable');
+    }
+
+    // 7. AI call succeeded — save ocrText, processedAt, status=PROCESSED
+    try {
+      return await this.prisma.document.update({
+        where: { id: documentId },
+        data: {
+          ocrText,
+          processedAt: new Date(),
+          documentStatusId: processedStatusId,
+        },
+        include: DOCUMENT_INCLUDE,
+      });
+    } catch (dbError) {
+      // 9. CRITICAL: if DB write fails, still attempt to set ERROR status
+      this.logger.error(
+        `Failed to save PROCESSED state for document ${documentId}: ${(dbError as Error).message}`,
+      );
+      try {
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            processingError: (dbError as Error).message,
+            documentStatusId: errorStatusId,
+          },
+        });
+      } catch (fallbackError) {
+        this.logger.error(
+          `CRITICAL: Failed to set ERROR status for document ${documentId}: ${(fallbackError as Error).message}`,
+        );
+      }
+      throw new BadGatewayException('Document processing service unavailable');
+    }
+  }
+
+  private async resolveStatusId(code: string): Promise<number> {
+    const status = await this.prisma.documentStatus.findUnique({
+      where: { code },
+    });
+
+    if (!status) {
+      throw new NotFoundException(`Document status ${code} not found`);
+    }
+
+    return status.id;
   }
 }

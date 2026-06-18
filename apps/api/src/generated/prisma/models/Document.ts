@@ -49,6 +49,9 @@ export type DocumentMinAggregateOutputType = {
   sizeBytes: number | null
   originalName: string | null
   uploadedById: string | null
+  ocrText: string | null
+  processedAt: Date | null
+  processingError: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -64,6 +67,9 @@ export type DocumentMaxAggregateOutputType = {
   sizeBytes: number | null
   originalName: string | null
   uploadedById: string | null
+  ocrText: string | null
+  processedAt: Date | null
+  processingError: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -79,6 +85,9 @@ export type DocumentCountAggregateOutputType = {
   sizeBytes: number
   originalName: number
   uploadedById: number
+  ocrText: number
+  processedAt: number
+  processingError: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -108,6 +117,9 @@ export type DocumentMinAggregateInputType = {
   sizeBytes?: true
   originalName?: true
   uploadedById?: true
+  ocrText?: true
+  processedAt?: true
+  processingError?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -123,6 +135,9 @@ export type DocumentMaxAggregateInputType = {
   sizeBytes?: true
   originalName?: true
   uploadedById?: true
+  ocrText?: true
+  processedAt?: true
+  processingError?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -138,6 +153,9 @@ export type DocumentCountAggregateInputType = {
   sizeBytes?: true
   originalName?: true
   uploadedById?: true
+  ocrText?: true
+  processedAt?: true
+  processingError?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -240,6 +258,9 @@ export type DocumentGroupByOutputType = {
   sizeBytes: number | null
   originalName: string
   uploadedById: string
+  ocrText: string | null
+  processedAt: Date | null
+  processingError: string | null
   createdAt: Date
   updatedAt: Date
   _count: DocumentCountAggregateOutputType | null
@@ -278,6 +299,9 @@ export type DocumentWhereInput = {
   sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
+  ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
+  processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   mortgageCase?: Prisma.XOR<Prisma.MortgageCaseScalarRelationFilter, Prisma.MortgageCaseWhereInput>
@@ -297,6 +321,9 @@ export type DocumentOrderByWithRelationInput = {
   sizeBytes?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
+  ocrText?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingError?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   mortgageCase?: Prisma.MortgageCaseOrderByWithRelationInput
@@ -319,6 +346,9 @@ export type DocumentWhereUniqueInput = Prisma.AtLeast<{
   sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
+  ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
+  processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   mortgageCase?: Prisma.XOR<Prisma.MortgageCaseScalarRelationFilter, Prisma.MortgageCaseWhereInput>
@@ -338,6 +368,9 @@ export type DocumentOrderByWithAggregationInput = {
   sizeBytes?: Prisma.SortOrderInput | Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
+  ocrText?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingError?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.DocumentCountOrderByAggregateInput
@@ -361,6 +394,9 @@ export type DocumentScalarWhereWithAggregatesInput = {
   sizeBytes?: Prisma.IntNullableWithAggregatesFilter<"Document"> | number | null
   originalName?: Prisma.StringWithAggregatesFilter<"Document"> | string
   uploadedById?: Prisma.StringWithAggregatesFilter<"Document"> | string
+  ocrText?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
+  processedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Document"> | Date | string | null
+  processingError?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
 }
@@ -372,6 +408,9 @@ export type DocumentCreateInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
@@ -391,6 +430,9 @@ export type DocumentUncheckedCreateInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -402,6 +444,9 @@ export type DocumentUpdateInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
@@ -421,6 +466,9 @@ export type DocumentUncheckedUpdateInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -436,6 +484,9 @@ export type DocumentCreateManyInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -447,6 +498,9 @@ export type DocumentUpdateManyMutationInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -462,6 +516,9 @@ export type DocumentUncheckedUpdateManyInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -487,6 +544,9 @@ export type DocumentCountOrderByAggregateInput = {
   sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
+  ocrText?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  processingError?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -508,6 +568,9 @@ export type DocumentMaxOrderByAggregateInput = {
   sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
+  ocrText?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  processingError?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -523,6 +586,9 @@ export type DocumentMinOrderByAggregateInput = {
   sizeBytes?: Prisma.SortOrder
   originalName?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
+  ocrText?: Prisma.SortOrder
+  processedAt?: Prisma.SortOrder
+  processingError?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -617,6 +683,10 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput = {
   deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
 }
 
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
 export type DocumentCreateNestedManyWithoutDocumentTypeInput = {
   create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
   connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
@@ -708,6 +778,9 @@ export type DocumentCreateWithoutUploadedByInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
@@ -725,6 +798,9 @@ export type DocumentUncheckedCreateWithoutUploadedByInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -769,6 +845,9 @@ export type DocumentScalarWhereInput = {
   sizeBytes?: Prisma.IntNullableFilter<"Document"> | number | null
   originalName?: Prisma.StringFilter<"Document"> | string
   uploadedById?: Prisma.StringFilter<"Document"> | string
+  ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
+  processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
+  processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Document"> | Date | string
 }
@@ -780,6 +859,9 @@ export type DocumentCreateWithoutMortgageCaseInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   documentType: Prisma.DocumentTypeCreateNestedOneWithoutDocumentsInput
@@ -797,6 +879,9 @@ export type DocumentUncheckedCreateWithoutMortgageCaseInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -834,6 +919,9 @@ export type DocumentCreateWithoutDocumentTypeInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
@@ -851,6 +939,9 @@ export type DocumentUncheckedCreateWithoutDocumentTypeInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -888,6 +979,9 @@ export type DocumentCreateWithoutDocumentStatusInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mortgageCase: Prisma.MortgageCaseCreateNestedOneWithoutDocumentsInput
@@ -905,6 +999,9 @@ export type DocumentUncheckedCreateWithoutDocumentStatusInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -945,6 +1042,9 @@ export type DocumentCreateManyUploadedByInput = {
   mimeType?: string | null
   sizeBytes?: number | null
   originalName: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -956,6 +1056,9 @@ export type DocumentUpdateWithoutUploadedByInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
@@ -973,6 +1076,9 @@ export type DocumentUncheckedUpdateWithoutUploadedByInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -987,6 +1093,9 @@ export type DocumentUncheckedUpdateManyWithoutUploadedByInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1001,6 +1110,9 @@ export type DocumentCreateManyMortgageCaseInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1012,6 +1124,9 @@ export type DocumentUpdateWithoutMortgageCaseInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documentType?: Prisma.DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput
@@ -1029,6 +1144,9 @@ export type DocumentUncheckedUpdateWithoutMortgageCaseInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1043,6 +1161,9 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1057,6 +1178,9 @@ export type DocumentCreateManyDocumentTypeInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1068,6 +1192,9 @@ export type DocumentUpdateWithoutDocumentTypeInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
@@ -1085,6 +1212,9 @@ export type DocumentUncheckedUpdateWithoutDocumentTypeInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1099,6 +1229,9 @@ export type DocumentUncheckedUpdateManyWithoutDocumentTypeInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1113,6 +1246,9 @@ export type DocumentCreateManyDocumentStatusInput = {
   sizeBytes?: number | null
   originalName: string
   uploadedById: string
+  ocrText?: string | null
+  processedAt?: Date | string | null
+  processingError?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1124,6 +1260,9 @@ export type DocumentUpdateWithoutDocumentStatusInput = {
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mortgageCase?: Prisma.MortgageCaseUpdateOneRequiredWithoutDocumentsNestedInput
@@ -1141,6 +1280,9 @@ export type DocumentUncheckedUpdateWithoutDocumentStatusInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1155,6 +1297,9 @@ export type DocumentUncheckedUpdateManyWithoutDocumentStatusInput = {
   sizeBytes?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   originalName?: Prisma.StringFieldUpdateOperationsInput | string
   uploadedById?: Prisma.StringFieldUpdateOperationsInput | string
+  ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1172,6 +1317,9 @@ export type DocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
+  ocrText?: boolean
+  processedAt?: boolean
+  processingError?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
@@ -1191,6 +1339,9 @@ export type DocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
+  ocrText?: boolean
+  processedAt?: boolean
+  processingError?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
@@ -1210,6 +1361,9 @@ export type DocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
+  ocrText?: boolean
+  processedAt?: boolean
+  processingError?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
@@ -1229,11 +1383,14 @@ export type DocumentSelectScalar = {
   sizeBytes?: boolean
   originalName?: boolean
   uploadedById?: boolean
+  ocrText?: boolean
+  processedAt?: boolean
+  processingError?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
+export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "ocrText" | "processedAt" | "processingError" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
 export type DocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
   documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
@@ -1272,6 +1429,9 @@ export type $DocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     sizeBytes: number | null
     originalName: string
     uploadedById: string
+    ocrText: string | null
+    processedAt: Date | null
+    processingError: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["document"]>
@@ -1711,6 +1871,9 @@ export interface DocumentFieldRefs {
   readonly sizeBytes: Prisma.FieldRef<"Document", 'Int'>
   readonly originalName: Prisma.FieldRef<"Document", 'String'>
   readonly uploadedById: Prisma.FieldRef<"Document", 'String'>
+  readonly ocrText: Prisma.FieldRef<"Document", 'String'>
+  readonly processedAt: Prisma.FieldRef<"Document", 'DateTime'>
+  readonly processingError: Prisma.FieldRef<"Document", 'String'>
   readonly createdAt: Prisma.FieldRef<"Document", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Document", 'DateTime'>
 }

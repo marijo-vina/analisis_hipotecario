@@ -107,4 +107,14 @@ export class DocumentsController {
   ) {
     await this.documentsService.delete(caseId, documentId);
   }
+
+  @Post(':documentId/process')
+  @HttpCode(200)
+  async processDocument(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.documentsService.processDocument(caseId, documentId);
+    return { data };
+  }
 }

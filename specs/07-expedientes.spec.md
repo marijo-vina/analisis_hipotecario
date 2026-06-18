@@ -1,4 +1,5 @@
 # 07. Expedientes Hipotecarios — HU-03
+> Nota: Este documento pertenece al Sprint 1 y describe la base actualmente implementada. No debe asumirse como alcance completo del Sprint 2.
 
 ## Propósito
 

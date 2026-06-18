@@ -1,4 +1,5 @@
 # 03. Data Model (Sprint 1)
+> Nota: Este documento pertenece al Sprint 1 y describe la base actualmente implementada. No debe asumirse como alcance completo del Sprint 2.
 
 Este documento define el modelo conceptual de datos para el **Sprint 1**, el cual abarca la base del sistema, gestión de expedientes y catálogos principales.
 

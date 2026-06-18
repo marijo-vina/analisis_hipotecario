@@ -27,6 +27,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@google-cloud/documentai": "^9.6.2",
     "@google-cloud/storage": "^7.21.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

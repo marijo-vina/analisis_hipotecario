@@ -2,6 +2,7 @@ import { BadGatewayException, BadRequestException, NotFoundException } from '@ne
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { DocumentAiService } from './document-ai.service';
 import { DocumentsService } from './documents.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
@@ -23,11 +24,33 @@ describe('DocumentsService', () => {
     order: 1,
   };
 
+  const mockProcessingStatus = {
+    id: 3,
+    code: 'PROCESSING',
+    name: 'Procesando',
+    order: 3,
+  };
+
+  const mockProcessedStatus = {
+    id: 4,
+    code: 'PROCESSED',
+    name: 'Procesado',
+    order: 4,
+  };
+
+  const mockErrorStatus = {
+    id: 5,
+    code: 'ERROR',
+    name: 'Error',
+    order: 5,
+  };
+
   const mockPrismaService = {
     document: {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn(),
     },
     documentType: {
@@ -39,6 +62,10 @@ describe('DocumentsService', () => {
     mortgageCase: {
       findUnique: jest.fn(),
     },
+  };
+
+  const mockDocumentAiService = {
+    extractText: jest.fn(),
   };
 
   const mockGcsService = {
@@ -60,6 +87,10 @@ describe('DocumentsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: DocumentAiService,
+          useValue: mockDocumentAiService,
         },
         {
           provide: GcsService,
@@ -631,6 +662,276 @@ describe('DocumentsService', () => {
       );
       expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
       expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('processDocument', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+    const gcsUri = 'gs://bucket/case-uuid-1/PAYROLL_RECEIPT/doc.pdf';
+    const mimeType = 'application/pdf';
+    const extractedText = 'Contenido extraído del documento';
+    const now = new Date('2026-06-18T12:00:00Z');
+
+    const mockDocument = {
+      id: documentId,
+      mortgageCaseId: caseId,
+      documentTypeId: 1,
+      documentStatusId: 1,
+      fileUrl: gcsUri,
+      storagePath: 'case-uuid-1/PAYROLL_RECEIPT/doc.pdf',
+      mimeType,
+      sizeBytes: 12345,
+      originalName: 'doc.pdf',
+      uploadedById: 'advisor-1',
+      ocrText: null,
+      processedAt: null,
+      processingError: null,
+      documentType: mockDocumentType,
+      documentStatus: mockDocumentStatus,
+      uploadedBy: { id: 'advisor-1', name: 'Test', email: 'test@test.com', role: 'ADVISOR' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(now);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should transition UPLOADED → PROCESSING → PROCESSED and save ocrText', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...mockDocument,
+          documentStatusId: mockProcessedStatus.id,
+          documentStatus: mockProcessedStatus,
+          ocrText: extractedText,
+          processedAt: now,
+        });
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      const result = await service.processDocument(caseId, documentId);
+
+      // Step 1: Find document
+      expect(mockPrismaService.document.findUnique).toHaveBeenCalledWith({
+        where: { id: documentId },
+        include: { documentType: true, documentStatus: true, uploadedBy: true },
+      });
+
+      // Step 2: Set PROCESSING
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(1, {
+        where: { id: documentId },
+        data: { documentStatusId: mockProcessingStatus.id },
+      });
+
+      // Step 3: Call Document AI
+      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+
+      // Step 4: Set PROCESSED with ocrText
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(2, {
+        where: { id: documentId },
+        data: {
+          ocrText: extractedText,
+          processedAt: now,
+          documentStatusId: mockProcessedStatus.id,
+        },
+        include: { documentType: true, documentStatus: true, uploadedBy: true },
+      });
+
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
+      expect(result.processedAt).toEqual(now);
+    });
+
+    it('should allow reprocessing of ERROR document → PROCESSED', async () => {
+      const errorDocument = {
+        ...mockDocument,
+        documentStatusId: mockErrorStatus.id,
+        documentStatus: mockErrorStatus,
+        processingError: 'Previous error',
+      };
+
+      mockPrismaService.document.findUnique.mockResolvedValue(errorDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...errorDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...errorDocument,
+          documentStatusId: mockProcessedStatus.id,
+          documentStatus: mockProcessedStatus,
+          ocrText: extractedText,
+          processedAt: now,
+          processingError: null,
+        });
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      const result = await service.processDocument(caseId, documentId);
+
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
+    });
+
+    it('should reject PROCESSING status with 400', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        documentStatusId: mockProcessingStatus.id,
+        documentStatus: mockProcessingStatus,
+      });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        'Document is already being processed',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should reject PROCESSED status with 400', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        documentStatusId: mockProcessedStatus.id,
+        documentStatus: mockProcessedStatus,
+      });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        'Document has already been processed',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should reject null fileUrl with 400', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        fileUrl: null,
+      });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        'Document has no file to process',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should reject null mimeType with 400', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        mimeType: null,
+      });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        'Document has no MIME type',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when document does not exist', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(null);
+
+      await expect(service.processDocument(caseId, 'nonexistent')).rejects.toThrow(
+        'Document not found',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when document belongs to different case', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        mortgageCaseId: 'other-case',
+      });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        'Document not found',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should persist processingError and set ERROR status on Document AI failure', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...mockDocument,
+          documentStatusId: mockErrorStatus.id,
+          documentStatus: mockErrorStatus,
+          processingError: 'gRPC timeout',
+        });
+      mockDocumentAiService.extractText.mockRejectedValue(new Error('gRPC timeout'));
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      // Verify ERROR status was persisted
+      expect(mockPrismaService.document.update).toHaveBeenLastCalledWith({
+        where: { id: documentId },
+        data: expect.objectContaining({
+          processingError: 'gRPC timeout',
+          documentStatusId: mockErrorStatus.id,
+        }),
+      });
+    });
+
+    it('should catch unexpected runtime error after PROCESSING and set ERROR', async () => {
+      const runtimeError = new Error('Unexpected DB write failure');
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+
+      // First update (PROCESSING) succeeds
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus });
+
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      // Second update (PROCESSED) fails with unexpected error
+      mockPrismaService.document.update
+        .mockRejectedValueOnce(runtimeError)
+        // Fallback update (ERROR) succeeds
+        .mockResolvedValueOnce({
+          ...mockDocument,
+          documentStatusId: mockErrorStatus.id,
+          documentStatus: mockErrorStatus,
+          processingError: 'Unexpected DB write failure',
+        });
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      // Verify fallback ERROR status was attempted (3 calls: PROCESSING, PROCESSED-fail, ERROR-fallback)
+      expect(mockPrismaService.document.update).toHaveBeenCalledTimes(3);
     });
   });
 });
