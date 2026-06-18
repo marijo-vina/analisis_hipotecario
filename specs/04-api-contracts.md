@@ -1,4 +1,5 @@
 # 04. API Contracts (Sprint 1)
+> Nota: Este documento pertenece al Sprint 1 y describe la base actualmente implementada. No debe asumirse como alcance completo del Sprint 2.
 
 Este documento define la estructura de las peticiones (Requests) y respuestas (Responses) para los endpoints del backend del Sprint 1, construidos en NestJS.
 

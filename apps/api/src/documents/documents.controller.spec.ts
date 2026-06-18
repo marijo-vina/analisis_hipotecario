@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -16,6 +16,7 @@ describe('DocumentsController', () => {
     uploadAndCreate: jest.fn(),
     getSignedUrl: jest.fn(),
     delete: jest.fn(),
+    processDocument: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -251,6 +252,72 @@ describe('DocumentsController', () => {
       await expect(
         controller.deleteDocument('case-uuid-1', 'doc-validated'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('processDocument', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+
+    const processedDocument = {
+      id: documentId,
+      mortgageCaseId: caseId,
+      documentType: { id: 1, code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina' },
+      documentStatus: { id: 4, code: 'PROCESSED', name: 'Procesado' },
+      ocrText: 'Contenido extraído del documento',
+      processedAt: new Date('2026-06-18T12:00:00Z'),
+      originalName: 'doc.pdf',
+      mimeType: 'application/pdf',
+      fileUrl: 'gs://bucket/doc.pdf',
+    };
+
+    it('should return 200 with document in data envelope on success', async () => {
+      mockDocumentsService.processDocument.mockResolvedValue(processedDocument);
+
+      const result = await controller.processDocument(caseId, documentId);
+
+      expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: processedDocument });
+    });
+
+    it('should propagate BadRequestException for status validation error', async () => {
+      mockDocumentsService.processDocument.mockRejectedValue(
+        new BadRequestException('Document is already being processed'),
+      );
+
+      await expect(controller.processDocument(caseId, documentId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should propagate BadRequestException for metadata validation error', async () => {
+      mockDocumentsService.processDocument.mockRejectedValue(
+        new BadRequestException('Document has no file to process'),
+      );
+
+      await expect(controller.processDocument(caseId, documentId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should propagate NotFoundException from service', async () => {
+      mockDocumentsService.processDocument.mockRejectedValue(
+        new NotFoundException('Document not found'),
+      );
+
+      await expect(controller.processDocument(caseId, documentId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should propagate BadGatewayException from service', async () => {
+      mockDocumentsService.processDocument.mockRejectedValue(
+        new BadGatewayException('Document processing service unavailable'),
+      );
+
+      await expect(controller.processDocument(caseId, documentId)).rejects.toThrow(
+        BadGatewayException,
+      );
     });
   });
 });

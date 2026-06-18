@@ -44,36 +44,47 @@ Reducir el trabajo manual de captura y análisis documental para clientes asalar
 
 ## Sprint 1 — Base Operativa
 
-Estado: En progreso
+Estado: Completado
 
-Historias:
-
-* HU-01 Login interno.
-* HU-02 Gestión de clientes.
-* HU-03 Crear expediente hipotecario.
-* HU-04 Actualizar expediente y documentos.
+Historias entregadas:
+- HU-01 Login interno.
+- HU-02 Gestión de clientes.
+- HU-03 Crear expediente hipotecario.
+- HU-04 Frontend operativo de clientes y expedientes.
+- HU-05 Estados del expediente.
+- HU-06 Carga documental y metadata.
+- HU-07 Dashboard / ajustes operativos.
 
 Resultado:
-
-* Cliente registrado.
-* Expediente creado.
-* Documentos cargados.
-* Expediente consultable.
+- Login funcional.
+- Clientes registrados.
+- Expedientes creados y consultables.
+- Documentos cargados en Google Cloud Storage.
+- Metadata documental registrada.
+- Estados de expediente disponibles.
+- Dashboard interno operativo.
 
 ---
 
-## Sprint 2 — OCR e IA
+## Sprint 2 — Procesamiento documental OCR + IA
 
-Historias:
+Estado: En progreso
 
-* Procesamiento OCR.
-* Extracción de nóminas.
-* Extracción de estados de cuenta.
-* Extracción de buró.
+Objetivo:
+Procesar documentos cargados en expedientes mediante OCR, extraer texto, preparar extracción estructurada con IA y mostrar datos obtenidos para revisión humana.
 
-Resultado:
+Tareas:
+- Tarea 2.1 Preparar configuración de Google Document AI.
+- Tarea 2.2 Procesar documentos cargados con OCR.
+- Tarea 2.3 Guardar texto extraído.
+- Tarea 2.4 Extraer datos estructurados de nóminas.
+- Tarea 2.5 Extraer datos estructurados de estados de cuenta.
+- Tarea 2.6 Extraer datos estructurados de buró de crédito.
 
-* Datos estructurados generados automáticamente.
+Resultado esperado:
+- Documentos procesables desde Google Cloud Storage.
+- Texto OCR almacenado.
+- Datos estructurados iniciales disponibles para revisión.
 
 ---
 
