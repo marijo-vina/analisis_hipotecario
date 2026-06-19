@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -17,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsService } from './documents.service';
 
 @UseGuards(JwtAuthGuard)
@@ -74,8 +76,11 @@ export class DocumentsController {
   }
 
   @Get()
-  async findAllByCase(@Param('caseId') caseId: string) {
-    const data = await this.documentsService.findAllByCase(caseId);
+  async findAllByCase(
+    @Param('caseId') caseId: string,
+    @Query() query: QueryDocumentDto,
+  ) {
+    const data = await this.documentsService.findAllByCase(caseId, query);
 
     return { data };
   }

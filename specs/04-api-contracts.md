@@ -406,3 +406,59 @@ Elimina un documento y su archivo en GCS. Solo permite eliminar documentos con s
 | 502 | Error al eliminar de GCS | `"Error al eliminar el archivo del almacenamiento"` |
 
 **Prerrequisito GCP:** Service account necesita permiso IAM `storage.objects.delete`.
+
+---
+
+## 6. Procesamiento OCR de Documentos (`/mortgage-cases/:caseId/documents/:documentId/process`)
+
+*Endpoint agregado en HU-08 Sprint 2. Permite procesar documentos vía Google Document AI para extraer texto OCR.*
+
+### `POST /mortgage-cases/:caseId/documents/:documentId/process`
+
+Envía un documento almacenado en GCS a Google Document AI, extrae el texto OCR y actualiza el estado del documento.
+**Auth:** Bearer JWT (requerido) — `401 Unauthorized` si falta.
+**Content-Type:** application/json
+**Body:** Ninguno (empty).
+
+**Reglas de procesamiento:**
+- Solo se permite procesar documentos en estado `UPLOADED` o `ERROR`.
+- Documentos en `PROCESSING` o `PROCESSED` devuelven 400.
+- `fileUrl` y `mimeType` deben estar presentes — 400 si faltan.
+- El flujo de estados es: UPLOADED/ERROR → PROCESSING → PROCESSED (éxito) o ERROR (fallo).
+
+**Response (200 OK):**
+```json
+{
+  "data": {
+    "id": "uuid-doc-1",
+    "documentType": { "id": 1, "code": "PAYROLL_RECEIPT", "name": "Recibo de Nómina" },
+    "documentStatus": { "id": 3, "code": "PROCESSED", "name": "Procesado" },
+    "originalName": "recibo_nomina_mayo.pdf",
+    "fileUrl": "gs://hipotecario-documentos-dev/abc-123/PAYROLL_RECEIPT/recibo_nomina_mayo.pdf",
+    "mimeType": "application/pdf",
+    "ocrText": "NOMBRE: Juan Pérez García ...",
+    "processedAt": "2026-06-18T18:15:00Z",
+    "processingError": null,
+    "uploadedBy": {
+      "id": "uuid-user-1",
+      "name": "María Asesora"
+    },
+    "createdAt": "2026-06-03T10:15:00Z",
+    "updatedAt": "2026-06-18T18:15:00Z"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condición | `message` |
+|--------|-----------|-----------|
+| 400 | Documento en PROCESSING | `"Document is already being processed"` |
+| 400 | Documento en PROCESSED | `"Document has already been processed"` |
+| 400 | `fileUrl` es null | `"Document has no file to process"` |
+| 400 | `mimeType` es null | `"Document has no MIME type"` |
+| 401 | JWT inválido | `"Unauthorized"` |
+| 404 | Documento no encontrado o caseId incorrecto | `"Document not found"` |
+| 502 | Document AI no disponible o falla | `"Document processing service unavailable"` |
+
+**Prerrequisito GCP:** Service account necesita permisos IAM para Document AI (`roles/documentai.apiUser`). Variables de entorno requeridas: `GCLOUD_PROJECT_ID`, `GCLOUD_LOCATION`, `GCLOUD_PROCESSOR_ID`.

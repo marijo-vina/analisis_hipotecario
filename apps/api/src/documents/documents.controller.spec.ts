@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 
@@ -79,18 +80,34 @@ describe('DocumentsController', () => {
       ];
       mockDocumentsService.findAllByCase.mockResolvedValue(documents);
 
-      const result = await controller.findAllByCase('case-uuid-1');
+      const query: QueryDocumentDto = {};
+      const result = await controller.findAllByCase('case-uuid-1', query);
 
       expect(result).toEqual({ data: documents });
-      expect(mockDocumentsService.findAllByCase).toHaveBeenCalledWith('case-uuid-1');
+      expect(mockDocumentsService.findAllByCase).toHaveBeenCalledWith('case-uuid-1', query);
     });
 
     it('should return empty array wrapped in data when no documents', async () => {
       mockDocumentsService.findAllByCase.mockResolvedValue([]);
 
-      const result = await controller.findAllByCase('case-uuid-1');
+      const query: QueryDocumentDto = {};
+      const result = await controller.findAllByCase('case-uuid-1', query);
 
       expect(result).toEqual({ data: [] });
+      expect(mockDocumentsService.findAllByCase).toHaveBeenCalledWith('case-uuid-1', query);
+    });
+
+    it('should pass documentStatusId filter to service', async () => {
+      const documents = [
+        { id: 'doc-1', documentType: { code: 'PAYROLL_RECEIPT' }, documentStatus: { code: 'PROCESSED' } },
+      ];
+      mockDocumentsService.findAllByCase.mockResolvedValue(documents);
+
+      const query: QueryDocumentDto = { documentStatusId: 4 };
+      const result = await controller.findAllByCase('case-uuid-1', query);
+
+      expect(result).toEqual({ data: documents });
+      expect(mockDocumentsService.findAllByCase).toHaveBeenCalledWith('case-uuid-1', query);
     });
   });
 

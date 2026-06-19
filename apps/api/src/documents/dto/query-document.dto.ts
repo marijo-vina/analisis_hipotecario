@@ -13,4 +13,10 @@ export class QueryDocumentDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  documentStatusId?: number;
 }

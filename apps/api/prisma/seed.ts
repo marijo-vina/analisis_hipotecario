@@ -27,6 +27,9 @@ const DOCUMENT_STATUSES = [
   { code: 'PROCESSING', name: 'En procesamiento', order: 3 },
   { code: 'PROCESSED', name: 'Procesado', order: 4 },
   { code: 'ERROR', name: 'Error', order: 5 },
+  { code: 'EXTRACTION_READY', name: 'Extracción pendiente', order: 6 },
+  { code: 'EXTRACTION_ERROR', name: 'Error de extracción', order: 7 },
+  { code: 'OCR_ERROR', name: 'Error de OCR', order: 8 },
 ];
 
 const CASE_STATUSES = [

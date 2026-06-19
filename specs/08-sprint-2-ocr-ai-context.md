@@ -57,7 +57,7 @@ No se debe implementar todavía:
 
 ## Historias de usuario del Sprint 2
 
-### HU-08 — Procesar documentos con OCR
+### HU-08 — Procesar documentos con OCR ✅ COMPLETADO (2026-06-18)
 
 Como asesora, quiero que el sistema procese documentos cargados en el expediente mediante OCR para reducir la lectura y captura manual de información.
 
@@ -181,3 +181,13 @@ Criterios mínimos:
 - Prueba mínima con documento no sensible.
 - Texto OCR recibido sin errores críticos.
 - Tests y build pasando.
+
+---
+
+## Backlog futuro (post-HU-08)
+
+Issues identificados durante la verificación de HU-08 para considerar en futuros sprints:
+
+1. **Métricas de latencia Document AI**: Agregar métricas de tiempo de respuesta para monitorear latencia de Document AI.
+2. **Exponer `processedAt` y `processingError` en HU-09**: Exponer `processedAt` y `processingError` en el endpoint de detalle de documento como parte de HU-09.
+3. **Timeout configurable para `processDocument`**: Agregar timeout configurable para `processDocument` antes de producción.
