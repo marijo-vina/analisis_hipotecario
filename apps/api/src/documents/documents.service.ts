@@ -1,6 +1,7 @@
 import { BadGatewayException, BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentAiService } from './document-ai.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
@@ -132,9 +133,17 @@ export class DocumentsService {
     });
   }
 
-  async findAllByCase(caseId: string) {
+  async findAllByCase(caseId: string, dto?: QueryDocumentDto) {
+    const where: { mortgageCaseId: string; documentStatusId?: number } = {
+      mortgageCaseId: caseId,
+    };
+
+    if (dto?.documentStatusId) {
+      where.documentStatusId = dto.documentStatusId;
+    }
+
     return this.prisma.document.findMany({
-      where: { mortgageCaseId: caseId },
+      where,
       include: DOCUMENT_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
@@ -211,6 +220,7 @@ export class DocumentsService {
     // 4. Resolve status IDs
     const processingStatusId = await this.resolveStatusId('PROCESSING');
     const processedStatusId = await this.resolveStatusId('PROCESSED');
+    const ocrErrorStatusId = await this.resolveStatusId('OCR_ERROR');
     const errorStatusId = await this.resolveStatusId('ERROR');
 
     // 5. Update status to PROCESSING
@@ -230,13 +240,13 @@ export class DocumentsService {
       this.logger.error(
         `Document AI processing failed for document ${documentId}: ${(aiError as Error).message}`,
       );
-      // Persist error on document
+      // Persist OCR_ERROR on document (Document AI / OCR failure)
       try {
         await this.prisma.document.update({
           where: { id: documentId },
           data: {
             processingError: (aiError as Error).message,
-            documentStatusId: errorStatusId,
+            documentStatusId: ocrErrorStatusId,
           },
         });
       } catch (dbError) {

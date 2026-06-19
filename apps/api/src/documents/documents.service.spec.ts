@@ -2,6 +2,7 @@ import { BadGatewayException, BadRequestException, NotFoundException } from '@ne
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentAiService } from './document-ai.service';
 import { DocumentsService } from './documents.service';
 import { GcsService } from './gcs.service';
@@ -43,6 +44,13 @@ describe('DocumentsService', () => {
     code: 'ERROR',
     name: 'Error',
     order: 5,
+  };
+
+  const mockOcrErrorStatus = {
+    id: 8,
+    code: 'OCR_ERROR',
+    name: 'Error de OCR',
+    order: 8,
   };
 
   const mockPrismaService = {
@@ -252,6 +260,68 @@ describe('DocumentsService', () => {
       const result = await service.findAllByCase(caseId);
 
       expect(result).toEqual([]);
+    });
+
+    it('should filter by documentStatusId when provided in DTO', async () => {
+      const dto: QueryDocumentDto = { documentStatusId: 4 };
+      const documents = [
+        {
+          id: 'doc-1',
+          mortgageCaseId: caseId,
+          documentType: mockDocumentType,
+          documentStatus: { id: 4, code: 'PROCESSED', name: 'Procesado', order: 4 },
+          originalName: 'doc1.pdf',
+          fileUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      mockPrismaService.document.findMany.mockResolvedValue(documents);
+
+      const result = await service.findAllByCase(caseId, dto);
+
+      expect(mockPrismaService.document.findMany).toHaveBeenCalledWith({
+        where: { mortgageCaseId: caseId, documentStatusId: 4 },
+        include: {
+          documentType: true,
+          documentStatus: true,
+          uploadedBy: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result).toEqual(documents);
+    });
+
+    it('should not filter by status when DTO has no documentStatusId', async () => {
+      const dto: QueryDocumentDto = {};
+      const documents = [
+        {
+          id: 'doc-1',
+          mortgageCaseId: caseId,
+          documentType: mockDocumentType,
+          documentStatus: mockDocumentStatus,
+          originalName: 'doc1.pdf',
+          fileUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      mockPrismaService.document.findMany.mockResolvedValue(documents);
+
+      const result = await service.findAllByCase(caseId, dto);
+
+      expect(mockPrismaService.document.findMany).toHaveBeenCalledWith({
+        where: { mortgageCaseId: caseId },
+        include: {
+          documentType: true,
+          documentStatus: true,
+          uploadedBy: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(result).toEqual(documents);
     });
   });
 
@@ -710,6 +780,7 @@ describe('DocumentsService', () => {
           PROCESSING: mockProcessingStatus,
           PROCESSED: mockProcessedStatus,
           ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
         };
         return Promise.resolve(statusMap[args.where.code] || null);
       });
@@ -771,6 +842,7 @@ describe('DocumentsService', () => {
           PROCESSING: mockProcessingStatus,
           PROCESSED: mockProcessedStatus,
           ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
         };
         return Promise.resolve(statusMap[args.where.code] || null);
       });
@@ -863,13 +935,14 @@ describe('DocumentsService', () => {
       expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
     });
 
-    it('should persist processingError and set ERROR status on Document AI failure', async () => {
+    it('should set OCR_ERROR status and processingError when extractText() throws', async () => {
       mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
       mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
         const statusMap: Record<string, typeof mockProcessingStatus> = {
           PROCESSING: mockProcessingStatus,
           PROCESSED: mockProcessedStatus,
           ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
         };
         return Promise.resolve(statusMap[args.where.code] || null);
       });
@@ -877,9 +950,10 @@ describe('DocumentsService', () => {
         .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
         .mockResolvedValueOnce({
           ...mockDocument,
-          documentStatusId: mockErrorStatus.id,
-          documentStatus: mockErrorStatus,
+          documentStatusId: mockOcrErrorStatus.id,
+          documentStatus: mockOcrErrorStatus,
           processingError: 'gRPC timeout',
+          ocrText: null,
         });
       mockDocumentAiService.extractText.mockRejectedValue(new Error('gRPC timeout'));
 
@@ -887,13 +961,54 @@ describe('DocumentsService', () => {
         BadGatewayException,
       );
 
-      // Verify ERROR status was persisted
+      // Verify OCR_ERROR status was persisted with processingError
       expect(mockPrismaService.document.update).toHaveBeenLastCalledWith({
         where: { id: documentId },
         data: expect.objectContaining({
           processingError: 'gRPC timeout',
-          documentStatusId: mockErrorStatus.id,
+          documentStatusId: mockOcrErrorStatus.id,
         }),
+      });
+    });
+
+    it('should allow re-processing from OCR_ERROR document', async () => {
+      const ocrErrorDocument = {
+        ...mockDocument,
+        documentStatusId: mockOcrErrorStatus.id,
+        documentStatus: mockOcrErrorStatus,
+        processingError: 'Previous OCR failure',
+      };
+
+      mockPrismaService.document.findUnique.mockResolvedValue(ocrErrorDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...ocrErrorDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...ocrErrorDocument,
+          documentStatusId: mockProcessedStatus.id,
+          documentStatus: mockProcessedStatus,
+          ocrText: extractedText,
+          processedAt: now,
+          processingError: null,
+        });
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      const result = await service.processDocument(caseId, documentId);
+
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
+      // OCR_ERROR is not guarded — should pass through to PROCESSING
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(1, {
+        where: { id: documentId },
+        data: { documentStatusId: mockProcessingStatus.id },
       });
     });
 
@@ -905,6 +1020,7 @@ describe('DocumentsService', () => {
           PROCESSING: mockProcessingStatus,
           PROCESSED: mockProcessedStatus,
           ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
         };
         return Promise.resolve(statusMap[args.where.code] || null);
       });

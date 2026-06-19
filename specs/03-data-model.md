@@ -53,6 +53,9 @@ Metadatos de los documentos cargados al expediente. El archivo físico vive en G
 - `mimeType`: String? (MIME type del archivo subido, e.g. application/pdf — se asigna en HU-07)
 - `sizeBytes`: Int? (tamaño del archivo en bytes — se asigna en HU-07)
 - `uploadedById`: UUID (FK -> User)
+- `ocrText`: String? (texto extraído por OCR de Document AI — agregado en HU-08 Sprint 2)
+- `processedAt`: DateTime? (timestamp de procesamiento OCR exitoso — agregado en HU-08 Sprint 2)
+- `processingError`: String? (mensaje de error si OCR falló — agregado en HU-08 Sprint 2)
 - `createdAt`: DateTime
 - `updatedAt`: DateTime (@updatedAt)
 
