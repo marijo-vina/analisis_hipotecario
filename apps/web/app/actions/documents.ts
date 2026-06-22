@@ -49,3 +49,36 @@ export async function deleteDocument(
 
   return { success: true };
 }
+
+/**
+ * Procesa un documento con OCR (Google Document AI).
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/process`
+ * del backend NestJS. La operación es sincrónica (~5-30s). Retorna
+ * el texto extraído y la fecha de procesamiento.
+ *
+ * @throws {Error} si el backend responde con error (400/409) o hay fallo de red.
+ */
+export async function processDocument(
+  caseId: string,
+  documentId: string,
+): Promise<{ success: boolean; ocrText: string; processedAt: string }> {
+  const result = await apiFetch<{
+    data: { ocrText: string; processedAt: string };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/process`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al procesar el documento",
+    );
+  }
+
+  return {
+    success: true,
+    ocrText: result.data.data.ocrText,
+    processedAt: result.data.data.processedAt,
+  };
+}

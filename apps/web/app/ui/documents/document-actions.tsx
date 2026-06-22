@@ -3,10 +3,11 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument } from "@/app/actions/documents";
+import { getDocumentViewUrl, deleteDocument, processDocument } from "@/app/actions/documents";
 import Button from "@/app/ui/common/button";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
+import OcrTextDialog from "@/app/ui/common/ocr-text-dialog";
 
 interface DocumentActionsProps {
   caseId: string;
@@ -14,16 +15,19 @@ interface DocumentActionsProps {
 }
 
 /**
- * Client component that renders "Ver" and "Eliminar" action buttons per
- * document row in the table.
+ * Client component that renders action buttons per document row in the
+ * table: "Ver" (document preview), "Procesar" / "Reintentar" (OCR),
+ * "Ver OCR" (extracted text modal), and "Eliminar" (with confirmation).
  *
- * - **Ver**: calls the existing `getDocumentViewUrl` server action to
- *   obtain a signed URL, then opens the `DocumentPreviewDialog` with the
- *   URL and document metadata (embedded viewer — no `window.open`).
- * - **Eliminar**: visible only when `documentStatus.code === 'UPLOADED'`.
- *   Opens `ConfirmDialog` with file name highlighted, Spanish messages,
- *   and Cancelar/Eliminar buttons. Calls the existing `deleteDocument`
- *   server action. On error the dialog stays open with the error message.
+ * Button visibility is driven by `document.documentStatus.code`:
+ *
+ * | Status      | Buttons                          |
+ * |-------------|----------------------------------|
+ * | UPLOADED    | Ver, Procesar, Eliminar          |
+ * | PROCESSING  | Ver (disabled), spinner        |
+ * | PROCESSED   | Ver, Ver OCR                     |
+ * | OCR_ERROR   | Ver, Reintentar                  |
+ * | ERROR       | Ver, Reintentar                  |
  *
  * All backend calls go through server actions — `apiFetch` is never
  * exposed on the client side.
@@ -42,6 +46,11 @@ export default function DocumentActions({
   // ── Delete state ─────────────────────────────────────────────────────
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // ── OCR state ────────────────────────────────────────────────────────
+  const [processLoading, setProcessLoading] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
+  const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
 
   // ── View handler ─────────────────────────────────────────────────────
   const handleView = useCallback(async () => {
@@ -87,22 +96,108 @@ export default function DocumentActions({
     setDeleteError(null);
   }, []);
 
+  // ── OCR process handler (Procesar / Reintentar) ──────────────────────
+  const handleProcess = useCallback(async () => {
+    setProcessLoading(true);
+    setProcessError(null);
+    try {
+      await processDocument(caseId, document.id);
+      router.refresh();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Error al procesar el documento";
+      setProcessError(msg);
+    } finally {
+      setProcessLoading(false);
+    }
+  }, [caseId, document.id, router]);
+
   // ── Visibility ───────────────────────────────────────────────────────
-  const isUploaded = document.documentStatus.code === "UPLOADED";
+  const statusCode = document.documentStatus.code;
+  const isUploaded = statusCode === "UPLOADED";
+  const isProcessing = statusCode === "PROCESSING";
+  const isProcessed = statusCode === "PROCESSED";
+  const isError = statusCode === "OCR_ERROR" || statusCode === "ERROR";
 
   return (
     <>
       {/* ── Action buttons ───────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
+        {/* ── Ver (disabled during PROCESSING) ──────────────────────── */}
         <Button
           variant="secondary"
           onClick={handleView}
-          disabled={viewLoading}
+          disabled={viewLoading || isProcessing}
           loading={viewLoading}
         >
           {viewLoading ? "Abriendo..." : "Ver"}
         </Button>
 
+        {/* ── Procesar (UPLOADED) ────────────────────────────────────── */}
+        {isUploaded && (
+          <Button
+            variant="primary"
+            onClick={handleProcess}
+            disabled={processLoading}
+            loading={processLoading}
+          >
+            Procesar
+          </Button>
+        )}
+
+        {/* ── Processing indicator (PROCESSING) ──────────────────────── */}
+        {isProcessing && (
+          <Button variant="secondary" disabled>
+            <svg
+              className="animate-spin h-4 w-4 mr-1"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+            Procesando...
+          </Button>
+        )}
+
+        {/* ── Ver OCR (PROCESSED) ────────────────────────────────────── */}
+        {isProcessed && (
+          <Button
+            variant="secondary"
+            onClick={() => setOcrDialogOpen(true)}
+          >
+            Ver OCR
+          </Button>
+        )}
+
+        {/* ── Reintentar (OCR_ERROR / ERROR) ─────────────────────────── */}
+        {isError && (
+          <Button
+            variant="destructive"
+            onClick={handleProcess}
+            disabled={processLoading}
+            loading={processLoading}
+          >
+            Reintentar
+          </Button>
+        )}
+
+        {/* ── Eliminar (UPLOADED only) ───────────────────────────────── */}
         {isUploaded && (
           <Button
             variant="destructive"
@@ -112,6 +207,11 @@ export default function DocumentActions({
           </Button>
         )}
       </div>
+
+      {/* ── Process error (inline per-document) ────────────────────────── */}
+      {processError && (
+        <p className="mt-1 text-xs text-red-600">{processError}</p>
+      )}
 
       {/* ── Document preview dialog (T029) ────────────────────────────── */}
       <DocumentPreviewDialog
@@ -132,6 +232,14 @@ export default function DocumentActions({
         confirmVariant="destructive"
         onConfirm={handleDelete}
         error={deleteError}
+      />
+
+      {/* ── OCR text dialog ────────────────────────────────────────────── */}
+      <OcrTextDialog
+        open={ocrDialogOpen}
+        onClose={() => setOcrDialogOpen(false)}
+        ocrText={document.ocrText}
+        fileName={document.originalName}
       />
     </>
   );
