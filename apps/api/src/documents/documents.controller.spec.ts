@@ -293,7 +293,7 @@ describe('DocumentsController', () => {
 
       const result = await controller.processDocument(caseId, documentId);
 
-      expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId);
+      expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId, false);
       expect(result).toEqual({ data: processedDocument });
     });
 
@@ -335,6 +335,24 @@ describe('DocumentsController', () => {
       await expect(controller.processDocument(caseId, documentId)).rejects.toThrow(
         BadGatewayException,
       );
+    });
+
+    it('should pass force=true to service when ?force=true query param is present (Task 4.1)', async () => {
+      mockDocumentsService.processDocument.mockResolvedValue(processedDocument);
+
+      const result = await controller.processDocument(caseId, documentId, 'true');
+
+      expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId, true);
+      expect(result).toEqual({ data: processedDocument });
+    });
+
+    it('should pass force=false to service when force query param is absent (Task 4.2)', async () => {
+      mockDocumentsService.processDocument.mockResolvedValue(processedDocument);
+
+      const result = await controller.processDocument(caseId, documentId);
+
+      expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId, false);
+      expect(result).toEqual({ data: processedDocument });
     });
   });
 });

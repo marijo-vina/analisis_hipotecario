@@ -118,8 +118,9 @@ export class DocumentsController {
   async processDocument(
     @Param('caseId') caseId: string,
     @Param('documentId') documentId: string,
+    @Query('force') force?: string,
   ) {
-    const data = await this.documentsService.processDocument(caseId, documentId);
+    const data = await this.documentsService.processDocument(caseId, documentId, force === 'true');
     return { data };
   }
 }
