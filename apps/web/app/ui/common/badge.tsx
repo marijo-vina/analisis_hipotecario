@@ -17,6 +17,7 @@ const STATUS_COLOR_MAP: Record<string, string> = {
   VALIDATED:  'bg-green-100 text-green-800',
   PROCESSED:  'bg-teal-100 text-teal-800',
   ERROR:      'bg-red-100 text-red-800',
+  OCR_ERROR:  'bg-red-100 text-red-800',
 
   // Legacy case statuses — kept for backward compatibility
   DATA_EXTRACTED:   'bg-violet-100 text-violet-800',
@@ -42,11 +43,15 @@ interface StatusBadgeProps {
  */
 export default function StatusBadge({ code, name }: StatusBadgeProps): ReactElement {
   const colorClasses = STATUS_COLOR_MAP[code] ?? FALLBACK_COLOR;
+  const isProcessing = code === "PROCESSING";
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorClasses}`}
     >
+      {isProcessing && (
+        <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-current animate-pulse" aria-hidden="true" />
+      )}
       {name}
     </span>
   );
