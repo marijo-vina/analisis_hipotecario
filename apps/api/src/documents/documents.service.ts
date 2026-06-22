@@ -197,7 +197,7 @@ export class DocumentsService {
     await this.prisma.document.delete({ where: { id: documentId } });
   }
 
-  async processDocument(caseId: string, documentId: string) {
+  async processDocument(caseId: string, documentId: string, force?: boolean) {
     // 1. Fetch document with status include — 404 if not found or wrong case
     const document = await this.findOneByCase(caseId, documentId);
 
@@ -205,7 +205,7 @@ export class DocumentsService {
     if (document.documentStatus.code === 'PROCESSING') {
       throw new BadRequestException('Document is already being processed');
     }
-    if (document.documentStatus.code === 'PROCESSED') {
+    if (!force && document.documentStatus.code === 'PROCESSED') {
       throw new BadRequestException('Document has already been processed');
     }
 

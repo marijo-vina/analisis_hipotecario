@@ -767,6 +767,12 @@ describe('DocumentsService', () => {
     beforeEach(() => {
       jest.useFakeTimers();
       jest.setSystemTime(now);
+      // Reset mock implementation chains to prevent stale mockResolvedValueOnce
+      // values from leaking between tests (critical for TDD RED phase where
+      // failing tests don't consume their mockResolvedValueOnce values).
+      mockPrismaService.document.update.mockReset();
+      mockPrismaService.document.findUnique.mockReset();
+      mockDocumentAiService.extractText.mockReset();
     });
 
     afterEach(() => {
@@ -888,6 +894,108 @@ describe('DocumentsService', () => {
         'Document has already been processed',
       );
       expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should bypass PROCESSED gate when force=true and proceed to processing (Task 3.1)', async () => {
+      const processedDoc = {
+        ...mockDocument,
+        documentStatusId: mockProcessedStatus.id,
+        documentStatus: mockProcessedStatus,
+        ocrText: 'Old OCR text',
+        processedAt: new Date('2026-01-01T00:00:00Z'),
+      };
+
+      mockPrismaService.document.findUnique.mockResolvedValue(processedDoc);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...processedDoc, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...processedDoc,
+          documentStatusId: mockProcessedStatus.id,
+          documentStatus: mockProcessedStatus,
+          ocrText: extractedText,
+          processedAt: now,
+        });
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      const result = await service.processDocument(caseId, documentId, true);
+
+      // Gate was bypassed — processing proceeded
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(1, {
+        where: { id: documentId },
+        data: { documentStatusId: mockProcessingStatus.id },
+      });
+      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
+    });
+
+    it('should still reject PROCESSING status with 400 when force=true (Task 3.2)', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        documentStatusId: mockProcessingStatus.id,
+        documentStatus: mockProcessingStatus,
+      });
+
+      await expect(service.processDocument(caseId, documentId, true)).rejects.toThrow(
+        'Document is already being processed',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should reject PROCESSED status with 400 when force=false (Task 3.3)', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue({
+        ...mockDocument,
+        documentStatusId: mockProcessedStatus.id,
+        documentStatus: mockProcessedStatus,
+      });
+
+      await expect(service.processDocument(caseId, documentId, false)).rejects.toThrow(
+        'Document has already been processed',
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should process UPLOADED normally with force=true (Task 3.4)', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
+        const statusMap: Record<string, typeof mockProcessingStatus> = {
+          PROCESSING: mockProcessingStatus,
+          PROCESSED: mockProcessedStatus,
+          ERROR: mockErrorStatus,
+          OCR_ERROR: mockOcrErrorStatus,
+        };
+        return Promise.resolve(statusMap[args.where.code] || null);
+      });
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...mockDocument,
+          documentStatusId: mockProcessedStatus.id,
+          documentStatus: mockProcessedStatus,
+          ocrText: extractedText,
+          processedAt: now,
+        });
+      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+
+      const result = await service.processDocument(caseId, documentId, true);
+
+      // Processing proceeds normally — force is harmless on UPLOADED
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(1, {
+        where: { id: documentId },
+        data: { documentStatusId: mockProcessingStatus.id },
+      });
+      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
     });
 
     it('should reject null fileUrl with 400', async () => {
