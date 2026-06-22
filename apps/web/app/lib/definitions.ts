@@ -114,6 +114,10 @@ export interface Document {
   originalName: string;
   uploadedById: string;
   uploadedBy?: { id: string; name: string };
+  // OCR fields (HU-07 document processing)
+  ocrText?: string;
+  processedAt?: string;
+  processingError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
