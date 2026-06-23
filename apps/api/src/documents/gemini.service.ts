@@ -34,7 +34,7 @@ export interface ExtractionResult {
   error?: { code: string; message: string; details?: unknown };
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-pro';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
@@ -143,7 +143,6 @@ export class GeminiService {
       responseMimeType: 'application/json',
       temperature: 0.1,
       maxOutputTokens: this.maxOutputTokens,
-      responseSchema: schema,
     };
 
     try {

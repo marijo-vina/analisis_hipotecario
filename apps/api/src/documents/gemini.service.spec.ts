@@ -48,7 +48,7 @@ describe('GeminiService', () => {
   });
 
   describe('constructor', () => {
-    it('initializes the SDK client when GEMINI_API_KEY is set and non-empty', async () => {
+    it('initializes the SDK client with default Gemini model when GEMINI_MODEL is not set', async () => {
       configureEnv();
       const module = await buildModule();
       service = module.get<GeminiService>(GeminiService);
@@ -56,7 +56,7 @@ describe('GeminiService', () => {
       expect(service).toBeDefined();
       expect(GoogleGenerativeAI).toHaveBeenCalledWith(API_KEY);
       expect(mockGetGenerativeModel).toHaveBeenCalledWith({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash',
       });
     });
 
@@ -229,7 +229,7 @@ describe('GeminiService', () => {
       expect(result.extractedData).toEqual({ rfc: 'XAXX010101000' });
     });
 
-    it('injects the provided schema into generationConfig.responseSchema', async () => {
+    it('injects the provided schema into the prompt, not generationConfig', async () => {
       const customSchema = {
         type: 'object',
         properties: { name: { type: 'string' }, date: { type: 'string' } },
@@ -243,9 +243,21 @@ describe('GeminiService', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          generationConfig: expect.objectContaining({ responseSchema: customSchema }),
+          generationConfig: expect.objectContaining({
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+          }),
         }),
       );
+      // responseSchema NO debe estar en generationConfig
+      const callArgs = mockGenerateContent.mock.calls[0][0];
+      expect((callArgs as any).generationConfig).not.toHaveProperty(
+        'responseSchema',
+      );
+      // El esquema debe ir serializado dentro del prompt
+      const promptText = callArgs.contents[0].parts[0].text;
+      expect(promptText).toContain(JSON.stringify(customSchema));
     });
 
     it('sets responseMimeType application/json and temperature 0.1 in generationConfig', async () => {
