@@ -5,11 +5,18 @@ import { DocumentsService } from './documents.service';
 import { DocumentAiService } from './document-ai.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
+import { GeminiService } from './gemini.service';
 
 @Module({
   imports: [PrismaModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentAiService, StoragePathService, GcsService],
+  providers: [
+    DocumentsService,
+    DocumentAiService,
+    StoragePathService,
+    GcsService,
+    GeminiService,
+  ],
   exports: [DocumentsService, StoragePathService],
 })
 export class DocumentsModule {}
