@@ -6,6 +6,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { OfficialIdExtractionService } from './official-id-extraction.service';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -20,6 +21,10 @@ describe('DocumentsController', () => {
     processDocument: jest.fn(),
   };
 
+  const mockOfficialIdExtractionService = {
+    extract: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -29,6 +34,10 @@ describe('DocumentsController', () => {
         {
           provide: DocumentsService,
           useValue: mockDocumentsService,
+        },
+        {
+          provide: OfficialIdExtractionService,
+          useValue: mockOfficialIdExtractionService,
         },
       ],
     }).compile();
@@ -353,6 +362,55 @@ describe('DocumentsController', () => {
 
       expect(mockDocumentsService.processDocument).toHaveBeenCalledWith(caseId, documentId, false);
       expect(result).toEqual({ data: processedDocument });
+    });
+  });
+
+  describe('extractOfficialId', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+
+    const successfulExtraction = {
+      success: true,
+      documentId,
+      extractedData: {
+        identity: {
+          idType: 'INE',
+          fullName: 'JUAN PÉREZ',
+          birthDate: '1990-03-15',
+          curp: 'PEJ900315HYNRLN08',
+        },
+      },
+      alerts: [],
+      missingFields: [],
+    };
+
+    it('should return 200 with extraction result in data envelope', async () => {
+      mockOfficialIdExtractionService.extract.mockResolvedValue(
+        successfulExtraction,
+      );
+
+      const result = await controller.extractOfficialId(caseId, documentId);
+
+      expect(
+        mockOfficialIdExtractionService.extract,
+      ).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
+    });
+
+    it('should return error result without throwing when extraction fails gracefully', async () => {
+      const failureResult = {
+        success: false,
+        documentId,
+        extractedData: null,
+        alerts: [],
+        missingFields: [],
+        error: { code: 'DOCUMENT_NOT_PROCESSED', message: 'El documento debe estar procesado' },
+      };
+      mockOfficialIdExtractionService.extract.mockResolvedValue(failureResult);
+
+      const result = await controller.extractOfficialId(caseId, documentId);
+
+      expect(result).toEqual({ data: failureResult });
     });
   });
 });

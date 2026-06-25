@@ -3,11 +3,10 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument, processDocument } from "@/app/actions/documents";
+import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId } from "@/app/actions/documents";
 import Button from "@/app/ui/common/button";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
-import OcrTextDialog from "@/app/ui/common/ocr-text-dialog";
 
 interface DocumentActionsProps {
   caseId: string;
@@ -15,22 +14,20 @@ interface DocumentActionsProps {
 }
 
 /**
- * Client component that renders action buttons per document row in the
- * table: "Ver" (document preview), "Procesar" / "Reintentar" (OCR),
- * "Ver OCR" (extracted text modal), and "Eliminar" (with confirmation).
+ * Client component that renders action buttons per document row.
  *
- * Button visibility is driven by `document.documentStatus.code`:
+ * Button visibility by status:
  *
- * | Status      | Buttons                          |
- * |-------------|----------------------------------|
- * | UPLOADED    | Ver, Procesar, Eliminar          |
- * | PROCESSING  | Ver (disabled), spinner        |
- * | PROCESSED   | Ver, Ver OCR                     |
- * | OCR_ERROR   | Ver, Reintentar                  |
- * | ERROR       | Ver, Reintentar                  |
+ * | Status     | Buttons                                          |
+ * |------------|--------------------------------------------------|
+ * | UPLOADED   | Ver, Procesar (OCR+IA), Eliminar                 |
+ * | PROCESSING | Ver (disabled), spinner                         |
+ * | PROCESSED  | Ver, Reprocesar                                  |
+ * | OCR_ERROR  | Ver, Reintentar                                  |
+ * | ERROR      | Ver, Reintentar                                  |
  *
- * All backend calls go through server actions — `apiFetch` is never
- * exposed on the client side.
+ * "Procesar" chains OCR + AI extraction for document types that have
+ * an extractor (currently INE). "Reprocesar" re-runs the full pipeline.
  */
 export default function DocumentActions({
   caseId,
@@ -47,22 +44,19 @@ export default function DocumentActions({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // ── OCR state ────────────────────────────────────────────────────────
+  // ── Process state (OCR + optional extraction) ─────────────────────────
   const [processLoading, setProcessLoading] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
 
   // ── View handler ─────────────────────────────────────────────────────
   const handleView = useCallback(async () => {
     setViewLoading(true);
     setPreviewUrl(null);
-
     try {
       const signedUrl = await getDocumentViewUrl(caseId, document.id);
       setPreviewUrl(signedUrl);
       setPreviewOpen(true);
     } catch {
-      // signedUrl stays null — dialog will show error state
       setPreviewOpen(true);
     } finally {
       setViewLoading(false);
@@ -74,20 +68,17 @@ export default function DocumentActions({
     setPreviewUrl(null);
   }, []);
 
-  // ── Delete handler (passed to ConfirmDialog.onConfirm) ───────────────
+  // ── Delete handler ───────────────────────────────────────────────────
   const handleDelete = useCallback(async () => {
     setDeleteError(null);
     try {
       await deleteDocument(caseId, document.id);
       router.refresh();
-      // Success — ConfirmDialog will call onClose
     } catch (err) {
       const msg =
-        err instanceof Error
-          ? err.message
-          : "Error al eliminar el documento";
+        err instanceof Error ? err.message : "Error al eliminar el documento";
       setDeleteError(msg);
-      throw err; // Re-throw so ConfirmDialog keeps the dialog open
+      throw err;
     }
   }, [caseId, document.id, router]);
 
@@ -96,12 +87,31 @@ export default function DocumentActions({
     setDeleteError(null);
   }, []);
 
-  // ── OCR process handler (Procesar / Reintentar) ──────────────────────
+  // ── Process handler: OCR → optional AI extraction ────────────────────
   const handleProcess = useCallback(async () => {
     setProcessLoading(true);
     setProcessError(null);
     try {
-      await processDocument(caseId, document.id);
+      const needsForce =
+        document.documentStatus.code === "PROCESSED" ||
+        document.documentStatus.code === "OCR_ERROR" ||
+        document.documentStatus.code === "ERROR";
+
+      // Step 1: OCR
+      await processDocument(caseId, document.id, needsForce);
+
+      // Step 2: AI extraction for eligible document types (currently INE)
+      if (document.documentType.code === "INE") {
+        try {
+          await extractOfficialId(caseId, document.id);
+        } catch {
+          // Extraction failed — non-blocking; OCR succeeded
+          setProcessError(
+            "OCR completado, pero la extracción de datos falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
       router.refresh();
     } catch (err) {
       const msg =
@@ -112,7 +122,7 @@ export default function DocumentActions({
     } finally {
       setProcessLoading(false);
     }
-  }, [caseId, document.id, router]);
+  }, [caseId, document.id, document.documentType.code, router]);
 
   // ── Visibility ───────────────────────────────────────────────────────
   const statusCode = document.documentStatus.code;
@@ -143,11 +153,11 @@ export default function DocumentActions({
             disabled={processLoading}
             loading={processLoading}
           >
-            Procesar
+            {processLoading ? "Procesando..." : "Procesar"}
           </Button>
         )}
 
-        {/* ── Processing indicator (PROCESSING) ──────────────────────── */}
+        {/* ── Processing indicator ───────────────────────────────────── */}
         {isProcessing && (
           <Button variant="secondary" disabled>
             <svg
@@ -175,13 +185,15 @@ export default function DocumentActions({
           </Button>
         )}
 
-        {/* ── Ver OCR (PROCESSED) ────────────────────────────────────── */}
+        {/* ── Reprocesar (PROCESSED) ───────────────────────────────── */}
         {isProcessed && (
           <Button
-            variant="secondary"
-            onClick={() => setOcrDialogOpen(true)}
+            variant="primary"
+            onClick={handleProcess}
+            disabled={processLoading}
+            loading={processLoading}
           >
-            Ver OCR
+            {processLoading ? "Procesando..." : "Reprocesar"}
           </Button>
         )}
 
@@ -193,7 +205,7 @@ export default function DocumentActions({
             disabled={processLoading}
             loading={processLoading}
           >
-            Reintentar
+            {processLoading ? "Procesando..." : "Reintentar"}
           </Button>
         )}
 
@@ -213,7 +225,7 @@ export default function DocumentActions({
         <p className="mt-1 text-xs text-red-600">{processError}</p>
       )}
 
-      {/* ── Document preview dialog (T029) ────────────────────────────── */}
+      {/* ── Document preview dialog ────────────────────────────────────── */}
       <DocumentPreviewDialog
         open={previewOpen}
         onClose={handleClosePreview}
@@ -222,24 +234,16 @@ export default function DocumentActions({
         mimeType={document.mimeType ?? ""}
       />
 
-      {/* ── Delete confirmation dialog (T028) ─────────────────────────── */}
+      {/* ── Delete confirmation dialog ─────────────────────────────────── */}
       <ConfirmDialog
         open={deleteConfirmOpen}
         onClose={handleCloseDeleteDialog}
         title="Eliminar documento"
-        message={`¿Estás segura de que deseas eliminar este documento? Esta acción no se puede deshacer y el archivo será removido del expediente.`}
+        message="¿Estás segura de que deseas eliminar este documento? Esta acción no se puede deshacer y el archivo será removido del expediente."
         confirmLabel="Eliminar"
         confirmVariant="destructive"
         onConfirm={handleDelete}
         error={deleteError}
-      />
-
-      {/* ── OCR text dialog ────────────────────────────────────────────── */}
-      <OcrTextDialog
-        open={ocrDialogOpen}
-        onClose={() => setOcrDialogOpen(false)}
-        ocrText={document.ocrText}
-        fileName={document.originalName}
       />
     </>
   );
