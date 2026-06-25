@@ -211,3 +211,249 @@ export function aggregateAlerts(documents: Document[]): AggregatedAlert[] {
   }
   return out;
 }
+
+// ── Payroll extraction parsing ────────────────────────────────────────────
+
+export interface ParsedPayrollSummary {
+  recibosProcesados: number;
+  totalRecibos: number;
+  periodos: string[];
+  empleado: { nombre: string; rfc: string } | null;
+  empleadores: { nombre: string; rfc: string }[];
+  ingresoBrutoPromedio: number | null;
+  ingresoNetoPromedio: number | null;
+  timbradoDetectado: number;
+  totalRecibosTimbrados: number;
+  alertas: number;
+}
+
+export interface ParsedPayrollReceipt {
+  documentId: string;
+  periodo: string;
+  fechaPago: string;
+  periodicidad: string;
+  ingresoBruto: number | null;
+  deducciones: number | null;
+  ingresoNeto: number | null;
+  timbrado: boolean;
+  alertas: number;
+  alertasLista: ExtractionAlert[];
+  empleado: { nombre: string; rfc: string } | null;
+  empleador: { nombre: string; rfc: string } | null;
+  percepciones: { concepto: string; importe: number }[];
+  deduccionesDetalle: { concepto: string; importe: number }[];
+}
+
+export interface ParsedPayroll {
+  summary: ParsedPayrollSummary | null;
+  receipts: ParsedPayrollReceipt[];
+  hasError: boolean;
+  errorMessage: string | null;
+}
+
+/**
+ * Parses all PAYROLL_RECEIPT documents into a structured payroll view.
+ *
+ * Only documents with `extractedData` are included in the summary/table.
+ * Documents with PROCESSED status but no extractedData are counted as
+ * unprocessed. Documents with ERROR/EXTRACTION_ERROR status are flagged.
+ */
+export function parsePayroll(documents: Document[]): ParsedPayroll {
+  const payrollDocs = documents.filter(
+    (d) => d.documentType.code === "PAYROLL_RECEIPT",
+  );
+
+  const totalRecibos = payrollDocs.length;
+
+  // Check for extraction errors
+  const errorDoc = payrollDocs.find(
+    (d) =>
+      d.documentStatus.code === "ERROR" ||
+      d.documentStatus.code === "EXTRACTION_ERROR",
+  );
+  if (errorDoc) {
+    return {
+      summary: null,
+      receipts: [],
+      hasError: true,
+      errorMessage:
+        "No se pudo extraer la información de este recibo de nómina. Intenta reprocesar el documento.",
+    };
+  }
+
+  // Filter to PROCESSED docs with extractedData
+  const processed = payrollDocs.filter(
+    (d) =>
+      d.documentStatus.code === "PROCESSED" && d.extractedData != null,
+  );
+
+  if (processed.length === 0) {
+    return {
+      summary: null,
+      receipts: [],
+      hasError: false,
+      errorMessage: null,
+    };
+  }
+
+  // Build receipts from processed documents
+  const receipts: ParsedPayrollReceipt[] = [];
+  const allPeriodos: string[] = [];
+  let totalBruto = 0;
+  let totalNeto = 0;
+  let countBruto = 0;
+  let countNeto = 0;
+  let timbradoCount = 0;
+  let totalAlertas = 0;
+  const empleadosMap = new Map<string, { nombre: string; rfc: string }>();
+  const empleadoresMap = new Map<string, { nombre: string; rfc: string }>();
+
+  for (const doc of processed) {
+    const ed = doc.extractedData as Record<string, unknown>;
+    const employee = (ed.employee as Record<string, unknown>) ?? {};
+    const employer = (ed.employer as Record<string, unknown>) ?? {};
+    const payrollPeriod =
+      (ed.payrollPeriod as Record<string, unknown>) ?? {};
+    const income = (ed.income as Record<string, unknown>) ?? {};
+    const fiscalStamp =
+      (ed.fiscalStamp as Record<string, unknown>) ?? {};
+    const deductionsArr = ed.deductions as Record<string, unknown>[] | undefined;
+    const variablePerceptions = income.variablePerceptions as
+      | Record<string, unknown>[]
+      | undefined;
+
+    const empName = (employee.fullName as string) ?? null;
+    const empRfc = (employee.rfc as string) ?? null;
+    const emplName = (employer.legalName as string) ?? null;
+    const emplRfc = (employer.rfc as string) ?? null;
+
+    if (empName || empRfc) {
+      const key = empRfc ?? empName ?? "unknown";
+      if (!empleadosMap.has(key)) {
+        empleadosMap.set(key, {
+          nombre: empName ?? "No detectado",
+          rfc: empRfc ?? "—",
+        });
+      }
+    }
+
+    if (emplName || emplRfc) {
+      const key = emplRfc ?? emplName ?? "unknown";
+      if (!empleadoresMap.has(key)) {
+        empleadoresMap.set(key, {
+          nombre: emplName ?? "No detectado",
+          rfc: emplRfc ?? "—",
+        });
+      }
+    }
+
+    const periodo =
+      [
+        payrollPeriod.periodStartDate,
+        payrollPeriod.periodEndDate,
+      ]
+        .filter(Boolean)
+        .join(" a ") || "No detectado";
+    const fechaPago =
+      (payrollPeriod.paymentDate as string) ?? "No detectado";
+    const periodicidad =
+      (payrollPeriod.periodicity as string) ?? "No detectado";
+
+    const ingresoBruto = income.grossIncome as number | null;
+    const deducciones = income.totalDeductions as number | null;
+    const ingresoNeto = income.netIncome as number | null;
+
+    const hasQr = fiscalStamp.hasQrCode === true;
+    const hasSeal = fiscalStamp.hasSatDigitalSeal === true;
+    const timbrado = hasQr || hasSeal;
+
+    const alerts = filterAlerts(ed.alerts);
+    const alertCount = alerts.length;
+
+    // Percepciones
+    const percepciones: { concepto: string; importe: number }[] = [];
+    if (Array.isArray(variablePerceptions)) {
+      for (const p of variablePerceptions) {
+        const desc =
+          (p.description as string) ?? (p.type as string) ?? "Percepción";
+        const amount = p.amount as number | undefined;
+        if (amount != null) {
+          percepciones.push({ concepto: desc, importe: amount });
+        }
+      }
+    }
+
+    // Deducciones detalle
+    const deduccionesDetalle: { concepto: string; importe: number }[] = [];
+    if (Array.isArray(deductionsArr)) {
+      for (const d of deductionsArr) {
+        const desc =
+          (d.description as string) ?? (d.type as string) ?? "Deducción";
+        const amount = d.amount as number | undefined;
+        if (amount != null) {
+          deduccionesDetalle.push({ concepto: desc, importe: amount });
+        }
+      }
+    }
+
+    allPeriodos.push(periodo);
+
+    if (ingresoBruto != null) {
+      totalBruto += ingresoBruto;
+      countBruto++;
+    }
+    if (ingresoNeto != null) {
+      totalNeto += ingresoNeto;
+      countNeto++;
+    }
+    if (timbrado) timbradoCount++;
+    totalAlertas += alertCount;
+
+    receipts.push({
+      documentId: doc.id,
+      periodo,
+      fechaPago,
+      periodicidad,
+      ingresoBruto,
+      deducciones,
+      ingresoNeto,
+      timbrado,
+      alertas: alertCount,
+      alertasLista: alerts,
+      empleado: empName
+        ? { nombre: empName, rfc: empRfc ?? "—" }
+        : null,
+      empleador: emplName
+        ? { nombre: emplName, rfc: emplRfc ?? "—" }
+        : null,
+      percepciones,
+      deduccionesDetalle,
+    });
+  }
+
+  // Build summary
+  const empleados = Array.from(empleadosMap.values());
+  const empleadores = Array.from(empleadoresMap.values());
+
+  const summary: ParsedPayrollSummary = {
+    recibosProcesados: processed.length,
+    totalRecibos,
+    periodos: allPeriodos,
+    empleado: empleados.length > 0 ? empleados[0] : null,
+    empleadores,
+    ingresoBrutoPromedio:
+      countBruto > 0 ? totalBruto / countBruto : null,
+    ingresoNetoPromedio:
+      countNeto > 0 ? totalNeto / countNeto : null,
+    timbradoDetectado: timbradoCount,
+    totalRecibosTimbrados: processed.length,
+    alertas: totalAlertas,
+  };
+
+  return {
+    summary,
+    receipts,
+    hasError: false,
+    errorMessage: null,
+  };
+}
