@@ -24,6 +24,7 @@ export enum GeminiErrorCode {
   GEMINI_TIMEOUT = 'GEMINI_TIMEOUT',
   GEMINI_SCHEMA_MISSING = 'GEMINI_SCHEMA_MISSING',
   OCR_TEXT_EMPTY = 'OCR_TEXT_EMPTY',
+  GEMINI_TEMPORARILY_UNAVAILABLE = 'GEMINI_TEMPORARILY_UNAVAILABLE',
 }
 
 export interface ExtractionResult {
@@ -37,6 +38,15 @@ export interface ExtractionResult {
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+/** HTTP status codes that indicate a temporary server-side overload. */
+const RETRYABLE_STATUSES = new Set([429, 503]);
+
+/** Maximum retries for transient errors. */
+const MAX_RETRIES = 3;
+
+/** Backoff delays in milliseconds: attempt 1 → 0ms, 2 → 1000ms, 3 → 2000ms. */
+const RETRY_DELAYS_MS = [0, 1000, 2000];
 
 @Injectable()
 export class GeminiService {
@@ -117,6 +127,43 @@ export class GeminiService {
     }
   }
 
+  /**
+   * Executes a single Gemini API call with timeout.
+   * Returns the raw GenerateContentResult, or throws on failure.
+   */
+  private async executeRequest(
+    prompt: string,
+    generationConfig: Record<string, unknown>,
+  ) {
+    return this.callWithTimeout(
+      this.model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig,
+      }),
+    );
+  }
+
+  /**
+   * Determines whether an error is retryable (429 Too Many Requests or
+   * 503 Service Unavailable / high-demand).
+   */
+  private isRetryable(err: unknown): boolean {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = (err as { status?: number })?.status;
+
+    // Check HTTP status first
+    if (status !== undefined && RETRYABLE_STATUSES.has(status)) {
+      return true;
+    }
+
+    // Fallback: check error message for known patterns
+    return (
+      /503|service unavailable|high demand|too many requests|429|overloaded/i.test(
+        message,
+      )
+    );
+  }
+
   async extractStructuredData(
     ocrText: string,
     documentType: string,
@@ -147,51 +194,126 @@ export class GeminiService {
       };
     }
 
-    const prompt = this.buildPrompt(ocrText, documentType, schema, extraInstructions);
+    const prompt = this.buildPrompt(
+      ocrText,
+      documentType,
+      schema,
+      extraInstructions,
+    );
     const generationConfig = {
       responseMimeType: 'application/json',
       temperature: 0.1,
       maxOutputTokens: this.maxOutputTokens,
     };
 
-    try {
-      const genResult = await this.callWithTimeout(
-        this.model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig,
-        }),
-      );
+    // ── Retry loop for transient errors ─────────────────────────────
+    let lastError: unknown;
 
-      const rawText = genResult.response.text();
-
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        const extracted = this.parseJsonResponse(rawText);
-        return {
-          success: true,
-          documentType,
-          extractedData: extracted,
-          rawResponse: rawText,
-        };
-      } catch (parseErr) {
-        const code =
-          parseErr instanceof Error
-            ? parseErr.message
-            : GeminiErrorCode.GEMINI_INVALID_JSON;
-        this.logger.error(`[Gemini] JSON parse failed: ${code}`);
-        return {
-          success: false,
-          documentType,
-          extractedData: null,
-          rawResponse: rawText,
-          error: {
-            code,
-            message: parseErr instanceof Error ? parseErr.message : String(parseErr),
-          },
-        };
+        if (attempt > 0) {
+          const delay = RETRY_DELAYS_MS[attempt] ?? 2000;
+          this.logger.warn(
+            `[Gemini] Retry attempt ${attempt + 1}/${MAX_RETRIES} after ${delay}ms for ${documentType}`,
+          );
+          await this.sleep(delay);
+        }
+
+        const genResult = await this.executeRequest(prompt, generationConfig);
+        const rawText = genResult.response.text();
+
+        try {
+          const extracted = this.parseJsonResponse(rawText);
+          return {
+            success: true,
+            documentType,
+            extractedData: extracted,
+            rawResponse: rawText,
+          };
+        } catch (parseErr) {
+          const code =
+            parseErr instanceof Error
+              ? parseErr.message
+              : GeminiErrorCode.GEMINI_INVALID_JSON;
+          this.logger.error(`[Gemini] JSON parse failed: ${code}`);
+          return {
+            success: false,
+            documentType,
+            extractedData: null,
+            rawResponse: rawText,
+            error: {
+              code,
+              message:
+                parseErr instanceof Error
+                  ? parseErr.message
+                  : String(parseErr),
+            },
+          };
+        }
+      } catch (err) {
+        lastError = err;
+
+        // Only retry on transient server errors
+        if (this.isRetryable(err) && attempt < MAX_RETRIES - 1) {
+          continue;
+        }
+
+        // If it's a timeout, don't retry — return immediately
+        if (/timeout|deadline|GEMINI_TIMEOUT/i.test(
+          err instanceof Error ? err.message : String(err),
+        )) {
+          return {
+            success: false,
+            documentType,
+            extractedData: null,
+            error: {
+              code: GeminiErrorCode.GEMINI_TIMEOUT,
+              message: err instanceof Error ? err.message : String(err),
+            },
+          };
+        }
+
+        break; // non-retryable or exhausted retries
       }
-    } catch (err) {
-      return this.mapExtractorError(err, documentType);
     }
+
+    // ── Exhausted retries or non-retryable error ────────────────────
+    const message =
+      lastError instanceof Error ? lastError.message : String(lastError);
+    this.logger.error(`[Gemini] extraction error: ${message}`);
+
+    // Distinguish transient from permanent
+    if (this.isRetryable(lastError)) {
+      return {
+        success: false,
+        documentType,
+        extractedData: null,
+        error: {
+          code: GeminiErrorCode.GEMINI_TEMPORARILY_UNAVAILABLE,
+          message:
+            'Gemini no estuvo disponible temporalmente. Intenta reprocesar el documento en unos minutos.',
+          details: { attempts: MAX_RETRIES },
+        },
+      };
+    }
+
+    const maybeStatus = (lastError as { status?: unknown; code?: unknown }) || {};
+    const status = maybeStatus.status ?? maybeStatus.code;
+
+    return {
+      success: false,
+      documentType,
+      extractedData: null,
+      error: {
+        code: GeminiErrorCode.GEMINI_REQUEST_ERROR,
+        message,
+        details: status !== undefined ? { status } : undefined,
+      },
+    };
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private callWithTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -208,36 +330,5 @@ export class GeminiService {
       /* swallow — race settled already */
     });
     return Promise.race([promise, timeoutPromise]);
-  }
-
-  private mapExtractorError(
-    err: unknown,
-    documentType: string,
-  ): ExtractionResult {
-    const message = err instanceof Error ? err.message : String(err);
-    this.logger.error(`[Gemini] extraction error: ${message}`);
-
-    if (/timeout|deadline|GEMINI_TIMEOUT/i.test(message)) {
-      return {
-        success: false,
-        documentType,
-        extractedData: null,
-        error: { code: GeminiErrorCode.GEMINI_TIMEOUT, message },
-      };
-    }
-
-    const maybeStatus = (err as { status?: unknown; code?: unknown }) || {};
-    const status = maybeStatus.status ?? maybeStatus.code;
-
-    return {
-      success: false,
-      documentType,
-      extractedData: null,
-      error: {
-        code: GeminiErrorCode.GEMINI_REQUEST_ERROR,
-        message,
-        details: status !== undefined ? { status } : undefined,
-      },
-    };
   }
 }

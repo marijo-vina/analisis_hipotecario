@@ -308,7 +308,7 @@ describe('GeminiService', () => {
       expect(result.error?.code).toBe('GEMINI_TIMEOUT');
     });
 
-    it('returns GEMINI_REQUEST_ERROR with status in details when API returns HTTP 503', async () => {
+    it('returns GEMINI_TEMPORARILY_UNAVAILABLE after exhausting retries on HTTP 503', async () => {
       const apiError: any = new Error('Service Unavailable');
       apiError.status = 503;
       mockGenerateContent.mockRejectedValue(apiError);
@@ -316,8 +316,51 @@ describe('GeminiService', () => {
       const result = await service.extractStructuredData(ocrText, 'INE', schema);
 
       expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('GEMINI_TEMPORARILY_UNAVAILABLE');
+      expect(result.error?.message).toContain('no estuvo disponible temporalmente');
+      // Should have attempted MAX_RETRIES (3) times
+      expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries on HTTP 429 and returns GEMINI_TEMPORARILY_UNAVAILABLE after exhausting retries', async () => {
+      const apiError: any = new Error('Too Many Requests');
+      apiError.status = 429;
+      mockGenerateContent.mockRejectedValue(apiError);
+
+      const result = await service.extractStructuredData(ocrText, 'INE', schema);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('GEMINI_TEMPORARILY_UNAVAILABLE');
+      expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    });
+
+    it('succeeds on second attempt when first attempt is 503', async () => {
+      const apiError: any = new Error('Service Unavailable');
+      apiError.status = 503;
+      mockGenerateContent
+        .mockRejectedValueOnce(apiError)
+        .mockResolvedValueOnce({
+          response: { text: () => '{"name":"retry-success"}' },
+        });
+
+      const result = await service.extractStructuredData(ocrText, 'INE', schema);
+
+      expect(result.success).toBe(true);
+      expect(result.extractedData).toEqual({ name: 'retry-success' });
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns GEMINI_REQUEST_ERROR on non-retryable errors without retrying', async () => {
+      const apiError: any = new Error('Internal Server Error');
+      apiError.status = 500;
+      mockGenerateContent.mockRejectedValue(apiError);
+
+      const result = await service.extractStructuredData(ocrText, 'INE', schema);
+
+      expect(result.success).toBe(false);
       expect(result.error?.code).toBe('GEMINI_REQUEST_ERROR');
-      expect(result.error?.details).toEqual({ status: 503 });
+      // Should NOT retry — only 1 attempt
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     });
 
     it('returns GEMINI_INVALID_JSON when API returns non-JSON text', async () => {

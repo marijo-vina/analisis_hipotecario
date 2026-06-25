@@ -361,6 +361,27 @@ describe('PayrollExtractionService', () => {
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe('GEMINI_TIMEOUT');
     });
+
+    it('returns GEMINI_TEMPORARILY_UNAVAILABLE and does NOT save data', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockGemini.extractStructuredData.mockResolvedValue({
+        success: false,
+        documentType: 'PAYROLL_RECEIPT',
+        extractedData: null,
+        error: {
+          code: 'GEMINI_TEMPORARILY_UNAVAILABLE',
+          message:
+            'Gemini no estuvo disponible temporalmente. Intenta reprocesar el documento en unos minutos.',
+        },
+      });
+
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('GEMINI_TEMPORARILY_UNAVAILABLE');
+      expect(result.extractedData).toBeNull();
+      // Must NOT attempt to persist
+      expect(mockPrisma.document.update).not.toHaveBeenCalled();
+    });
   });
 
   // ── Alert: missing net income ──────────────────────────────────────
@@ -566,6 +587,203 @@ describe('PayrollExtractionService', () => {
       const result = await service.extract('case-1', 'doc-payroll-1');
       expect(result.success).toBe(true);
       expect(result.extractedData).not.toBeNull();
+    });
+  });
+
+  // ── IMSS receipt: real data extraction ─────────────────────────────
+  describe('extract — IMSS receipt (real data)', () => {
+    const imssOcrText =
+      'INSTITUTO MEXICANO DEL SEGURO SOCIAL\n' +
+      'IMS421231I45\n' +
+      'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS\n' +
+      'RFC: DICA690402RZ4\n' +
+      'CURP: DICA690402HYNZBL09\n' +
+      'PERIODO: 1A-MAY-2025\n' +
+      'FECHA PAGO: 30-ABR-2025\n' +
+      'TOTAL PERCEPCIONES: 39104.26\n' +
+      'TOTAL DEDUCCIONES: 12814.26\n' +
+      'LIQUIDO: 26290.00\n' +
+      'FECHA INGRESO: 20/12/2001\n' +
+      'ANTIGÜEDAD: 21 AÑOS 7 QNAS 10 DIAS\n' +
+      'FOLIO FISCAL: ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED\n' +
+      'FECHA CERTIFICACION: 2025-04-30T09:35:53\n' +
+      'CREDITO HIPOTECARIO ESMI: 3972.48\n' +
+      'FALTAS INJUSTIFICADAS: 1618.43\n' +
+      'ISR: 3506.04\n' +
+      'METODO PAGO: ACREDITAMIENTO EN CUENTA\n' +
+      'BANCO: BANCOMER\n' +
+      'SELLO DIGITAL SAT: PRESENTE\n' +
+      'QR: PRESENTE';
+
+    const imssGeminiResponse = {
+      schemaVersion: '1.0',
+      documentType: 'PAYROLL_RECEIPT',
+      extractionMetadata: {
+        sourceDocumentId: 'doc-imss-1',
+        mortgageCaseId: 'case-1',
+        ocrProcessedAt: '2026-06-24T12:00:00Z',
+        extractedAt: '2026-06-24T12:01:00Z',
+        model: 'gemini-2.5-flash',
+        confidence: 0.93,
+      },
+      documentRequirementContext: {
+        incomeBehavior: 'FIXED',
+        requiredPayrollReceiptMonths: 3,
+        requiredBankStatementMonths: 3,
+        detectedDocumentMonths: null,
+        isRequirementSatisfied: null,
+        requirementNotes: null,
+      },
+      employee: {
+        fullName: 'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS',
+        rfc: 'DICA690402RZ4',
+        curp: 'DICA690402HYNZBL09',
+        employmentStartDate: '2001-12-20',
+        employmentSeniorityText: '21 AÑOS 7 QNAS 10 DIAS',
+        contributesToImss: false,
+      },
+      employer: {
+        legalName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
+        rfc: 'IMS421231I45',
+        possiblePayrollProvider: false,
+      },
+      payrollPeriod: {
+        periodStartDate: null,
+        periodEndDate: null,
+        paymentDate: '2025-04-30',
+        periodicity: 'MONTHLY',
+        isClosedPeriod: true,
+      },
+      income: {
+        grossIncome: 39104.26,
+        totalDeductions: 12814.26,
+        netIncome: 26290.0,
+        currency: 'MXN',
+        incomeBehaviorDetected: 'FIXED',
+        variablePerceptions: [],
+      },
+      deductions: [
+        {
+          type: 'TAX',
+          description: 'ISR',
+          amount: 3506.04,
+          requiresAlert: false,
+        },
+        {
+          type: 'MORTGAGE_LOAN',
+          description: 'CREDITO HIPOTECARIO ESMI',
+          amount: 3972.48,
+          requiresAlert: true,
+        },
+        {
+          type: 'OTHER',
+          description: 'FALTAS INJUSTIFICADAS',
+          amount: 1618.43,
+          requiresAlert: false,
+        },
+      ],
+      fiscalStamp: {
+        hasQrCode: true,
+        hasSatDigitalSeal: true,
+        uuid: 'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
+        stampDate: '2025-04-30T09:35:53',
+      },
+      crossCheckPreparation: {
+        expectedBankDepositAmount: 26290.0,
+        expectedBankDepositDate: '2025-04-30',
+        expectedEmployerName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
+        requiresBankStatementMatch: true,
+      },
+      missingFields: [],
+      alerts: [],
+    };
+
+    beforeEach(() => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: imssOcrText }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue({
+        success: true,
+        documentType: 'PAYROLL_RECEIPT',
+        extractedData: imssGeminiResponse,
+      });
+      mockPrisma.document.update.mockResolvedValue({});
+    });
+
+    it('extracts employer legal name correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const employer = ed.employer as Record<string, unknown>;
+      expect(employer.legalName).toBe(
+        'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
+      );
+    });
+
+    it('extracts employer RFC correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const employer = ed.employer as Record<string, unknown>;
+      expect(employer.rfc).toBe('IMS421231I45');
+    });
+
+    it('extracts employee full name correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const employee = ed.employee as Record<string, unknown>;
+      expect(employee.fullName).toBe(
+        'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS',
+      );
+    });
+
+    it('extracts employee RFC correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const employee = ed.employee as Record<string, unknown>;
+      expect(employee.rfc).toBe('DICA690402RZ4');
+    });
+
+    it('extracts gross income correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const income = ed.income as Record<string, unknown>;
+      expect(income.grossIncome).toBe(39104.26);
+    });
+
+    it('extracts net income correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const income = ed.income as Record<string, unknown>;
+      expect(income.netIncome).toBe(26290.0);
+    });
+
+    it('extracts fiscal folio (UUID) correctly', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const fs = ed.fiscalStamp as Record<string, unknown>;
+      expect(fs.uuid).toBe(
+        'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
+      );
+    });
+
+    it('detects timbrado/CFDI as present', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const fs = ed.fiscalStamp as Record<string, unknown>;
+      expect(fs.hasQrCode).toBe(true);
+      expect(fs.hasSatDigitalSeal).toBe(true);
+    });
+
+    it('generates alert for mortgage loan deduction (Crédito Hipotecario ESMI)', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PAYROLL_DEDUCTION_MORTGAGE_LOAN',
+            severity: 'WARNING',
+            category: 'INCOME',
+          }),
+        ]),
+      );
     });
   });
 });

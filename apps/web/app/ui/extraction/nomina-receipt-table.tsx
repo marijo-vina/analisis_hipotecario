@@ -1,29 +1,32 @@
 "use client";
 
 import { useState, Fragment } from "react";
+import type { ExtractionAlert } from "@/app/lib/extraction";
 
-// ── Mock receipt shape (contract not finalized on the backend yet) ────────
-export interface ReceiptRow {
+// ── Receipt row shape (parsed from real extractedData) ─────────────────
+export interface ParsedReceiptRow {
+  documentId: string;
   periodo: string;
   fechaPago: string;
   periodicidad: string;
-  ingresoBruto: number;
-  deducciones: number;
-  ingresoNeto: number;
+  ingresoBruto: number | null;
+  deducciones: number | null;
+  ingresoNeto: number | null;
   timbrado: boolean;
   alertas: number;
-  // expanded detail
-  empleado?: { nombre: string; rfc: string };
-  empleador?: { nombre: string; rfc: string };
-  percepciones?: { concepto: string; importe: number }[];
-  deduccionesDetalle?: { concepto: string; importe: number }[];
+  alertasLista: ExtractionAlert[];
+  empleado: { nombre: string; rfc: string } | null;
+  empleador: { nombre: string; rfc: string } | null;
+  percepciones: { concepto: string; importe: number }[];
+  deduccionesDetalle: { concepto: string; importe: number }[];
 }
 
 interface NominaReceiptTableProps {
-  rows: ReceiptRow[];
+  rows: ParsedReceiptRow[];
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | null): string {
+  if (value == null) return "—";
   return `$${value.toLocaleString("es-MX")}`;
 }
 
@@ -46,7 +49,9 @@ function DetailBlock({ title, items }: DetailBlockProps) {
             className="flex items-center justify-between gap-4 text-xs text-gf-text"
           >
             <span>{item.concepto}</span>
-            <span className="font-medium">{formatCurrency(item.importe)}</span>
+            <span className="font-medium">
+              {formatCurrency(item.importe)}
+            </span>
           </li>
         ))}
       </ul>
@@ -55,14 +60,12 @@ function DetailBlock({ title, items }: DetailBlockProps) {
 }
 
 /**
- * NominaReceiptTable — expandable table of individual payroll receipts.
- *
- * Custom table (not the presentational `DataTable`) because it needs per-row
- * expand state. Columns: Periodo, Fecha de pago, Periodicidad, Ingreso bruto,
- * Deducciones, Ingreso neto, Timbrado, Alertas, plus a "Ver detalle" toggle
- * that reveals the expanded row with empleado/empleador/percepciones/deducciones.
+ * NominaReceiptTable — expandable table of individual payroll receipts
+ * built from real extracted data. No mock data.
  */
-export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
+export default function NominaReceiptTable({
+  rows,
+}: NominaReceiptTableProps) {
   const [expanded, setExpanded] = useState<number | null>(null);
 
   const toggle = (index: number) => {
@@ -72,7 +75,7 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
   if (rows.length === 0) {
     return (
       <div className="rounded-[var(--radius-md)] border border-gf-border bg-gf-surface p-8 text-center text-sm text-gf-text-muted">
-        No hay recibos de nomina procesados aun.
+        No hay recibos de nómina procesados aún.
       </div>
     );
   }
@@ -86,7 +89,7 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
     "Ingreso neto",
     "Timbrado",
     "Alertas",
-    "Accion",
+    "Acción",
   ];
 
   return (
@@ -109,10 +112,14 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
           {rows.map((row, index) => {
             const isExpanded = expanded === index;
             return (
-              <Fragment key={index}>
-                <tr key={`row-${index}`} className="border-b border-gf-border last:border-b-0 hover:bg-gf-red-soft/30 transition-colors duration-150">
-                  <td className="px-4 py-3 whitespace-nowrap">{row.periodo}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{row.fechaPago}</td>
+              <Fragment key={row.documentId}>
+                <tr className="border-b border-gf-border last:border-b-0 hover:bg-gf-red-soft/30 transition-colors duration-150">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {row.periodo}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {row.fechaPago}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {row.periodicidad}
                   </td>
@@ -128,7 +135,7 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
                   <td className="px-4 py-3 whitespace-nowrap">
                     {row.timbrado ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
-                        <span aria-hidden="true">✓</span> Si
+                        <span aria-hidden="true">✓</span> Sí
                       </span>
                     ) : (
                       <span className="text-xs font-medium text-amber-700">
@@ -158,8 +165,11 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
                 </tr>
 
                 {isExpanded && (
-                  <tr key={`detail-${index}`} className="border-b border-gf-border last:border-b-0 bg-gf-bg/40">
-                    <td colSpan={headers.length} className="px-4 py-4">
+                  <tr className="border-b border-gf-border last:border-b-0 bg-gf-bg/40">
+                    <td
+                      colSpan={headers.length}
+                      className="px-4 py-4"
+                    >
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* Datos del empleado / empleador */}
                         <div className="space-y-4">
@@ -187,7 +197,9 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
                               <dt className="font-medium text-gf-text-muted">
                                 Nombre:
                               </dt>
-                              <dd>{row.empleador?.nombre ?? "—"}</dd>
+                              <dd>
+                                {row.empleador?.nombre ?? "—"}
+                              </dd>
                               <dt className="font-medium text-gf-text-muted">
                                 RFC:
                               </dt>
@@ -200,11 +212,23 @@ export default function NominaReceiptTable({ rows }: NominaReceiptTableProps) {
                               <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
                                 Alertas del recibo
                               </h5>
-                              <p className="text-xs text-amber-700">
-                                Este recibo presenta {row.alertas}{" "}
-                                {row.alertas === 1 ? "alerta" : "alertas"}.
-                                Revisa los detalles con la asesora.
-                              </p>
+                              <ul className="space-y-1">
+                                {row.alertasLista.map((a, i) => (
+                                  <li
+                                    key={`${a.code}-${i}`}
+                                    className={`text-xs rounded px-2 py-1 ${
+                                      a.severity === "CRITICAL"
+                                        ? "bg-red-50 text-red-700"
+                                        : "bg-amber-50 text-amber-700"
+                                    }`}
+                                  >
+                                    <span className="font-semibold">
+                                      {a.severity}
+                                    </span>
+                                    : {a.message}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
                           )}
                         </div>

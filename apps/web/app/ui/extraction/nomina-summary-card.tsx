@@ -1,30 +1,16 @@
 import type { ReactNode } from "react";
-
+import type { ParsedPayrollSummary } from "@/app/lib/extraction";
 import Card from "@/app/ui/common/card";
 
-// ── Mock summary shape (contract not finalized on the backend yet) ────────
-export interface NominaSummaryData {
-  recibosProcesados: number;
-  totalRecibos: number;
-  periodos: string[];
-  empleado: { nombre: string; rfc: string };
-  empleadores: { nombre: string; rfc: string }[];
-  ingresoBrutoPromedio: number;
-  ingresoNetoPromedio: number;
-  timbradoDetectado: number;
-  totalRecibosTimbrados: number;
-  alertas: number;
-}
-
 interface NominaSummaryCardProps {
-  data: NominaSummaryData;
+  data: ParsedPayrollSummary;
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | null): string {
+  if (value == null) return "—";
   return `$${value.toLocaleString("es-MX")}`;
 }
 
-/** A small labelled cell for the summary grid (mirrors FieldGrid's look). */
 function Cell({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -37,26 +23,24 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * NominaSummaryCard — consolidated payroll summary shown at the top of the
- * Nomina tab. Renders counts, employee/employer data, average income,
- * timbrado status, and alert count.
- *
- * Uses the mock shape defined in the change prompt — no financial data is
- * pulled from the API until the payroll extraction contract is finalized.
+ * NominaSummaryCard — consolidated payroll summary from real extracted data.
  */
-export default function NominaSummaryCard({ data }: NominaSummaryCardProps) {
+export default function NominaSummaryCard({
+  data,
+}: NominaSummaryCardProps) {
   const allTimbrado =
-    data.totalRecibos > 0 && data.timbradoDetectado === data.totalRecibos;
+    data.totalRecibos > 0 &&
+    data.timbradoDetectado === data.totalRecibosTimbrados;
   const someTimbrado = data.timbradoDetectado > 0 && !allTimbrado;
 
   return (
     <Card>
       <h3 className="text-base font-semibold text-gf-text mb-1">
-        Resumen de nomina
+        Resumen de nómina
       </h3>
       <p className="text-xs text-gf-text-muted mb-4">
-        Consolidado de {data.recibosProcesados} de {data.totalRecibos} recibos
-        procesados.
+        Consolidado de {data.recibosProcesados} de {data.totalRecibos}{" "}
+        recibos procesados.
       </p>
 
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -68,8 +52,12 @@ export default function NominaSummaryCard({ data }: NominaSummaryCardProps) {
             ? data.periodos.join(", ")
             : "Sin periodos detectados"}
         </Cell>
-        <Cell label="Empleado">{data.empleado.nombre}</Cell>
-        <Cell label="RFC del empleado">{data.empleado.rfc}</Cell>
+        <Cell label="Empleado">
+          {data.empleado?.nombre ?? "No detectado"}
+        </Cell>
+        <Cell label="RFC del empleado">
+          {data.empleado?.rfc ?? "—"}
+        </Cell>
         <Cell label="Empleador">
           {data.empleadores.length > 0
             ? data.empleadores.map((e) => e.nombre).join(", ")
@@ -98,14 +86,14 @@ export default function NominaSummaryCard({ data }: NominaSummaryCardProps) {
           >
             {allTimbrado && (
               <>
-                <span aria-hidden="true">✓</span> {data.timbradoDetectado}/
-                {data.totalRecibosTimbrados}
+                <span aria-hidden="true">✓</span>{" "}
+                {data.timbradoDetectado}/{data.totalRecibosTimbrados}
               </>
             )}
             {someTimbrado && (
               <>
-                <span aria-hidden="true">⚠</span> {data.timbradoDetectado}/
-                {data.totalRecibosTimbrados}
+                <span aria-hidden="true">⚠</span>{" "}
+                {data.timbradoDetectado}/{data.totalRecibosTimbrados}
               </>
             )}
             {!allTimbrado && !someTimbrado && "No detectado"}
