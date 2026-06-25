@@ -52,17 +52,21 @@ function DetailBlock({ title, items }: DetailBlockProps) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+      <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
         {title}
       </h5>
-      <ul className="space-y-1">
+      <ul className="divide-y divide-gf-border/50 rounded-md border border-gf-border/50 overflow-hidden">
         {items.map((item, i) => (
           <li
             key={`${item.concepto}-${item.importe}-${i}`}
-            className="flex items-center justify-between gap-4 text-xs text-gf-text"
+            className={`flex items-center justify-between gap-4 px-3 py-2 text-xs ${
+              i % 2 === 0 ? "bg-white" : "bg-gf-bg/40"
+            }`}
           >
-            <span>{item.concepto}</span>
-            <span className="font-medium">
+            <span className="text-gf-text leading-snug min-w-0 break-words">
+              {item.concepto}
+            </span>
+            <span className="font-semibold text-gf-text text-right shrink-0 tabular-nums">
               {formatCurrency(item.importe)}
             </span>
           </li>
@@ -178,19 +182,19 @@ export default function NominaReceiptTable({
                 </tr>
 
                 {isExpanded && (
-                  <tr className="border-b border-gf-border last:border-b-0 bg-gf-bg/40">
+                  <tr className="border-b border-gf-border last:border-b-0 bg-gf-red-soft/10">
                     <td
                       colSpan={headers.length}
-                      className="px-4 py-4"
+                      className="px-5 py-5"
                     >
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Datos del empleado / empleador / employment */}
-                        <div className="space-y-4">
+                        <div className="space-y-5">
                           <div>
-                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
                               Datos del empleado
                             </h5>
-                            <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
                               <dt className="font-medium text-gf-text-muted">
                                 Nombre:
                               </dt>
@@ -198,15 +202,15 @@ export default function NominaReceiptTable({
                               <dt className="font-medium text-gf-text-muted">
                                 RFC:
                               </dt>
-                              <dd>{row.empleado?.rfc ?? "—"}</dd>
+                              <dd className="font-mono">{row.empleado?.rfc ?? "—"}</dd>
                             </dl>
                           </div>
 
                           <div>
-                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
                               Datos del empleador
                             </h5>
-                            <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
                               <dt className="font-medium text-gf-text-muted">
                                 Nombre:
                               </dt>
@@ -216,16 +220,16 @@ export default function NominaReceiptTable({
                               <dt className="font-medium text-gf-text-muted">
                                 RFC:
                               </dt>
-                              <dd>{row.empleador?.rfc ?? "—"}</dd>
+                              <dd className="font-mono">{row.empleador?.rfc ?? "—"}</dd>
                             </dl>
                           </div>
 
                           {row.employment && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
                                 Antigüedad laboral
                               </h5>
-                              <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
                                 <dt className="font-medium text-gf-text-muted">
                                   Fecha de ingreso:
                                 </dt>
@@ -248,19 +252,19 @@ export default function NominaReceiptTable({
                                 </dd>
                               </dl>
                               {row.employment.imssEvidence && (
-                                <p className="mt-1 text-xs text-gf-text-muted">
-                                  Evidencia: {row.employment.imssEvidence}
+                                <p className="mt-1.5 text-[11px] text-gf-text-muted leading-relaxed">
+                                  {row.employment.imssEvidence}
                                 </p>
                               )}
                             </div>
                           )}
 
                           {row.isVariableIncome && (
-                            <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
-                                ⚠ Ingresos variables detectados
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-amber-800 mb-1">
+                                Ingresos variables detectados
                               </h5>
-                              <p className="text-xs text-amber-700">
+                              <p className="text-xs text-amber-700 leading-relaxed">
                                 Este recibo contiene percepciones variables o
                                 conceptos no base. Revisar si se requieren 6
                                 meses de recibos para promediar.
@@ -270,17 +274,17 @@ export default function NominaReceiptTable({
 
                           {row.alertas > 0 && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
                                 Alertas del recibo
                               </h5>
-                              <ul className="space-y-1">
+                              <ul className="space-y-1.5">
                                 {row.alertasLista.map((a, i) => (
                                   <li
                                     key={`${a.code}-${i}`}
-                                    className={`text-xs rounded px-2 py-1 ${
+                                    className={`text-xs rounded-md border-l-2 px-3 py-2 ${
                                       a.severity === "CRITICAL"
-                                        ? "bg-red-50 text-red-700"
-                                        : "bg-amber-50 text-amber-700"
+                                        ? "border-l-red-500 bg-red-50 text-red-800"
+                                        : "border-l-amber-500 bg-amber-50 text-amber-800"
                                     }`}
                                   >
                                     <span className="font-semibold">
@@ -295,7 +299,7 @@ export default function NominaReceiptTable({
                         </div>
 
                         {/* Percepciones / Deducciones */}
-                        <div className="space-y-4">
+                        <div className="space-y-5">
                           <DetailBlock
                             title="Percepciones"
                             items={row.percepciones}
@@ -307,20 +311,20 @@ export default function NominaReceiptTable({
 
                           {row.fiscalData && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
-                                Datos fiscales / Timbrado
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                                Datos fiscales
                               </h5>
-                              <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
                                 <dt className="font-medium text-gf-text-muted">
                                   Folio fiscal:
                                 </dt>
-                                <dd className="font-mono text-[11px] break-all">
+                                <dd className="font-mono text-[11px] break-all leading-snug">
                                   {row.fiscalData.fiscalFolio ?? "—"}
                                 </dd>
                                 <dt className="font-medium text-gf-text-muted">
-                                  Fecha certificación:
+                                  Certificación:
                                 </dt>
-                                <dd>
+                                <dd className="text-[11px]">
                                   {row.fiscalData.certificationDate
                                     ? new Date(
                                         row.fiscalData.certificationDate,
@@ -338,11 +342,11 @@ export default function NominaReceiptTable({
                                 </dt>
                                 <dd>
                                   {row.fiscalData.isStamped ? (
-                                    <span className="text-green-700 font-medium">
-                                      Sí
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800">
+                                      <span aria-hidden="true">✓</span> Sí
                                     </span>
                                   ) : (
-                                    <span className="text-amber-700">
+                                    <span className="text-[11px] font-medium text-amber-700">
                                       No detectado
                                     </span>
                                   )}
