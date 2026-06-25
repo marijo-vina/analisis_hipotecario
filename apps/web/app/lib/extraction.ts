@@ -25,6 +25,24 @@ export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
 };
 
 /**
+ * Periodicity code → Spanish label for UI display.
+ * The backend returns WEEKLY/BIWEEKLY/MONTHLY; the UI never shows codes.
+ */
+export const PERIODICITY_LABELS: Record<string, string> = {
+  WEEKLY: "Semanal",
+  BIWEEKLY: "Quincenal",
+  MONTHLY: "Mensual",
+  OTHER: "Otro",
+  UNKNOWN: "No detectado",
+};
+
+/** Converts a periodicity code to its Spanish label. */
+export function periodicityLabel(code: string | null | undefined): string {
+  if (!code) return "No detectado";
+  return PERIODICITY_LABELS[code] ?? code;
+}
+
+/**
  * Maps a document type code to its extraction category.
  * Unknown types default to null (rendered nowhere).
  */
@@ -242,6 +260,14 @@ export interface ParsedPayrollReceipt {
   empleador: { nombre: string; rfc: string } | null;
   percepciones: { concepto: string; importe: number }[];
   deduccionesDetalle: { concepto: string; importe: number }[];
+  employment: {
+    hireDate: string | null;
+    seniorityText: string | null;
+    hasMinimumSeniority: boolean | null;
+    contributesToImss: boolean | null;
+    imssEvidence: string | null;
+  } | null;
+  isVariableIncome: boolean;
 }
 
 export interface ParsedPayroll {
@@ -357,7 +383,7 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
     const fechaPago =
       (payrollPeriod.paymentDate as string) ?? "No detectado";
     const periodicidad =
-      (payrollPeriod.periodicity as string) ?? "No detectado";
+      periodicityLabel(payrollPeriod.periodicity as string | null | undefined);
 
     const ingresoBruto = income.grossIncome as number | null;
     const deducciones = income.totalDeductions as number | null;
@@ -396,6 +422,31 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       }
     }
 
+    // Employment data (from employment section, fallback to employee fields)
+    const employmentData = (ed.employment as Record<string, unknown>) ?? {};
+    const hireDate =
+      (employmentData.hireDate as string) ??
+      (employee.employmentStartDate as string) ??
+      null;
+    const seniority =
+      (employmentData.seniorityText as string) ??
+      (employee.employmentSeniorityText as string) ??
+      null;
+    const hasMinSeniority =
+      employmentData.hasMinimumSeniority as boolean | null | undefined ?? null;
+    const contributesImss =
+      (employmentData.contributesToImss as boolean) ??
+      (employee.contributesToImss as boolean) ??
+      null;
+    const imssEvidence =
+      (employmentData.imssEvidence as string) ??
+      (employee.imssEvidence as string) ??
+      null;
+
+    const isVarIncome =
+      income.isVariableIncome === true ||
+      (Array.isArray(variablePerceptions) && variablePerceptions.length > 0);
+
     allPeriodos.push(periodo);
 
     if (ingresoBruto != null) {
@@ -428,6 +479,16 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
         : null,
       percepciones,
       deduccionesDetalle,
+      employment: hireDate || seniority || contributesImss != null
+        ? {
+            hireDate,
+            seniorityText: seniority,
+            hasMinimumSeniority: hasMinSeniority,
+            contributesToImss: contributesImss,
+            imssEvidence,
+          }
+        : null,
+      isVariableIncome: isVarIncome,
     });
   }
 
