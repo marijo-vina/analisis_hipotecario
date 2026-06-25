@@ -56,9 +56,9 @@ function DetailBlock({ title, items }: DetailBlockProps) {
         {title}
       </h5>
       <ul className="space-y-1">
-        {items.map((item) => (
+        {items.map((item, i) => (
           <li
-            key={item.concepto}
+            key={`${item.concepto}-${item.importe}-${i}`}
             className="flex items-center justify-between gap-4 text-xs text-gf-text"
           >
             <span>{item.concepto}</span>
