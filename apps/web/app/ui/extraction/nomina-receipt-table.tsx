@@ -52,9 +52,9 @@ function DetailBlock({ title, items }: DetailBlockProps) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
-        {title}
-      </h5>
+            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
+              {title}
+            </h5>
       <ul className="divide-y divide-gf-border/50 rounded-md border border-gf-border/50 overflow-hidden">
         {items.map((item, i) => (
           <li
@@ -110,7 +110,7 @@ export default function NominaReceiptTable({
   ];
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-gf-border">
+    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-gf-border touch-manipulation">
       <table className="w-full min-w-[820px] text-sm text-gf-text">
         <thead>
           <tr className="border-b border-gf-border bg-gf-bg/50">
@@ -170,14 +170,15 @@ export default function NominaReceiptTable({
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => toggle(index)}
-                      aria-expanded={isExpanded}
-                      className="rounded border border-gf-border bg-gf-bg px-2.5 py-1 text-xs font-medium text-gf-text transition-colors hover:bg-gray-50"
-                    >
-                      Ver detalle
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => toggle(index)}
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? "Ocultar" : "Ver"} detalle del recibo`}
+                        className="rounded border border-gf-border bg-gf-bg px-2.5 py-1 text-xs font-medium text-gf-text transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-gf-red/40 focus-visible:outline-none"
+                      >
+                        {isExpanded ? "Ocultar" : "Ver detalle"}
+                      </button>
                   </td>
                 </tr>
 
@@ -191,7 +192,7 @@ export default function NominaReceiptTable({
                         {/* Datos del empleado / empleador / employment */}
                         <div className="space-y-5">
                           <div>
-                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
                               Datos del empleado
                             </h5>
                             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
@@ -207,7 +208,7 @@ export default function NominaReceiptTable({
                           </div>
 
                           <div>
-                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                            <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
                               Datos del empleador
                             </h5>
                             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
@@ -226,7 +227,7 @@ export default function NominaReceiptTable({
 
                           {row.employment && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
                                 Antigüedad laboral
                               </h5>
                               <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
@@ -274,7 +275,7 @@ export default function NominaReceiptTable({
 
                           {row.alertas > 0 && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
                                 Alertas del recibo
                               </h5>
                               <ul className="space-y-1.5">
@@ -311,7 +312,7 @@ export default function NominaReceiptTable({
 
                           {row.fiscalData && (
                             <div>
-                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2">
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
                                 Datos fiscales
                               </h5>
                               <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-gf-text">
