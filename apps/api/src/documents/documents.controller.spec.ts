@@ -7,6 +7,7 @@ import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
+import { PayrollExtractionService } from './payroll-extraction.service';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -25,6 +26,10 @@ describe('DocumentsController', () => {
     extract: jest.fn(),
   };
 
+  const mockPayrollExtractionService = {
+    extract: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -38,6 +43,10 @@ describe('DocumentsController', () => {
         {
           provide: OfficialIdExtractionService,
           useValue: mockOfficialIdExtractionService,
+        },
+        {
+          provide: PayrollExtractionService,
+          useValue: mockPayrollExtractionService,
         },
       ],
     }).compile();
@@ -409,6 +418,57 @@ describe('DocumentsController', () => {
       mockOfficialIdExtractionService.extract.mockResolvedValue(failureResult);
 
       const result = await controller.extractOfficialId(caseId, documentId);
+
+      expect(result).toEqual({ data: failureResult });
+    });
+  });
+
+  describe('extractPayrollReceipt', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-payroll-uuid-1';
+
+    const successfulExtraction = {
+      success: true,
+      documentId,
+      extractedData: {
+        employee: {
+          fullName: 'JUAN PÉREZ LÓPEZ',
+          rfc: 'PELJ900101ABC',
+        },
+        income: {
+          netIncome: 14800.0,
+          grossIncome: 18000.0,
+        },
+      },
+      alerts: [],
+      missingFields: [],
+    };
+
+    it('should return 200 with extraction result in data envelope', async () => {
+      mockPayrollExtractionService.extract.mockResolvedValue(
+        successfulExtraction,
+      );
+
+      const result = await controller.extractPayrollReceipt(caseId, documentId);
+
+      expect(
+        mockPayrollExtractionService.extract,
+      ).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
+    });
+
+    it('should return error result without throwing when extraction fails gracefully', async () => {
+      const failureResult = {
+        success: false,
+        documentId,
+        extractedData: null,
+        alerts: [],
+        missingFields: [],
+        error: { code: 'DOCUMENT_NOT_PROCESSED', message: 'El documento debe estar procesado' },
+      };
+      mockPayrollExtractionService.extract.mockResolvedValue(failureResult);
+
+      const result = await controller.extractPayrollReceipt(caseId, documentId);
 
       expect(result).toEqual({ data: failureResult });
     });
