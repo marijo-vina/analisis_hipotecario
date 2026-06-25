@@ -6,6 +6,7 @@ import { DocumentAiService } from './document-ai.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
 import { GeminiService } from './gemini.service';
+import { OfficialIdExtractionService } from './official-id-extraction.service';
 
 @Module({
   imports: [PrismaModule],
@@ -16,6 +17,7 @@ import { GeminiService } from './gemini.service';
     StoragePathService,
     GcsService,
     GeminiService,
+    OfficialIdExtractionService,
   ],
   exports: [DocumentsService, StoragePathService],
 })

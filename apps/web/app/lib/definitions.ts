@@ -118,6 +118,8 @@ export interface Document {
   ocrText?: string;
   processedAt?: string;
   processingError?: string | null;
+  // AI extraction (Task 2.7)
+  extractedData?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }

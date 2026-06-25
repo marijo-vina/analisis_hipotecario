@@ -62,13 +62,12 @@ export async function deleteDocument(
 export async function processDocument(
   caseId: string,
   documentId: string,
+  force?: boolean,
 ): Promise<{ success: boolean; ocrText: string; processedAt: string }> {
+  const url = `/mortgage-cases/${caseId}/documents/${documentId}/process${force ? "?force=true" : ""}`;
   const result = await apiFetch<{
     data: { ocrText: string; processedAt: string };
-  }>(
-    `/mortgage-cases/${caseId}/documents/${documentId}/process`,
-    { method: "POST" },
-  );
+  }>(url, { method: "POST" });
 
   if (!result.ok) {
     throw new Error(
@@ -81,4 +80,57 @@ export async function processDocument(
     ocrText: result.data.data.ocrText,
     processedAt: result.data.data.processedAt,
   };
+}
+
+/**
+ * Extrae datos estructurados de un documento de identificación oficial (INE/pasaporte)
+ * usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function extractOfficialId(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+  alerts: Array<{
+    code: string;
+    severity: string;
+    category: string;
+    message: string;
+    field: string | null;
+    requiresManualReview: boolean;
+  }>;
+  missingFields: string[];
+}> {
+  const result = await apiFetch<{
+    data: {
+      success: boolean;
+      extractedData: Record<string, unknown> | null;
+      alerts: Array<{
+        code: string;
+        severity: string;
+        category: string;
+        message: string;
+        field: string | null;
+        requiresManualReview: boolean;
+      }>;
+      missingFields: string[];
+    };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al extraer datos del documento",
+    );
+  }
+
+  return result.data.data;
 }

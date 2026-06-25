@@ -73,9 +73,15 @@ export class GeminiService {
     ocrText: string,
     documentType: string,
     schema: Record<string, unknown>,
+    extraInstructions?: string,
   ): string {
-    return [
-      SYSTEM_INSTRUCTION,
+    const parts = [SYSTEM_INSTRUCTION];
+
+    if (extraInstructions) {
+      parts.push('', extraInstructions);
+    }
+
+    parts.push(
       '',
       `Tipo de documento: ${documentType}`,
       '',
@@ -88,7 +94,9 @@ export class GeminiService {
       '"""',
       ocrText,
       '"""',
-    ].join('\n');
+    );
+
+    return parts.join('\n');
   }
 
   private parseJsonResponse(text: string): Record<string, unknown> {
@@ -113,6 +121,7 @@ export class GeminiService {
     ocrText: string,
     documentType: string,
     schema: Record<string, unknown>,
+    extraInstructions?: string,
   ): Promise<ExtractionResult> {
     if (!ocrText || ocrText.trim() === '') {
       return {
@@ -138,7 +147,7 @@ export class GeminiService {
       };
     }
 
-    const prompt = this.buildPrompt(ocrText, documentType, schema);
+    const prompt = this.buildPrompt(ocrText, documentType, schema, extraInstructions);
     const generationConfig = {
       responseMimeType: 'application/json',
       temperature: 0.1,

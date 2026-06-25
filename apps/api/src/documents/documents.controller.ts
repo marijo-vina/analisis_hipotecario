@@ -20,11 +20,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsService } from './documents.service';
+import { OfficialIdExtractionService } from './official-id-extraction.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly officialIdExtractionService: OfficialIdExtractionService,
+  ) {}
 
   @Post()
   async create(
@@ -121,6 +125,19 @@ export class DocumentsController {
     @Query('force') force?: string,
   ) {
     const data = await this.documentsService.processDocument(caseId, documentId, force === 'true');
+    return { data };
+  }
+
+  @Post(':documentId/extract')
+  @HttpCode(200)
+  async extractOfficialId(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.officialIdExtractionService.extract(
+      caseId,
+      documentId,
+    );
     return { data };
   }
 }
