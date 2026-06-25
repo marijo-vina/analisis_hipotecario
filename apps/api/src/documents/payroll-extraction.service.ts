@@ -22,8 +22,16 @@ const PAYROLL_INSTRUCTIONS = [
   '  - rfc: RFC del trabajador (13 caracteres para persona física).',
   '  - curp: CURP del trabajador (18 caracteres).',
   '  - employmentStartDate: fecha de ingreso o antigüedad (YYYY-MM-DD).',
-  '  - employmentSeniorityText: texto de antigüedad tal cual aparece (ej. "2 AÑOS 5 MESES").',
-  '  - contributesToImss: true si el recibo muestra retención IMSS, false si no.',
+  '     Buscar explícitamente: "Fecha de Ingreso", "Fecha ingreso", "Ingreso", "Antigüedad".',
+  '     Normalizar a YYYY-MM-DD. Ej: "20/12/2001" → "2001-12-20".',
+  '  - employmentSeniorityText: texto de antigüedad tal cual aparece (ej. "21 AÑOS 7 QNAS 10 DIAS", "2 AÑOS 5 MESES").',
+  '     Buscar: "Antigüedad efectiva", "Antigüedad", "Antigüedad laboral".',
+  '  - contributesToImss: true si el recibo muestra evidencia de cotización al IMSS.',
+  '     Evidencia incluye: NSS (Número de Seguridad Social), Registro Patronal,',
+  '     emisor relacionado con IMSS, deducciones de seguridad social,',
+  '     CFDI de nómina timbrado con régimen de sueldos y salarios.',
+  '     Para recibos del IMSS como empleador: marcar true.',
+  '  - imssEvidence: texto breve con la evidencia encontrada (ej. "NSS y registro patronal detectados", "Emisor IMSS").',
   '',
   'Empleador (employer):',
   '  - legalName: razón social del patrón. Normalizar a MAYÚSCULAS.',
@@ -35,6 +43,7 @@ const PAYROLL_INSTRUCTIONS = [
   '  - periodEndDate: fecha de fin del periodo (YYYY-MM-DD).',
   '  - paymentDate: fecha de pago (YYYY-MM-DD).',
   '  - periodicity: periodicidad: WEEKLY, BIWEEKLY (quincenal), MONTHLY, OTHER, UNKNOWN.',
+  '     La UI traducirá estos códigos a español. No escribas etiquetas en español aquí.',
   '  - isClosedPeriod: true si el periodo ya finalizó.',
   '',
   'Ingresos (income):',
@@ -43,7 +52,15 @@ const PAYROLL_INSTRUCTIONS = [
   '  - netIncome: ingreso neto = grossIncome - totalDeductions.',
   '  - currency: "MXN".',
   '  - incomeBehaviorDetected: FIXED si el ingreso es constante entre recibos, VARIABLE si hay comisiones/bonos/PTU, UNKNOWN si no se puede determinar.',
-  '  - variablePerceptions: lista de percepciones variables (BONUS, COMMISSION, COMPENSATION, OVERTIME, PTU, OTHER) con description y amount.',
+  '  - isVariableIncome: true si se detectan percepciones variables o conceptos no base.',
+  '  - variablePerceptions: lista de percepciones variables o no base.',
+  '     Identificar conceptos como: BONUS, COMMISSION (comisiones), COMPENSATION,',
+  '     OVERTIME (horas extra), VACATION_BONUS (prima vacacional),',
+  '     INCENTIVE (estímulos, bonificaciones), OTHER (ayudas, sobresueldos).',
+  '     Incluir también: prima vacacional, estímulo por puntualidad,',
+  '     bonificación seguro médico, atención integral contínua,',
+  '     ayudas extraordinarias, o cualquier concepto que no sea sueldo base fijo.',
+  '     Cada entrada: type, description y amount.',
   '',
   'Deducciones (deductions):',
   '  - Lista de deducciones con type (TAX, IMSS, INFONAVIT, FONACOT, MORTGAGE_LOAN, ALIMONY, EMPLOYEE_LOAN, OTHER, UNKNOWN), description, amount.',
@@ -52,8 +69,9 @@ const PAYROLL_INSTRUCTIONS = [
   'Timbrado fiscal (fiscalStamp):',
   '  - hasQrCode: true si el recibo tiene código QR detectable.',
   '  - hasSatDigitalSeal: true si tiene sello digital SAT.',
-  '  - uuid: UUID del CFDI (36 caracteres con guiones).',
-  '  - stampDate: fecha y hora de timbrado (ISO 8601).',
+  '  - hasCfdiStamp: true si tiene cadena original, sello CFDI, o No. de Serie del Certificado SAT.',
+  '  - fiscalFolio: UUID del CFDI o folio fiscal (36 caracteres con guiones).',
+  '  - certificationDate: fecha y hora de certificación (ISO 8601).',
   '',
   'Preparación de cruce (crossCheckPreparation):',
   '  - expectedBankDepositAmount: monto neto esperado como depósito bancario.',
@@ -62,23 +80,30 @@ const PAYROLL_INSTRUCTIONS = [
   '  - requiresBankStatementMatch: true.',
   '',
   'Contexto de requerimiento documental (documentRequirementContext):',
-  '  - incomeBehavior: FIXED o VARIABLE (según lo detectado en income.incomeBehaviorDetected).',
+  '  - incomeBehavior: FIXED o VARIABLE.',
   '  - requiredPayrollReceiptMonths: 3 para ingreso fijo, 6 para ingreso variable.',
   '  - requiredBankStatementMonths: mismo valor que requiredPayrollReceiptMonths.',
-  '  - detectedDocumentMonths: null (el servicio lo calculará en post-procesamiento).',
-  '  - isRequirementSatisfied: null (el servicio lo evaluará).',
+  '  - detectedDocumentMonths: null.',
+  '  - isRequirementSatisfied: null.',
   '  - requirementNotes: null.',
+  '',
+  'Employment (employment):',
+  '  - hireDate: fecha de ingreso normalizada a YYYY-MM-DD.',
+  '  - seniorityText: texto original de antigüedad.',
+  '  - hasMinimumSeniority: true si la antigüedad o fecha de ingreso indican >= 6 meses. null si no se puede determinar.',
+  '  - contributesToImss: true si hay evidencia de cotización IMSS.',
+  '  - imssEvidence: texto breve con la evidencia encontrada.',
   '',
   'Reglas de alertas:',
   '  - Si falta netIncome, generar alerta CRITICAL PAYROLL_MISSING_NET_INCOME.',
   '  - Si falta employee.rfc, generar alerta WARNING PAYROLL_MISSING_EMPLOYEE_RFC.',
   '  - Si falta employee.fullName, generar alerta WARNING PAYROLL_MISSING_EMPLOYEE_NAME.',
-  '  - Si falta payrollPeriod (periodStartDate o periodEndDate), generar alerta WARNING PAYROLL_MISSING_PERIOD.',
+  '  - Si falta payrollPeriod, generar alerta WARNING PAYROLL_MISSING_PERIOD.',
   '  - Si falta paymentDate, generar alerta WARNING PAYROLL_MISSING_PAYMENT_DATE.',
-  '  - Si fiscalStamp.hasQrCode = false o fiscalStamp.hasSatDigitalSeal = false, generar alerta WARNING PAYROLL_NO_FISCAL_STAMP.',
+  '  - Si NO hay evidencia de timbrado (sin QR, sin sello SAT, sin CFDI, sin folio fiscal, sin fecha certificación), generar alerta WARNING PAYROLL_NO_FISCAL_STAMP.',
   '  - Si hay deducciones de tipo MORTGAGE_LOAN, ALIMONY, INFONAVIT o FONACOT con requiresAlert = true, generar alerta WARNING por cada una.',
-  '  - Si no se detecta employmentStartDate ni employmentSeniorityText, generar alerta WARNING PAYROLL_NO_SENIORITY.',
-  '  - Si hay percepciones variables (variablePerceptions no vacío) y incomeBehavior = VARIABLE, generar alerta INFO (el post-procesamiento la convertirá en CRITICAL si hay < 6 meses).',
+  '  - Si no se detecta hireDate ni seniorityText, generar alerta WARNING PAYROLL_NO_SENIORITY.',
+  '  - Si hay percepciones variables o isVariableIncome = true, generar alerta WARNING PAYROLL_VARIABLE_INCOME.',
   '',
   'Regla de oro: NO inventes datos. Ante cualquier duda, usá null.',
 ].join('\n');
@@ -135,6 +160,14 @@ const PAYROLL_SCHEMA = {
     employmentStartDate: 'YYYY-MM-DD | null',
     employmentSeniorityText: 'string | null',
     contributesToImss: 'boolean | null',
+    imssEvidence: 'string | null',
+  },
+  employment: {
+    hireDate: 'YYYY-MM-DD | null',
+    seniorityText: 'string | null',
+    hasMinimumSeniority: 'boolean | null',
+    contributesToImss: 'boolean | null',
+    imssEvidence: 'string | null',
   },
   employer: {
     legalName: 'string | null',
@@ -154,9 +187,10 @@ const PAYROLL_SCHEMA = {
     netIncome: 'number | null',
     currency: 'MXN',
     incomeBehaviorDetected: 'FIXED | VARIABLE | UNKNOWN',
+    isVariableIncome: 'boolean | null',
     variablePerceptions: [
       {
-        type: 'BONUS | COMMISSION | COMPENSATION | OVERTIME | PTU | OTHER',
+        type: 'BONUS | COMMISSION | COMPENSATION | OVERTIME | VACATION_BONUS | INCENTIVE | OTHER',
         description: 'string | null',
         amount: 'number | null',
       },
@@ -173,8 +207,9 @@ const PAYROLL_SCHEMA = {
   fiscalStamp: {
     hasQrCode: 'boolean | null',
     hasSatDigitalSeal: 'boolean | null',
-    uuid: 'string | null',
-    stampDate: 'datetime | null',
+    hasCfdiStamp: 'boolean | null',
+    fiscalFolio: 'string | null',
+    certificationDate: 'datetime | null',
   },
   crossCheckPreparation: {
     expectedBankDepositAmount: 'number | null',
@@ -210,24 +245,15 @@ export class PayrollExtractionService {
     private readonly geminiService: GeminiService,
   ) {}
 
-  // -----------------------------------------------------------------------
-  // Public: document-type guard
-  // -----------------------------------------------------------------------
-
   /** Returns true when the document type should trigger payroll extraction. */
   static isPayrollDocument(documentTypeCode: string): boolean {
     return PAYROLL_DOC_TYPES.includes(documentTypeCode);
   }
 
-  // -----------------------------------------------------------------------
-  // Public: main extraction method
-  // -----------------------------------------------------------------------
-
   async extract(
     caseId: string,
     documentId: string,
   ): Promise<PayrollExtractionResult> {
-    // 1. Fetch document with type + status
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
       include: { documentType: true, documentStatus: true },
@@ -237,7 +263,6 @@ export class PayrollExtractionService {
       throw new Error('Document not found');
     }
 
-    // 2. Guard: must be PROCESSED (have OCR text)
     if (document.documentStatus.code !== 'PROCESSED') {
       return {
         success: false,
@@ -247,8 +272,7 @@ export class PayrollExtractionService {
         missingFields: [],
         error: {
           code: 'DOCUMENT_NOT_PROCESSED',
-          message:
-            'El documento debe estar procesado (OCR) antes de la extracción.',
+          message: 'El documento debe estar procesado (OCR) antes de la extracción.',
         },
       };
     }
@@ -267,7 +291,6 @@ export class PayrollExtractionService {
       };
     }
 
-    // 3. Call Gemini with specialized instructions
     const promptSchema = { ...PAYROLL_SCHEMA };
     const geminiResult = await this.geminiService.extractStructuredData(
       document.ocrText,
@@ -276,7 +299,6 @@ export class PayrollExtractionService {
       PAYROLL_INSTRUCTIONS,
     );
 
-    // 4. Handle Gemini errors
     if (!geminiResult.success) {
       this.logger.warn(
         `[Payroll] Gemini extraction failed for doc ${documentId}: ${geminiResult.error?.code}`,
@@ -288,21 +310,16 @@ export class PayrollExtractionService {
         alerts: [],
         missingFields: [],
         error: geminiResult.error
-          ? {
-              code: geminiResult.error.code,
-              message: geminiResult.error.message,
-            }
+          ? { code: geminiResult.error.code, message: geminiResult.error.message }
           : { code: 'UNKNOWN', message: 'Extraction failed' },
       };
     }
 
     const data = geminiResult.extractedData as Record<string, unknown>;
 
-    // 5. Post-process: compute alerts and missing fields
     const alerts = this.computeAlerts(data);
     const missingFields = this.computeMissingFields(data);
 
-    // 6. Merge alerts into extractedData (dedup by code)
     const existingCodes = new Set<string>();
     if (Array.isArray(data.alerts)) {
       for (const a of data.alerts as ExtractionAlert[]) {
@@ -314,7 +331,6 @@ export class PayrollExtractionService {
       data.alerts = alerts;
     }
 
-    // Merge missingFields
     if (Array.isArray(data.missingFields)) {
       const existingFields: string[] = (data.missingFields as unknown[])
         .filter((f): f is string => typeof f === 'string');
@@ -326,12 +342,8 @@ export class PayrollExtractionService {
       data.missingFields = missingFields;
     }
 
-    // 7. Normalize alerts to Spanish
-    data.alerts = this.normalizeAlerts(
-      (data.alerts as ExtractionAlert[]) ?? [],
-    );
+    data.alerts = this.normalizeAlerts((data.alerts as ExtractionAlert[]) ?? []);
 
-    // 8. Persist extractedData to DB
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await this.prisma.document.update({
@@ -342,7 +354,6 @@ export class PayrollExtractionService {
       this.logger.error(
         `[Payroll] Failed to persist extractedData for doc ${documentId}: ${(dbError as Error).message}`,
       );
-      // Non-blocking — return the data even if persistence fails
     }
 
     return {
@@ -361,30 +372,22 @@ export class PayrollExtractionService {
   private computeAlerts(data: Record<string, unknown>): ExtractionAlert[] {
     const alerts: ExtractionAlert[] = [];
 
-    const employee =
-      (data.employee as Record<string, unknown> | undefined) ?? {};
-    const employer =
-      (data.employer as Record<string, unknown> | undefined) ?? {};
-    const payrollPeriod =
-      (data.payrollPeriod as Record<string, unknown> | undefined) ?? {};
-    const income =
-      (data.income as Record<string, unknown> | undefined) ?? {};
-    const fiscalStamp =
-      (data.fiscalStamp as Record<string, unknown> | undefined) ?? {};
+    const employee = (data.employee as Record<string, unknown> | undefined) ?? {};
+    const employment = (data.employment as Record<string, unknown> | undefined) ?? {};
+    const employer = (data.employer as Record<string, unknown> | undefined) ?? {};
+    const payrollPeriod = (data.payrollPeriod as Record<string, unknown> | undefined) ?? {};
+    const income = (data.income as Record<string, unknown> | undefined) ?? {};
+    const fiscalStamp = (data.fiscalStamp as Record<string, unknown> | undefined) ?? {};
     const deductions = data.deductions as Record<string, unknown>[] | undefined;
-    const variablePerceptions = income.variablePerceptions as
-      | Record<string, unknown>[]
-      | undefined;
+    const variablePerceptions = income.variablePerceptions as Record<string, unknown>[] | undefined;
 
     // --- Missing net income ---
-    const netIncome = income.netIncome as number | undefined | null;
-    if (netIncome == null) {
+    if (income.netIncome == null) {
       alerts.push({
         code: 'PAYROLL_MISSING_NET_INCOME',
         severity: 'CRITICAL',
         category: 'INCOME',
-        message:
-          'No se pudo extraer el ingreso neto del recibo de nómina.',
+        message: 'No se pudo extraer el ingreso neto del recibo de nómina.',
         field: 'income.netIncome',
         requiresManualReview: true,
       });
@@ -397,8 +400,7 @@ export class PayrollExtractionService {
         code: 'PAYROLL_MISSING_EMPLOYEE_RFC',
         severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'No se detectó el RFC del empleado en el recibo de nómina.',
+        message: 'No se detectó el RFC del empleado en el recibo de nómina.',
         field: 'employee.rfc',
         requiresManualReview: true,
       });
@@ -411,76 +413,53 @@ export class PayrollExtractionService {
         code: 'PAYROLL_MISSING_EMPLOYEE_NAME',
         severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'No se detectó el nombre del empleado en el recibo de nómina.',
+        message: 'No se detectó el nombre del empleado en el recibo de nómina.',
         field: 'employee.fullName',
         requiresManualReview: true,
       });
     }
 
     // --- Missing payroll period ---
-    const periodStart = payrollPeriod.periodStartDate as
-      | string
-      | undefined
-      | null;
-    const periodEnd = payrollPeriod.periodEndDate as
-      | string
-      | undefined
-      | null;
+    const periodStart = payrollPeriod.periodStartDate as string | undefined | null;
+    const periodEnd = payrollPeriod.periodEndDate as string | undefined | null;
     if (!periodStart && !periodEnd) {
       alerts.push({
         code: 'PAYROLL_MISSING_PERIOD',
         severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'No se detectó el periodo del recibo de nómina.',
+        message: 'No se detectó el periodo del recibo de nómina.',
         field: 'payrollPeriod',
         requiresManualReview: true,
       });
     }
 
     // --- Missing payment date ---
-    const paymentDate = payrollPeriod.paymentDate as
-      | string
-      | undefined
-      | null;
+    const paymentDate = payrollPeriod.paymentDate as string | undefined | null;
     if (!paymentDate || paymentDate.trim() === '') {
       alerts.push({
         code: 'PAYROLL_MISSING_PAYMENT_DATE',
         severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'No se detectó la fecha de pago del recibo de nómina.',
+        message: 'No se detectó la fecha de pago del recibo de nómina.',
         field: 'payrollPeriod.paymentDate',
         requiresManualReview: true,
       });
     }
 
-    // --- No fiscal stamp ---
-    const hasQr = fiscalStamp.hasQrCode as boolean | undefined | null;
-    const hasSeal = fiscalStamp.hasSatDigitalSeal as
-      | boolean
-      | undefined
-      | null;
-    if (hasQr === false || hasSeal === false) {
+    // --- No fiscal stamp — use isStamped logic ────────────────────────
+    if (!this.isStamped(fiscalStamp)) {
       alerts.push({
         code: 'PAYROLL_NO_FISCAL_STAMP',
         severity: 'WARNING',
         category: 'DOCUMENT_QUALITY',
-        message:
-          'No se detectó timbrado fiscal (QR o sello digital SAT) en el recibo.',
+        message: 'No se detectó timbrado fiscal (QR, sello digital SAT, CFDI o folio fiscal) en el recibo.',
         field: 'fiscalStamp',
         requiresManualReview: true,
       });
     }
 
     // --- Relevant deductions (mortgage, alimony, INFONAVIT, FONACOT) ---
-    const relevantDeductionTypes = [
-      'MORTGAGE_LOAN',
-      'ALIMONY',
-      'INFONAVIT',
-      'FONACOT',
-    ];
+    const relevantDeductionTypes = ['MORTGAGE_LOAN', 'ALIMONY', 'INFONAVIT', 'FONACOT'];
     if (Array.isArray(deductions)) {
       for (const ded of deductions) {
         const dType = (ded.type as string) ?? '';
@@ -500,62 +479,47 @@ export class PayrollExtractionService {
       }
     }
 
-    // --- Missing employment seniority ---
-    const employmentStart = employee.employmentStartDate as
-      | string
-      | undefined
-      | null;
-    const seniorityText = employee.employmentSeniorityText as
-      | string
-      | undefined
-      | null;
+    // --- Missing employment seniority ─────────────────────────────────
+    const hireDate = (employment.hireDate ?? employee.employmentStartDate) as string | undefined | null;
+    const seniorityText = (employment.seniorityText ?? employee.employmentSeniorityText) as string | undefined | null;
     if (
-      (!employmentStart || employmentStart.trim() === '') &&
+      (!hireDate || hireDate.trim() === '') &&
       (!seniorityText || seniorityText.trim() === '')
     ) {
       alerts.push({
         code: 'PAYROLL_NO_SENIORITY',
         severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'No se detectó fecha de ingreso ni antigüedad laboral. Si se requiere comprobar antigüedad, solicitar nómina antigua de al menos 7 meses.',
-        field: 'employee.employmentStartDate',
+        message: 'No se detectó fecha de ingreso ni antigüedad laboral. Solicitar al cliente una nómina antigua para validar al menos 6 meses de antigüedad.',
+        field: 'employment.hireDate',
         requiresManualReview: true,
       });
     }
 
-    // --- Variable income detected ---
-    const hasVariablePerceptions =
-      Array.isArray(variablePerceptions) &&
-      variablePerceptions.length > 0;
-    const incomeBehavior = income.incomeBehaviorDetected as
-      | string
-      | undefined;
-    if (hasVariablePerceptions && incomeBehavior !== 'FIXED') {
+    // --- Variable income detected ─────────────────────────────────────
+    const isVariableIncome = income.isVariableIncome === true;
+    const hasVariablePerceptions = Array.isArray(variablePerceptions) && variablePerceptions.length > 0;
+    const incomeBehavior = income.incomeBehaviorDetected as string | undefined;
+    if (hasVariablePerceptions || isVariableIncome || (incomeBehavior && incomeBehavior !== 'FIXED' && incomeBehavior !== 'UNKNOWN')) {
       alerts.push({
-        code: 'PAYROLL_VARIABLE_INCOME_DETECTED',
-        severity: 'INFO',
+        code: 'PAYROLL_VARIABLE_INCOME',
+        severity: 'WARNING',
         category: 'INCOME',
-        message:
-          'Se detectaron percepciones variables en el recibo de nómina.',
+        message: 'El recibo contiene percepciones variables o conceptos no base. La asesora debe revisar si se requieren 6 meses de recibos para promediar ingresos.',
         field: 'income.variablePerceptions',
-        requiresManualReview: false,
+        requiresManualReview: true,
       });
     }
 
     // --- Possible payroll provider (outsourcing) ---
-    const possibleProvider = employer.possiblePayrollProvider as
-      | boolean
-      | undefined
-      | null;
+    const possibleProvider = employer.possiblePayrollProvider as boolean | undefined | null;
     if (possibleProvider === true) {
-      const employerName =
-        (employer.legalName as string) ?? 'desconocido';
+      const empName = (employer.legalName as string) ?? 'desconocido';
       alerts.push({
         code: 'PAYROLL_POSSIBLE_PROVIDER',
         severity: 'WARNING',
         category: 'INCOME',
-        message: `La razón social "${employerName}" podría ser una pagadora externa y no el empleador real. Verificar relación laboral.`,
+        message: `La razón social "${empName}" podría ser una pagadora externa y no el empleador real. Verificar relación laboral.`,
         field: 'employer.possiblePayrollProvider',
         requiresManualReview: true,
       });
@@ -564,47 +528,54 @@ export class PayrollExtractionService {
     return alerts;
   }
 
+  /**
+   * Determines whether the fiscal stamp evidence indicates the receipt
+   * is properly stamped. True if ANY of these are detected:
+   * QR, SAT digital seal, CFDI stamp, fiscal folio/UUID, or certification date.
+   */
+  private isStamped(fiscalStamp: Record<string, unknown>): boolean {
+    const hasQr = fiscalStamp.hasQrCode === true;
+    const hasSeal = fiscalStamp.hasSatDigitalSeal === true;
+    const hasCfdi = fiscalStamp.hasCfdiStamp === true;
+    const hasFolio = !!fiscalStamp.fiscalFolio && String(fiscalStamp.fiscalFolio).trim() !== '';
+    const hasCertDate = !!fiscalStamp.certificationDate && String(fiscalStamp.certificationDate).trim() !== '';
+    return hasQr || hasSeal || hasCfdi || hasFolio || hasCertDate;
+  }
+
   // -----------------------------------------------------------------------
   // Private: missing field detection
   // -----------------------------------------------------------------------
 
   private computeMissingFields(data: Record<string, unknown>): string[] {
     const missing: string[] = [];
-    const employee =
-      (data.employee as Record<string, unknown> | undefined) ?? {};
-    const income =
-      (data.income as Record<string, unknown> | undefined) ?? {};
-    const payrollPeriod =
-      (data.payrollPeriod as Record<string, unknown> | undefined) ?? {};
+    const employee = (data.employee as Record<string, unknown> | undefined) ?? {};
+    const income = (data.income as Record<string, unknown> | undefined) ?? {};
+    const payrollPeriod = (data.payrollPeriod as Record<string, unknown> | undefined) ?? {};
+    const employment = (data.employment as Record<string, unknown> | undefined) ?? {};
 
-    // Employee fields
-    if (
-      !employee.fullName ||
-      (employee.fullName as string)?.trim() === ''
-    ) {
+    if (!employee.fullName || (employee.fullName as string)?.trim() === '') {
       missing.push('employee.fullName');
     }
     if (!employee.rfc || (employee.rfc as string)?.trim() === '') {
       missing.push('employee.rfc');
     }
-
-    // Income fields
     if (income.netIncome == null) {
       missing.push('income.netIncome');
     }
     if (income.grossIncome == null) {
       missing.push('income.grossIncome');
     }
-
-    // Period fields
     if (!payrollPeriod.periodStartDate && !payrollPeriod.periodEndDate) {
       missing.push('payrollPeriod');
     }
-    if (
-      !payrollPeriod.paymentDate ||
-      (payrollPeriod.paymentDate as string)?.trim() === ''
-    ) {
+    if (!payrollPeriod.paymentDate || (payrollPeriod.paymentDate as string)?.trim() === '') {
       missing.push('payrollPeriod.paymentDate');
+    }
+    // Employment
+    const hireDate = (employment.hireDate ?? employee.employmentStartDate) as string | undefined | null;
+    const seniorityText = (employment.seniorityText ?? employee.employmentSeniorityText) as string | undefined | null;
+    if ((!hireDate || hireDate.trim() === '') && (!seniorityText || seniorityText.trim() === '')) {
+      missing.push('employment.hireDate');
     }
 
     return missing;
@@ -617,17 +588,12 @@ export class PayrollExtractionService {
   private normalizeAlerts(alerts: ExtractionAlert[]): ExtractionAlert[] {
     return alerts.map((a) => {
       const englishToSpanish: Record<string, string> = {
-        'Variable income detected.':
-          'Se detectaron percepciones variables en el recibo de nómina.',
-        'Missing employee RFC.':
-          'No se detectó el RFC del empleado en el recibo de nómina.',
-        'Missing employee name.':
-          'No se detectó el nombre del empleado en el recibo de nómina.',
+        'Variable income detected.': 'Se detectaron percepciones variables en el recibo de nómina.',
+        'Missing employee RFC.': 'No se detectó el RFC del empleado en el recibo de nómina.',
+        'Missing employee name.': 'No se detectó el nombre del empleado en el recibo de nómina.',
       };
       const translated = englishToSpanish[a.message];
-      if (translated) {
-        return { ...a, message: translated };
-      }
+      if (translated) return { ...a, message: translated };
       return a;
     });
   }

@@ -506,7 +506,7 @@ describe('PayrollExtractionService', () => {
 
   // ── Alert: variable income ─────────────────────────────────────────
   describe('extract — alert: variable income', () => {
-    it('generates INFO alert when variable perceptions exist', async () => {
+    it('generates WARNING alert when variable perceptions exist', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
       mockGemini.extractStructuredData.mockResolvedValue({
         success: true,
@@ -519,8 +519,8 @@ describe('PayrollExtractionService', () => {
       expect(result.alerts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'PAYROLL_VARIABLE_INCOME_DETECTED',
-            severity: 'INFO',
+            code: 'PAYROLL_VARIABLE_INCOME',
+            severity: 'WARNING',
             category: 'INCOME',
           }),
         ]),

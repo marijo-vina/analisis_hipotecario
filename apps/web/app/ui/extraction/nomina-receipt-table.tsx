@@ -19,6 +19,14 @@ export interface ParsedReceiptRow {
   empleador: { nombre: string; rfc: string } | null;
   percepciones: { concepto: string; importe: number }[];
   deduccionesDetalle: { concepto: string; importe: number }[];
+  employment: {
+    hireDate: string | null;
+    seniorityText: string | null;
+    hasMinimumSeniority: boolean | null;
+    contributesToImss: boolean | null;
+    imssEvidence: string | null;
+  } | null;
+  isVariableIncome: boolean;
 }
 
 interface NominaReceiptTableProps {
@@ -171,7 +179,7 @@ export default function NominaReceiptTable({
                       className="px-4 py-4"
                     >
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Datos del empleado / empleador */}
+                        {/* Datos del empleado / empleador / employment */}
                         <div className="space-y-4">
                           <div>
                             <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
@@ -206,6 +214,54 @@ export default function NominaReceiptTable({
                               <dd>{row.empleador?.rfc ?? "—"}</dd>
                             </dl>
                           </div>
+
+                          {row.employment && (
+                            <div>
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                                Antigüedad laboral
+                              </h5>
+                              <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                                <dt className="font-medium text-gf-text-muted">
+                                  Fecha de ingreso:
+                                </dt>
+                                <dd>
+                                  {row.employment.hireDate ?? "No detectado"}
+                                </dd>
+                                <dt className="font-medium text-gf-text-muted">
+                                  Antigüedad:
+                                </dt>
+                                <dd>
+                                  {row.employment.seniorityText ?? "No detectado"}
+                                </dd>
+                                <dt className="font-medium text-gf-text-muted">
+                                  Cotiza IMSS:
+                                </dt>
+                                <dd>
+                                  {row.employment.contributesToImss === true
+                                    ? "Sí"
+                                    : "No detectado"}
+                                </dd>
+                              </dl>
+                              {row.employment.imssEvidence && (
+                                <p className="mt-1 text-xs text-gf-text-muted">
+                                  Evidencia: {row.employment.imssEvidence}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {row.isVariableIncome && (
+                            <div>
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                                ⚠ Ingresos variables detectados
+                              </h5>
+                              <p className="text-xs text-amber-700">
+                                Este recibo contiene percepciones variables o
+                                conceptos no base. Revisar si se requieren 6
+                                meses de recibos para promediar.
+                              </p>
+                            </div>
+                          )}
 
                           {row.alertas > 0 && (
                             <div>
