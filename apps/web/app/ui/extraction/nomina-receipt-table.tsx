@@ -7,7 +7,7 @@ import type { ExtractionAlert } from "@/app/lib/extraction";
 export interface ParsedReceiptRow {
   documentId: string;
   periodo: string;
-  fechaPago: string;
+  fechaPago: string | null;
   periodicidad: string;
   ingresoBruto: number | null;
   deducciones: number | null;
@@ -27,6 +27,11 @@ export interface ParsedReceiptRow {
     imssEvidence: string | null;
   } | null;
   isVariableIncome: boolean;
+  fiscalData: {
+    fiscalFolio: string | null;
+    certificationDate: string | null;
+    isStamped: boolean;
+  } | null;
 }
 
 interface NominaReceiptTableProps {
@@ -126,7 +131,7 @@ export default function NominaReceiptTable({
                     {row.periodo}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {row.fechaPago}
+                    {row.fechaPago ?? "No detectada"}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {row.periodicidad}
@@ -299,6 +304,52 @@ export default function NominaReceiptTable({
                             title="Deducciones"
                             items={row.deduccionesDetalle}
                           />
+
+                          {row.fiscalData && (
+                            <div>
+                              <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-1">
+                                Datos fiscales / Timbrado
+                              </h5>
+                              <dl className="grid grid-cols-2 gap-2 text-xs text-gf-text">
+                                <dt className="font-medium text-gf-text-muted">
+                                  Folio fiscal:
+                                </dt>
+                                <dd className="font-mono text-[11px] break-all">
+                                  {row.fiscalData.fiscalFolio ?? "—"}
+                                </dd>
+                                <dt className="font-medium text-gf-text-muted">
+                                  Fecha certificación:
+                                </dt>
+                                <dd>
+                                  {row.fiscalData.certificationDate
+                                    ? new Date(
+                                        row.fiscalData.certificationDate,
+                                      ).toLocaleString("es-MX", {
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })
+                                    : "—"}
+                                </dd>
+                                <dt className="font-medium text-gf-text-muted">
+                                  Timbrado:
+                                </dt>
+                                <dd>
+                                  {row.fiscalData.isStamped ? (
+                                    <span className="text-green-700 font-medium">
+                                      Sí
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-700">
+                                      No detectado
+                                    </span>
+                                  )}
+                                </dd>
+                              </dl>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
