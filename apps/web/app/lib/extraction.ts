@@ -248,7 +248,7 @@ export interface ParsedPayrollSummary {
 export interface ParsedPayrollReceipt {
   documentId: string;
   periodo: string;
-  fechaPago: string;
+  fechaPago: string | null;
   periodicidad: string;
   ingresoBruto: number | null;
   deducciones: number | null;
@@ -268,6 +268,11 @@ export interface ParsedPayrollReceipt {
     imssEvidence: string | null;
   } | null;
   isVariableIncome: boolean;
+  fiscalData: {
+    fiscalFolio: string | null;
+    certificationDate: string | null;
+    isStamped: boolean;
+  } | null;
 }
 
 export interface ParsedPayroll {
@@ -374,14 +379,17 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
     }
 
     const periodo =
-      [
-        payrollPeriod.periodStartDate,
-        payrollPeriod.periodEndDate,
-      ]
-        .filter(Boolean)
-        .join(" a ") || "No detectado";
+      ((payrollPeriod.periodLabel as string) ??
+        (payrollPeriod.periodRaw as string) ??
+        [
+          payrollPeriod.periodStartDate,
+          payrollPeriod.periodEndDate,
+        ]
+          .filter(Boolean)
+          .join(" a ")) ||
+      "No detectado";
     const fechaPago =
-      (payrollPeriod.paymentDate as string) ?? "No detectado";
+      (payrollPeriod.paymentDate as string) ?? null;
     const periodicidad =
       periodicityLabel(payrollPeriod.periodicity as string | null | undefined);
 
@@ -447,6 +455,18 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       income.isVariableIncome === true ||
       (Array.isArray(variablePerceptions) && variablePerceptions.length > 0);
 
+    // Fiscal data
+    const fiscalFolio =
+      (fiscalStamp.fiscalFolio as string) ?? null;
+    const certificationDate =
+      (fiscalStamp.certificationDate as string) ?? null;
+    const isStamped =
+      fiscalStamp.hasQrCode === true ||
+      fiscalStamp.hasSatDigitalSeal === true ||
+      fiscalStamp.hasCfdiStamp === true ||
+      !!fiscalFolio ||
+      !!certificationDate;
+
     allPeriodos.push(periodo);
 
     if (ingresoBruto != null) {
@@ -489,6 +509,9 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
           }
         : null,
       isVariableIncome: isVarIncome,
+      fiscalData: isStamped || fiscalFolio || certificationDate
+        ? { fiscalFolio, certificationDate, isStamped }
+        : null,
     });
   }
 

@@ -468,11 +468,15 @@ export class PayrollExtractionService {
         message: 'No se detectó el periodo del recibo de nómina.', field: 'payrollPeriod', requiresManualReview: true });
     }
 
-    // ── Missing payment date ────────────────────────────────────────
+    // ── Missing payment date (only if no period data and no fiscal stamp) ──
     const paymentDate = payrollPeriod.paymentDate as string | undefined | null;
     if (!paymentDate || paymentDate.trim() === '') {
-      alerts.push({ code: 'PAYROLL_MISSING_PAYMENT_DATE', severity: 'WARNING', category: 'INCOME',
-        message: 'No se detectó la fecha de pago del recibo de nómina.', field: 'payrollPeriod.paymentDate', requiresManualReview: true });
+      const hasPeriodData = !!(periodStart || periodEnd || (periodRaw && periodRaw.trim() !== ''));
+      const hasFiscalEvidence = isStamped || !!(fiscalStamp.certificationDate as string | undefined);
+      if (!hasPeriodData && !hasFiscalEvidence) {
+        alerts.push({ code: 'PAYROLL_MISSING_PAYMENT_DATE', severity: 'WARNING', category: 'INCOME',
+          message: 'No se detectó la fecha de pago del recibo de nómina.', field: 'payrollPeriod.paymentDate', requiresManualReview: true });
+      }
     }
 
     // ── No fiscal stamp (only if isStamped is false) ─────────────────
