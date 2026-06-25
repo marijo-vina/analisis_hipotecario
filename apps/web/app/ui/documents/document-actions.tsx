@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId } from "@/app/actions/documents";
+import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt } from "@/app/actions/documents";
 import Button from "@/app/ui/common/button";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
@@ -100,14 +100,23 @@ export default function DocumentActions({
       // Step 1: OCR
       await processDocument(caseId, document.id, needsForce);
 
-      // Step 2: AI extraction for eligible document types (currently INE)
+      // Step 2: AI extraction for eligible document types
       if (document.documentType.code === "INE") {
         try {
           await extractOfficialId(caseId, document.id);
         } catch {
-          // Extraction failed — non-blocking; OCR succeeded
           setProcessError(
             "OCR completado, pero la extracción de datos falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "PAYROLL_RECEIPT") {
+        try {
+          await extractPayrollReceipt(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción de nómina falló. Puede intentar reprocesar.",
           );
         }
       }

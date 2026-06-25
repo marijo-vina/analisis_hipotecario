@@ -21,6 +21,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsService } from './documents.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
+import { PayrollExtractionService } from './payroll-extraction.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
@@ -28,6 +29,7 @@ export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly officialIdExtractionService: OfficialIdExtractionService,
+    private readonly payrollExtractionService: PayrollExtractionService,
   ) {}
 
   @Post()
@@ -135,6 +137,19 @@ export class DocumentsController {
     @Param('documentId') documentId: string,
   ) {
     const data = await this.officialIdExtractionService.extract(
+      caseId,
+      documentId,
+    );
+    return { data };
+  }
+
+  @Post(':documentId/extract-payroll')
+  @HttpCode(200)
+  async extractPayrollReceipt(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.payrollExtractionService.extract(
       caseId,
       documentId,
     );

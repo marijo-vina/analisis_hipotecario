@@ -134,3 +134,55 @@ export async function extractOfficialId(
 
   return result.data.data;
 }
+
+/**
+ * Extrae datos estructurados de un recibo de nómina (CFDI) usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-payroll`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function extractPayrollReceipt(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+  alerts: Array<{
+    code: string;
+    severity: string;
+    category: string;
+    message: string;
+    field: string | null;
+    requiresManualReview: boolean;
+  }>;
+  missingFields: string[];
+}> {
+  const result = await apiFetch<{
+    data: {
+      success: boolean;
+      extractedData: Record<string, unknown> | null;
+      alerts: Array<{
+        code: string;
+        severity: string;
+        category: string;
+        message: string;
+        field: string | null;
+        requiresManualReview: boolean;
+      }>;
+      missingFields: string[];
+    };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-payroll`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al extraer datos del recibo de nómina",
+    );
+  }
+
+  return result.data.data;
+}
