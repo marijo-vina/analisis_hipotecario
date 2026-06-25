@@ -640,7 +640,7 @@ describe('PayrollExtractionService', () => {
         curp: 'DICA690402HYNZBL09',
         employmentStartDate: '2001-12-20',
         employmentSeniorityText: '21 AÑOS 7 QNAS 10 DIAS',
-        contributesToImss: false,
+        contributesToImss: null,
       },
       employer: {
         legalName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
@@ -685,9 +685,19 @@ describe('PayrollExtractionService', () => {
       fiscalStamp: {
         hasQrCode: true,
         hasSatDigitalSeal: true,
-        uuid: 'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
-        stampDate: '2025-04-30T09:35:53',
+        hasCfdiStamp: true,
+        fiscalFolio: 'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
+        certificationDate: '2025-04-30T09:35:53',
       },
+      employment: {
+        hireDate: '2001-12-20',
+        seniorityText: '21 AÑOS 7 QNAS 10 DIAS',
+        hasMinimumSeniority: null,
+        contributesToImss: null,
+        imssEvidence: null,
+        imssSignals: [],
+      },
+      evidence: {},
       crossCheckPreparation: {
         expectedBankDepositAmount: 26290.0,
         expectedBankDepositDate: '2025-04-30',
@@ -760,7 +770,7 @@ describe('PayrollExtractionService', () => {
       const result = await service.extract('case-1', 'doc-payroll-1');
       const ed = result.extractedData as Record<string, unknown>;
       const fs = ed.fiscalStamp as Record<string, unknown>;
-      expect(fs.uuid).toBe(
+      expect(fs.fiscalFolio).toBe(
         'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
       );
     });
@@ -782,6 +792,129 @@ describe('PayrollExtractionService', () => {
             severity: 'WARNING',
             category: 'INCOME',
           }),
+        ]),
+      );
+    });
+
+    it('does NOT generate false timbrado alert when isStamped is true', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const timbradoAlerts = result.alerts.filter(
+        (a) => a.code === 'PAYROLL_NO_FISCAL_STAMP',
+      );
+      expect(timbradoAlerts).toHaveLength(0);
+    });
+
+    it('infers contributesToImss when employer is IMSS', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const emp = ed.employment as Record<string, unknown>;
+      expect(emp.contributesToImss).toBe(true);
+    });
+  });
+
+  // ── Format flexibility: periodRaw, aliases, contradictions ─────────
+  describe('extract — format flexibility', () => {
+    const genericOcrText =
+      'EMPLEADO: MARIA GONZALEZ HERNANDEZ\n' +
+      'RFC: GOHM850101ABC\n' +
+      'EMPRESA: COMERCIALIZADORA DEL NORTE SA DE CV\n' +
+      'RFC EMPRESA: CNO020101XYZ\n' +
+      'FECHA DE PAGO: 15 DE MAYO 2025\n' +
+      'PERIODO DE PAGO: 1A-MAY-2025\n' +
+      'TOTAL PERCEPCIONES: 25000.00\n' +
+      'TOTAL DEDUCCIONES: 5500.00\n' +
+      'LIQUIDO: 19500.00\n' +
+      'NSS: 12345678901\n' +
+      'REGISTRO PATRONAL: Y1234567890\n' +
+      'SELLO DIGITAL SAT: PRESENTE';
+
+    const genericGeminiResponse = {
+      schemaVersion: '1.0',
+      documentType: 'PAYROLL_RECEIPT',
+      employee: {
+        fullName: 'MARIA GONZALEZ HERNANDEZ',
+        rfc: 'GOHM850101ABC',
+      },
+      employer: {
+        legalName: 'COMERCIALIZADORA DEL NORTE SA DE CV',
+        rfc: 'CNO020101XYZ',
+        possiblePayrollProvider: false,
+      },
+      payrollPeriod: {
+        periodStartDate: null,
+        periodEndDate: null,
+        paymentDate: '2025-05-15',
+        periodRaw: '1A-MAY-2025',
+        periodLabel: '1A Quincena Mayo 2025',
+        periodicity: 'BIWEEKLY',
+      },
+      income: {
+        grossIncome: 25000,
+        totalDeductions: 5500,
+        netIncome: 19500,
+        currency: 'MXN',
+        isVariableIncome: false,
+        variablePerceptions: [],
+      },
+      deductions: [],
+      fiscalStamp: {
+        hasQrCode: false,
+        hasSatDigitalSeal: true,
+        hasCfdiStamp: false,
+        fiscalFolio: null,
+        certificationDate: null,
+      },
+      employment: {
+        hireDate: null,
+        seniorityText: null,
+        contributesToImss: null,
+        imssEvidence: null,
+        imssSignals: ['NSS', 'registro patronal'],
+      },
+      missingFields: [],
+      alerts: [],
+    };
+
+    beforeEach(() => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: genericOcrText }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue({
+        success: true,
+        documentType: 'PAYROLL_RECEIPT',
+        extractedData: genericGeminiResponse,
+      });
+      mockPrisma.document.update.mockResolvedValue({});
+    });
+
+    it('accepts periodRaw without explicit start/end dates and does NOT generate period alert', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const periodAlerts = result.alerts.filter(
+        (a) => a.code === 'PAYROLL_MISSING_PERIOD',
+      );
+      expect(periodAlerts).toHaveLength(0);
+    });
+
+    it('does NOT generate false timbrado alert when hasSatDigitalSeal is true', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const timbradoAlerts = result.alerts.filter(
+        (a) => a.code === 'PAYROLL_NO_FISCAL_STAMP',
+      );
+      expect(timbradoAlerts).toHaveLength(0);
+    });
+
+    it('infers contributesToImss from imssSignals (NSS + registro patronal)', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const emp = ed.employment as Record<string, unknown>;
+      expect(emp.contributesToImss).toBe(true);
+    });
+
+    it('generates seniority alert when no hireDate and no seniorityText', async () => {
+      const result = await service.extract('case-1', 'doc-payroll-1');
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PAYROLL_NO_SENIORITY' }),
         ]),
       );
     });
