@@ -138,7 +138,8 @@ export default function DocumentActions({
   const isUploaded = statusCode === "UPLOADED";
   const isProcessing = statusCode === "PROCESSING";
   const isProcessed = statusCode === "PROCESSED";
-  const isError = statusCode === "OCR_ERROR" || statusCode === "ERROR";
+  const isOcrError = statusCode === "OCR_ERROR" || statusCode === "ERROR";
+  const isExtractionError = statusCode === "EXTRACTION_ERROR";
 
   return (
     <>
@@ -207,7 +208,7 @@ export default function DocumentActions({
         )}
 
         {/* ── Reintentar (OCR_ERROR / ERROR) ─────────────────────────── */}
-        {isError && (
+        {isOcrError && (
           <Button
             variant="destructive"
             onClick={handleProcess}
@@ -215,6 +216,18 @@ export default function DocumentActions({
             loading={processLoading}
           >
             {processLoading ? "Procesando..." : "Reintentar"}
+          </Button>
+        )}
+
+        {/* ── Reintentar extracción (EXTRACTION_ERROR) ─────────────── */}
+        {isExtractionError && (
+          <Button
+            variant="primary"
+            onClick={handleProcess}
+            disabled={processLoading}
+            loading={processLoading}
+          >
+            {processLoading ? "Procesando..." : "Reintentar extracción"}
           </Button>
         )}
 
