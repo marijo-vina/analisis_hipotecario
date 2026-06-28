@@ -232,28 +232,30 @@ export function aggregateAlerts(documents: Document[]): AggregatedAlert[] {
 
 // ── Payroll extraction parsing ────────────────────────────────────────────
 
+/**
+ * Sprint 2 summary — only counts and employee identification.
+ * Financial analysis (averages, variable income, payment capacity) is Sprint 3.
+ */
 export interface ParsedPayrollSummary {
-  recibosProcesados: number;
   totalRecibos: number;
-  periodos: string[];
+  recibosConDatos: number;
+  recibosConError: number;
   empleado: { nombre: string; rfc: string } | null;
-  empleadores: { nombre: string; rfc: string }[];
-  ingresoBrutoPromedio: number | null;
-  ingresoNetoPromedio: number | null;
-  timbradoDetectado: number;
-  totalRecibosTimbrados: number;
-  alertas: number;
 }
 
 export interface ParsedPayrollReceipt {
   documentId: string;
-  periodo: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+  periodo: string | null;
   fechaPago: string | null;
-  periodicidad: string;
+  periodicidad: string | null;
   ingresoBruto: number | null;
   deducciones: number | null;
   ingresoNeto: number | null;
-  timbrado: boolean;
+  timbrado: boolean | null;
   alertas: number;
   alertasLista: ExtractionAlert[];
   empleado: { nombre: string; rfc: string } | null;
@@ -278,16 +280,15 @@ export interface ParsedPayrollReceipt {
 export interface ParsedPayroll {
   summary: ParsedPayrollSummary | null;
   receipts: ParsedPayrollReceipt[];
-  hasError: boolean;
-  errorMessage: string | null;
 }
 
 /**
- * Parses all PAYROLL_RECEIPT documents into a structured payroll view.
+ * Parses ALL PAYROLL_RECEIPT documents into a structured payroll view.
  *
- * Only documents with `extractedData` are included in the summary/table.
- * Documents with PROCESSED status but no extractedData are counted as
- * unprocessed. Documents with ERROR/EXTRACTION_ERROR status are flagged.
+ * Every document appears in the table with its real status — including
+ * UPLOADED, PROCESSING, PROCESSED (with or without extractedData), and
+ * ERROR/EXTRACTION_ERROR. Documents without extractedData show placeholder
+ * values so the asesora knows they exist and what state they're in.
  */
 export function parsePayroll(documents: Document[]): ParsedPayroll {
   const payrollDocs = documents.filter(
@@ -296,58 +297,72 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
 
   const totalRecibos = payrollDocs.length;
 
-  // Check for extraction errors
-  const errorDoc = payrollDocs.find(
-    (d) =>
-      d.documentStatus.code === "ERROR" ||
-      d.documentStatus.code === "EXTRACTION_ERROR",
-  );
-  if (errorDoc) {
-    return {
-      summary: null,
-      receipts: [],
-      hasError: true,
-      errorMessage:
-        "No se pudo extraer la información de este recibo de nómina. Intenta reprocesar el documento.",
-    };
+  if (totalRecibos === 0) {
+    return { summary: null, receipts: [] };
   }
 
-  // Filter to PROCESSED docs with extractedData
-  const processed = payrollDocs.filter(
-    (d) =>
-      d.documentStatus.code === "PROCESSED" && d.extractedData != null,
-  );
-
-  if (processed.length === 0) {
-    return {
-      summary: null,
-      receipts: [],
-      hasError: false,
-      errorMessage: null,
-    };
-  }
-
-  // Build receipts from processed documents
   const receipts: ParsedPayrollReceipt[] = [];
-  const allPeriodos: string[] = [];
-  let totalBruto = 0;
-  let totalNeto = 0;
-  let countBruto = 0;
-  let countNeto = 0;
-  let timbradoCount = 0;
-  let totalAlertas = 0;
   const empleadosMap = new Map<string, { nombre: string; rfc: string }>();
-  const empleadoresMap = new Map<string, { nombre: string; rfc: string }>();
+  let recibosConDatos = 0;
+  let recibosConError = 0;
 
-  for (const doc of processed) {
+  // ── Helper: build a placeholder row for docs without extractedData ──────
+  function emptyReceipt(doc: Document): ParsedPayrollReceipt {
+    return {
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: false,
+      periodo: null,
+      fechaPago: null,
+      periodicidad: null,
+      ingresoBruto: null,
+      deducciones: null,
+      ingresoNeto: null,
+      timbrado: null,
+      alertas: 0,
+      alertasLista: [],
+      empleado: null,
+      empleador: null,
+      percepciones: [],
+      deduccionesDetalle: [],
+      employment: null,
+      isVariableIncome: false,
+      fiscalData: null,
+    };
+  }
+
+  // ── Process every payroll document ──────────────────────────────────────
+  for (const doc of payrollDocs) {
+    const statusCode = doc.documentStatus.code;
+
+    // Error states — show in table with empty data
+    if (statusCode === "ERROR" || statusCode === "EXTRACTION_ERROR") {
+      recibosConError++;
+      receipts.push(emptyReceipt(doc));
+      continue;
+    }
+
+    // Uploaded / Processing — show in table as pending
+    if (statusCode === "UPLOADED" || statusCode === "PROCESSING") {
+      receipts.push(emptyReceipt(doc));
+      continue;
+    }
+
+    // PROCESSED — must have extractedData to show full row
+    if (!doc.extractedData) {
+      receipts.push(emptyReceipt(doc));
+      continue;
+    }
+
+    recibosConDatos++;
     const ed = doc.extractedData as Record<string, unknown>;
     const employee = (ed.employee as Record<string, unknown>) ?? {};
     const employer = (ed.employer as Record<string, unknown>) ?? {};
-    const payrollPeriod =
-      (ed.payrollPeriod as Record<string, unknown>) ?? {};
+    const payrollPeriod = (ed.payrollPeriod as Record<string, unknown>) ?? {};
     const income = (ed.income as Record<string, unknown>) ?? {};
-    const fiscalStamp =
-      (ed.fiscalStamp as Record<string, unknown>) ?? {};
+    const fiscalStamp = (ed.fiscalStamp as Record<string, unknown>) ?? {};
     const deductionsArr = ed.deductions as Record<string, unknown>[] | undefined;
     const variablePerceptions = income.variablePerceptions as
       | Record<string, unknown>[]
@@ -362,18 +377,8 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       const key = empRfc ?? empName ?? "unknown";
       if (!empleadosMap.has(key)) {
         empleadosMap.set(key, {
-          nombre: empName ?? "No detectado",
+          nombre: empName ?? "Sin nombre",
           rfc: empRfc ?? "—",
-        });
-      }
-    }
-
-    if (emplName || emplRfc) {
-      const key = emplRfc ?? emplName ?? "unknown";
-      if (!empleadoresMap.has(key)) {
-        empleadoresMap.set(key, {
-          nombre: emplName ?? "No detectado",
-          rfc: emplRfc ?? "—",
         });
       }
     }
@@ -381,17 +386,14 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
     const periodo =
       ((payrollPeriod.periodLabel as string) ??
         (payrollPeriod.periodRaw as string) ??
-        [
-          payrollPeriod.periodStartDate,
-          payrollPeriod.periodEndDate,
-        ]
+        [payrollPeriod.periodStartDate, payrollPeriod.periodEndDate]
           .filter(Boolean)
           .join(" a ")) ||
-      "No detectado";
-    const fechaPago =
-      (payrollPeriod.paymentDate as string) ?? null;
-    const periodicidad =
-      periodicityLabel(payrollPeriod.periodicity as string | null | undefined);
+      "Sin periodo";
+    const fechaPago = (payrollPeriod.paymentDate as string) ?? null;
+    const periodicidad = periodicityLabel(
+      payrollPeriod.periodicity as string | null | undefined,
+    );
 
     const ingresoBruto = income.grossIncome as number | null;
     const deducciones = income.totalDeductions as number | null;
@@ -402,7 +404,6 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
     const timbrado = hasQr || hasSeal;
 
     const alerts = filterAlerts(ed.alerts);
-    const alertCount = alerts.length;
 
     // Percepciones
     const percepciones: { concepto: string; importe: number }[] = [];
@@ -430,7 +431,7 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       }
     }
 
-    // Employment data (from employment section, fallback to employee fields)
+    // Employment data
     const employmentData = (ed.employment as Record<string, unknown>) ?? {};
     const hireDate =
       (employmentData.hireDate as string) ??
@@ -456,8 +457,7 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       (Array.isArray(variablePerceptions) && variablePerceptions.length > 0);
 
     // Fiscal data
-    const fiscalFolio =
-      (fiscalStamp.fiscalFolio as string) ?? null;
+    const fiscalFolio = (fiscalStamp.fiscalFolio as string) ?? null;
     const certificationDate =
       (fiscalStamp.certificationDate as string) ?? null;
     const isStamped =
@@ -467,21 +467,12 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       !!fiscalFolio ||
       !!certificationDate;
 
-    allPeriodos.push(periodo);
-
-    if (ingresoBruto != null) {
-      totalBruto += ingresoBruto;
-      countBruto++;
-    }
-    if (ingresoNeto != null) {
-      totalNeto += ingresoNeto;
-      countNeto++;
-    }
-    if (timbrado) timbradoCount++;
-    totalAlertas += alertCount;
-
     receipts.push({
       documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: true,
       periodo,
       fechaPago,
       periodicidad,
@@ -489,7 +480,7 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
       deducciones,
       ingresoNeto,
       timbrado,
-      alertas: alertCount,
+      alertas: alerts.length,
       alertasLista: alerts,
       empleado: empName
         ? { nombre: empName, rfc: empRfc ?? "—" }
@@ -499,45 +490,33 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
         : null,
       percepciones,
       deduccionesDetalle,
-      employment: hireDate || seniority || contributesImss != null
-        ? {
-            hireDate,
-            seniorityText: seniority,
-            hasMinimumSeniority: hasMinSeniority,
-            contributesToImss: contributesImss,
-            imssEvidence,
-          }
-        : null,
+      employment:
+        hireDate || seniority || contributesImss != null
+          ? {
+              hireDate,
+              seniorityText: seniority,
+              hasMinimumSeniority: hasMinSeniority,
+              contributesToImss: contributesImss,
+              imssEvidence,
+            }
+          : null,
       isVariableIncome: isVarIncome,
-      fiscalData: isStamped || fiscalFolio || certificationDate
-        ? { fiscalFolio, certificationDate, isStamped }
-        : null,
+      fiscalData:
+        isStamped || fiscalFolio || certificationDate
+          ? { fiscalFolio, certificationDate, isStamped }
+          : null,
     });
   }
 
-  // Build summary
+  // ── Build summary ───────────────────────────────────────────────────────
   const empleados = Array.from(empleadosMap.values());
-  const empleadores = Array.from(empleadoresMap.values());
 
   const summary: ParsedPayrollSummary = {
-    recibosProcesados: processed.length,
     totalRecibos,
-    periodos: allPeriodos,
+    recibosConDatos,
+    recibosConError,
     empleado: empleados.length > 0 ? empleados[0] : null,
-    empleadores,
-    ingresoBrutoPromedio:
-      countBruto > 0 ? totalBruto / countBruto : null,
-    ingresoNetoPromedio:
-      countNeto > 0 ? totalNeto / countNeto : null,
-    timbradoDetectado: timbradoCount,
-    totalRecibosTimbrados: processed.length,
-    alertas: totalAlertas,
   };
 
-  return {
-    summary,
-    receipts,
-    hasError: false,
-    errorMessage: null,
-  };
+  return { summary, receipts };
 }

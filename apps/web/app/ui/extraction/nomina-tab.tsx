@@ -1,8 +1,7 @@
 import type { Document } from "@/app/lib/definitions";
-import { parsePayroll, type ParsedPayrollSummary } from "@/app/lib/extraction";
+import { parsePayroll } from "@/app/lib/extraction";
 import EmptyState from "@/app/ui/common/empty-state";
-import ErrorMessage from "@/app/ui/error-message";
-import NominaSummaryCard from "@/app/ui/extraction/nomina-summary-card";
+import NominaHeader from "@/app/ui/extraction/nomina-header";
 import NominaReceiptTable, {
   type ParsedReceiptRow,
 } from "@/app/ui/extraction/nomina-receipt-table";
@@ -14,39 +13,23 @@ interface NominaTabProps {
 /**
  * NominaTab — renders payroll extraction data for PAYROLL_RECEIPT documents.
  *
- * States:
- *  - No payroll documents processed → EmptyState
- *  - Extraction error → ErrorMessage with retry suggestion
- *  - Real extracted data → summary card + receipt table
- *
- * No mock data is ever displayed in production.
+ * Every payroll document appears in the table with its real status.
+ * The header shows a compact count (Sprint 2 only — no financial analysis).
  */
 export default function NominaTab({ documents }: NominaTabProps) {
   const parsed = parsePayroll(documents);
 
-  // ── Error state: extraction failed ────────────────────────────────
-  if (parsed.hasError) {
-    return (
-      <ErrorMessage
-        message={
-          parsed.errorMessage ??
-          "Error al procesar los recibos de nómina."
-        }
-      />
-    );
-  }
-
-  // ── Empty state: no processed payroll ─────────────────────────────
+  // ── Empty state: no payroll documents at all ──────────────────────
   if (!parsed.summary) {
     return (
-      <EmptyState message="Los datos de nómina se mostrarán aquí una vez que se procesen recibos de nómina." />
+      <EmptyState message="Los datos de nómina se mostrarán aquí una vez que se suban recibos de nómina." />
     );
   }
 
   // ── Real data ─────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <NominaSummaryCard data={parsed.summary} />
+      <NominaHeader data={parsed.summary} />
       <NominaReceiptTable rows={parsed.receipts} />
     </div>
   );
