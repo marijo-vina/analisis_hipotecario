@@ -390,7 +390,7 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
           .filter(Boolean)
           .join(" a ")) ||
       "Sin periodo";
-    const fechaPago = (payrollPeriod.paymentDate as string) ?? null;
+    const fechaPago = formatDateDisplay((payrollPeriod.paymentDate as string) ?? undefined) ?? null;
     const periodicidad = periodicityLabel(
       payrollPeriod.periodicity as string | null | undefined,
     );
@@ -433,10 +433,11 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
 
     // Employment data
     const employmentData = (ed.employment as Record<string, unknown>) ?? {};
-    const hireDate =
+    const hireDateRaw =
       (employmentData.hireDate as string) ??
       (employee.employmentStartDate as string) ??
       null;
+    const hireDate = formatDateDisplay(hireDateRaw ?? undefined) ?? null;
     const seniority =
       (employmentData.seniorityText as string) ??
       (employee.employmentSeniorityText as string) ??

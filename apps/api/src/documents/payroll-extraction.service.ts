@@ -327,6 +327,10 @@ export class PayrollExtractionService {
     const missingFields = this.computeMissingFields(data);
 
     // ── Step 6: Merge + dedup + filter contradictions ────────────────
+    // Normalize Gemini-generated alert codes to backend-standard codes
+    // so the dedup by code works correctly.
+    this.normalizeGeminiAlertCodes(data);
+
     const existingCodes = new Set<string>();
     if (Array.isArray(data.alerts)) {
       for (const a of data.alerts as ExtractionAlert[]) { if (a.code) existingCodes.add(a.code); }
@@ -636,5 +640,43 @@ export class PayrollExtractionService {
       const tr = map[a.message];
       return tr ? { ...a, message: tr } : a;
     });
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: normalize Gemini alert codes to backend-standard codes
+  // Ensures the dedup in Step 6 works when Gemini uses non-standard codes.
+  // -----------------------------------------------------------------------
+
+  private normalizeGeminiAlertCodes(data: Record<string, unknown>): void {
+    if (!Array.isArray(data.alerts)) return;
+
+    const codeMap: Record<string, string> = {
+      // Variable income
+      'VARIABLE_INCOME': 'PAYROLL_VARIABLE_INCOME',
+      'variable_income': 'PAYROLL_VARIABLE_INCOME',
+      'VARIABLE_INCOME_DETECTED': 'PAYROLL_VARIABLE_INCOME',
+      'variable_income_detected': 'PAYROLL_VARIABLE_INCOME',
+      // Missing fields
+      'MISSING_EMPLOYEE_RFC': 'PAYROLL_MISSING_EMPLOYEE_RFC',
+      'MISSING_EMPLOYEE_NAME': 'PAYROLL_MISSING_EMPLOYEE_NAME',
+      'MISSING_NET_INCOME': 'PAYROLL_MISSING_NET_INCOME',
+      'MISSING_PERIOD': 'PAYROLL_MISSING_PERIOD',
+      'MISSING_PAYMENT_DATE': 'PAYROLL_MISSING_PAYMENT_DATE',
+      // Timbrado
+      'NO_FISCAL_STAMP': 'PAYROLL_NO_FISCAL_STAMP',
+      'MISSING_FISCAL_STAMP': 'PAYROLL_NO_FISCAL_STAMP',
+      // Seniority / employment
+      'NO_SENIORITY': 'PAYROLL_NO_SENIORITY',
+      'MISSING_SENIORITY': 'PAYROLL_NO_SENIORITY',
+      // Payroll provider
+      'POSSIBLE_PAYROLL_PROVIDER': 'PAYROLL_POSSIBLE_PROVIDER',
+      'PAYROLL_PROVIDER': 'PAYROLL_POSSIBLE_PROVIDER',
+    };
+
+    for (const a of data.alerts as ExtractionAlert[]) {
+      if (a.code && codeMap[a.code]) {
+        a.code = codeMap[a.code];
+      }
+    }
   }
 }

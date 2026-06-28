@@ -45,6 +45,9 @@ interface DetailBlockProps {
 
 function DetailBlock({ title, items }: DetailBlockProps) {
   if (!items || items.length === 0) return null;
+
+  const total = items.reduce((sum, item) => sum + item.importe, 0);
+
   return (
     <div>
       <h5 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-2 text-pretty">
@@ -66,6 +69,13 @@ function DetailBlock({ title, items }: DetailBlockProps) {
             </span>
           </li>
         ))}
+        {/* ── Total row ────────────────────────────────────────────── */}
+        <li className="flex items-center justify-between gap-4 px-3 py-2 text-xs bg-gf-red-soft/20 font-semibold">
+          <span className="text-gf-text">Total</span>
+          <span className="text-gf-text text-right shrink-0 tabular-nums">
+            {formatCurrency(total)}
+          </span>
+        </li>
       </ul>
     </div>
   );
