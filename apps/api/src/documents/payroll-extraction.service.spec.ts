@@ -216,7 +216,10 @@ const payrollProviderResponse = {
 
 describe('PayrollExtractionService', () => {
   let service: PayrollExtractionService;
-  let mockPrisma: { document: { findUnique: jest.Mock; update: jest.Mock } };
+  let mockPrisma: {
+    document: { findUnique: jest.Mock; update: jest.Mock };
+    documentStatus: { findUnique: jest.Mock };
+  };
   let mockGemini: { extractStructuredData: jest.Mock };
 
   beforeEach(async () => {
@@ -224,6 +227,18 @@ describe('PayrollExtractionService', () => {
       document: {
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      documentStatus: {
+        findUnique: jest.fn().mockImplementation(
+          (args: { where: { code: string } }) => {
+            const statuses: Record<string, { id: number; code: string; name: string; order: number }> = {
+              PROCESSED: { id: 4, code: 'PROCESSED', name: 'Procesado', order: 4 },
+              EXTRACTION_ERROR: { id: 7, code: 'EXTRACTION_ERROR', name: 'Error de extracción', order: 7 },
+            };
+            const status = statuses[args.where.code];
+            return Promise.resolve(status ?? null);
+          },
+        ),
       },
     };
     mockGemini = {
@@ -362,7 +377,7 @@ describe('PayrollExtractionService', () => {
       expect(result.error?.code).toBe('GEMINI_TIMEOUT');
     });
 
-    it('returns GEMINI_TEMPORARILY_UNAVAILABLE and does NOT save data', async () => {
+    it('returns GEMINI_TEMPORARILY_UNAVAILABLE and sets EXTRACTION_ERROR status', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
       mockGemini.extractStructuredData.mockResolvedValue({
         success: false,
@@ -379,8 +394,11 @@ describe('PayrollExtractionService', () => {
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe('GEMINI_TEMPORARILY_UNAVAILABLE');
       expect(result.extractedData).toBeNull();
-      // Must NOT attempt to persist
-      expect(mockPrisma.document.update).not.toHaveBeenCalled();
+      // Must update document status to EXTRACTION_ERROR (not save extractedData)
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-payroll-1' },
+        data: { documentStatusId: 7 },
+      });
     });
   });
 
@@ -571,9 +589,9 @@ describe('PayrollExtractionService', () => {
     });
   });
 
-  // ── DB persistence failure (non-blocking) ──────────────────────────
+  // ── DB persistence failure (now propagated, not swallowed) ─────────
   describe('extract — DB persistence failure', () => {
-    it('returns success even when DB update fails', async () => {
+    it('throws error when DB update fails', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
       mockGemini.extractStructuredData.mockResolvedValue({
         success: true,
@@ -584,9 +602,9 @@ describe('PayrollExtractionService', () => {
         new Error('DB connection lost'),
       );
 
-      const result = await service.extract('case-1', 'doc-payroll-1');
-      expect(result.success).toBe(true);
-      expect(result.extractedData).not.toBeNull();
+      await expect(
+        service.extract('case-1', 'doc-payroll-1'),
+      ).rejects.toThrow('DB connection lost');
     });
   });
 

@@ -253,7 +253,9 @@ export class PayrollExtractionService {
     });
     if (!document || document.mortgageCaseId !== caseId) throw new Error('Document not found');
 
-    if (document.documentStatus.code !== 'PROCESSED') {
+    // ── Status gate: allow PROCESSED (first extraction) and EXTRACTION_ERROR (retry) ─
+    const statusCode = document.documentStatus.code;
+    if (statusCode !== 'PROCESSED' && statusCode !== 'EXTRACTION_ERROR') {
       return { success: false, documentId, extractedData: null, alerts: [], missingFields: [],
         error: { code: 'DOCUMENT_NOT_PROCESSED', message: 'El documento debe estar procesado (OCR) antes de la extracción.' } };
     }
@@ -262,11 +264,31 @@ export class PayrollExtractionService {
         error: { code: GeminiErrorCode.OCR_TEXT_EMPTY, message: 'El documento no tiene texto OCR extraído.' } };
     }
 
+    // ── Resolve status IDs for transitions ──────────────────────────────
+    const processedStatus = await this.prisma.documentStatus.findUnique({ where: { code: 'PROCESSED' } });
+    const extractionErrorStatus = await this.prisma.documentStatus.findUnique({ where: { code: 'EXTRACTION_ERROR' } });
+    if (!processedStatus || !extractionErrorStatus) {
+      throw new Error('Required document status codes not found in database');
+    }
+
     const geminiResult = await this.geminiService.extractStructuredData(
       document.ocrText, document.documentType.code, { ...PAYROLL_SCHEMA }, PAYROLL_INSTRUCTIONS,
     );
     if (!geminiResult.success) {
       this.logger.warn(`[Payroll] Gemini extraction failed for doc ${documentId}: ${geminiResult.error?.code}`);
+
+      // Transition to EXTRACTION_ERROR so the UI can show the real state
+      try {
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: { documentStatusId: extractionErrorStatus.id },
+        });
+      } catch (dbError) {
+        this.logger.error(
+          `[Payroll] Failed to set EXTRACTION_ERROR status for doc ${documentId}: ${(dbError as Error).message}`,
+        );
+      }
+
       return { success: false, documentId, extractedData: geminiResult.extractedData, alerts: [], missingFields: [],
         error: geminiResult.error ? { code: geminiResult.error.code, message: geminiResult.error.message } : { code: 'UNKNOWN', message: 'Extraction failed' } };
     }
@@ -301,12 +323,12 @@ export class PayrollExtractionService {
     // ── Step 7: Filter contradictory alerts ─────────────────────────
     data.alerts = this.filterContradictoryAlerts(data.alerts as ExtractionAlert[], data);
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await this.prisma.document.update({ where: { id: documentId }, data: { extractedData: data as any } });
-    } catch (dbError) {
-      this.logger.error(`[Payroll] Failed to persist extractedData for doc ${documentId}: ${(dbError as Error).message}`);
-    }
+    // ── Step 8: Persist extractedData + status atomically ─────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data as any, documentStatusId: processedStatus.id },
+    });
 
     return { success: true, documentId, extractedData: data, alerts: data.alerts as ExtractionAlert[], missingFields };
   }
