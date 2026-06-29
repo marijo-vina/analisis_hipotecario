@@ -8,6 +8,7 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
 import { PayrollExtractionService } from './payroll-extraction.service';
+import { BankStatementExtractionService } from './bank-statement-extraction.service';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -30,6 +31,10 @@ describe('DocumentsController', () => {
     extract: jest.fn(),
   };
 
+  const mockBankStatementExtractionService = {
+    extract: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -47,6 +52,10 @@ describe('DocumentsController', () => {
         {
           provide: PayrollExtractionService,
           useValue: mockPayrollExtractionService,
+        },
+        {
+          provide: BankStatementExtractionService,
+          useValue: mockBankStatementExtractionService,
         },
       ],
     }).compile();
@@ -471,6 +480,97 @@ describe('DocumentsController', () => {
       const result = await controller.extractPayrollReceipt(caseId, documentId);
 
       expect(result).toEqual({ data: failureResult });
+    });
+  });
+
+  describe('extractBankStatement', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-bank-uuid-1';
+
+    const successfulExtraction = {
+      success: true,
+      documentId,
+      extractedData: {
+        accountHolder: {
+          fullName: 'JUAN PÉREZ LÓPEZ',
+          isJointAccount: false,
+        },
+        bank: {
+          institutionName: 'BBVA',
+          accountNumber: '0123456789',
+          clabe: '012345678901234567',
+        },
+        statementPeriod: {
+          periodStartDate: '2026-03-01',
+          periodEndDate: '2026-05-31',
+          averageBalance: 25000.0,
+          endingBalance: 28000.0,
+        },
+        payrollDeposits: [
+          {
+            date: '2026-03-15',
+            amount: 15000.0,
+            currency: 'MXN',
+            originalConcept: 'NOMINA',
+            detectedPayerRfc: 'PELJ900101ABC',
+            isPayrollConcept: true,
+            containsPayrollKeyword: true,
+            possiblePayrollProvider: false,
+            matchCandidateForPayrollReceipt: {
+              expectedPayrollReceiptId: null,
+              amountMatchesPayrollNetIncome: null,
+              dateMatchesPayrollPaymentDate: null,
+              conceptMatchesEmployer: null,
+              matchConfidence: null,
+            },
+          },
+        ],
+      },
+      alerts: ['BANK_NO_RFC_DETECTED'],
+      missingFields: [],
+    };
+
+    it('should return 200 with extraction result in data envelope', async () => {
+      mockBankStatementExtractionService.extract.mockResolvedValue(
+        successfulExtraction,
+      );
+
+      const result = await controller.extractBankStatement(caseId, documentId);
+
+      expect(
+        mockBankStatementExtractionService.extract,
+      ).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
+    });
+
+    it('should return error result without throwing when extraction fails gracefully', async () => {
+      const failureResult = {
+        success: false,
+        documentId,
+        extractedData: null,
+        alerts: [],
+        missingFields: [],
+        error: { code: 'DOCUMENT_NOT_PROCESSED', message: 'El documento debe estar procesado' },
+      };
+      mockBankStatementExtractionService.extract.mockResolvedValue(failureResult);
+
+      const result = await controller.extractBankStatement(caseId, documentId);
+
+      expect(result).toEqual({ data: failureResult });
+    });
+
+    it('should propagate Document not found error when service rejects', async () => {
+      mockBankStatementExtractionService.extract.mockRejectedValue(
+        new NotFoundException('Document not found'),
+      );
+
+      await expect(
+        controller.extractBankStatement(caseId, 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(
+        mockBankStatementExtractionService.extract,
+      ).toHaveBeenCalledWith(caseId, 'nonexistent');
     });
   });
 });
