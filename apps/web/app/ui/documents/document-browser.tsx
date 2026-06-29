@@ -67,7 +67,7 @@ function DocumentRow({
   document: Document;
 }) {
   return (
-    <div className="flex items-center gap-3 px-0 py-2 border-b border-gf-border last:border-b-0 hover:bg-gf-bg transition-colors">
+    <div className="flex items-center gap-3 px-0 py-1.5 border-b border-gf-border last:border-b-0 hover:bg-gf-bg transition-colors">
       {/* Icono + nombre (truncado) */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span aria-hidden="true" className="shrink-0 text-base">
@@ -194,7 +194,7 @@ export default function DocumentBrowser({
                 shrink-0 sm:w-full
                 flex items-center justify-between gap-3
                 rounded-[var(--radius-sm)] border
-                px-3 py-2 text-sm text-left
+                px-3 py-1.5 text-sm text-left
                 transition-colors
                 ${
                   active

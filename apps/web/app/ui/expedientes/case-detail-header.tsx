@@ -65,7 +65,7 @@ export default function CaseDetailHeader({
   }, [popoverOpen]);
 
   return (
-    <header className="mb-4">
+    <header className="mb-3">
       {/* ── Fila compacta ~52px ────────────────────────────────────────── */}
       <div className="flex items-center gap-3 min-h-[52px] flex-wrap">
         {/* Flecha ← */}

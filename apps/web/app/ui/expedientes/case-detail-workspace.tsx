@@ -95,65 +95,61 @@ export default function CaseDetailWorkspace({
         statuses={statuses}
       />
 
-      {/* ── Card resumen — mini columnas ────────────────────────────────── */}
-      <Card className="mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Columna 1: Cliente */}
-          <div className="space-y-1.5">
-            <p className="text-xs text-gf-text-muted uppercase tracking-wide">
-              Cliente
-            </p>
-            {client ? (
-              <>
-                <p className="text-sm font-medium text-gf-text">
-                  {client.fullName}
-                </p>
+      {/* ── Resumen + Observaciones (2 columnas) ────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* Columna izquierda (2/3): Card resumen */}
+        <Card className="lg:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Col 1: Cliente */}
+            <div>
+              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                Cliente
+              </p>
+              {client ? (
                 <button
                   type="button"
                   onClick={() => setClientDrawerOpen(true)}
-                  className="text-xs text-gf-text-muted hover:text-gf-text underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gf-red/40 rounded-[var(--radius-sm)]"
+                  className="text-sm font-medium text-gf-text hover:text-gf-red transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gf-red/40 rounded-[var(--radius-sm)]"
                 >
-                  Ver expediente
+                  {client.fullName}
                 </button>
-              </>
-            ) : (
-              <p className="text-sm font-medium text-gf-text-muted italic">
-                No disponible
-              </p>
-            )}
-          </div>
+              ) : (
+                <p className="text-sm font-medium text-gf-text-muted italic">
+                  No disponible
+                </p>
+              )}
+            </div>
 
-          {/* Columna 2: Tipo persona + Tipo crédito */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
-                Tipo persona
-              </p>
-              <p className="text-sm font-medium text-gf-text">
-                {personTypeLabel(caseData.personType)}
-              </p>
+            {/* Col 2: Tipo persona + Tipo crédito */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                  Tipo persona
+                </p>
+                <p className="text-sm font-medium text-gf-text">
+                  {personTypeLabel(caseData.personType)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                  Tipo crédito
+                </p>
+                <p className="text-sm font-medium text-gf-text">
+                  {caseData.creditType?.name ?? "—"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
-                Tipo crédito
-              </p>
-              <p className="text-sm font-medium text-gf-text">
-                {caseData.creditType?.name ?? "—"}
-              </p>
-            </div>
-          </div>
 
-          {/* Columna 3: Monto + Ver expediente */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
-                Monto solicitado
-              </p>
-              <p className="text-sm font-medium text-gf-text">
-                {formatCurrency(caseData.requestedAmount)}
-              </p>
-            </div>
-            <div>
+            {/* Col 3: Monto + Ver expediente */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                  Monto solicitado
+                </p>
+                <p className="text-sm font-medium text-gf-text">
+                  {formatCurrency(caseData.requestedAmount)}
+                </p>
+              </div>
               <Button
                 variant="secondary"
                 type="button"
@@ -163,16 +159,22 @@ export default function CaseDetailWorkspace({
               </Button>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
 
-      {/* ── Observaciones ──────────────────────────────────────────────── */}
-      <div className="mb-4">
+        {/* Columna derecha (1/3): Observaciones */}
         <ObservationsEditor caseId={caseId} initialNotes={caseData.notes ?? null} />
       </div>
 
       {/* ── Documentos por categoría ───────────────────────────────────── */}
       <div id="documentos" className="mb-4">
+        <h2 className="text-base font-semibold text-gf-text mb-3">
+          Documentos
+          {documents.length > 0 && (
+            <span className="text-gf-text-muted font-normal ml-1">
+              ({documents.length})
+            </span>
+          )}
+        </h2>
         <DocumentBrowser
           caseId={caseId}
           documents={documents}

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function Topbar() {
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-topbar px-content bg-gf-surface border-b border-gf-border ml-sidebar">
+    <header data-topbar className="sticky top-0 z-30 flex items-center justify-between h-topbar px-content bg-gf-surface border-b border-gf-border ml-sidebar">
       {/* Spacer — left side intentionally empty */}
 
       {/* ── Right: quick actions ───────────────────────────────── */}
