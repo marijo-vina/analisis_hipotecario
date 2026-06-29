@@ -521,3 +521,422 @@ export function parsePayroll(documents: Document[]): ParsedPayroll {
 
   return { summary, receipts };
 }
+
+// ── Bank statement extraction parsing ──────────────────────────────────────
+
+export interface ParsedBankStatementDeposit {
+  date: string | null;
+  amount: number | null;
+  currency: string;
+  originalConcept: string | null;
+  employerName: string | null;
+  employerRfc: string | null;
+  isPayrollConcept: boolean;
+  containsPayrollKeyword: boolean;
+  matchCandidateForPayroll: boolean;
+}
+
+export interface ParsedBankStatementProvider {
+  payerName: string;
+  depositDate: string | null;
+  amount: number | null;
+  payerRfc: string | null;
+  estimatedRecurrence: string | null;
+}
+
+export interface ParsedOtherMovement {
+  date: string | null;
+  amount: number | null;
+  movementType: string | null;
+  description: string | null;
+}
+
+export interface ParsedStatementContext {
+  incomeBehavior: string | null;
+  requiredMonths: number | null;
+  detectedMonths: number | null;
+  isRequirementSatisfied: boolean | null;
+}
+
+export interface ParsedBankStatement {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+
+  // Bank & account
+  bankName: string | null;
+  accountNumber: string | null;
+  clabe: string | null;
+  isJointAccount: boolean | null;
+
+  // Account holder
+  accountHolder: string | null;
+
+  // Period
+  periodStart: string | null;
+  periodEnd: string | null;
+  cutoffDate: string | null;
+  isClosedMonth: boolean;
+  isCurrentIncompleteMonth: boolean;
+
+  // Balances
+  averageBalance: number | null;
+  endingBalance: number | null;
+
+  // Payroll deposits
+  deposits: ParsedBankStatementDeposit[];
+
+  // Possible payroll providers (aggregated across all statements)
+  providers: ParsedBankStatementProvider[];
+
+  // Other movements
+  otherMovements: ParsedOtherMovement[];
+
+  // Requirement context
+  context: ParsedStatementContext | null;
+
+  // Alerts
+  alerts: ExtractionAlert[];
+  alertCount: number;
+  hasCritical: boolean;
+}
+
+export interface ParsedBankStatements {
+  summary: {
+    totalStatements: number;
+    statementsWithData: number;
+    statementsWithError: number;
+    banks: string[];
+    periodStart: string | null;
+    periodEnd: string | null;
+    totalDeposits: number;
+    totalCriticalAlerts: number;
+    totalWarningAlerts: number;
+  } | null;
+  statements: ParsedBankStatement[];
+
+  // Aggregated data for cross-statement analysis
+  allProviders: ParsedBankStatementProvider[];
+  allDeposits: ParsedBankStatementDeposit[];
+  aggregatedContext: {
+    incomeBehavior: string | null;
+    requiredMonths: number | null;
+    detectedMonths: number | null;
+    isRequirementSatisfied: boolean | null;
+    coveredMonths: string[]; // e.g. ["2026-01", "2026-02", ...]
+  } | null;
+
+  // All alerts across statements
+  allAlerts: ExtractionAlert[];
+}
+
+function emptyStatement(doc: Document): ParsedBankStatement {
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: false,
+    bankName: null,
+    accountNumber: null,
+    clabe: null,
+    isJointAccount: null,
+    accountHolder: null,
+    periodStart: null,
+    periodEnd: null,
+    cutoffDate: null,
+    isClosedMonth: false,
+    isCurrentIncompleteMonth: false,
+    averageBalance: null,
+    endingBalance: null,
+    deposits: [],
+    providers: [],
+    otherMovements: [],
+    context: null,
+    alerts: [],
+    alertCount: 0,
+    hasCritical: false,
+  };
+}
+
+/**
+ * Parses ALL BANK_STATEMENT documents into a structured bank statement view.
+ *
+ * Every document appears — including UPLOADED, PROCESSING, PROCESSED
+ * (with or without extractedData), and error states. Aggregated providers
+ * and context are collected for cross-statement analysis.
+ */
+export function parseBankStatements(
+  documents: Document[],
+): ParsedBankStatements {
+  const bankDocs = documents.filter(
+    (d) => d.documentType.code === "BANK_STATEMENT",
+  );
+
+  const totalStatements = bankDocs.length;
+
+  if (totalStatements === 0) {
+    return {
+      summary: null,
+      statements: [],
+      allProviders: [],
+      allDeposits: [],
+      aggregatedContext: null,
+      allAlerts: [],
+    };
+  }
+
+  const statements: ParsedBankStatement[] = [];
+  const allProvidersMap = new Map<
+    string,
+    ParsedBankStatementProvider
+  >();
+  const allDeposits: ParsedBankStatementDeposit[] = [];
+  const allAlerts: ExtractionAlert[] = [];
+  const banks = new Set<string>();
+  const coveredMonths = new Set<string>();
+
+  let statementsWithData = 0;
+  let statementsWithError = 0;
+  let totalCriticalAlerts = 0;
+  let totalWarningAlerts = 0;
+  let periodStart: string | null = null;
+  let periodEnd: string | null = null;
+  let aggregatedContext: ParsedBankStatements["aggregatedContext"] = null;
+
+  for (const doc of bankDocs) {
+    const statusCode = doc.documentStatus.code;
+
+    if (statusCode === "ERROR" || statusCode === "EXTRACTION_ERROR") {
+      statementsWithError++;
+      statements.push(emptyStatement(doc));
+      continue;
+    }
+
+    if (
+      statusCode === "UPLOADED" ||
+      statusCode === "PROCESSING"
+    ) {
+      statements.push(emptyStatement(doc));
+      continue;
+    }
+
+    if (!doc.extractedData) {
+      statements.push(emptyStatement(doc));
+      continue;
+    }
+
+    statementsWithData++;
+    const ed = doc.extractedData as Record<string, unknown>;
+
+    // ── Bank & account ──────────────────────────────────────────────────
+    const bank = (ed.bank as Record<string, unknown>) ?? {};
+    const bankName = (bank.institutionName as string) ?? null;
+    const accountNumber = (bank.accountNumber as string) ?? null;
+    const clabe = (bank.clabe as string) ?? null;
+
+    if (bankName) banks.add(bankName);
+
+    // ── Account holder ──────────────────────────────────────────────────
+    const holder = (ed.accountHolder as Record<string, unknown>) ?? {};
+    const accountHolder = (holder.fullName as string) ?? null;
+    const isJointAccount =
+      (holder.isJointAccount as boolean) ?? null;
+
+    // ── Period ─────────────────────────────────────────────────────────
+    const period = (ed.statementPeriod as Record<string, unknown>) ?? {};
+    const ps = (period.periodStartDate as string) ?? null;
+    const pe = (period.periodEndDate as string) ?? null;
+    const cutoff = (period.cutoffDate as string) ?? null;
+    const isClosedMonth =
+      period.isClosedMonth === true;
+    const isCurrentIncompleteMonth =
+      period.isCurrentIncompleteMonth === true;
+    const averageBalance = (period.averageBalance as number) ?? null;
+    const endingBalance = (period.endingBalance as number) ?? null;
+
+    // Track period range
+    if (ps && (!periodStart || ps < periodStart)) periodStart = ps;
+    if (pe && (!periodEnd || pe > periodEnd)) periodEnd = pe;
+
+    // Track covered months (YYYY-MM)
+    if (ps) {
+      const m = /^(\d{4}-\d{2})/.exec(ps);
+      if (m) coveredMonths.add(m[1]);
+    }
+    if (pe) {
+      const m = /^(\d{4}-\d{2})/.exec(pe);
+      if (m) coveredMonths.add(m[1]);
+    }
+
+    // ── Payroll deposits ────────────────────────────────────────────────
+    const depositsArr =
+      (ed.payrollDeposits as Record<string, unknown>[]) ?? [];
+    const deposits: ParsedBankStatementDeposit[] = [];
+    for (const dep of depositsArr) {
+      const deposit: ParsedBankStatementDeposit = {
+        date: (dep.date as string) ?? null,
+        amount: (dep.amount as number) ?? null,
+        currency: (dep.currency as string) ?? "MXN",
+        originalConcept: (dep.originalConcept as string) ?? null,
+        employerName:
+          (dep.detectedEmployerOrPayerName as string) ?? null,
+        employerRfc: (dep.detectedPayerRfc as string) ?? null,
+        isPayrollConcept: dep.isPayrollConcept === true,
+        containsPayrollKeyword:
+          dep.containsPayrollKeyword === true,
+        matchCandidateForPayroll:
+          dep.matchCandidateForPayrollReceipt === true,
+      };
+      deposits.push(deposit);
+    }
+    allDeposits.push(...deposits);
+
+    // ── Possible providers ──────────────────────────────────────────────
+    const providersArr =
+      (ed.possiblePayrollProviders as Record<string, unknown>[]) ?? [];
+    const providers: ParsedBankStatementProvider[] = [];
+    for (const prov of providersArr) {
+      const name = (prov.payerName as string) ?? "Sin nombre";
+      const provider: ParsedBankStatementProvider = {
+        payerName: name,
+        depositDate: (prov.depositDate as string) ?? null,
+        amount: (prov.amount as number) ?? null,
+        payerRfc: (prov.detectedPayerRfc as string) ?? null,
+        estimatedRecurrence:
+          (prov.estimatedRecurrence as string) ?? null,
+      };
+      providers.push(provider);
+
+      const key = (prov.detectedPayerRfc as string) ?? name;
+      if (!allProvidersMap.has(key)) {
+        allProvidersMap.set(key, provider);
+      }
+    }
+
+    // ── Other movements ─────────────────────────────────────────────────
+    const movementsArr =
+      (ed.otherRelevantMovements as Record<string, unknown>[]) ?? [];
+    const otherMovements: ParsedOtherMovement[] = [];
+    for (const mov of movementsArr) {
+      // trashDepositAnalysis is an OBJECT from Gemini, not a string.
+      // Extract a readable description from it.
+      const trashAnalysis = mov.trashDepositAnalysis as
+        | Record<string, unknown>
+        | undefined;
+      let description: string | null = null;
+      if (trashAnalysis && typeof trashAnalysis === "object") {
+        const evidence = trashAnalysis.evidenceText as string | undefined;
+        const reason = trashAnalysis.reason as string | undefined;
+        description = evidence ?? reason ?? null;
+      } else if (typeof mov.trashDepositAnalysis === "string") {
+        description = mov.trashDepositAnalysis;
+      }
+
+      otherMovements.push({
+        date: (mov.date as string) ?? null,
+        amount: (mov.amount as number) ?? null,
+        movementType: (mov.movementType as string) ?? null,
+        description,
+      });
+    }
+
+    // ── Context ─────────────────────────────────────────────────────────
+    const ctx =
+      ed.documentRequirementContext as Record<string, unknown> | undefined;
+    const context: ParsedStatementContext | null = ctx
+      ? {
+          incomeBehavior: (ctx.incomeBehavior as string) ?? null,
+          requiredMonths:
+            (ctx.requiredBankStatementMonths as number) ?? null,
+          detectedMonths:
+            (ctx.detectedDocumentMonths as number) ?? null,
+          isRequirementSatisfied:
+            (ctx.isRequirementSatisfied as boolean) ?? null,
+        }
+      : null;
+
+    // Use the first statement's context for aggregation
+    if (!aggregatedContext && context) {
+      aggregatedContext = {
+        ...context,
+        coveredMonths: [],
+      };
+    }
+
+    // ── Alerts ──────────────────────────────────────────────────────────
+    const alerts = filterAlerts(ed.alerts);
+    const hasCritical = alerts.some(
+      (a) => a.severity === "CRITICAL",
+    );
+    for (const a of alerts) {
+      if (a.severity === "CRITICAL") totalCriticalAlerts++;
+      else totalWarningAlerts++;
+    }
+    allAlerts.push(...alerts);
+
+    statements.push({
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: true,
+      bankName,
+      accountNumber,
+      clabe,
+      isJointAccount,
+      accountHolder,
+      periodStart: ps,
+      periodEnd: pe,
+      cutoffDate: cutoff,
+      isClosedMonth,
+      isCurrentIncompleteMonth,
+      averageBalance,
+      endingBalance,
+      deposits,
+      providers,
+      otherMovements,
+      context,
+      alerts,
+      alertCount: alerts.length,
+      hasCritical,
+    });
+  }
+
+  // Sort statements by periodStart ascending
+  statements.sort((a, b) => {
+    if (!a.periodStart && !b.periodStart) return 0;
+    if (!a.periodStart) return 1;
+    if (!b.periodStart) return -1;
+    return a.periodStart.localeCompare(b.periodStart);
+  });
+
+  // ── Aggregated context ─────────────────────────────────────────────────
+  if (aggregatedContext) {
+    aggregatedContext.coveredMonths = Array.from(coveredMonths).sort();
+  }
+
+  // ── Summary ────────────────────────────────────────────────────────────
+  const summary = {
+    totalStatements,
+    statementsWithData,
+    statementsWithError,
+    banks: Array.from(banks).sort(),
+    periodStart,
+    periodEnd,
+    totalDeposits: allDeposits.length,
+    totalCriticalAlerts,
+    totalWarningAlerts,
+  };
+
+  return {
+    summary,
+    statements,
+    allProviders: Array.from(allProvidersMap.values()),
+    allDeposits,
+    aggregatedContext,
+    allAlerts,
+  };
+}

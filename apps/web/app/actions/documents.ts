@@ -186,3 +186,56 @@ export async function extractPayrollReceipt(
 
   return result.data.data;
 }
+
+/**
+ * Extrae datos estructurados de un estado de cuenta bancario usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-bank-statement`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function extractBankStatement(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+  alerts: Array<{
+    code: string;
+    severity: string;
+    category: string;
+    message: string;
+    field: string | null;
+    requiresManualReview: boolean;
+  }>;
+  missingFields: string[];
+}> {
+  const result = await apiFetch<{
+    data: {
+      success: boolean;
+      extractedData: Record<string, unknown> | null;
+      alerts: Array<{
+        code: string;
+        severity: string;
+        category: string;
+        message: string;
+        field: string | null;
+        requiresManualReview: boolean;
+      }>;
+      missingFields: string[];
+    };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-bank-statement`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ??
+        "Error al extraer datos del estado de cuenta",
+    );
+  }
+
+  return result.data.data;
+}

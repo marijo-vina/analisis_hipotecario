@@ -12,6 +12,7 @@ import ExtractionCategoryTabs from "@/app/ui/extraction/extraction-category-tabs
 import EmptyState from "@/app/ui/common/empty-state";
 import IdentidadTab from "@/app/ui/extraction/identidad-tab";
 import NominaTab from "@/app/ui/extraction/nomina-tab";
+import EstadosTab from "@/app/ui/extraction/estados-tab";
 
 interface ExtractionSectionProps {
   documents: Document[];
@@ -72,7 +73,10 @@ export default function ExtractionSection({
             <NominaTab documents={docsByCategory.get("nomina") ?? []} />
           )}
           {activeTab === "estados" && (
-            <EmptyState message="Los datos de estados de cuenta se mostraran aqui una vez procesados." />
+            <EstadosTab
+              documents={docsByCategory.get("estados") ?? []}
+              allDocuments={documents}
+            />
           )}
           {activeTab === "buro" && (
             <EmptyState message="Los datos del buró de crédito se mostraran aqui una vez procesados." />
