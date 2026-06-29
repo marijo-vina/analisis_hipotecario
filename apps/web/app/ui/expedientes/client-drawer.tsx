@@ -1,7 +1,6 @@
 "use client";
 
 import Drawer from "@/app/ui/common/drawer";
-import FieldGrid, { type FieldGridField } from "@/app/ui/common/field-grid";
 
 interface ClientDrawerClient {
   fullName: string;
@@ -22,8 +21,8 @@ const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
 };
 
-function personTypeLabel(code?: string): string | undefined {
-  if (!code) return undefined;
+function personTypeLabel(code?: string): string {
+  if (!code) return "—";
   return PERSON_TYPE_LABELS[code] ?? code;
 }
 
@@ -31,8 +30,9 @@ function personTypeLabel(code?: string): string | undefined {
  * ClientDrawer — panel lateral con la información del cliente asociado.
  *
  * Envuelve el Drawer reutilizable. Si `client` es null muestra un mensaje de
- * carga no disponible; en caso contrario despliega un FieldGrid con todos los
- * campos disponibles. FieldGrid ya renderiza "—" para los valores vacíos.
+ * no disponible; en caso contrario despliega secciones manuales con labels
+ * pequeños y valores en font-medium, organizados por "Datos personales" y
+ * "Contacto".
  */
 export default function ClientDrawer({ open, onClose, client }: ClientDrawerProps) {
   const title = client ? `Cliente: ${client.fullName}` : "Cliente";
@@ -47,18 +47,63 @@ export default function ClientDrawer({ open, onClose, client }: ClientDrawerProp
     );
   }
 
-  const fields: FieldGridField[] = [
-    { label: "Nombre", value: client.fullName || undefined },
-    { label: "RFC", value: client.rfc || undefined },
-    { label: "CURP", value: client.curp || undefined },
-    { label: "Tipo persona", value: personTypeLabel(client.personType) },
-    { label: "Correo", value: client.email || undefined },
-    { label: "Teléfono", value: client.phone || undefined },
-  ];
-
   return (
     <Drawer open={open} onClose={onClose} title={title}>
-      <FieldGrid fields={fields} />
+      <div className="space-y-6">
+        {/* ── Datos personales ─────────────────────────────────────────── */}
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-3">
+            Datos personales
+          </h3>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div>
+              <dt className="text-xs text-gf-text-muted">Nombre</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5">
+                {client.fullName}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gf-text-muted">RFC</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5 font-mono">
+                {client.rfc || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gf-text-muted">CURP</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5 font-mono">
+                {client.curp || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gf-text-muted">Tipo persona</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5">
+                {personTypeLabel(client.personType)}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {/* ── Contacto ─────────────────────────────────────────────────── */}
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted mb-3">
+            Contacto
+          </h3>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div>
+              <dt className="text-xs text-gf-text-muted">Correo</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5 break-all">
+                {client.email || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gf-text-muted">Teléfono</dt>
+              <dd className="text-sm font-medium text-gf-text mt-0.5">
+                {client.phone || "—"}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      </div>
     </Drawer>
   );
 }
