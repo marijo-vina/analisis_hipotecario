@@ -9,7 +9,7 @@ import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
 import FieldGrid from "@/app/ui/common/field-grid";
 import ExtractionSection from "@/app/ui/extraction/extraction-section";
 import DocumentUploadSection from "@/app/ui/documents/document-upload-section";
-import DocumentListGrouped from "@/app/ui/documents/document-list-grouped";
+import DocumentCardGrid from "@/app/ui/documents/document-card-grid";
 import type {
   MortgageCase,
   Client,
@@ -235,11 +235,8 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         </div>
       </div>
 
-      {/* ── Full-width: Datos extraídos ────────────────────────────────── */}
-      <ExtractionSection documents={documents} />
-
       {/* ── Full-width: Documentos agrupados por tipo ──────────────────── */}
-      <div className="mt-6" id="documentos">
+      <div className="mt-2" id="documentos">
         <h2 className="text-lg font-semibold text-gf-text mb-4">
           Documentos
           {documents.length > 0 && (
@@ -248,8 +245,11 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             </span>
           )}
         </h2>
-        <DocumentListGrouped caseId={c.id} documents={documents} />
+        <DocumentCardGrid caseId={c.id} documents={documents} />
       </div>
+
+      {/* ── Full-width: Datos extraídos ────────────────────────────────── */}
+      <ExtractionSection documents={documents} />
     </div>
   );
 }
