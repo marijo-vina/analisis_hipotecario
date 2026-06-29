@@ -1,18 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 
 const SYSTEM_INSTRUCTION = [
-  'Eres un extractor documental para análisis hipotecario.',
-  'Tu única tarea es extraer datos estructurados a partir del texto OCR provisto.',
+  'Eres un extractor documental para analisis hipotecario.',
+  'Tu unica tarea es extraer datos estructurados a partir del texto OCR provisto.',
   'Reglas estrictas:',
-  '- Extrae ÚNICAMENTE de la información presente en el texto OCR. No utilices conocimiento externo.',
+  '- Extrae UNICAMENTE de la informacion presente en el texto OCR. No utilices conocimiento externo.',
   '- NO inventes ni adivines datos. Ante cualquier duda, usa null.',
   '- Usa null para todo campo que no se encuentre en el OCR.',
   '- Normaliza todas las fechas al formato YYYY-MM-DD.',
-  '- Normaliza todos los montos como números decimales sin $ y sin comas como separador de miles.',
-  '- Mantén RFC, CURP y nombres en MAYÚSCULAS.',
-  '- Devuelve ÚNICAMENTE un objeto JSON válido, sin texto explicativo, sin markdown.',
+  '- Normaliza todos los montos como numeros decimales sin $ y sin comas como separador de miles.',
+  '- Manten RFC, CURP y nombres en MAYUSCULAS.',
+  '- Devuelve UNICAMENTE un objeto JSON valido, sin texto explicativo, sin markdown.',
   '- Incluye un arreglo "alerts" con los campos faltantes o de baja confianza.',
 ].join('\n');
 
@@ -36,6 +36,7 @@ export interface ExtractionResult {
 }
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_LOCATION = 'us-central1';
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
@@ -45,27 +46,32 @@ const RETRYABLE_STATUSES = new Set([429, 503]);
 /** Maximum retries for transient errors. */
 const MAX_RETRIES = 3;
 
-/** Backoff delays in milliseconds: attempt 1 → 0ms, 2 → 1000ms, 3 → 2000ms. */
+/** Backoff delays in milliseconds: attempt 1 -> 0ms, 2 -> 1000ms, 3 -> 2000ms. */
 const RETRY_DELAYS_MS = [0, 1000, 2000];
 
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
-  private readonly genAI: GoogleGenerativeAI;
-  private readonly model: GenerativeModel;
+  private readonly vertexAI: VertexAI;
+  private readonly modelName: string;
   private readonly timeoutMs: number;
   private readonly maxOutputTokens: number;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (!apiKey) {
-      throw new Error(GeminiErrorCode.GEMINI_CONFIG_ERROR);
+    const projectId = this.configService.get<string>('GEMINI_PROJECT_ID');
+    const location =
+      this.configService.get<string>('GEMINI_LOCATION') || DEFAULT_LOCATION;
+
+    if (!projectId) {
+      throw new Error(
+        `${GeminiErrorCode.GEMINI_CONFIG_ERROR}: GEMINI_PROJECT_ID is required for Vertex AI`,
+      );
     }
 
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    const modelName =
+    this.vertexAI = new VertexAI({ project: projectId, location });
+
+    this.modelName =
       this.configService.get<string>('GEMINI_MODEL') || DEFAULT_MODEL;
-    this.model = this.genAI.getGenerativeModel({ model: modelName });
 
     this.timeoutMs = parseInt(
       this.configService.get<string>('GEMINI_TIMEOUT_MS') ||
@@ -79,20 +85,45 @@ export class GeminiService {
     );
   }
 
+  /**
+   * Creates a fresh GenerativeModel instance per extraction call.
+   * This ensures generationConfig is set correctly each time (Vertex AI SDK
+   * does not support per-request generationConfig overrides).
+   */
+  private getModel(maxTokens: number) {
+    return this.vertexAI.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: maxTokens,
+      },
+      safetySettings: [
+        {
+          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        },
+      ],
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: SYSTEM_INSTRUCTION }],
+      },
+    });
+  }
+
   private buildPrompt(
     ocrText: string,
     documentType: string,
     schema: Record<string, unknown>,
     extraInstructions?: string,
   ): string {
-    const parts = [SYSTEM_INSTRUCTION];
+    const parts: string[] = [];
 
     if (extraInstructions) {
-      parts.push('', extraInstructions);
+      parts.push(extraInstructions, '');
     }
 
     parts.push(
-      '',
       `Tipo de documento: ${documentType}`,
       '',
       'Esquema de salida (contrato JSON):',
@@ -128,17 +159,33 @@ export class GeminiService {
   }
 
   /**
-   * Executes a single Gemini API call with timeout.
-   * Returns the raw GenerateContentResult, or throws on failure.
+   * Extracts the text response from a Vertex AI GenerateContentResult.
+   * Vertex AI returns: response.candidates[0].content.parts[0].text
+   */
+  private extractText(result: {
+    response: {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+  }): string {
+    const candidate = result.response.candidates?.[0];
+    if (!candidate?.content?.parts?.length) {
+      throw new Error(GeminiErrorCode.GEMINI_EMPTY_RESPONSE);
+    }
+    return candidate.content.parts[0].text ?? '';
+  }
+
+  /**
+   * Executes a single Vertex AI API call with timeout.
    */
   private async executeRequest(
+    model: ReturnType<GeminiService['getModel']>,
     prompt: string,
-    generationConfig: Record<string, unknown>,
   ) {
     return this.callWithTimeout(
-      this.model.generateContent({
+      model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig,
       }),
     );
   }
@@ -151,12 +198,10 @@ export class GeminiService {
     const message = err instanceof Error ? err.message : String(err);
     const status = (err as { status?: number })?.status;
 
-    // Check HTTP status first
     if (status !== undefined && RETRYABLE_STATUSES.has(status)) {
       return true;
     }
 
-    // Fallback: check error message for known patterns
     return (
       /503|service unavailable|high demand|too many requests|429|overloaded/i.test(
         message,
@@ -200,13 +245,10 @@ export class GeminiService {
       schema,
       extraInstructions,
     );
-    const generationConfig = {
-      responseMimeType: 'application/json',
-      temperature: 0.1,
-      maxOutputTokens: this.maxOutputTokens,
-    };
 
-    // ── Retry loop for transient errors ─────────────────────────────
+    const model = this.getModel(this.maxOutputTokens);
+
+    // ---- Retry loop for transient errors ----
     let lastError: unknown;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -219,8 +261,8 @@ export class GeminiService {
           await this.sleep(delay);
         }
 
-        const genResult = await this.executeRequest(prompt, generationConfig);
-        const rawText = genResult.response.text();
+        const genResult = await this.executeRequest(model, prompt);
+        const rawText = this.extractText(genResult);
 
         try {
           const extracted = this.parseJsonResponse(rawText);
@@ -235,7 +277,9 @@ export class GeminiService {
             parseErr instanceof Error
               ? parseErr.message
               : GeminiErrorCode.GEMINI_INVALID_JSON;
-          this.logger.error(`[Gemini] JSON parse failed: ${code}`);
+          this.logger.error(
+            `[Gemini] JSON parse failed: ${code}. Raw length: ${rawText.length} chars. Start: ${rawText.slice(0, 300)} ... End: ${rawText.slice(-300)}`,
+          );
           return {
             success: false,
             documentType,
@@ -253,12 +297,10 @@ export class GeminiService {
       } catch (err) {
         lastError = err;
 
-        // Only retry on transient server errors
         if (this.isRetryable(err) && attempt < MAX_RETRIES - 1) {
           continue;
         }
 
-        // If it's a timeout, don't retry — return immediately
         if (/timeout|deadline|GEMINI_TIMEOUT/i.test(
           err instanceof Error ? err.message : String(err),
         )) {
@@ -273,16 +315,15 @@ export class GeminiService {
           };
         }
 
-        break; // non-retryable or exhausted retries
+        break;
       }
     }
 
-    // ── Exhausted retries or non-retryable error ────────────────────
+    // ---- Exhausted retries or non-retryable error ----
     const message =
       lastError instanceof Error ? lastError.message : String(lastError);
     this.logger.error(`[Gemini] extraction error: ${message}`);
 
-    // Distinguish transient from permanent
     if (this.isRetryable(lastError)) {
       return {
         success: false,
@@ -297,7 +338,8 @@ export class GeminiService {
       };
     }
 
-    const maybeStatus = (lastError as { status?: unknown; code?: unknown }) || {};
+    const maybeStatus =
+      (lastError as { status?: unknown; code?: unknown }) || {};
     const status = maybeStatus.status ?? maybeStatus.code;
 
     return {
@@ -327,7 +369,7 @@ export class GeminiService {
       }
     });
     timeoutPromise.catch(() => {
-      /* swallow — race settled already */
+      /* swallow - race settled already */
     });
     return Promise.race([promise, timeoutPromise]);
   }

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt } from "@/app/actions/documents";
+import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt, extractBankStatement } from "@/app/actions/documents";
 import Button from "@/app/ui/common/button";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
@@ -117,6 +117,16 @@ export default function DocumentActions({
         } catch {
           setProcessError(
             "OCR completado, pero la extracción de nómina falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "BANK_STATEMENT") {
+        try {
+          await extractBankStatement(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción del estado de cuenta falló. Puede intentar reprocesar.",
           );
         }
       }
