@@ -5,26 +5,13 @@ import PageHeader from "@/app/ui/common/page-header";
 import Button from "@/app/ui/common/button";
 import Card from "@/app/ui/common/card";
 import StatusBadge from "@/app/ui/status-badge";
-import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
-import FieldGrid from "@/app/ui/common/field-grid";
-import ExtractionSection from "@/app/ui/extraction/extraction-section";
-import DocumentUploadSection from "@/app/ui/documents/document-upload-section";
-import DocumentCardGrid from "@/app/ui/documents/document-card-grid";
+import CaseDetailWorkspace from "@/app/ui/expedientes/case-detail-workspace";
 import type {
   MortgageCase,
   Client,
   DocumentType,
   Document,
 } from "@/app/lib/definitions";
-
-// ── Person type → human-readable Spanish label ─────────────────────────
-const PERSON_TYPE_LABELS: Record<string, string> = {
-  SALARIED: "Asalariado",
-};
-
-function personTypeLabel(code: string): string {
-  return PERSON_TYPE_LABELS[code] ?? code;
-}
 
 interface CaseDetailPageProps {
   params: Promise<{ id: string }>;
@@ -33,11 +20,13 @@ interface CaseDetailPageProps {
 /**
  * Mortgage case detail page — server component.
  *
- * Layout (top → bottom):
- *   1. Page header with breadcrumbs + actions
- *   2. Two-column grid: case summary / client (left 2/3), observations (right 1/3)
- *   3. Full-width: documents section (upload + list)
- *   4. Full-width: extraction results grouped by document type
+ * Fetches the case, client, statuses, document types and documents, then
+ * delegates all rendering to `CaseDetailWorkspace` (client), which composes
+ * the compact header, summary card, observations editor, document browser
+ * and extraction section, plus the client/case detail drawers.
+ *
+ * The PageHeader above is retained temporarily; CaseDetailWorkspace renders
+ * its own compact header, so removing the PageHeader is an optional follow-up.
  */
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { id } = await params;
@@ -137,119 +126,27 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         }
       />
 
-      {/* ── Top: 2-column grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <h3 className="text-base font-semibold text-gf-text mb-4">
-              Resumen del expediente
-            </h3>
-            <FieldGrid
-              fields={[
-                {
-                  label: "Monto solicitado",
-                  value:
-                    c.requestedAmount != null
-                      ? `$${Number(c.requestedAmount).toLocaleString("es-MX")}`
-                      : undefined,
-                },
-                { label: "Ubicación", value: c.propertyLocation },
-                {
-                  label: "Valor propiedad",
-                  value:
-                    c.propertyValue != null
-                      ? `$${Number(c.propertyValue).toLocaleString("es-MX")}`
-                      : undefined,
-                },
-                {
-                  label: "Plazo estimado",
-                  value:
-                    c.estimatedTermMonths != null
-                      ? `${c.estimatedTermMonths} meses`
-                      : undefined,
-                },
-                { label: "Tipo crédito", value: c.creditType.name },
-                { label: "Tipo persona", value: personTypeLabel(c.personType) },
-              ]}
-            />
-          </Card>
-
-          <Card>
-            <h3 className="text-base font-semibold text-gf-text mb-4">
-              Cliente asociado
-            </h3>
-            {client ? (
-              <FieldGrid
-                fields={[
-                  { label: "Nombre", value: client.fullName },
-                  { label: "RFC", value: client.rfc },
-                  { label: "Tipo persona", value: personTypeLabel(c.personType) },
-                  { label: "Correo", value: client.email },
-                  { label: "Teléfono", value: client.phone },
-                ]}
-              />
-            ) : (
-              <p className="text-sm text-gf-text-muted">
-                No se pudo cargar la información del cliente.
-              </p>
-            )}
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <h3 className="text-base font-semibold text-gf-text mb-2">
-              Observaciones
-            </h3>
-            {c.notes ? (
-              <p className="text-sm text-gf-text whitespace-pre-wrap">
-                {c.notes}
-              </p>
-            ) : (
-              <p className="text-sm text-gf-text-muted">Sin observaciones</p>
-            )}
-          </Card>
-
-          <Card>
-            <h3 className="text-base font-semibold text-gf-text mb-2">
-              Análisis financiero
-            </h3>
-            <p className="text-sm text-gf-text-muted">
-              El análisis financiero estará disponible cuando se procesen todos
-              los documentos requeridos.
-            </p>
-          </Card>
-
-          <Card>
-            <CaseStatusDropdown
-              caseId={c.id}
-              currentCode={c.status.code}
-              statuses={statuses}
-            />
-          </Card>
-
-          <DocumentUploadSection
-            caseId={c.id}
-            documentTypes={documentTypes}
-          />
-        </div>
-      </div>
-
-      {/* ── Full-width: Documentos agrupados por tipo ──────────────────── */}
-      <div className="mt-2" id="documentos">
-        <h2 className="text-lg font-semibold text-gf-text mb-4">
-          Documentos
-          {documents.length > 0 && (
-            <span className="text-gf-text-muted font-normal ml-1">
-              ({documents.length})
-            </span>
-          )}
-        </h2>
-        <DocumentCardGrid caseId={c.id} documents={documents} />
-      </div>
-
-      {/* ── Full-width: Datos extraídos ────────────────────────────────── */}
-      <ExtractionSection documents={documents} />
+      <CaseDetailWorkspace
+        caseId={c.id}
+        statusCode={c.status.code}
+        statusName={c.status.name}
+        statuses={statuses}
+        client={client}
+        caseData={{
+          id: c.id,
+          requestedAmount: c.requestedAmount,
+          personType: c.personType,
+          creditType: c.creditType,
+          notes: c.notes,
+          propertyLocation: c.propertyLocation,
+          propertyValue: c.propertyValue,
+          estimatedTermMonths: c.estimatedTermMonths,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        }}
+        documents={documents}
+        documentTypes={documentTypes}
+      />
     </div>
   );
 }
