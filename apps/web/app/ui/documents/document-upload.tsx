@@ -9,6 +9,13 @@ interface DocumentUploadProps {
   caseId: string;
   documentTypes: DocumentType[];
   onSuccess: () => void;
+  /**
+   * Optional pre-selected document type id. When provided, the type
+   * selector initializes to this value instead of the empty placeholder.
+   * The user can still change the selection. Additive and backward
+   * compatible — existing callers that omit this prop behave as before.
+   */
+  defaultDocumentTypeId?: string;
 }
 
 /**
@@ -25,9 +32,15 @@ export default function DocumentUpload({
   caseId,
   documentTypes,
   onSuccess,
+  defaultDocumentTypeId,
 }: DocumentUploadProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [documentTypeId, setDocumentTypeId] = useState<string>("");
+  // Initialize from pre-select prop when provided and valid; otherwise empty.
+  const [documentTypeId, setDocumentTypeId] = useState<string>(
+    defaultDocumentTypeId && documentTypes.some((dt) => dt.id === Number(defaultDocumentTypeId))
+      ? defaultDocumentTypeId
+      : "",
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
