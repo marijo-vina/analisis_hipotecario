@@ -10,7 +10,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "documentType": "BANK_STATEMENT",
   "extractionMetadata": {
     "sourceDocumentId": null,
@@ -29,7 +29,8 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     "requirementNotes": "string | null"
   },
   "accountHolder": {
-    "fullName": "string | null"
+    "fullName": "string | null",
+    "isJointAccount": "boolean | null"
   },
   "bank": {
     "institutionName": "string | null",
@@ -41,15 +42,18 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     "periodEndDate": "YYYY-MM-DD | null",
     "cutoffDate": "YYYY-MM-DD | null",
     "isClosedMonth": "boolean | null",
-    "isCurrentIncompleteMonth": "boolean | null"
+    "isCurrentIncompleteMonth": "boolean | null",
+    "averageBalance": "number | null",
+    "endingBalance": "number | null"
   },
   "payrollDeposits": [
     {
       "date": "YYYY-MM-DD | null",
       "amount": "number | null",
-      "currency": "MXN",
+      "currency": "MXN | USD | OTHER",
       "originalConcept": "string | null",
       "detectedEmployerOrPayerName": "string | null",
+      "detectedPayerRfc": "string | null",
       "isPayrollConcept": "boolean | null",
       "containsPayrollKeyword": "boolean | null",
       "possiblePayrollProvider": "boolean | null",
@@ -68,6 +72,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
       "depositDate": "YYYY-MM-DD | null",
       "amount": "number | null",
       "originalConcept": "string | null",
+      "detectedPayerRfc": "string | null",
       "receivingBank": "string | null",
       "receivingAccount": "string | null",
       "estimatedRecurrence": "WEEKLY | BIWEEKLY | MONTHLY | IRREGULAR | UNKNOWN",
@@ -134,12 +139,16 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
 - Alertar si el concepto no contiene la palabra “nómina” cuando podría ser relevante para políticas bancarias.
 - Alertar si hay menos meses de estados de cuenta que los requeridos por el comportamiento del ingreso.
 - Alertar si los depósitos no coinciden en monto o fecha con la nómina esperada.
+- **Moneda no MXN**: `payrollDeposits[].currency` admite `"MXN" | "USD" | "OTHER"` (valor por defecto `"MXN"`). Cuando `currency !== "MXN"`, adjuntar una alerta en `alerts[]`. La moneda no MXN NO debe bloquear la extracción ni invalidar el esquema.
+- **Detección de RFC del pagador**: En `payrollDeposits[]` y `possiblePayrollProviders[]`, el campo `detectedPayerRfc` (`string | null`) debe intentar extraerse aplicando el patrón regex `[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}` contra `originalConcept`. Si no hay coincidencia, el valor debe ser `null`. Un `detectedPayerRfc` nulo es informativo y NO debe bloquear la conciliación (fallback a Nombre + Monto + Fecha). Falsos positivos degradan con gracia al mismo fallback.
+- **Saldos negativos**: `statementPeriod.averageBalance` y `statementPeriod.endingBalance` deben ser no negativos (`>= 0`) cuando estén presentes. Si se detecta un valor negativo, adjuntar una alerta en `alerts[]` pero NO bloquear la extracción (las cuentas con sobregiro son reales).
+- **Cuenta mancomunada**: `accountHolder.isJointAccount` (`boolean | null`). Cuando el extracto muestre múltiples titulares o texto indicativo de mancomunidad, debe ser `true`. Cuando la titularidad no sea clara, debe ser `null`. Si `true`, generar alerta para revisión del analista (las cuentas mancomunadas pueden mostrar nómina de dos empleadores).
 
 ## Ejemplo simulado
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "documentType": "BANK_STATEMENT",
   "extractionMetadata": {
     "sourceDocumentId": "doc_statement_001",
@@ -158,7 +167,8 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     "requirementNotes": "Se detectaron 3 meses de estados de cuenta para ingreso fijo."
   },
   "accountHolder": {
-    "fullName": "MARIA JOSE PEREZ LOPEZ"
+    "fullName": "MARIA JOSE PEREZ LOPEZ",
+    "isJointAccount": false
   },
   "bank": {
     "institutionName": "BBVA",
@@ -170,7 +180,9 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     "periodEndDate": "2026-05-31",
     "cutoffDate": "2026-05-31",
     "isClosedMonth": true,
-    "isCurrentIncompleteMonth": false
+    "isCurrentIncompleteMonth": false,
+    "averageBalance": 25000.0,
+    "endingBalance": 32000.0
   },
   "payrollDeposits": [
     {
@@ -179,6 +191,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
       "currency": "MXN",
       "originalConcept": "ABONO NOMINA EMPRESA EJEMPLO SA DE CV",
       "detectedEmployerOrPayerName": "EMPRESA EJEMPLO SA DE CV",
+      "detectedPayerRfc": "ABC123456XYZ",
       "isPayrollConcept": true,
       "containsPayrollKeyword": true,
       "possiblePayrollProvider": false,
@@ -214,4 +227,5 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
   },
   "missingFields": [],
   "alerts": []
-}---
+}
+```
