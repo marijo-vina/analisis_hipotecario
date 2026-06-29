@@ -39,13 +39,13 @@ Chain strategy: pending
 
 ## Phase 3: Document Browser
 
-- [ ] 3.1 Create `apps/web/app/ui/documents/document-browser.tsx` — 2-column: left category list with counts, right compact DocumentCardGrid filtered by category
-- [ ] 3.2 Add upload modal to DocumentBrowser — wraps DocumentUpload, pre-selects doc type from active category, opens on "Agregar documento" click
+- [x] 3.1 Create `apps/web/app/ui/documents/document-browser.tsx` — 2-column: left category list with counts, right compact DocumentCardGrid filtered by category
+- [x] 3.2 Add upload modal to DocumentBrowser — wraps DocumentUpload, pre-selects doc type from active category, opens on "Agregar documento" click
 
 ## Phase 4: Integration
 
-- [ ] 4.1 Create `apps/web/app/ui/expedientes/case-detail-workspace.tsx` — client wrapper, manages drawer open/close states, renders header + summary + observations + DocumentBrowser + drawers + ExtractionSection
-- [ ] 4.2 Modify `apps/web/app/dashboard/expedientes/[id]/page.tsx` — fetch all data (case, client, statuses, doc types, docs), render CaseDetailWorkspace, remove old 3-col layout and financial analysis card
+- [x] 4.1 Create `apps/web/app/ui/expedientes/case-detail-workspace.tsx` — client wrapper, manages drawer open/close states, renders header + summary + observations + DocumentBrowser + drawers + ExtractionSection
+- [x] 4.2 Modify `apps/web/app/dashboard/expedientes/[id]/page.tsx` — fetch all data (case, client, statuses, doc types, docs), render CaseDetailWorkspace, remove old 3-col layout and financial analysis card
 
 ## Phase 5: Testing
 
