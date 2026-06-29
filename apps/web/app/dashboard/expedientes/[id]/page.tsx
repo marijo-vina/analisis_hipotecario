@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
-import PageHeader from "@/app/ui/common/page-header";
-import Button from "@/app/ui/common/button";
-import Card from "@/app/ui/common/card";
-import StatusBadge from "@/app/ui/status-badge";
 import CaseDetailWorkspace from "@/app/ui/expedientes/case-detail-workspace";
 import type {
   MortgageCase,
@@ -24,9 +20,6 @@ interface CaseDetailPageProps {
  * delegates all rendering to `CaseDetailWorkspace` (client), which composes
  * the compact header, summary card, observations editor, document browser
  * and extraction section, plus the client/case detail drawers.
- *
- * The PageHeader above is retained temporarily; CaseDetailWorkspace renders
- * its own compact header, so removing the PageHeader is an optional follow-up.
  */
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { id } = await params;
@@ -36,25 +29,15 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   if (!result.ok && result.notFound) {
     return (
       <div>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Expedientes", href: "/dashboard/expedientes" },
-            { label: "No encontrado" },
-          ]}
-          title="Expediente no encontrado"
-        />
-        <Card>
-          <p className="text-gf-text-muted mb-4">
-            No se encontró un expediente con el ID especificado.
-          </p>
-          <Link
-            href="/dashboard/expedientes"
-            className="text-gf-text font-medium hover:underline"
-          >
-            &larr; Volver al listado
-          </Link>
-        </Card>
+        <p className="text-gf-text-muted mb-4">
+          No se encontró un expediente con el ID especificado.
+        </p>
+        <Link
+          href="/dashboard/expedientes"
+          className="text-gf-text font-medium hover:underline"
+        >
+          &larr; Volver al listado
+        </Link>
       </div>
     );
   }
@@ -62,14 +45,6 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   if (!result.ok) {
     return (
       <div>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Expedientes", href: "/dashboard/expedientes" },
-            { label: "Error" },
-          ]}
-          title="Expediente"
-        />
         <ErrorMessage message="Error al cargar el expediente" />
         <div className="mt-4">
           <Link
@@ -102,51 +77,27 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     : [];
   const documents: Document[] = docsResult.ok ? docsResult.data.data : [];
 
-  const expShort = id.slice(0, 8);
-
   return (
-    <div>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Expedientes", href: "/dashboard/expedientes" },
-          { label: `Expediente ${expShort.toUpperCase()}` },
-        ]}
-        title={`Expediente ${expShort.toUpperCase()}`}
-        statusBadge={
-          <StatusBadge code={c.status.code} name={c.status.name} />
-        }
-        action={
-          <Button
-            variant="primary"
-            href={`/dashboard/expedientes/${id}/editar`}
-          >
-            Editar expediente
-          </Button>
-        }
-      />
-
-      <CaseDetailWorkspace
-        caseId={c.id}
-        statusCode={c.status.code}
-        statusName={c.status.name}
-        statuses={statuses}
-        client={client}
-        caseData={{
-          id: c.id,
-          requestedAmount: c.requestedAmount,
-          personType: c.personType,
-          creditType: c.creditType,
-          notes: c.notes,
-          propertyLocation: c.propertyLocation,
-          propertyValue: c.propertyValue,
-          estimatedTermMonths: c.estimatedTermMonths,
-          createdAt: c.createdAt,
-          updatedAt: c.updatedAt,
-        }}
-        documents={documents}
-        documentTypes={documentTypes}
-      />
-    </div>
+    <CaseDetailWorkspace
+      caseId={c.id}
+      statusCode={c.status.code}
+      statusName={c.status.name}
+      statuses={statuses}
+      client={client}
+      caseData={{
+        id: c.id,
+        requestedAmount: c.requestedAmount,
+        personType: c.personType,
+        creditType: c.creditType,
+        notes: c.notes,
+        propertyLocation: c.propertyLocation,
+        propertyValue: c.propertyValue,
+        estimatedTermMonths: c.estimatedTermMonths,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      }}
+      documents={documents}
+      documentTypes={documentTypes}
+    />
   );
 }

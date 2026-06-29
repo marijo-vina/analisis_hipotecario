@@ -95,69 +95,84 @@ export default function CaseDetailWorkspace({
         statuses={statuses}
       />
 
-      {/* ── Card resumen compacto ───────────────────────────────────────── */}
-      <Card className="mb-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1.5 min-w-0">
-            {/* Cliente (clickeable → client drawer) */}
-            <div className="text-sm">
-              <span className="text-gf-text-muted">Cliente: </span>
-              {client ? (
+      {/* ── Card resumen — mini columnas ────────────────────────────────── */}
+      <Card className="mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Columna 1: Cliente */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+              Cliente
+            </p>
+            {client ? (
+              <>
+                <p className="text-sm font-medium text-gf-text">
+                  {client.fullName}
+                </p>
                 <button
                   type="button"
                   onClick={() => setClientDrawerOpen(true)}
-                  className="font-medium text-gf-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gf-red/40 rounded-[var(--radius-sm)]"
+                  className="text-xs text-gf-text-muted hover:text-gf-text underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gf-red/40 rounded-[var(--radius-sm)]"
                 >
-                  {client.fullName}
+                  Ver expediente
                 </button>
-              ) : (
-                <span className="text-gf-text-muted italic">
-                  No disponible
-                </span>
-              )}
-            </div>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-gf-text-muted italic">
+                No disponible
+              </p>
+            )}
+          </div>
 
-            {/* Resumen en línea: tipo persona · tipo crédito · monto */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gf-text">
-              <span>{personTypeLabel(caseData.personType)}</span>
-              <span className="text-gf-text-soft select-none">·</span>
-              <span>{caseData.creditType?.name ?? "—"}</span>
-              <span className="text-gf-text-soft select-none">·</span>
-              <span>
-                <span className="text-gf-text-muted">Monto solicitado: </span>
-                {formatCurrency(caseData.requestedAmount)}
-              </span>
+          {/* Columna 2: Tipo persona + Tipo crédito */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                Tipo persona
+              </p>
+              <p className="text-sm font-medium text-gf-text">
+                {personTypeLabel(caseData.personType)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                Tipo crédito
+              </p>
+              <p className="text-sm font-medium text-gf-text">
+                {caseData.creditType?.name ?? "—"}
+              </p>
             </div>
           </div>
 
-          {/* Ver expediente → case detail drawer */}
-          <div className="shrink-0">
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => setCaseDrawerOpen(true)}
-            >
-              Ver expediente
-            </Button>
+          {/* Columna 3: Monto + Ver expediente */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-gf-text-muted uppercase tracking-wide">
+                Monto solicitado
+              </p>
+              <p className="text-sm font-medium text-gf-text">
+                {formatCurrency(caseData.requestedAmount)}
+              </p>
+            </div>
+            <div>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setCaseDrawerOpen(true)}
+              >
+                Ver expediente
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
 
       {/* ── Observaciones ──────────────────────────────────────────────── */}
-      <div className="mb-6">
+      <div className="mb-4">
         <ObservationsEditor caseId={caseId} initialNotes={caseData.notes ?? null} />
       </div>
 
       {/* ── Documentos por categoría ───────────────────────────────────── */}
-      <div id="documentos" className="mb-6">
-        <h2 className="text-lg font-semibold text-gf-text mb-4">
-          Documentos
-          {documents.length > 0 && (
-            <span className="text-gf-text-muted font-normal ml-1">
-              ({documents.length})
-            </span>
-          )}
-        </h2>
+      <div id="documentos" className="mb-4">
         <DocumentBrowser
           caseId={caseId}
           documents={documents}

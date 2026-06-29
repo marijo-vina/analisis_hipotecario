@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Document, DocumentType } from "@/app/lib/definitions";
 import Button from "@/app/ui/common/button";
-import DocumentCardGrid from "@/app/ui/documents/document-card-grid";
+import StatusBadge from "@/app/ui/common/badge";
+import DocumentActions from "@/app/ui/documents/document-actions";
 import DocumentUpload from "@/app/ui/documents/document-upload";
 
 // ---------------------------------------------------------------------------
@@ -34,15 +35,87 @@ interface DocumentBrowserProps {
   documentTypes: DocumentType[];
 }
 
+// ── Icono por tipo de documento ────────────────────────────────────────────
+function docTypeIcon(code: string): string {
+  switch (code) {
+    case "PAYROLL_RECEIPT":
+      return "💰";
+    case "INE":
+      return "🪪";
+    case "PASSPORT":
+      return "📘";
+    case "BANK_STATEMENT":
+      return "🏦";
+    case "CREDIT_BUREAU":
+      return "📊";
+    default:
+      return "📄";
+  }
+}
+
+/**
+ * DocumentRow — fila compacta inline para un documento.
+ *
+ * Layout: icono + nombre (truncado) | status + fecha | acciones.
+ * Usa DocumentActions existente para los botones.
+ */
+function DocumentRow({
+  caseId,
+  document,
+}: {
+  caseId: string;
+  document: Document;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-0 py-2 border-b border-gf-border last:border-b-0 hover:bg-gf-bg transition-colors">
+      {/* Icono + nombre (truncado) */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <span aria-hidden="true" className="shrink-0 text-base">
+          {docTypeIcon(document.documentType.code)}
+        </span>
+        <p
+          className="text-sm font-medium text-gf-text truncate"
+          title={document.originalName}
+        >
+          {document.originalName}
+        </p>
+      </div>
+
+      {/* Status + fecha */}
+      <div className="flex items-center gap-2 shrink-0">
+        <StatusBadge
+          code={document.documentStatus.code}
+          name={document.documentStatus.name}
+        />
+        <time
+          className="text-xs text-gf-text-muted shrink-0"
+          dateTime={document.createdAt}
+        >
+          {new Date(document.createdAt).toLocaleDateString("es-MX", {
+            day: "numeric",
+            month: "short",
+          })}
+        </time>
+      </div>
+
+      {/* Acciones */}
+      <div className="shrink-0">
+        <DocumentActions caseId={caseId} document={document} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * DocumentBrowser — two-column layout for a case's documentation section.
  *
  * Left column (desktop ~240px): clickable category list with a circular
  * count badge per category. The active category is highlighted.
  *
- * Right column: header (selected category title + "Agregar documento"
- * button) followed by a compact grid of the documents in the selected
- * category. Reuses the existing `DocumentCardGrid` for the cards.
+ * Right column: header (selected category title + "+ Agregar"
+ * button) followed by a compact list of inline document rows for the
+ * selected category. Each row shows icon + name, status badge + date,
+ * and the existing DocumentActions component for action buttons.
  *
  * On screens below 640px the category list collapses into a horizontal
  * pill row above the document grid (functional, not advanced mobile).
@@ -159,21 +232,29 @@ export default function DocumentBrowser({
             {selectedCategory?.label}
           </h3>
           <Button
-            variant="primary"
+            variant="secondary"
             onClick={() => setUploadModalOpen(true)}
             type="button"
           >
-            + Agregar documento
+            + Agregar
           </Button>
         </header>
 
         {selectedCategory && selectedCategory.documents.length > 0 ? (
-          <DocumentCardGrid caseId={caseId} documents={selectedCategory.documents} />
+          <div className="rounded-[var(--radius-md)] border border-gf-border bg-gf-surface px-3">
+            {selectedCategory.documents.map((doc) => (
+              <DocumentRow
+                key={doc.id}
+                caseId={caseId}
+                document={doc}
+              />
+            ))}
+          </div>
         ) : (
           <div className="rounded-[var(--radius-md)] border border-dashed border-gf-border bg-gf-bg/30 p-8 text-center">
             <p className="text-sm text-gf-text-muted">
               No hay documentos de este tipo. Usa el botón{" "}
-              <span className="font-medium text-gf-text">Agregar documento</span>{" "}
+              <span className="font-medium text-gf-text">+ Agregar</span>{" "}
               para subir uno.
             </p>
           </div>
