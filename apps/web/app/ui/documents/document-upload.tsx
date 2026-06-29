@@ -74,11 +74,11 @@ export default function DocumentUpload({
       setError(null);
 
       if (!file) {
-        setError("Seleccioná un archivo");
+        setError("Selecciona un archivo");
         return;
       }
       if (!documentTypeId) {
-        setError("Seleccioná un tipo de documento");
+        setError("Selecciona un tipo de documento");
         return;
       }
 
@@ -202,10 +202,10 @@ export default function DocumentUpload({
             ) : (
               <div>
                 <p className="text-sm text-gf-text-muted mb-1">
-                  Arrastrá el archivo aquí o
+                  Arrastra el archivo aquí o
                 </p>
                 <span className="text-sm font-medium text-gf-red hover:text-gf-red-dark underline">
-                  seleccioná un archivo
+                  selecciona un archivo
                 </span>
               </div>
             )}

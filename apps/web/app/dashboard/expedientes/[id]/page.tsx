@@ -8,7 +8,8 @@ import StatusBadge from "@/app/ui/status-badge";
 import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
 import FieldGrid from "@/app/ui/common/field-grid";
 import ExtractionSection from "@/app/ui/extraction/extraction-section";
-import { DocumentsClientSection } from "@/app/ui/documents/documents-client-section";
+import DocumentUploadSection from "@/app/ui/documents/document-upload-section";
+import DocumentListGrouped from "@/app/ui/documents/document-list-grouped";
 import type {
   MortgageCase,
   Client,
@@ -127,17 +128,12 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <StatusBadge code={c.status.code} name={c.status.name} />
         }
         action={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="primary"
-              href={`/dashboard/expedientes/${id}/editar`}
-            >
-              Editar expediente
-            </Button>
-            <Button variant="secondary" href="#documentos">
-              Subir documento
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            href={`/dashboard/expedientes/${id}/editar`}
+          >
+            Editar expediente
+          </Button>
         }
       />
 
@@ -198,12 +194,6 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               </p>
             )}
           </Card>
-
-          <CaseStatusDropdown
-            caseId={c.id}
-            currentCode={c.status.code}
-            statuses={statuses}
-          />
         </div>
 
         <div className="space-y-6">
@@ -229,20 +219,37 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               los documentos requeridos.
             </p>
           </Card>
-        </div>
-      </div>
 
-      {/* ── Full-width: Documentos ─────────────────────────────────────── */}
-      <div className="mt-6" id="documentos">
-        <DocumentsClientSection
-          caseId={c.id}
-          documentTypes={documentTypes}
-          initialDocuments={documents}
-        />
+          <Card>
+            <CaseStatusDropdown
+              caseId={c.id}
+              currentCode={c.status.code}
+              statuses={statuses}
+            />
+          </Card>
+
+          <DocumentUploadSection
+            caseId={c.id}
+            documentTypes={documentTypes}
+          />
+        </div>
       </div>
 
       {/* ── Full-width: Datos extraídos ────────────────────────────────── */}
       <ExtractionSection documents={documents} />
+
+      {/* ── Full-width: Documentos agrupados por tipo ──────────────────── */}
+      <div className="mt-6" id="documentos">
+        <h2 className="text-lg font-semibold text-gf-text mb-4">
+          Documentos
+          {documents.length > 0 && (
+            <span className="text-gf-text-muted font-normal ml-1">
+              ({documents.length})
+            </span>
+          )}
+        </h2>
+        <DocumentListGrouped caseId={c.id} documents={documents} />
+      </div>
     </div>
   );
 }
