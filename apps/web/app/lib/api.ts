@@ -117,7 +117,12 @@ export async function apiFetch<T>(
 
   // ---- 401 → session expired / invalid token ----------------------------
   if (res.status === 401) {
-    await deleteSession();
+    try {
+      await deleteSession();
+    } catch {
+      // Cookie deletion not available during server component render.
+      // The login page will clear the session.
+    }
     redirect("/login?reason=expired");
   }
 
