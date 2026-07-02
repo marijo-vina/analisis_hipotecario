@@ -119,29 +119,29 @@ function BuroHeader({ parsed }: { parsed: ParsedCreditBureau }) {
     <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-semibold text-slate-800">
+          <h2 className="text-base font-semibold text-slate-800">
             Buró de crédito
           </h2>
           {isProcessed && (
-            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700">
+            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
               Procesado
             </span>
           )}
         </div>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[13px] text-slate-500">
           Datos extraídos del Reporte de Buró de Crédito Especial
         </p>
       </div>
 
       <div className="flex items-center gap-3">
         {parsed.consultationDate && (
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[13px] text-slate-500">
             Consulta: {parsed.consultationDate}
           </span>
         )}
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-100"
+          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
         >
           Ver OCR
         </button>
@@ -184,21 +184,21 @@ function KpiCard({
       className={`flex flex-1 flex-col justify-center gap-0.5 rounded-lg border bg-white px-3 py-2.5 ${border}`}
     >
       <div className="flex items-baseline gap-1.5">
-        <span className={`text-xl font-bold ${textColor}`}>{value}</span>
-        <span className="text-[11px] text-slate-500">{label}</span>
+        <span className={`text-2xl font-bold ${textColor}`}>{value}</span>
+        <span className="text-xs text-slate-500">{label}</span>
       </div>
       {accent !== "neutral" && (
         <div className="flex items-center gap-1">
           <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${
+            className={`inline-block h-2 w-2 rounded-full ${
               accent === "orange" ? "bg-orange-500" : "bg-red-500"
             }`}
           />
-          <span className={`text-[10px] ${textColor}`}>{sub}</span>
+          <span className={`text-[11px] ${textColor}`}>{sub}</span>
         </div>
       )}
       {accent === "neutral" && (
-        <span className="text-[10px] text-slate-400">{sub}</span>
+        <span className="text-[11px] text-slate-400">{sub}</span>
       )}
     </div>
   );
@@ -325,17 +325,17 @@ function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
   return (
     <div className={`rounded-lg border px-4 py-3 ${bgColor}`}>
       <div className="flex items-center gap-2 mb-1">
-        <h3 className="text-[13px] font-semibold text-slate-700">
+        <h3 className="text-sm font-semibold text-slate-700">
           Diagnóstico preliminar de Buró
         </h3>
         <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${chipColor}`}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${chipColor}`}
         >
           Riesgo {riskLevel.toLowerCase()}
         </span>
       </div>
-      <p className="text-[12px] text-slate-600">{riskMessage}</p>
-      <p className="mt-1 text-[10px] text-slate-400">
+      <p className="text-[13px] text-slate-600">{riskMessage}</p>
+      <p className="mt-1 text-[11px] text-slate-400">
         Cálculo de pasivos se realizará en Sprint 3 · Pasivo mensual preliminar pendiente de validación
       </p>
     </div>
@@ -392,7 +392,7 @@ function RiskChips({ parsed }: { parsed: ParsedCreditBureau }) {
         return (
           <span
             key={chip.label}
-            className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-medium ${activeClass}`}
+            className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium ${activeClass}`}
           >
             {prefix} {label}
           </span>
@@ -429,7 +429,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
       : [];
 
   return (
-    <tr className={`border-b border-slate-100 ${rowBg} text-[11px]`}>
+    <tr className={`border-b border-slate-100 ${rowBg} text-[13px]`}>
       {/* Institution */}
       <td className="py-2 pl-3 pr-1">
         <span className="font-medium text-slate-800">
@@ -440,7 +440,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
       {/* Type chip */}
       <td className="py-2 px-1">
         <span
-          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-medium ${classificationChipColor(credit.classification)}`}
+          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${classificationChipColor(credit.classification)}`}
         >
           {CLASSIFICATION_LABELS[credit.classification] ??
             credit.classification}
@@ -450,24 +450,24 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
       {/* Status chip */}
       <td className="py-2 px-1 text-center">
         <span
-          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-medium ${statusChipColor(credit.status)}`}
+          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${statusChipColor(credit.status)}`}
         >
           {STATUS_LABELS[credit.status] ?? credit.status}
         </span>
       </td>
 
       {/* Saldo actual */}
-      <td className="py-2 px-1 text-right font-mono text-[11px] tabular-nums">
+      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
         {formatMxn(credit.currentBalance)}
       </td>
 
       {/* Pago reportado */}
-      <td className="py-2 px-1 text-right font-mono text-[11px] tabular-nums">
+      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
         {formatMxn(credit.amountToPay)}
       </td>
 
       {/* Límite */}
-      <td className="py-2 px-1 text-right font-mono text-[11px] tabular-nums">
+      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
         {formatMxn(credit.creditLimit)}
       </td>
 
@@ -478,7 +478,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
             ? mopCodes.map((code, i) => (
                 <span
                   key={i}
-                  className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm text-[8px] font-bold ${mopBadgeColor(code)}`}
+                  className={`inline-flex h-[20px] w-[20px] items-center justify-center rounded-sm text-[10px] font-bold ${mopBadgeColor(code)}`}
                   title={`MOP ${code}`}
                 >
                   {code}
@@ -486,7 +486,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
               ))
             : "—"}
           {credit.paymentHistory && credit.paymentHistory.length > 8 && (
-            <span className="text-[9px] text-slate-400 ml-0.5">
+            <span className="text-[10px] text-slate-400 ml-0.5">
               +{credit.paymentHistory.length - 8}
             </span>
           )}
@@ -498,7 +498,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
         <div className="flex gap-0.5">
           {credit.hasWriteOff && (
             <span
-              className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm bg-red-100 text-[8px] font-bold text-red-700"
+              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
               title="Quebranto"
             >
               Q
@@ -506,7 +506,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
           )}
           {credit.hasFraudFlag && (
             <span
-              className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm bg-red-100 text-[8px] font-bold text-red-700"
+              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
               title="Fraude"
             >
               F
@@ -514,7 +514,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
           )}
           {credit.hasSeriousDelinquency && (
             <span
-              className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm bg-red-100 text-[8px] font-bold text-red-700"
+              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
               title="Mora grave"
             >
               M
@@ -523,7 +523,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
           {credit.hasLatePayments &&
             !credit.hasSeriousDelinquency && (
               <span
-                className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-sm bg-amber-100 text-[8px] font-bold text-amber-700"
+                className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-amber-100 text-[10px] font-bold text-amber-700"
                 title="Atraso"
               >
                 A
@@ -533,7 +533,7 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
             !credit.hasWriteOff &&
             !credit.hasFraudFlag &&
             !credit.hasSeriousDelinquency && (
-              <span className="text-[9px] text-emerald-600">✓</span>
+              <span className="text-[11px] text-emerald-600">✓</span>
             )}
         </div>
       </td>
@@ -555,15 +555,15 @@ function CreditsTable({ parsed }: { parsed: ParsedCreditBureau }) {
     <div className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
       {/* Title bar */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
-        <h3 className="text-[13px] font-semibold text-slate-800">
+        <h3 className="text-sm font-semibold text-slate-800">
           Créditos ({parsed.credits.length})
         </h3>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1 text-[11px] text-slate-500">
             <span className="inline-block h-2 w-2 rounded-sm bg-emerald-400" />
             {activeCount} activos
           </span>
-          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1 text-[11px] text-slate-500">
             <span className="inline-block h-2 w-2 rounded-sm bg-slate-300" />
             {closedCount} cerrados
           </span>
@@ -574,7 +574,7 @@ function CreditsTable({ parsed }: { parsed: ParsedCreditBureau }) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-medium text-slate-400">
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-medium text-slate-500">
               <th className="py-2 pl-3 pr-1">Institución</th>
               <th className="py-2 px-1">Tipo</th>
               <th className="py-2 px-1 text-center">Estado</th>
@@ -605,33 +605,33 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-      <h3 className="text-[13px] font-semibold text-slate-800 mb-2">
+      <h3 className="text-sm font-semibold text-slate-800 mb-2">
         Datos del acreditado
       </h3>
 
       {b ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between">
-            <span className="text-[11px] text-slate-400">Nombre</span>
-            <span className="text-[11px] font-medium text-slate-800">
+            <span className="text-xs text-slate-400">Nombre</span>
+            <span className="text-[13px] font-medium text-slate-800">
               {b.fullName ?? "—"}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[11px] text-slate-400">RFC</span>
-            <span className="text-[11px] font-mono text-slate-800">
+            <span className="text-xs text-slate-400">RFC</span>
+            <span className="text-[13px] font-mono text-slate-800">
               {b.rfc ?? "—"}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[11px] text-slate-400">Nacimiento</span>
-            <span className="text-[11px] font-medium text-slate-800">
+            <span className="text-xs text-slate-400">Nacimiento</span>
+            <span className="text-[13px] font-medium text-slate-800">
               {b.birthDate ?? "—"}
             </span>
           </div>
         </div>
       ) : (
-        <p className="text-[11px] text-slate-400">Sin datos del acreditado</p>
+        <p className="text-[13px] text-slate-400">Sin datos del acreditado</p>
       )}
 
       {(parsed.consultationDate || parsed.numberOfInquiries != null) && (
@@ -640,20 +640,20 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
           <div className="flex flex-col gap-1.5">
             {parsed.consultationDate && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-400">
+                <span className="text-xs text-slate-400">
                   Fecha consulta
                 </span>
-                <span className="text-[11px] font-medium text-slate-800">
+                <span className="text-[13px] font-medium text-slate-800">
                   {parsed.consultationDate}
                 </span>
               </div>
             )}
             {parsed.numberOfInquiries != null && (
               <div className="flex justify-between">
-                <span className="text-[11px] text-slate-400">
+                <span className="text-xs text-slate-400">
                   Consultas 24m
                 </span>
-                <span className="text-[11px] font-medium text-slate-800">
+                <span className="text-[13px] font-medium text-slate-800">
                   {parsed.numberOfInquiries}
                 </span>
               </div>
@@ -662,7 +662,7 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
         </>
       )}
 
-      <p className="mt-2 text-[9px] text-slate-400 leading-tight">
+      <p className="mt-2 text-[10px] text-slate-400 leading-tight">
         Datos extraídos automáticamente; validar contra el reporte original.
       </p>
     </div>
@@ -679,14 +679,14 @@ function CompactAlertItem({ alert }: { alert: ExtractionAlert }) {
       }`}
     >
       <span
-        className={`mt-px text-[9px] ${
+        className={`mt-px text-[10px] ${
           isCritical ? "text-red-500" : "text-amber-500"
         }`}
       >
         ●
       </span>
       <span
-        className={`text-[11px] leading-tight ${
+        className={`text-[13px] leading-tight ${
           isCritical ? "text-red-800" : "text-amber-800"
         }`}
       >
@@ -699,17 +699,13 @@ function CompactAlertItem({ alert }: { alert: ExtractionAlert }) {
 function CompactAlerts({ parsed }: { parsed: ParsedCreditBureau }) {
   if (parsed.alerts.length === 0) return null;
 
-  const criticalCount = parsed.alerts.filter(
-    (a) => a.severity === "CRITICAL",
-  ).length;
-
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3.5">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[13px] font-semibold text-slate-800">
+        <h3 className="text-sm font-semibold text-slate-800">
           Alertas
         </h3>
-        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
+        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
           {parsed.alerts.length} alerta{parsed.alerts.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -720,7 +716,7 @@ function CompactAlerts({ parsed }: { parsed: ParsedCreditBureau }) {
         {parsed.alerts.length > 6 && (
           <button
             type="button"
-            className="text-[10px] text-slate-400 hover:text-slate-600 mt-1"
+            className="text-[11px] text-slate-400 hover:text-slate-600 mt-1"
           >
             Ver {parsed.alerts.length - 6} alertas más
           </button>
