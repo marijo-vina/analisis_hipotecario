@@ -17,6 +17,7 @@ const DOCUMENT_TYPES = [
   { code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
   { code: 'BANK_STATEMENT', name: 'Estado de cuenta', isActive: true },
   { code: 'CREDIT_BUREAU_REPORT', name: 'Buró de crédito', isActive: true },
+  { code: 'CREDIT_SCORE', name: 'Mi Score', isActive: true },
   { code: 'INE', name: 'INE', isActive: true },
   { code: 'PROOF_OF_ADDRESS', name: 'Comprobante de domicilio', isActive: true },
 ];
