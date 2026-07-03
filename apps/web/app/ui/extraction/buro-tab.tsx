@@ -478,9 +478,9 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
         {formatMxn(credit.currentBalance)}
       </td>
 
-      {/* Pago reportado — uses paymentDueAmount (PAY-004) */}
+      {/* Monto a pagar (solo paymentDueAmount, nunca lastPaymentAmount) */}
       <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
-        {formatMxn(credit.paymentDueAmount)}
+        {credit.isClosed ? "—" : formatMxn(credit.paymentDueAmount)}
       </td>
 
       {/* Límite */}
@@ -596,8 +596,8 @@ function CreditsTable({ parsed }: { parsed: ParsedCreditBureau }) {
               <th className="py-2 px-1">Tipo</th>
               <th className="py-2 px-1 text-center">Estado</th>
               <th className="py-2 px-1 text-right">Saldo actual</th>
-              <th className="py-2 px-1 text-right">Pago rep.</th>
-              <th className="py-2 px-1 text-right">Límite</th>
+              <th className="py-2 px-1 text-right">Monto a pagar</th>
+              <th className="py-2 px-1 text-right">Límite / crédito</th>
               <th className="py-2 px-1">MOP</th>
               <th className="py-2 pl-1 pr-3">Flags</th>
             </tr>
