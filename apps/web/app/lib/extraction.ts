@@ -958,9 +958,11 @@ export interface ParsedCreditBureauCredit {
   currency: string;
   paymentHistory: string | null;
   mopCodes: string[];
+  observationKeys: string[];
   hasLatePayments: boolean;
   hasSeriousDelinquency: boolean;
   hasWriteOff: boolean;
+  hasSettlementOrDiscount: boolean;
   hasFraudFlag: boolean;
   hasIdentityTheft: boolean;
   isClosed: boolean;
@@ -1014,6 +1016,7 @@ export interface ParsedCreditBureau {
 
   riskSummary: {
     hasWriteOff: boolean;
+    hasSettlementOrDiscount: boolean;
     hasFraudFlag: boolean;
     hasIdentityTheft: boolean;
     hasMinorDelinquency: boolean;
@@ -1189,6 +1192,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
       (isClosed ? 0 : paymentDueAmount) ??
       null;
     const hasIdentityTheft = credit.hasIdentityTheft === true;
+    const hasSettlementOrDiscount = credit.hasSettlementOrDiscount === true;
 
     credits.push({
       institution: (credit.institution as string) ?? null,
@@ -1203,9 +1207,11 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
       currency: (credit.currency as string) ?? "MXN",
       paymentHistory: (credit.paymentHistory as string) ?? null,
       mopCodes: (credit.mopCodes as string[]) ?? [],
+      observationKeys: (credit.observationKeys as string[]) ?? [],
       hasLatePayments: credit.hasLatePayments === true,
       hasSeriousDelinquency: credit.hasSeriousDelinquency === true,
       hasWriteOff: credit.hasWriteOff === true,
+      hasSettlementOrDiscount,
       hasFraudFlag: credit.hasFraudFlag === true,
       hasIdentityTheft,
       isClosed,
@@ -1218,6 +1224,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
   const riskRaw = (ed.riskSummary ?? {}) as Record<string, unknown>;
   const riskSummary = {
     hasWriteOff: riskRaw.hasWriteOff === true,
+    hasSettlementOrDiscount: riskRaw.hasSettlementOrDiscount === true,
     hasFraudFlag: riskRaw.hasFraudFlag === true,
     hasIdentityTheft: riskRaw.hasIdentityTheft === true,
     hasMinorDelinquency: riskRaw.hasMinorDelinquency === true,
