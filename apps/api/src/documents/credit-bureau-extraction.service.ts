@@ -373,9 +373,19 @@ export class CreditBureauExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Call Gemini with specialized instructions ────────────────────
+    // ── 6. Truncate OCR text if excessively large ───────────────────────
+    // Bureau reports can be 20+ pages. Gemini has input token limits and
+    // performance degrades with very large inputs. Keep the first 30K chars
+    // which typically contain the summary and credit detail sections.
+    const MAX_OCR_CHARS = 30000;
+    const ocrText = document.ocrText.length > MAX_OCR_CHARS
+      ? document.ocrText.slice(0, MAX_OCR_CHARS) +
+        `\n\n[OCR truncado — ${document.ocrText.length - MAX_OCR_CHARS} caracteres omitidos del final]`
+      : document.ocrText;
+
+    // ── 7. Call Gemini with specialized instructions ────────────────────
     const geminiResult = await this.geminiService.extractStructuredData(
-      document.ocrText,
+      ocrText,
       document.documentType.code,
       { ...CREDIT_BUREAU_SCHEMA },
       CREDIT_BUREAU_INSTRUCTIONS,
