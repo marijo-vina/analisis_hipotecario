@@ -13,6 +13,7 @@ import EmptyState from "@/app/ui/common/empty-state";
 import IdentidadTab from "@/app/ui/extraction/identidad-tab";
 import NominaTab from "@/app/ui/extraction/nomina-tab";
 import EstadosTab from "@/app/ui/extraction/estados-tab";
+import BuroTab from "@/app/ui/extraction/buro-tab";
 
 interface ExtractionSectionProps {
   documents: Document[];
@@ -79,7 +80,7 @@ export default function ExtractionSection({
             />
           )}
           {activeTab === "buro" && (
-            <EmptyState message="Los datos del buró de crédito se mostraran aqui una vez procesados." />
+            <BuroTab documents={docsByCategory.get("buro") ?? []} />
           )}
         </div>
       </div>

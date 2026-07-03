@@ -30,11 +30,33 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   'report.publicScore: null (el score viene de documento separado "Mi Score").',
   '',
   '─── Créditos ───',
-  'Extraé TODOS los créditos. Campos por crédito:',
+  'Extraé TODOS los créditos. El OCR tiene DOS partes por crédito:',
+  '',
+  'PARTE 1 — Línea de datos concatenados (Saldo, Máximo, Límite, Moneda, Fechas, etc.):',
+  '  Ej: "30,283193,336150,000MXAGO-25AGO-03050,000NO APLICA"',
+  '  Ej: "73,881307,825MXAGO-25JUL-09049,800NO APLICA"',
+  '  El último número ANTES de "NO APLICA" es Monto Último Pago → lastPaymentAmount.',
+  '  En los ejemplos: 50,000 y 49,800 son lastPaymentAmount.',
+  '',
+  'PARTE 2 — Línea de pago (SIEMPRE en renglones separados ABAJO de la línea concatenada):',
+  '  Formato: [número] [texto descriptivo en mayúsculas en renglones separados]',
+  '  Ej: "1,875\\nPAGO\\nMÍNIMO\\nPARA\\nCUENTAS\\nREVOLVE\\nNTES" → paymentDueAmount = 1875',
+  '  Ej: "0\\nMENSUAL"                                          → paymentDueAmount = 0',
+  '  Ej: "0\\nMENSUAL\\n36"                                     → paymentDueAmount = 0',
+  '  Ej: "0\\nPAGO\\nMÍNIMO\\nPARA\\nCUENTAS\\nREVOLVE\\nNTES"  → paymentDueAmount = 0',
+  '  REGLA: paymentDueAmount es el número de ESTA línea. El texto que sigue',
+  '  ("MENSUAL", "PAGO MÍNIMO PARA CUENTAS REVOLVENTES") es solo decorativo, ignorá su valor.',
+  '',
+  'RESUMEN:',
+  '  - lastPaymentAmount = último número de la línea concatenada (antes de NO APLICA).',
+  '  - paymentDueAmount = número de la línea de pago separada (la que tiene texto debajo).',
+  '  - NUNCA tomes un número de la línea concatenada como paymentDueAmount.',
+  '',
   '  institution, creditType, classification (REVOLVING|FIXED_PAYMENT|MORTGAGE|AUTO|',
   '    PERSONAL_LOAN|DEPARTMENT_STORE|NON_BANK_SERVICE|UNKNOWN),',
   '  status (ACTIVE|CLOSED), currentBalance, creditLimit,',
-  '  paymentDueAmount ("Monto a Pagar"), lastPaymentAmount ("Monto Último Pago"),',
+  '  paymentDueAmount: número del OCR que viene con texto ("PAGO MÍNIMO", "MENSUAL").',
+  '  lastPaymentAmount: número del OCR que está SOLO, sin texto descriptivo.',
   '  currency ("MXN" por defecto),',
   '  paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
   '  mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
@@ -52,6 +74,13 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   'NO generes alertas, riskSummary, ni flags de quebranto/fraude/quita.',
   'NO uses el glosario como fuente de datos.',
   'NO marques score (el campo publicScore es null).',
+  '',
+  '─── JSON VÁLIDO ───',
+  'El JSON de salida DEBE ser parseable. Reglas estrictas:',
+  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222".',
+  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"].',
+  '- NUNCA pongas texto crudo del OCR fuera de comillas en el JSON.',
+  '- El JSON debe cerrar correctamente con }.',
 ].join('\n');
 
 // ---------------------------------------------------------------------------
@@ -118,8 +147,8 @@ const CREDIT_BUREAU_SCHEMA = {
         'REVOLVING | FIXED_PAYMENT | MORTGAGE | AUTO | PERSONAL_LOAN | DEPARTMENT_STORE | NON_BANK_SERVICE | UNKNOWN',
       status: 'ACTIVE | CLOSED | UNKNOWN',
       currentBalance: 'number | null',
-      paymentDueAmount: 'number | null — "Monto a Pagar"',
-      lastPaymentAmount: 'number | null — "Monto Último Pago"',
+      paymentDueAmount: 'number | null — "Monto a Pagar". El OCR incluye texto como "PAGO MÍNIMO" o "MENSUAL" junto al número. Extraé solo el número.',
+      lastPaymentAmount: 'number | null — "Monto Último Pago". El OCR muestra solo números limpios, sin texto descriptivo.',
       creditLimit: 'number | null',
       currency: 'MXN',
       paymentHistory: 'string | null',
@@ -449,13 +478,20 @@ export class CreditBureauExtractionService {
           }
         }
 
-        // Validate MOP codes
+        // Validate MOP codes and deduplicate consecutive repeats (OCR ghosts)
         const mopCodes = credit.mopCodes as string[] | undefined;
         if (Array.isArray(mopCodes)) {
-          credit.mopCodes = mopCodes.filter((mop) => {
-            const code = String(mop).trim();
-            return VALID_MOP_CODES.has(code) || /^\d$/.test(code);
-          });
+          const validCodes = mopCodes
+            .map((mop) => String(mop).trim())
+            .filter((code) => VALID_MOP_CODES.has(code) || /^\d$/.test(code));
+          // Deduplicate consecutive identical codes (OCR often repeats adjacent cells)
+          const deduped: string[] = [];
+          for (const code of validCodes) {
+            if (deduped.length === 0 || deduped[deduped.length - 1] !== code) {
+              deduped.push(code);
+            }
+          }
+          credit.mopCodes = deduped;
         }
 
         // Compute boolean flags from MOP + observation keys if not already set
@@ -572,6 +608,25 @@ export class CreditBureauExtractionService {
         }
         if (credit.lastPaymentAmount == null) {
           credit.lastPaymentAmount = null;
+        }
+
+        // ── PAY-004: Detect suspicious identical values (likely misclassified) ─
+        // Only warn when both are non-zero and equal. Zero is legitimate for
+        // closed credits or credits with no payment activity.
+        if (
+          credit.paymentDueAmount != null &&
+          credit.lastPaymentAmount != null &&
+          credit.paymentDueAmount !== 0 &&
+          credit.lastPaymentAmount !== 0 &&
+          credit.paymentDueAmount === credit.lastPaymentAmount
+        ) {
+          this.logger.warn(
+            `[CreditBureau] Suspicious: paymentDueAmount === lastPaymentAmount ` +
+              `(${credit.paymentDueAmount}) for ${credit.institution ?? 'unknown'}. ` +
+              `Gemini may have misclassified the payment column. ` +
+              `Verify against the original PDF — these are likely the same value ` +
+              `extracted into both fields.`,
+          );
         }
       }
     }
