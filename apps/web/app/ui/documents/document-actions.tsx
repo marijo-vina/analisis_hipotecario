@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt, extractBankStatement } from "@/app/actions/documents";
+import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt, extractBankStatement, extractCreditBureau, extractCreditScore } from "@/app/actions/documents";
 import Button from "@/app/ui/common/button";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
@@ -127,6 +127,26 @@ export default function DocumentActions({
         } catch {
           setProcessError(
             "OCR completado, pero la extracción del estado de cuenta falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "CREDIT_BUREAU_REPORT") {
+        try {
+          await extractCreditBureau(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción del buró de crédito falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "CREDIT_SCORE") {
+        try {
+          await extractCreditScore(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción del Mi Score falló. Puede intentar reprocesar.",
           );
         }
       }
