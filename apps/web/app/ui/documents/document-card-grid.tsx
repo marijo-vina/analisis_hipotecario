@@ -18,8 +18,10 @@ function docTypeIcon(code: string): string {
       return "📘";
     case "BANK_STATEMENT":
       return "🏦";
-    case "CREDIT_BUREAU":
+    case "CREDIT_BUREAU_REPORT":
       return "📊";
+    case "CREDIT_SCORE":
+      return "🎯";
     default:
       return "📄";
   }
@@ -36,8 +38,10 @@ function docTypeAccent(code: string): string {
       return "border-l-indigo-500";
     case "BANK_STATEMENT":
       return "border-l-emerald-500";
-    case "CREDIT_BUREAU":
+    case "CREDIT_BUREAU_REPORT":
       return "border-l-amber-500";
+    case "CREDIT_SCORE":
+      return "border-l-violet-500";
     default:
       return "border-l-gf-border";
   }

@@ -239,3 +239,97 @@ export async function extractBankStatement(
 
   return result.data.data;
 }
+
+/**
+ * Extrae datos estructurados de un reporte de Buró de Crédito Especial
+ * usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-bureau`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function extractCreditBureau(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+  alerts: Array<{
+    code: string;
+    severity: string;
+    category: string;
+    message: string;
+    field: string | null;
+    requiresManualReview: boolean;
+  }>;
+  missingFields: string[];
+}> {
+  const result = await apiFetch<{
+    data: {
+      success: boolean;
+      extractedData: Record<string, unknown> | null;
+      alerts: Array<{
+        code: string;
+        severity: string;
+        category: string;
+        message: string;
+        field: string | null;
+        requiresManualReview: boolean;
+      }>;
+      missingFields: string[];
+    };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-bureau`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ??
+        "Error al extraer datos del buró de crédito",
+    );
+  }
+
+  return result.data.data;
+}
+
+/**
+ * Extrae el score crediticio de un documento "Mi Score"
+ * usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-score`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function extractCreditScore(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  score: number | null;
+  scoreIsExcluded: boolean;
+  scoreExclusionReason: string | null;
+}> {
+  const result = await apiFetch<{
+    data: {
+      success: boolean;
+      score: number | null;
+      scoreIsExcluded: boolean;
+      scoreExclusionReason: string | null;
+    };
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-score`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ??
+        "Error al extraer el score crediticio",
+    );
+  }
+
+  return result.data.data;
+}

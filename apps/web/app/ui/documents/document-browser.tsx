@@ -26,7 +26,7 @@ const CATEGORIES: CategoryDef[] = [
   { key: "identificacion", label: "Identificación", codes: ["INE", "PASSPORT"] },
   { key: "nomina", label: "Nómina", codes: ["PAYROLL_RECEIPT"] },
   { key: "estados-cuenta", label: "Estados de cuenta", codes: ["BANK_STATEMENT"] },
-  { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU"] },
+  { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"] },
 ];
 
 interface DocumentBrowserProps {
@@ -46,8 +46,10 @@ function docTypeIcon(code: string): string {
       return "📘";
     case "BANK_STATEMENT":
       return "🏦";
-    case "CREDIT_BUREAU":
+    case "CREDIT_BUREAU_REPORT":
       return "📊";
+    case "CREDIT_SCORE":
+      return "🎯";
     default:
       return "📄";
   }
