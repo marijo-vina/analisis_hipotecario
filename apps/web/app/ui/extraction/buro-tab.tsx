@@ -433,12 +433,23 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
 
   const rowOpacity = isClosed ? "opacity-60" : "";
 
-  // Build MOP badges from mopCodes or paymentHistory
-  const mopCodes = credit.mopCodes.length > 0
-    ? credit.mopCodes
-    : credit.paymentHistory
-      ? credit.paymentHistory.slice(0, 8).split("")
-      : [];
+  // Build MOP badges from mopCodes or paymentHistory (with compact view)
+  const MAX_VISIBLE_MOP = 12;
+  const allMopCodes: string[] = (() => {
+    if (credit.mopCodes.length > 0) return credit.mopCodes;
+    if (credit.paymentHistory) {
+      // Split paymentHistory into individual characters, filter valid MOP codes
+      return credit.paymentHistory
+        .replace(/\s/g, "")
+        .split("")
+        .filter((c) => /^[0-9U\-]$/.test(c));
+    }
+    return [];
+  })();
+  const visibleMopCodes = allMopCodes.slice(-MAX_VISIBLE_MOP);
+  const hiddenCount = allMopCodes.length - MAX_VISIBLE_MOP;
+  const fullMopTooltip =
+    allMopCodes.length > 0 ? allMopCodes.join(" ") : undefined;
 
   return (
     <tr className={`border-b border-slate-100 ${rowBg} ${rowOpacity} text-[13px]`}>
@@ -491,8 +502,8 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
       {/* MOP */}
       <td className="py-2 px-1">
         <div className="flex flex-wrap gap-0.5">
-          {mopCodes.length > 0
-            ? mopCodes.map((code, i) => (
+          {visibleMopCodes.length > 0
+            ? visibleMopCodes.map((code, i) => (
                 <span
                   key={i}
                   className={`inline-flex h-[20px] w-[20px] items-center justify-center rounded-sm text-[10px] font-bold ${mopBadgeColor(code)}`}
@@ -501,10 +512,15 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
                   {code}
                 </span>
               ))
-            : "—"}
-          {credit.paymentHistory && credit.paymentHistory.length > 8 && (
-            <span className="text-[10px] text-slate-400 ml-0.5">
-              +{credit.paymentHistory.length - 8}
+            : allMopCodes.length === 0
+              ? "—"
+              : null}
+          {hiddenCount > 0 && (
+            <span
+              className="inline-flex h-[20px] items-center rounded-sm bg-slate-100 px-1 text-[10px] font-medium text-slate-500 cursor-help"
+              title={fullMopTooltip}
+            >
+              +{hiddenCount}
             </span>
           )}
         </div>
