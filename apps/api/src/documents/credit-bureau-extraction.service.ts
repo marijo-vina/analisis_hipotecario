@@ -11,138 +11,47 @@ const CREDIT_BUREAU_DOC_TYPES = ['CREDIT_BUREAU_REPORT'];
 // Specialized instructions for credit bureau extraction
 // ---------------------------------------------------------------------------
 const CREDIT_BUREAU_INSTRUCTIONS = [
-  'Reporte de Buró de Crédito Especial (México) para análisis hipotecario.',
+  'Reporte de Buró de Crédito (México). Extraé ÚNICAMENTE datos crudos de este documento.',
   '',
-  'El documento puede tener CUALQUIER formato, layout o disposición de campos.',
-  'Analizá TODO el texto OCR, incluyendo el Resumen de Créditos y el Detalle de Créditos.',
+  '─── REGLA ANTI-GLOSARIO ───',
+  'IGNORÁ completamente secciones de glosario, leyendas, definiciones, instructivos,',
+  'notas al pie, textos legales, promocionales o explicativos. Ej: "¿Qué significa el',
+  'histórico de pagos?", tablas de claves de observación, definiciones generales de Buró.',
+  'Solo extraé datos de las secciones del acreditado: Resumen de Créditos, Detalle de',
+  'Créditos, Datos del Acreditado, Detalle de Consultas.',
   '',
-  '─── REGLA DE ORO — AISLAMIENTO DE CONTEXTO ───',
-  'NO inventes datos. Ante cualquier duda, usá null.',
-  'Extraé ÚNICAMENTE de la información presente en el OCR de ESTE documento.',
-  'NUNCA infieras ni referencies datos de otros documentos del expediente.',
-  'Extract ONLY from this document\'s text. Never infer or cross-reference other documents.',
+  '─── Datos del acreditado ───',
+  'borrower.fullName: nombre en MAYÚSCULAS. borrower.birthDate: YYYY-MM-DD.',
+  'borrower.rfc: RFC. borrower.lastReportedAddress: domicilio.',
   '',
-  '─── IMPORTANTE: Score (Mi Score) ───',
-  'Este documento es el Reporte de Buró. El score (Mi Score) proviene de un documento',
-  'SEPARADO ("Mi Score"). NO extraigas, infieras ni reportes ningún valor de score aquí.',
-  'El campo report.publicScore SIEMPRE debe ser null en este reporte.',
-  'NO generes ninguna alerta relacionada con score (BURO_SCORE_LOW, etc.).',
+  '─── Datos del reporte ───',
+  'report.consultationDate: YYYY-MM-DD (Fecha de Consulta).',
+  'report.numberOfInquiries: número de consultas 24 meses.',
+  'report.publicScore: null (el score viene de documento separado "Mi Score").',
   '',
-  '─── Datos del acreditado (borrower) ───',
-  '  fullName: nombre completo del titular del reporte. Normalizar a MAYÚSCULAS.',
-  '  birthDate: fecha de nacimiento YYYY-MM-DD.',
-  '  rfc: RFC del acreditado.',
-  '  lastReportedAddress: último domicilio reportado en el buró.',
+  '─── Créditos ───',
+  'Extraé TODOS los créditos. Campos por crédito:',
+  '  institution, creditType, classification (REVOLVING|FIXED_PAYMENT|MORTGAGE|AUTO|',
+  '    PERSONAL_LOAN|DEPARTMENT_STORE|NON_BANK_SERVICE|UNKNOWN),',
+  '  status (ACTIVE|CLOSED), currentBalance, creditLimit,',
+  '  paymentDueAmount ("Monto a Pagar"), lastPaymentAmount ("Monto Último Pago"),',
+  '  currency ("MXN" por defecto),',
+  '  paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
+  '  mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
+  '  observationKeys: array de strings con claves de observación que aparezcan',
+  '    ASOCIADAS DIRECTAMENTE a este crédito (no del glosario). Ej: ["UP","LC"].',
+  '  rawTextReference: texto original de la fila del crédito en el reporte.',
   '',
-  '─── Datos del reporte (report) ───',
-  '  consultationDate: fecha de consulta (Fecha de Consulta). YYYY-MM-DD.',
-  '  numberOfInquiries: número total de consultas en los últimos 24 meses (Detalle de Consultas).',
-  '  publicScore: SIEMPRE null. El score se extrae del documento "Mi Score" por separado.',
+  '─── Flags booleanos por crédito ───',
+  'hasLatePayments: true si hay MOP 2-3. MOP 0-1 NO es atraso. U y - NO son atraso.',
+  'hasSeriousDelinquency: true si hay MOP 4,5,6,7,8,9.',
+  'Los campos hasWriteOff, hasFraudFlag, hasSettlementOrDiscount, hasIdentityTheft',
+  'deben ser null. El sistema los calcula a partir de observationKeys.',
   '',
-  '─── Créditos (credits[]) ───',
-  '  Extraé TODOS los créditos del reporte (Resumen y Detalle). Para cada uno:',
-  '',
-  '  institution: nombre del otorgante (BBVA, BANORTE, SANTANDER, AMEX, etc.).',
-  '',
-  '  creditType: tipo de crédito según el reporte (TARJETA DE CREDITO, AUTOMOTRIZ,',
-  '    HIPOTECARIO, PERSONAL, TELEFONIA CELULAR, etc.).',
-  '',
-  '  classification: clasificación del crédito:',
-  '    "REVOLVING" — tarjetas de crédito, líneas de crédito revolventes.',
-  '    "FIXED_PAYMENT" — créditos con pagos fijos (personales, automotrices).',
-  '    "MORTGAGE" — créditos hipotecarios o de bienes raíces.',
-  '    "AUTO" — créditos automotrices.',
-  '    "PERSONAL_LOAN" — préstamos personales.',
-  '    "DEPARTMENT_STORE" — créditos de tiendas departamentales.',
-  '    "NON_BANK_SERVICE" — servicios no bancarios (telefonía, TV por cable).',
-  '    "UNKNOWN" — cuando no se puede determinar.',
-  '',
-  '  status: "ACTIVE" si el crédito está abierto/vigente, "CLOSED" si está cerrado.',
-  '    "UNKNOWN" si no se puede determinar.',
-  '',
-  '  currentBalance: saldo actual reportado. Número decimal sin $ ni comas.',
-  '  paymentDueAmount: "Monto a Pagar". Monto del próximo pago a realizar.',
-  '    Número decimal sin $ ni comas.',
-  '  lastPaymentAmount: "Monto Último Pago". Monto del último pago realizado.',
-  '    Número decimal sin $ ni comas.',
-  '  creditLimit: límite de crédito (para revolventes). Número decimal sin $ ni comas.',
-  '    null para créditos no revolventes.',
-  '',
-  '  currency: "MXN" por defecto. "USD" si se detecta en dólares. "OTHER" para otras.',
-  '',
-  '  paymentHistory: historial de pagos como string (ej. "111111222333").',
-  '    Cada dígito/carácter representa un mes en el Histórico de Pagos.',
-  '    Extraer la cadena completa tal como aparece, SIN interpretar.',
-  '',
-  '  mopCodes: array de strings con los códigos MOP únicos detectados en el historial.',
-  '    Los valores posibles son: "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "U", "-".',
-  '    Significado de códigos MOP (Forma de Pago):',
-  '      0 o vacío = Al corriente',
-  '      1 = Atraso de 1 a 29 días',
-  '      2 = Atraso de 30 a 59 días',
-  '      3 = Atraso de 60 a 89 días',
-  '      4 = Atraso de 90 a 119 días',
-  '      5 = Atraso de 120 a 149 días',
-  '      6 = Atraso de 150 días hasta 12 meses',
-  '      7 = Atraso de más de 12 meses',
-  '      8 = Deuda parcial o total sin recuperar (quebranto)',
-  '      9 = Fraude cometido por el consumidor',
-  '      U = Cuenta no reportada en este periodo',
-  '      - = Cuenta sin información',
-  '',
-  '  hasLatePayments: true si hay algún MOP >= 2 en el historial (30+ días de atraso).',
-  '    MOP 0-1 NO cuenta como atraso (0=al corriente, 1=1-29 días, considerado al corriente).',
-  '  hasSeriousDelinquency: true si hay algún MOP >= 4 (90+ días de atraso).',
-  '  hasWriteOff: true si hay MOP 8 o clave de observación LC/UP (cuenta que causa quebranto).',
-  '    También si aparece clave CV (vencida vendida),',
-  '    VR (dación en pago), PC (cobranza).',
-  '  hasFraudFlag: true si hay MOP 9 o clave FD (cuenta fraudulenta).',
-  '  hasIdentityTheft: true si aparece clave RI (robo de identidad). NO es fraude.',
-  '',
-  '  rawTextReference: texto original de referencia del reporte para este crédito.',
-  '',
-  '─── Claves de Observación importantes ───',
-  '  El reporte puede incluir claves de observación por crédito. Las más relevantes para riesgo:',
-  '  UP = Cuenta que causa quebranto (pérdida total) → CRÍTICO → hasWriteOff',
-  '  LC = Convenio de finiquito / quita → ALTO RIESGO → hasWriteOff',
-  '  FD = Cuenta fraudulenta → CRÍTICO → hasFraudFlag',
-  '  FR = Adjudicación de inmueble por morosidad → CRÍTICO',
-  '  SG = Demanda del otorgante → CRÍTICO',
-  '  CV = Cuenta vencida vendida → ALTO RIESGO → hasWriteOff',
-  '  PC = Cuenta en cobranza → ALTO RIESGO → hasWriteOff',
-  '  VR = Dación en pago → ALTO RIESGO → hasWriteOff',
-  '  LG = Pago menor por programa institucional',
-  '  RV = Cuenta reestructurada',
-  '  RI = Robo de identidad (no atribuible al consumidor) → hasIdentityTheft (NO es fraude)',
-  '  FN = Fraude no atribuible al consumidor',
-  '  CO = Crédito en controversia',
-  '  AD = Cuenta o monto ante aclaración',
-  '  CL = Cuenta en cobranza pagada totalmente sin quebranto',
-  '  CC = Cuenta cancelada o cerrada',
-  '  IA = Cuenta inactiva',
-  '',
-  '  Incluí las claves detectadas como contexto en rawTextReference o deducí las flags correspondientes.',
-  '',
-  '─── Resumen de riesgo (riskSummary) ───',
-  '  hasWriteOff: true si ALGÚN crédito tiene MOP 8 o clave UP/LC/CV/VR.',
-  '  hasFraudFlag: true si ALGÚN crédito tiene MOP 9 o clave FD.',
-  '  hasIdentityTheft: true si ALGÚN crédito tiene clave RI.',
-  '  hasMinorDelinquency: true si ALGÚN crédito tiene MOP 2-3 (30-89 días).',
-  '  hasSeriousDelinquency: true si ALGÚN crédito tiene MOP >= 4 (90+ días de atraso).',
-  '  hasPreventiveKeys: true si hay claves de observación de riesgo:',
-  '    UP, FD, FR, SG, LC, CV, PC, VR, LG, RV.',
-  '  possibleHomonym: true si el nombre/RFC/dirección no coincide con lo esperado',
-  '    o aparecen créditos que no parecen corresponder al acreditado.',
-  '    null si no se puede determinar (requiere comparación externa).',
-  '  riskNotes: notas de resumen sobre el perfil de riesgo detectado.',
-  '',
-  '─── Reglas de alertas ───',
-  '  Generá alertas del backend para los siguientes casos:',
-  '  - Créditos con MOP >= 4 (serious delinquency): alerta.',
-  '  - Créditos con quebranto o fraude: alerta CRÍTICA.',
-  '  - Sin créditos detectados: alerta.',
-  '  NO generes alertas relacionadas con score (score se procesa por separado).',
-  '  NO generes alertas duplicadas. Las alertas serán validadas y filtradas en post-procesamiento.',
+  '─── NO generes ───',
+  'NO generes alertas, riskSummary, ni flags de quebranto/fraude/quita.',
+  'NO uses el glosario como fuente de datos.',
+  'NO marques score (el campo publicScore es null).',
 ].join('\n');
 
 // ---------------------------------------------------------------------------
@@ -215,11 +124,13 @@ const CREDIT_BUREAU_SCHEMA = {
       currency: 'MXN',
       paymentHistory: 'string | null',
       mopCodes: [],
+      observationKeys: [],
       hasLatePayments: 'boolean | null',
       hasSeriousDelinquency: 'boolean | null',
-      hasWriteOff: 'boolean | null',
-      hasFraudFlag: 'boolean | null',
-      hasIdentityTheft: 'boolean | null',
+      hasWriteOff: 'boolean | null — solo si aparece clave UP asociada al crédito',
+      hasSettlementOrDiscount: 'boolean | null — solo si aparece clave LC o LG asociada al crédito',
+      hasFraudFlag: 'boolean | null — solo si aparece clave FD asociada al crédito',
+      hasIdentityTheft: 'boolean | null — solo si aparece clave RI asociada al crédito',
       isClosed: 'boolean | null',
       monthlyDebtContribution: 'number | null',
       rawTextReference: 'string | null',
@@ -227,6 +138,7 @@ const CREDIT_BUREAU_SCHEMA = {
   ],
   riskSummary: {
     hasWriteOff: 'boolean | null',
+    hasSettlementOrDiscount: 'boolean | null',
     hasFraudFlag: 'boolean | null',
     hasIdentityTheft: 'boolean | null',
     hasMinorDelinquency: 'boolean | null',
@@ -236,7 +148,6 @@ const CREDIT_BUREAU_SCHEMA = {
     riskNotes: 'string | null',
   },
   missingFields: [],
-  alerts: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -427,23 +338,10 @@ export class CreditBureauExtractionService {
     // ── 7. Normalize credit bureau fields ──────────────────────────────
     this.normalizeCreditBureau(data);
 
-    // ── 8. Compute alerts from normalized data ─────────────────────────
-    const alerts = this.computeAlerts(data);
+    // ── 8. Compute alerts deterministically from normalized data ─────────
+    // Alerts are computed entirely in the backend. Gemini extracts raw data only.
+    data.alerts = this.computeAlerts(data);
     const missingFields = this.computeMissingFields(data);
-
-    // ── 9. Merge + dedup + filter contradictions ──────────────────────
-    this.normalizeGeminiAlertCodes(data);
-
-    const existingCodes = new Set<string>();
-    if (Array.isArray(data.alerts)) {
-      for (const a of data.alerts as ExtractionAlert[]) {
-        if (a.code) existingCodes.add(a.code);
-      }
-      const newAlerts = alerts.filter((a) => !existingCodes.has(a.code));
-      data.alerts = [...(data.alerts as ExtractionAlert[]), ...newAlerts];
-    } else {
-      data.alerts = alerts;
-    }
 
     if (Array.isArray(data.missingFields)) {
       const existingFields: string[] = (data.missingFields as unknown[]).filter(
@@ -495,6 +393,24 @@ export class CreditBureauExtractionService {
       if (re.test(upperRaw)) return true;
     }
     return false;
+  }
+
+  /**
+   * Extracts 2-3 character uppercase observation keys from raw text.
+   * Used as legacy fallback when observationKeys array is not provided by Gemini.
+   * Only extracts keys from a known set to avoid false positives from glossary text.
+   */
+  private extractObservationKeys(upperRaw: string): string[] {
+    const KNOWN_KEYS = [
+      'UP', 'LC', 'LG', 'FD', 'FR', 'SG', 'CV', 'PC', 'VR', 'RV',
+      'RI', 'FN', 'CO', 'AD', 'CL', 'CC', 'IA',
+    ];
+    const found = new Set<string>();
+    for (const key of KNOWN_KEYS) {
+      const re = new RegExp(`(?<![A-ZÑ])${key}(?![A-ZÑ])`, 'u');
+      if (re.test(upperRaw)) found.add(key);
+    }
+    return Array.from(found);
   }
 
   // -----------------------------------------------------------------------
@@ -549,6 +465,18 @@ export class CreditBureauExtractionService {
         const rawText = (credit.rawTextReference as string) ?? '';
         const upperRaw = rawText.toUpperCase();
 
+        // Normalize observationKeys: prefer the array, fall back to rawTextReference
+        let obsKeys: string[] = [];
+        if (Array.isArray(credit.observationKeys)) {
+          obsKeys = credit.observationKeys
+            .map((k: unknown) => String(k).toUpperCase().trim())
+            .filter((k) => k.length >= 2 && k.length <= 3);
+        } else if (upperRaw) {
+          // Legacy fallback: extract 2-3 char uppercase keys from rawTextReference
+          obsKeys = this.extractObservationKeys(upperRaw);
+        }
+        credit.observationKeys = obsKeys;
+
         // hasLatePayments: any MOP >= 2 (MOP 0-1 are "al corriente", not late)
         if (credit.hasLatePayments == null) {
           credit.hasLatePayments = codes.some((c) =>
@@ -556,29 +484,36 @@ export class CreditBureauExtractionService {
           );
         }
 
-        // hasSeriousDelinquency: any MOP >= 4
+        // hasSeriousDelinquency: any MOP >= 4 (90+ days)
         if (credit.hasSeriousDelinquency == null) {
           credit.hasSeriousDelinquency = codes.some((c) =>
             ['4', '5', '6', '7', '8', '9'].includes(c),
           );
         }
 
-        // hasWriteOff: MOP 8 or observation keys LC/UP
+        // hasWriteOff: ONLY observation key UP (quebranto)
         if (credit.hasWriteOff == null) {
-          credit.hasWriteOff =
-            codes.includes('8') ||
-            this.rawHasObservationKey(upperRaw, ['LC', 'UP']);
+          credit.hasWriteOff = obsKeys.includes('UP') ||
+            this.rawHasObservationKey(upperRaw, ['UP']);
         }
 
-        // hasFraudFlag: MOP 9 or observation key FD
+        // hasSettlementOrDiscount: observation keys LC or LG (quita)
+        if (credit.hasSettlementOrDiscount == null) {
+          credit.hasSettlementOrDiscount = obsKeys.includes('LC') ||
+            obsKeys.includes('LG') ||
+            this.rawHasObservationKey(upperRaw, ['LC', 'LG']);
+        }
+
+        // hasFraudFlag: ONLY observation key FD
         if (credit.hasFraudFlag == null) {
-          credit.hasFraudFlag =
-            codes.includes('9') || this.rawHasObservationKey(upperRaw, ['FD']);
+          credit.hasFraudFlag = obsKeys.includes('FD') ||
+            this.rawHasObservationKey(upperRaw, ['FD']);
         }
 
         // hasIdentityTheft: observation key RI (NOT fraud)
         if (credit.hasIdentityTheft == null) {
-          credit.hasIdentityTheft = this.rawHasObservationKey(upperRaw, ['RI']);
+          credit.hasIdentityTheft = obsKeys.includes('RI') ||
+            this.rawHasObservationKey(upperRaw, ['RI']);
         }
 
         // Validate classification enum
@@ -647,6 +582,11 @@ export class CreditBureauExtractionService {
       if (riskSummary.hasWriteOff == null) {
         riskSummary.hasWriteOff = credits.some(
           (c) => c.hasWriteOff === true,
+        );
+      }
+      if (riskSummary.hasSettlementOrDiscount == null) {
+        riskSummary.hasSettlementOrDiscount = credits.some(
+          (c) => c.hasSettlementOrDiscount === true,
         );
       }
       if (riskSummary.hasFraudFlag == null) {
@@ -726,6 +666,19 @@ export class CreditBureauExtractionService {
       });
     }
 
+    // ── BURO_SETTLEMENT_OR_DISCOUNT — any credit with quita ──────────────
+    if (riskSummary.hasSettlementOrDiscount === true) {
+      alerts.push({
+        code: 'BURO_SETTLEMENT_OR_DISCOUNT',
+        severity: 'CRITICAL',
+        category: 'CREDIT_BUREAU',
+        message:
+          'Se detectaron créditos con quita o descuento (clave LC/LG). Implica acuerdo de pago reducido.',
+        field: 'credits[].hasSettlementOrDiscount',
+        requiresManualReview: true,
+      });
+    }
+
     // ── BURO_FRAUD — any credit with fraud flag ──────────────────────────
     if (riskSummary.hasFraudFlag === true) {
       alerts.push({
@@ -759,7 +712,7 @@ export class CreditBureauExtractionService {
     ) {
       alerts.push({
         code: 'BURO_MINOR_DELINQUENCY',
-        severity: 'INFO',
+        severity: 'WARNING',
         category: 'CREDIT_BUREAU',
         message:
           'Se detectaron atrasos menores (1-89 días) en algunos créditos. No es crítico pero revisar.',
@@ -926,64 +879,4 @@ export class CreditBureauExtractionService {
     });
   }
 
-  // -----------------------------------------------------------------------
-  // Private: normalize Gemini alert codes to backend-standard BURO_ codes
-  // -----------------------------------------------------------------------
-
-  private normalizeGeminiAlertCodes(data: Record<string, unknown>): void {
-    if (!Array.isArray(data.alerts)) return;
-
-    const codeMap: Record<string, string> = {
-      // Score
-      LOW_SCORE: 'BURO_SCORE_LOW',
-      low_score: 'BURO_SCORE_LOW',
-      SCORE_LOW: 'BURO_SCORE_LOW',
-      SCORE_EXCLUDED: 'BURO_SCORE_EXCLUDED',
-      score_excluded: 'BURO_SCORE_EXCLUDED',
-      SCORE_CRITICAL: 'BURO_SCORE_CRITICAL',
-      score_critical: 'BURO_SCORE_CRITICAL',
-      // No credits
-      NO_CREDITS: 'BURO_NO_CREDITS',
-      no_credits: 'BURO_NO_CREDITS',
-      EMPTY_CREDITS: 'BURO_NO_CREDITS',
-      // Delinquency
-      SERIOUS_DELINQUENCY: 'BURO_SERIOUS_DELINQUENCY',
-      serious_delinquency: 'BURO_SERIOUS_DELINQUENCY',
-      MINOR_DELINQUENCY: 'BURO_MINOR_DELINQUENCY',
-      minor_delinquency: 'BURO_MINOR_DELINQUENCY',
-      LATE_PAYMENTS: 'BURO_MINOR_DELINQUENCY',
-      // Write-off
-      WRITE_OFF: 'BURO_WRITE_OFF',
-      write_off: 'BURO_WRITE_OFF',
-      QUEBRANTO: 'BURO_WRITE_OFF',
-      // Fraud
-      FRAUD: 'BURO_FRAUD_FLAG',
-      fraud: 'BURO_FRAUD_FLAG',
-      FRAUD_FLAG: 'BURO_FRAUD_FLAG',
-      // Preventive keys
-      PREVENTIVE_KEYS: 'BURO_PREVENTIVE_KEYS',
-      preventive_keys: 'BURO_PREVENTIVE_KEYS',
-      // Borrower
-      MISSING_BORROWER: 'BURO_MISSING_BORROWER_NAME',
-      missing_borrower: 'BURO_MISSING_BORROWER_NAME',
-      MISSING_RFC: 'BURO_MISSING_BORROWER_RFC',
-      missing_rfc: 'BURO_MISSING_BORROWER_RFC',
-      // Homonym
-      HOMONYM: 'BURO_POSSIBLE_HOMONYM',
-      homonym: 'BURO_POSSIBLE_HOMONYM',
-      POSSIBLE_HOMONYM: 'BURO_POSSIBLE_HOMONYM',
-      // Counts
-      HIGH_CREDIT_COUNT: 'BURO_HIGH_CREDIT_COUNT',
-      HIGH_REVOLVING: 'BURO_HIGH_REVOLVING_COUNT',
-      // Balance
-      MISSING_BALANCE: 'BURO_MISSING_BALANCE',
-      missing_balance: 'BURO_MISSING_BALANCE',
-    };
-
-    for (const a of data.alerts as ExtractionAlert[]) {
-      if (a.code && codeMap[a.code]) {
-        a.code = codeMap[a.code];
-      }
-    }
-  }
 }
