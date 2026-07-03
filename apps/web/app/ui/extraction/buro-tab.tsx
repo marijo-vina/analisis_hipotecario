@@ -207,6 +207,7 @@ function KpiCard({
 function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
   const s = parsed.summary;
   const score = parsed.score;
+  const scoreIsNull = score == null || parsed.scoreIsExcluded;
 
   if (!s) return null;
 
@@ -215,55 +216,74 @@ function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
     : null;
 
   return (
-    <div className="flex gap-2">
-      {/* Score */}
-      <KpiCard
-        label="Score"
-        value={score != null && !parsed.scoreIsExcluded ? `${score}` : "—"}
-        sub={band ? band.label : "No disponible"}
-        accent={
-          band
-            ? band.label.includes("alto") || band.label.includes("muy alto")
-              ? "red"
-              : band.label.includes("medio")
-                ? "orange"
-                : "neutral"
-            : "neutral"
-        }
-      />
-      {/* Activos */}
-      <KpiCard
-        label="activos"
-        value={`${s.activeCredits}`}
-        sub="Créditos activos"
-      />
-      {/* Cerrados */}
-      <KpiCard
-        label="cerrados"
-        value={`${s.closedCredits}`}
-        sub="Créditos cerrados"
-      />
-      {/* Consultas */}
-      <KpiCard
-        label="consultas"
-        value={
-          parsed.numberOfInquiries != null
-            ? `${parsed.numberOfInquiries}`
-            : "—"
-        }
-        sub="Últimos 24 meses"
-      />
-      {/* Alertas */}
-      <KpiCard
-        label="alertas"
-        value={`${s.totalAlerts}`}
-        sub={
-          s.totalCritical > 0
-            ? `${s.totalCritical} crítica${s.totalCritical !== 1 ? "s" : ""}`
-            : "Sin alertas críticas"
-        }
-        accent="red"
-      />
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        {/* Score */}
+        <KpiCard
+          label="Score"
+          value={scoreIsNull ? "—" : `${score}`}
+          sub={
+            scoreIsNull
+              ? "Score no disponible"
+              : band
+                ? band.label
+                : "No disponible"
+          }
+          accent={
+            band
+              ? band.label.includes("alto") || band.label.includes("muy alto")
+                ? "red"
+                : band.label.includes("medio")
+                  ? "orange"
+                  : "neutral"
+              : "neutral"
+          }
+        />
+        {/* Activos */}
+        <KpiCard
+          label="activos"
+          value={`${s.activeCredits}`}
+          sub="Créditos activos"
+        />
+        {/* Cerrados */}
+        <KpiCard
+          label="cerrados"
+          value={`${s.closedCredits}`}
+          sub="Créditos cerrados"
+        />
+        {/* Consultas */}
+        <KpiCard
+          label="consultas"
+          value={
+            parsed.numberOfInquiries != null
+              ? `${parsed.numberOfInquiries}`
+              : "—"
+          }
+          sub="Últimos 24 meses"
+        />
+        {/* Alertas */}
+        <KpiCard
+          label="alertas"
+          value={`${s.totalAlerts}`}
+          sub={
+            s.totalCritical > 0
+              ? `${s.totalCritical} crítica${s.totalCritical !== 1 ? "s" : ""}`
+              : "Sin alertas críticas"
+          }
+          accent="red"
+        />
+      </div>
+
+      {/* Score source label + null-score note */}
+      {scoreIsNull ? (
+        <p className="text-[11px] text-slate-400">
+          El cliente no adjuntó documento Mi Score.
+        </p>
+      ) : parsed.scoreSource === "CREDIT_SCORE" ? (
+        <p className="text-[11px] text-slate-500">
+          Fuente: Mi Score
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -274,12 +294,11 @@ function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
 
 function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
   const r = parsed.riskSummary;
-  const score = parsed.score;
-  const scoreIsExcluded = parsed.scoreIsExcluded;
 
-  // Determine risk level
+  // Determine risk level from riskSummary flags ONLY (DX-001/002/003).
+  // Score-based risk messages must NOT appear when score is null.
   let riskLevel: "Alto" | "Medio" | "Bajo" = "Bajo";
-  let riskMessage = "";
+  let riskMessage = "Sin indicadores de riesgo detectados.";
 
   if (r) {
     if (r.hasWriteOff || r.hasFraudFlag || r.hasSeriousDelinquency) {
@@ -288,23 +307,9 @@ function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
     } else if (r.hasMinorDelinquency || r.hasPreventiveKeys || r.possibleHomonym) {
       riskLevel = "Medio";
       riskMessage = "Se recomienda revisar el historial crediticio con atención.";
-    } else if (score != null && !scoreIsExcluded && score >= 600) {
-      riskLevel = "Bajo";
-      riskMessage = "Perfil crediticio sin señales graves de riesgo.";
     } else {
       riskLevel = "Bajo";
       riskMessage = "Sin indicadores de riesgo detectados.";
-    }
-  } else if (score != null && !scoreIsExcluded) {
-    if (score < 500) {
-      riskLevel = "Alto";
-      riskMessage = "Score en zona de riesgo — requiere revisión.";
-    } else if (score < 600) {
-      riskLevel = "Medio";
-      riskMessage = "Score bajo — revisar historial con atención.";
-    } else {
-      riskLevel = "Bajo";
-      riskMessage = "Perfil crediticio saludable según score.";
     }
   }
 
@@ -415,11 +420,18 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
   const isWarning =
     !isRisky && credit.hasLatePayments;
 
+  // Closed credits get muted styling (CLS-001 visual indicator)
+  const isClosed = credit.isClosed;
+
   const rowBg = isRisky
     ? "bg-red-50/60"
     : isWarning
       ? "bg-amber-50/40"
-      : "";
+      : isClosed
+        ? "bg-slate-50/50"
+        : "";
+
+  const rowOpacity = isClosed ? "opacity-60" : "";
 
   // Build MOP badges from mopCodes or paymentHistory
   const mopCodes = credit.mopCodes.length > 0
@@ -429,12 +441,17 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
       : [];
 
   return (
-    <tr className={`border-b border-slate-100 ${rowBg} text-[13px]`}>
+    <tr className={`border-b border-slate-100 ${rowBg} ${rowOpacity} text-[13px]`}>
       {/* Institution */}
       <td className="py-2 pl-3 pr-1">
         <span className="font-medium text-slate-800">
           {credit.institution ?? "—"}
         </span>
+        {isClosed && (
+          <span className="ml-1 inline-flex items-center rounded bg-slate-200 px-1 py-0.5 text-[9px] font-medium text-slate-500 align-middle">
+            Cerrado
+          </span>
+        )}
       </td>
 
       {/* Type chip */}
@@ -461,9 +478,9 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
         {formatMxn(credit.currentBalance)}
       </td>
 
-      {/* Pago reportado */}
+      {/* Pago reportado — uses paymentDueAmount (PAY-004) */}
       <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
-        {formatMxn(credit.amountToPay)}
+        {formatMxn(credit.paymentDueAmount)}
       </td>
 
       {/* Límite */}

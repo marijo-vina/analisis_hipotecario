@@ -23,6 +23,8 @@ import { DocumentsService } from './documents.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
 import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
+import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
+import { CreditScoreExtractionService } from './credit-score-extraction.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
@@ -32,6 +34,8 @@ export class DocumentsController {
     private readonly officialIdExtractionService: OfficialIdExtractionService,
     private readonly payrollExtractionService: PayrollExtractionService,
     private readonly bankStatementExtractionService: BankStatementExtractionService,
+    private readonly creditBureauExtractionService: CreditBureauExtractionService,
+    private readonly creditScoreExtractionService: CreditScoreExtractionService,
   ) {}
 
   @Post()
@@ -165,6 +169,32 @@ export class DocumentsController {
     @Param('documentId') documentId: string,
   ) {
     const data = await this.bankStatementExtractionService.extract(
+      caseId,
+      documentId,
+    );
+    return { data };
+  }
+
+  @Post(':documentId/extract-bureau')
+  @HttpCode(200)
+  async extractCreditBureau(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.creditBureauExtractionService.extract(
+      caseId,
+      documentId,
+    );
+    return { data };
+  }
+
+  @Post(':documentId/extract-score')
+  @HttpCode(200)
+  async extractCreditScore(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.creditScoreExtractionService.extract(
       caseId,
       documentId,
     );

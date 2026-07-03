@@ -9,6 +9,8 @@ import { DocumentsService } from './documents.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
 import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
+import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
+import { CreditScoreExtractionService } from './credit-score-extraction.service';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -35,6 +37,14 @@ describe('DocumentsController', () => {
     extract: jest.fn(),
   };
 
+  const mockCreditBureauExtractionService = {
+    extract: jest.fn(),
+  };
+
+  const mockCreditScoreExtractionService = {
+    extract: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -56,6 +66,14 @@ describe('DocumentsController', () => {
         {
           provide: BankStatementExtractionService,
           useValue: mockBankStatementExtractionService,
+        },
+        {
+          provide: CreditBureauExtractionService,
+          useValue: mockCreditBureauExtractionService,
+        },
+        {
+          provide: CreditScoreExtractionService,
+          useValue: mockCreditScoreExtractionService,
         },
       ],
     }).compile();

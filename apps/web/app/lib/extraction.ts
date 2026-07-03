@@ -57,7 +57,8 @@ export function docCategory(
       return "nomina";
     case "BANK_STATEMENT":
       return "estados";
-    case "CREDIT_BUREAU":
+    case "CREDIT_BUREAU_REPORT":
+    case "CREDIT_SCORE":
       return "buro";
     default:
       return null;
@@ -938,5 +939,351 @@ export function parseBankStatements(
     allDeposits,
     aggregatedContext,
     allAlerts,
+  };
+}
+
+// ── Credit bureau extraction parsing ─────────────────────────────────────
+
+export interface ParsedCreditBureauCredit {
+  institution: string | null;
+  creditType: string | null;
+  classification: string;
+  status: string;
+  currentBalance: number | null;
+  /** @deprecated use paymentDueAmount — kept for backward compatibility */
+  amountToPay: number | null;
+  paymentDueAmount: number | null;
+  lastPaymentAmount: number | null;
+  creditLimit: number | null;
+  currency: string;
+  paymentHistory: string | null;
+  mopCodes: string[];
+  hasLatePayments: boolean;
+  hasSeriousDelinquency: boolean;
+  hasWriteOff: boolean;
+  hasFraudFlag: boolean;
+  hasIdentityTheft: boolean;
+  isClosed: boolean;
+  monthlyDebtContribution: number | null;
+  rawTextReference: string | null;
+}
+
+export interface ParsedCreditBureauSummary {
+  totalCredits: number;
+  activeCredits: number;
+  closedCredits: number;
+  hasSeriousDelinquency: boolean;
+  hasWriteOff: boolean;
+  hasFraudFlag: boolean;
+  /** null when score not available */
+  score: number | null;
+  /** true when score is an exclusion code (negative) */
+  scoreIsExcluded: boolean;
+  scoreExclusionReason: string | null;
+  totalAlerts: number;
+  totalCritical: number;
+  totalWarnings: number;
+}
+
+export interface ParsedCreditBureau {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+
+  borrower: {
+    fullName: string | null;
+    birthDate: string | null;
+    rfc: string | null;
+    lastReportedAddress: string | null;
+  } | null;
+
+  summary: ParsedCreditBureauSummary | null;
+
+  score: number | null;
+  /** true when score is an exclusion code (negative) */
+  scoreIsExcluded: boolean;
+  scoreExclusionReason: string | null;
+  /** Origin of the score: "CREDIT_SCORE" | "REPORT_CREDIT_BUREAU" | null */
+  scoreSource: string | null;
+  consultationDate: string | null;
+  numberOfInquiries: number | null;
+
+  credits: ParsedCreditBureauCredit[];
+
+  riskSummary: {
+    hasWriteOff: boolean;
+    hasFraudFlag: boolean;
+    hasIdentityTheft: boolean;
+    hasMinorDelinquency: boolean;
+    hasSeriousDelinquency: boolean;
+    hasPreventiveKeys: boolean;
+    possibleHomonym: boolean | null;
+    riskNotes: string | null;
+  } | null;
+
+  alerts: ExtractionAlert[];
+  alertCount: number;
+  hasCritical: boolean;
+}
+
+const SCORE_EXCLUSION_LABELS: Record<number, string> = {
+  [-1]: "Consumidor difunto",
+  [-5]: "Todas las cuentas cerradas — morosidad de 90+ días (MOP ≥ 4)",
+  [-6]: "Cuentas con menos de 6 meses — morosidad de 60+ días (MOP ≥ 3)",
+  [-7]: "Cuentas con menos de 6 meses — morosidad de 30+ días (MOP ≥ 2)",
+  [-8]: "Sin cuenta actualizada en 12 meses o abierta en 6 meses",
+  [-9]: "Sin cuentas para calcular Mi Score",
+};
+
+const SCORE_BAND = (score: number): { label: string; color: string } => {
+  if (score >= 680) return { label: "Bajo", color: "text-green-600" };
+  if (score >= 600) return { label: "Medio", color: "text-yellow-600" };
+  if (score >= 500) return { label: "Alto", color: "text-orange-600" };
+  return { label: "Muy alto", color: "text-red-600" };
+};
+
+function emptyBuro(doc: Document): ParsedCreditBureau {
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: false,
+    borrower: null,
+    summary: null,
+    score: null,
+    scoreIsExcluded: false,
+    scoreExclusionReason: null,
+    scoreSource: null,
+    consultationDate: null,
+    numberOfInquiries: null,
+    credits: [],
+    riskSummary: null,
+    alerts: [],
+    alertCount: 0,
+    hasCritical: false,
+  };
+}
+
+/**
+ * Parses ALL CREDIT_BUREAU_REPORT documents into a structured credit bureau view.
+ *
+ * The credit bureau report is typically a single document. Every document
+ * appears — including UPLOADED, PROCESSING, PROCESSED (with or without
+ * extractedData), and error states.
+ */
+export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
+  const buroDocs = documents.filter(
+    (d) => d.documentType.code === "CREDIT_BUREAU_REPORT",
+  );
+
+  if (buroDocs.length === 0) return null;
+
+  // Take the first (and typically only) credit bureau document
+  const doc = buroDocs[0];
+  const statusCode = doc.documentStatus.code;
+
+  if (
+    statusCode === "ERROR" ||
+    statusCode === "EXTRACTION_ERROR" ||
+    statusCode === "UPLOADED" ||
+    statusCode === "PROCESSING"
+  ) {
+    return emptyBuro(doc);
+  }
+
+  if (!doc.extractedData) {
+    return emptyBuro(doc);
+  }
+
+  const ed = doc.extractedData as Record<string, unknown>;
+
+  // ── Borrower ──────────────────────────────────────────────────────────
+  const borrowerRaw = (ed.borrower ?? {}) as Record<string, unknown>;
+  const borrower = borrowerRaw.fullName
+    ? {
+        fullName: (borrowerRaw.fullName as string) ?? null,
+        birthDate:
+          formatDateDisplay(
+            (borrowerRaw.birthDate as string) ?? undefined,
+          ) ?? null,
+        rfc: (borrowerRaw.rfc as string) ?? null,
+        lastReportedAddress:
+          (borrowerRaw.lastReportedAddress as string) ?? null,
+      }
+    : null;
+
+  // ── Report ─────────────────────────────────────────────────────────────
+  const reportRaw = (ed.report ?? {}) as Record<string, unknown>;
+
+  // ── Score merge: prefer CREDIT_SCORE document, fall back to bureau ─────
+  // MRG-001/002/003/004: score comes from a separate "Mi Score" document.
+  // The bureau report's publicScore is always null (score bleed prevention).
+  const scoreDocs = documents.filter(
+    (d) => d.documentType.code === "CREDIT_SCORE",
+  );
+  let score: number | null = null;
+  let scoreSource: string | null = null;
+  let scoreDocData: Record<string, unknown> | null = null;
+
+  // Try CREDIT_SCORE documents first
+  for (const sd of scoreDocs) {
+    if (
+      sd.documentStatus.code !== "PROCESSED" &&
+      sd.documentStatus.code !== "DATA_EXTRACTED"
+    )
+      continue;
+    if (!sd.extractedData) continue;
+    const sdEd = sd.extractedData as Record<string, unknown>;
+    const sdScore = (sdEd.score as number) ?? null;
+    if (sdScore != null) {
+      score = sdScore;
+      scoreSource = "CREDIT_SCORE";
+      scoreDocData = sdEd;
+      break;
+    }
+  }
+
+  // Fall back to bureau report's publicScore (legacy data may carry it)
+  if (score == null) {
+    const bureauScore = (reportRaw.publicScore as number) ?? null;
+    if (bureauScore != null) {
+      score = bureauScore;
+      scoreSource = "REPORT_CREDIT_BUREAU";
+    }
+  }
+
+  const scoreIsExcluded = score != null && score < 0;
+  const scoreExclusionReason = scoreIsExcluded
+    ? ((scoreDocData?.scoreExclusionReason as string) ??
+      SCORE_EXCLUSION_LABELS[score as number] ??
+      `Exclusión código ${score}`)
+    : null;
+  const consultationDate: string | null = formatDateDisplay(
+    (reportRaw.consultationDate as string) ?? undefined,
+  ) ?? null;
+  const numberOfInquiries = (reportRaw.numberOfInquiries as number) ?? null;
+
+  // ── Credits ────────────────────────────────────────────────────────────
+  const creditsArr =
+    (ed.credits as Record<string, unknown>[]) ?? [];
+  const credits: ParsedCreditBureauCredit[] = [];
+  let activeCredits = 0;
+  let closedCredits = 0;
+
+  for (const credit of creditsArr) {
+    const classification = (credit.classification as string) ?? "UNKNOWN";
+    const status = (credit.status as string) ?? "UNKNOWN";
+    if (status === "ACTIVE") activeCredits++;
+    else if (status === "CLOSED") closedCredits++;
+
+    const paymentDueAmount = (credit.paymentDueAmount as number) ?? null;
+    const lastPaymentAmount = (credit.lastPaymentAmount as number) ?? null;
+    // Backward-compat: amountToPay falls back to paymentDueAmount for old data
+    const amountToPay = paymentDueAmount ?? ((credit.amountToPay as number) ?? null);
+    const isClosed = credit.isClosed === true || status === "CLOSED";
+    const monthlyDebtContribution =
+      (credit.monthlyDebtContribution as number) ??
+      (isClosed ? 0 : paymentDueAmount) ??
+      null;
+    const hasIdentityTheft = credit.hasIdentityTheft === true;
+
+    credits.push({
+      institution: (credit.institution as string) ?? null,
+      creditType: (credit.creditType as string) ?? null,
+      classification,
+      status,
+      currentBalance: (credit.currentBalance as number) ?? null,
+      amountToPay,
+      paymentDueAmount,
+      lastPaymentAmount,
+      creditLimit: (credit.creditLimit as number) ?? null,
+      currency: (credit.currency as string) ?? "MXN",
+      paymentHistory: (credit.paymentHistory as string) ?? null,
+      mopCodes: (credit.mopCodes as string[]) ?? [],
+      hasLatePayments: credit.hasLatePayments === true,
+      hasSeriousDelinquency: credit.hasSeriousDelinquency === true,
+      hasWriteOff: credit.hasWriteOff === true,
+      hasFraudFlag: credit.hasFraudFlag === true,
+      hasIdentityTheft,
+      isClosed,
+      monthlyDebtContribution,
+      rawTextReference: (credit.rawTextReference as string) ?? null,
+    });
+  }
+
+  // ── Risk summary ──────────────────────────────────────────────────────
+  const riskRaw = (ed.riskSummary ?? {}) as Record<string, unknown>;
+  const riskSummary = {
+    hasWriteOff: riskRaw.hasWriteOff === true,
+    hasFraudFlag: riskRaw.hasFraudFlag === true,
+    hasIdentityTheft: riskRaw.hasIdentityTheft === true,
+    hasMinorDelinquency: riskRaw.hasMinorDelinquency === true,
+    hasSeriousDelinquency: riskRaw.hasSeriousDelinquency === true,
+    hasPreventiveKeys: riskRaw.hasPreventiveKeys === true,
+    possibleHomonym: (riskRaw.possibleHomonym as boolean) ?? null,
+    riskNotes: (riskRaw.riskNotes as string) ?? null,
+  };
+
+  // ── Alerts ────────────────────────────────────────────────────────────
+  const alerts = filterAlerts(ed.alerts);
+  // Merge score-related alerts from CREDIT_SCORE documents
+  for (const sd of scoreDocs) {
+    if (
+      sd.documentStatus.code !== "PROCESSED" &&
+      sd.documentStatus.code !== "DATA_EXTRACTED"
+    )
+      continue;
+    if (!sd.extractedData) continue;
+    const sdEd = sd.extractedData as Record<string, unknown>;
+    const sdAlerts = filterAlerts(sdEd.alerts);
+    // Only merge score alerts (avoid duplicating non-score alerts)
+    for (const a of sdAlerts) {
+      if (a.code.startsWith("BURO_SCORE") && !alerts.some((x) => x.code === a.code)) {
+        alerts.push(a);
+      }
+    }
+  }
+  const hasCritical = alerts.some((a) => a.severity === "CRITICAL");
+  const totalCritical = alerts.filter((a) => a.severity === "CRITICAL").length;
+  const totalWarnings = alerts.filter((a) => a.severity === "WARNING").length;
+
+  // ── Summary ───────────────────────────────────────────────────────────
+  const summary: ParsedCreditBureauSummary = {
+    totalCredits: credits.length,
+    activeCredits,
+    closedCredits,
+    hasSeriousDelinquency: riskSummary.hasSeriousDelinquency,
+    hasWriteOff: riskSummary.hasWriteOff,
+    hasFraudFlag: riskSummary.hasFraudFlag,
+    score,
+    scoreIsExcluded,
+    scoreExclusionReason,
+    totalAlerts: alerts.length,
+    totalCritical,
+    totalWarnings,
+  };
+
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: true,
+    borrower,
+    summary,
+    score,
+    scoreIsExcluded,
+    scoreExclusionReason,
+    scoreSource,
+    consultationDate,
+    numberOfInquiries,
+    credits,
+    riskSummary,
+    alerts,
+    alertCount: alerts.length,
+    hasCritical,
   };
 }

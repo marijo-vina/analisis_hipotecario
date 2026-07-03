@@ -9,6 +9,8 @@ import { GeminiService } from './gemini.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
 import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
+import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
+import { CreditScoreExtractionService } from './credit-score-extraction.service';
 
 @Module({
   imports: [PrismaModule],
@@ -22,6 +24,8 @@ import { BankStatementExtractionService } from './bank-statement-extraction.serv
     OfficialIdExtractionService,
     PayrollExtractionService,
     BankStatementExtractionService,
+    CreditBureauExtractionService,
+    CreditScoreExtractionService,
   ],
   exports: [DocumentsService, StoragePathService],
 })
