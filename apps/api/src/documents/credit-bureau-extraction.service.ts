@@ -1,6 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
+import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import {
+  FinancialFieldsConfidence,
+  FinancialFieldsConfidenceMap,
+  FinancialFieldsSource,
+  FinancialFieldName,
+  LayoutCreditField,
+  LayoutFinancialFields,
+  LayoutFinancialResult,
+  OcrLayout,
+} from './document-ai.types';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger credit bureau extraction
@@ -29,28 +41,42 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   'report.numberOfInquiries: número de consultas 24 meses.',
   'report.publicScore: null (el score viene de documento separado "Mi Score").',
   '',
+  '─── ⚠️ ¡CRÍTICO! CLASIFICACIÓN DE PAGOS (ERROR COMÚN) ───',
+  'La columna "Monto a Pagar" del reporte contiene DOS números por crédito.',
+  'El 90% de los errores de extracción vienen de confundirlos. USÁ ESTE ÁRBOL:',
+  '',
+  '┌─ DECISION TREE ─────────────────────────────────────────────────┐',
+  '│ ¿El número está ANTES de "NO APLICA"?                           │',
+  '│   SÍ → lastPaymentAmount (Monto Último Pago)                   │',
+  '│   NO → ¿Está en línea separada, con texto "PAGO"/"MENSUAL"?   │',
+  '│         SÍ → paymentDueAmount (Monto a Pagar)                  │',
+  '│         NO → ese número NO es un campo de pago, ignorá         │',
+  '└─────────────────────────────────────────────────────────────────┘',
+  '',
   '─── Créditos ───',
   'Extraé TODOS los créditos. El OCR tiene DOS partes por crédito:',
   '',
   'PARTE 1 — Línea de datos concatenados (Saldo, Máximo, Límite, Moneda, Fechas, etc.):',
-  '  Ej: "30,283193,336150,000MXAGO-25AGO-03050,000NO APLICA"',
-  '  Ej: "73,881307,825MXAGO-25JUL-09049,800NO APLICA"',
-  '  El último número ANTES de "NO APLICA" es Monto Último Pago → lastPaymentAmount.',
-  '  En los ejemplos: 50,000 y 49,800 son lastPaymentAmount.',
+  '  Ej: "0 53,763 42,400 MX MAY-25 ABR-13 0 1,743 NO APLICA"',
+  '  Ej: "30,283 193,336 150,000 MX AGO-25 AGO-03 50,000 NO APLICA"',
+  '  Ej: "73,881 307,825 MX AGO-25 JUL-09 49,800 NO APLICA"',
+  '  ➤ El ÚLTIMO número antes de "NO APLICA" es lastPaymentAmount.',
+  '  ➤ En los ejemplos: 1,743 / 50,000 / 49,800 son lastPaymentAmount.',
   '',
-  'PARTE 2 — Línea de pago (SIEMPRE en renglones separados ABAJO de la línea concatenada):',
-  '  Formato: [número] [texto descriptivo en mayúsculas en renglones separados]',
-  '  Ej: "1,875\\nPAGO\\nMÍNIMO\\nPARA\\nCUENTAS\\nREVOLVE\\nNTES" → paymentDueAmount = 1875',
-  '  Ej: "0\\nMENSUAL"                                          → paymentDueAmount = 0',
-  '  Ej: "0\\nMENSUAL\\n36"                                     → paymentDueAmount = 0',
-  '  Ej: "0\\nPAGO\\nMÍNIMO\\nPARA\\nCUENTAS\\nREVOLVE\\nNTES"  → paymentDueAmount = 0',
-  '  REGLA: paymentDueAmount es el número de ESTA línea. El texto que sigue',
-  '  ("MENSUAL", "PAGO MÍNIMO PARA CUENTAS REVOLVENTES") es solo decorativo, ignorá su valor.',
+  'PARTE 2 — Línea de pago (SIEMPRE en renglones separados DEBAJO de Parte 1):',
+  '  ➤ Es una línea con UN SOLO NÚMERO, seguida de texto descriptivo.',
+  '  ➤ Ese número es paymentDueAmount.',
+  '  Ej: "1,875" seguido de "PAGO MÍNIMO PARA CUENTAS REVOLVENTES" → paymentDueAmount = 1875',
+  '  Ej: "0"     seguido de "MENSUAL"                              → paymentDueAmount = 0',
+  '  Ej: "0"     seguido de "MENSUAL 36"                           → paymentDueAmount = 0',
+  '  Ej: "0"     seguido de "PAGO MÍNIMO PARA CUENTAS REVOLVENTES" → paymentDueAmount = 0',
   '',
-  'RESUMEN:',
-  '  - lastPaymentAmount = último número de la línea concatenada (antes de NO APLICA).',
-  '  - paymentDueAmount = número de la línea de pago separada (la que tiene texto debajo).',
-  '  - NUNCA tomes un número de la línea concatenada como paymentDueAmount.',
+  '⚠️ REGLA DE ORO (siempre cierta):',
+  '  lastPaymentAmount = el número PEGADO a "NO APLICA" en la línea de datos.',
+  '  paymentDueAmount  = el número SOLITARIO que tiene texto debajo.',
+  '  NUNCA INVIERTAS ESTOS CAMPOS. NUNCA uses el mismo número para ambos.',
+  '  Si ves "XXX NO APLICA\\n0\\nPAGO MÍNIMO" → lastPayment=XXX, paymentDue=0.',
+  '  Si ves "XXX NO APLICA\\n1,875\\nPAGO MÍNIMO" → lastPayment=XXX, paymentDue=1875.',
   '',
   '  institution, creditType, classification (REVOLVING|FIXED_PAYMENT|MORTGAGE|AUTO|',
   '    PERSONAL_LOAN|DEPARTMENT_STORE|NON_BANK_SERVICE|UNKNOWN),',
@@ -214,6 +240,18 @@ const VALID_MOP_CODES = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// The 6 financial fields merged by layout authority (stable iteration order).
+// ---------------------------------------------------------------------------
+const FINANCIAL_FIELDS: FinancialFieldName[] = [
+  'currentBalance',
+  'creditLimit',
+  'maxCredit',
+  'lastPaymentAmount',
+  'paymentDueAmount',
+  'pastDueAmount',
+];
+
+// ---------------------------------------------------------------------------
 // Extraction result envelope
 // ---------------------------------------------------------------------------
 export interface CreditBureauExtractionResult {
@@ -235,10 +273,101 @@ export class CreditBureauExtractionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
+    private readonly configService: ConfigService,
+    private readonly layoutExtractor: LayoutFinancialExtractorService,
   ) {}
 
   static isCreditBureauDocument(documentTypeCode: string): boolean {
     return CREDIT_BUREAU_DOC_TYPES.includes(documentTypeCode);
+  }
+
+  /**
+   * Strip non-credit sections from OCR text before sending to Gemini.
+   *
+   * Bureau reports contain inquiry lists, glossary/legend sections, legal
+   * disclaimers, and page boilerplate — all of which inflate Gemini's output
+   * and cause GEMINI_INVALID_JSON. We keep only:
+   *   1. Borrower data (Datos del Acreditado / Datos Generales)
+   *   2. Credit summary (Resumen de Créditos)
+   *   3. Credit detail (Detalle de Créditos → up to next major section)
+   *
+   * Excluded: consultas, glosario, pie de página legal, instrucciones.
+   */
+  private preFilterOcr(raw: string, maxChars: number): string {
+    const upper = raw.toUpperCase();
+
+    // ── Section boundary markers (in priority order) ────────────────────
+    const DETAIL_START = ['DETALLE DE CRÉDITOS', 'DETALLE DE CREDITOS'];
+    const CUT_AFTER = [
+      'DETALLE DE CONSULTAS',
+      'DECLARATIVA',
+      '¿ QUÉ SIGNIFICA',
+      'QUÉ SIGNIFICA EL HISTÓRICO',
+      'QUÉ SIGNIFICA EL HISTORICO',
+      'CLAVES DE OBSERVACIÓN',
+      'CLAVES DE OBSERVACION',
+      'INFORMACIÓN SOBRE LA ELIMINACIÓN',
+      'INFORMACION SOBRE LA ELIMINACION',
+      'OTRAS SOCIEDADES DE INFORMACIÓN',
+      'OTRAS SOCIEDADES DE INFORMACION',
+      'DOCUMENTO SIN VALOR PROBATORIO',
+    ];
+    const BORROWER = ['DATOS DEL ACREDITADO', 'DATOS GENERALES'];
+    const SUMMARY = 'RESUMEN DE CRÉDITOS';
+
+    // ── 1. Find borrower section (keep ~400 chars) ──────────────────────
+    let borrowerChunk = '';
+    for (const marker of BORROWER) {
+      const idx = upper.indexOf(marker);
+      if (idx !== -1) {
+        borrowerChunk = raw.slice(idx, idx + 400);
+        break;
+      }
+    }
+
+    // ── 2. Find detail section start ────────────────────────────────────
+    let detailStart = -1;
+    for (const marker of DETAIL_START) {
+      detailStart = upper.indexOf(marker);
+      if (detailStart !== -1) break;
+    }
+    if (detailStart === -1) {
+      // No detail section found → fall back to simple truncation
+      return raw.length > maxChars
+        ? raw.slice(0, maxChars)
+        : raw;
+    }
+
+    // ── 3. Find the cut point (first excluded section AFTER detail) ─────
+    let cutPoint = raw.length;
+    for (const marker of CUT_AFTER) {
+      const idx = upper.indexOf(marker, detailStart + 1);
+      if (idx !== -1 && idx < cutPoint) {
+        cutPoint = idx;
+      }
+    }
+
+    // ── 4. Include summary if it appears BEFORE the detail section ──────
+    let summaryChunk = '';
+    const summaryIdx = upper.indexOf(SUMMARY);
+    if (summaryIdx !== -1 && summaryIdx < detailStart) {
+      summaryChunk = raw.slice(summaryIdx, detailStart);
+    }
+
+    // ── 5. Assemble: borrower + summary + detail ────────────────────────
+    const detailChunk = raw.slice(detailStart, cutPoint);
+    let filtered = [borrowerChunk, summaryChunk, detailChunk]
+      .filter(Boolean)
+      .join('\n');
+
+    // ── 6. Cap at maxChars (trim from the end of detail, not the start) ─
+    if (filtered.length > maxChars) {
+      filtered =
+        filtered.slice(0, maxChars) +
+        `\n\n[OCR truncado — ${filtered.length - maxChars} caracteres omitidos]`;
+    }
+
+    return filtered;
   }
 
   async extract(
@@ -313,15 +442,13 @@ export class CreditBureauExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Truncate OCR text if excessively large ───────────────────────
-    // Bureau reports can be 20+ pages. Gemini has input token limits and
-    // performance degrades with very large inputs. Keep the first 30K chars
-    // which typically contain the summary and credit detail sections.
-    const MAX_OCR_CHARS = 30000;
-    const ocrText = document.ocrText.length > MAX_OCR_CHARS
-      ? document.ocrText.slice(0, MAX_OCR_CHARS) +
-        `\n\n[OCR truncado — ${document.ocrText.length - MAX_OCR_CHARS} caracteres omitidos del final]`
-      : document.ocrText;
+    // ── 6. Pre-filter OCR: strip boilerplate, inquiries, glossary, legal ──
+    //    Gemini chokes on long PDFs. Keep only the credit-detail sections +
+    //    borrower data, capped at 15K chars. This reduces Gemini's input
+    //    to the highest-signal content and avoids GEMINI_INVALID_JSON caused
+    //    by output-size overflow from processing irrelevant sections.
+    const MAX_OCR_CHARS = 15000;
+    const ocrText = this.preFilterOcr(document.ocrText, MAX_OCR_CHARS);
 
     // ── 7. Call Gemini with specialized instructions ────────────────────
     const geminiResult = await this.geminiService.extractStructuredData(
@@ -364,10 +491,32 @@ export class CreditBureauExtractionService {
 
     const data = geminiResult.extractedData as Record<string, unknown>;
 
-    // ── 7. Normalize credit bureau fields ──────────────────────────────
+    // ── 7. Disambiguate payment fields using OCR text ───────────────────
+    // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount.
+    // This step cross-references the raw OCR text to correct misclassifications
+    // before normalization runs.
+    //
+    // NOTE: the regex disambiguator is intentionally still active during the
+    // layout-aware rollout (Phase 4). Layout authority for paymentDueAmount
+    // is applied AFTER this in mergeLayoutWithGemini(); the regex method only
+    // still meaningfully corrects lastPaymentAmount once layout is the
+    // authoritative source for paymentDueAmount. Removal of the regex
+    // disambiguator is deferred to Phase 7 (after 10+ validated PDFs).
+    this.disambiguatePaymentFields(data, document.ocrText);
+
+    // ── 7b. Layout-aware merge (feature-flagged) ───────────────────────
+    // When USE_LAYOUT_EXTRACTION is enabled and the document has an
+    // `ocrLayout`, run the deterministic LayoutFinancialExtractor and merge
+    // its financial fields onto the Gemini credits using the authority
+    // hierarchy (LAYOUT HIGH/MEDIUM wins, LAYOUT LOW nulls critical fields).
+    // When the flag is off (default), the existing Gemini-only flow is
+    // preserved and no audit fields are populated.
+    this.maybeMergeLayout(data, document.ocrLayout as OcrLayout | null);
+
+    // ── 8. Normalize credit bureau fields ──────────────────────────────
     this.normalizeCreditBureau(data);
 
-    // ── 8. Compute alerts deterministically from normalized data ─────────
+    // ── 9. Compute alerts deterministically from normalized data ─────────
     // Alerts are computed entirely in the backend. Gemini extracts raw data only.
     data.alerts = this.computeAlerts(data);
     const missingFields = this.computeMissingFields(data);
@@ -440,6 +589,324 @@ export class CreditBureauExtractionService {
       if (re.test(upperRaw)) found.add(key);
     }
     return Array.from(found);
+  }
+
+  // -----------------------------------------------------------------------
+  // Phase 4: layout-aware merge (feature-flagged)
+  // -----------------------------------------------------------------------
+  //
+  // `mergeLayoutWithGemini` combines Gemini's semantic extraction (handles
+  // institution, creditType, classification, MOP, paymentHistory, …) with
+  // the deterministic LayoutFinancialExtractor result (handles the 6 numeric
+  // financial fields from the "Detalle de Créditos" table).
+  //
+  // Authority hierarchy (see design.md):
+  //   • Layout HIGH confidence → LAYOUT value wins (authoritative).
+  //   • Layout MEDIUM confidence → LAYOUT value wins (kept, marked MEDIUM).
+  //   • Layout LOW confidence →
+  //       - For `paymentDueAmount` (critical): null + needsManualReview +
+  //         candidatePaymentDueAmount (Gemini original archived for audit).
+  //         NEVER falls back to Gemini nor lastPaymentAmount.
+  //       - For other fields: keep the Gemini value (layout LOW unusable).
+  //
+  // Merge key: `accountNumber + institution` (exact). When accountNumber is
+  // missing for a Gemini credit, fall back to `institution + order within the
+  // credits array` (Nth layout credit of the same institution) and emit a
+  // warning. Credits with no layout match → financialFieldsSource=GEMINI.
+  //
+  // Audit fields deposited on EVERY credit:
+  //   financialFieldsSource / financialFieldsConfidence (per-field map) /
+  //   financialFieldsWarnings / candidatePaymentDueAmount.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Normalize a string for merge-key matching: strip non-alphanumeric chars
+   * + uppercase. Account numbers and institution names from OCR vs Gemini
+   * often differ only in punctuation/space/case.
+   */
+  private static normKey(account: string, institution: string): string {
+    const cleanedAccount = account.replace(/[^0-9A-ZÑa-zñ]/g, '').toUpperCase();
+    const cleanedInst = institution
+      .replace(/[^0-9A-ZÑa-zñ]/g, '')
+      .toUpperCase();
+    return `${cleanedAccount}|${cleanedInst}`;
+  }
+
+  /**
+   * Feature-flag gate. Resolves `USE_LAYOUT_EXTRACTION` from the NestJS
+   * ConfigService. Defaults to `false` (Gemini-only flow preserved).
+   */
+  private isLayoutExtractionEnabled(): boolean {
+    const v = this.configService.get<string>('USE_LAYOUT_EXTRACTION') ?? 'false';
+    return String(v).toLowerCase() === 'true';
+  }
+
+  /**
+   * Run the layout extractor + merge when the feature flag is on and the
+   * document has an `ocrLayout`. Otherwise no-op (current behavior).
+   */
+  private maybeMergeLayout(
+    data: Record<string, unknown>,
+    ocrLayout: OcrLayout | null,
+  ): void {
+    if (!this.isLayoutExtractionEnabled()) return;
+    if (!ocrLayout || !Array.isArray(ocrLayout.pages)) return;
+
+    let layoutResult: LayoutFinancialResult;
+    try {
+      layoutResult = this.layoutExtractor.extract(ocrLayout);
+    } catch (err) {
+      this.logger.warn(
+        `[CreditBureau] LayoutFinancialExtractor threw — skipping merge: ${(err as Error).message}`,
+      );
+      return;
+    }
+
+    // Only skip when the extractor produced zero credits (no table found).
+    // Institution-less credits are still valid — they carry financial fields
+    // that can be matched by orderInBlock position.
+    if (layoutResult.credits.length === 0) {
+      this.logger.warn(
+        '[CreditBureau] Layout extractor returned 0 credits — skipping merge.',
+      );
+      return;
+    }
+
+    this.mergeLayoutWithGemini(data, layoutResult);
+  }
+
+  /**
+   * Apply the layout→Gemini authority hierarchy and populate the audit
+   * fields. Mutates `data.credits[]` in place.
+   */
+  private mergeLayoutWithGemini(
+    data: Record<string, unknown>,
+    layoutResult: LayoutFinancialResult,
+  ): void {
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(credits) || credits.length === 0) return;
+
+    const layoutCredits = layoutResult.credits;
+    const layoutConfidence = layoutResult.confidence;
+
+    // No layout credits at all → mark every credit as GEMINI and return.
+    if (layoutCredits.length === 0) {
+      for (const credit of credits) {
+        CreditBureauExtractionService.attachAuditFields(
+          credit,
+          FinancialFieldsSource.GEMINI,
+          null,
+          [],
+          null,
+        );
+      }
+      return;
+    }
+
+    // 1. Build exact-match index `account|institution → layout credit index`.
+    const exactIndex = new Map<string, number>();
+    for (let i = 0; i < layoutCredits.length; i++) {
+      const lc = layoutCredits[i];
+      if (lc.accountNumber && lc.institution) {
+        exactIndex.set(
+          CreditBureauExtractionService.normKey(
+            lc.accountNumber,
+            lc.institution,
+          ),
+          i,
+        );
+      }
+    }
+
+    // 2. Build per-institution ordered queues for the fallback matcher.
+    //    In layout-credit order (which follows `orderInBlock`), so the Nth
+    //    Gemini credit of institution X pairs with the Nth layout credit of
+    //    the same institution.
+    const institutionQueues = new Map<string, number[]>();
+    for (let i = 0; i < layoutCredits.length; i++) {
+      const lc = layoutCredits[i];
+      if (!lc.institution) continue;
+      const key = lc.institution.toUpperCase();
+      if (!institutionQueues.has(key)) institutionQueues.set(key, []);
+      institutionQueues.get(key)!.push(i);
+    }
+    const institutionConsumed = new Map<string, number>();
+
+    // 3. Track which layout credit indices are already claimed (exact match
+    //    must not re-consume a layout credit that the fallback would use).
+    const claimed = new Set<number>();
+
+    for (const credit of credits) {
+      const gAccount = (credit.accountNumber as string | undefined) ?? null;
+      const gInstRaw = (credit.institution as string | undefined) ?? '';
+      const gInst = gInstRaw.toUpperCase().replace(/\s+/g, ' ').trim();
+
+      let matchIdx = -1;
+      let usedFallback = false;
+      const warnings: string[] = [];
+
+      // a) Exact match account+institution (preferred).
+      if (gAccount && gInst) {
+        const key = CreditBureauExtractionService.normKey(gAccount, gInst);
+        const idx = exactIndex.get(key);
+        if (idx !== undefined && !claimed.has(idx)) {
+          matchIdx = idx;
+        }
+      }
+
+      // b) Fallback: institution + order within credit block.
+      if (matchIdx === -1 && gInst && institutionQueues.has(gInst)) {
+        const queue = institutionQueues.get(gInst)!;
+        const consumed = institutionConsumed.get(gInst) ?? 0;
+        for (let q = consumed; q < queue.length; q++) {
+          if (!claimed.has(queue[q])) {
+            matchIdx = queue[q];
+            institutionConsumed.set(gInst, q + 1);
+            usedFallback = true;
+            break;
+          }
+        }
+      }
+
+      // c) Fallback: pure orderInBlock position (when institution is
+      //    unavailable on either side). Useful for PDFs where the extractor
+      //    captures financial columns but fails to read institution names.
+      if (matchIdx === -1) {
+        // Use Nth Gemini credit → Nth unclaimed layout credit.
+        const geminiPos = credits.indexOf(credit);
+        const unclaimed = layoutCredits
+          .map((_, i) => i)
+          .filter((i) => !claimed.has(i));
+        if (geminiPos < unclaimed.length) {
+          matchIdx = unclaimed[geminiPos];
+          usedFallback = true;
+          warnings.push(
+            'Matched by orderInBlock position (institution unavailable).',
+          );
+        }
+      }
+
+      // d) No layout match → when layout is enabled, NEVER let Gemini be
+      //    the authoritative source for paymentDueAmount. Null it and flag
+      //    for manual review — the whole point of the layout-aware change
+      //    is to stop depending on Gemini for this field.
+      if (matchIdx === -1) {
+        const geminiDue = credit.paymentDueAmount as number | null;
+        credit.paymentDueAmount = null;
+        credit.candidatePaymentDueAmount = geminiDue;
+        credit.needsManualReview = true;
+        CreditBureauExtractionService.attachAuditFields(
+          credit,
+          FinancialFieldsSource.MANUAL_REVIEW,
+          null,
+          [
+            'paymentDueAmount set to null (no layout match). Manual review required — Gemini candidate archived.',
+          ],
+          geminiDue,
+        );
+        this.logger.warn(
+          `[CreditBureau] MANUAL_REVIEW for "${gInstRaw || 'unknown'}": ` +
+            `no layout match — paymentDueAmount nulled (Gemini candidate=${geminiDue}).`,
+        );
+        continue;
+      }
+
+      claimed.add(matchIdx);
+
+      const lc = layoutCredits[matchIdx];
+      const fieldConfidence = layoutConfidence[matchIdx] as FinancialFieldsConfidenceMap;
+      if (usedFallback) {
+        warnings.push(
+          `Matched by institution-only fallback (accountNumber missing) for "${gInstRaw || gInst}".`,
+        );
+      }
+
+      // 4. Apply authority hierarchy per financial field.
+      let anyLayoutFieldUsed = false;
+      let criticalNeedsManualReview = false;
+      const geminiDue = credit.paymentDueAmount as number | null;
+
+      for (const field of FINANCIAL_FIELDS) {
+        const confidence = fieldConfidence[field];
+        const layoutVal = lc.fields[field] as number | null;
+
+        if (
+          confidence === FinancialFieldsConfidence.HIGH ||
+          confidence === FinancialFieldsConfidence.MEDIUM
+        ) {
+          // Layout value wins for HIGH and MEDIUM.
+          (credit as Record<string, unknown>)[field] = layoutVal;
+          anyLayoutFieldUsed = true;
+        } else {
+          // Layout LOW confidence.
+          if (field === 'paymentDueAmount') {
+            // CRITICAL: paymentDueAmount comes ONLY from layout "Monto a Pagar".
+            // If layout cannot confirm it with HIGH or MEDIUM, set it to null
+            // (NOT Gemini's value, NOT lastPaymentAmount) and flag for review.
+            credit.paymentDueAmount = null;
+            credit.candidatePaymentDueAmount = geminiDue;
+            credit.needsManualReview = true;
+            criticalNeedsManualReview = true;
+          }
+          // For non-critical LOW fields: keep the Gemini value untouched.
+        }
+      }
+
+      // When paymentDueAmount was overridden by LAYOUT HIGH/MEDIUM, preserve
+      // the original Gemini amount as candidatePaymentDueAmount for audit.
+      if (
+        !criticalNeedsManualReview &&
+        (fieldConfidence.paymentDueAmount === FinancialFieldsConfidence.HIGH ||
+          fieldConfidence.paymentDueAmount === FinancialFieldsConfidence.MEDIUM)
+      ) {
+        credit.candidatePaymentDueAmount = geminiDue;
+      }
+
+      // 5. Decide the coarse financialFieldsSource value.
+      let source: FinancialFieldsSource;
+      if (criticalNeedsManualReview) {
+        source = FinancialFieldsSource.MANUAL_REVIEW;
+        warnings.push(
+          'paymentDueAmount set to null (layout LOW confidence). Manual review required.',
+        );
+      } else if (anyLayoutFieldUsed) {
+        source = FinancialFieldsSource.LAYOUT;
+      } else {
+        source = FinancialFieldsSource.GEMINI;
+      }
+
+      CreditBureauExtractionService.attachAuditFields(
+        credit,
+        source,
+        fieldConfidence,
+        warnings,
+        credit.candidatePaymentDueAmount as number | null,
+      );
+
+      if (criticalNeedsManualReview) {
+        this.logger.warn(
+          `[CreditBureau] MANUAL_REVIEW for "${gInstRaw}": paymentDueAmount nulled ` +
+            `(Gemini candidate=${geminiDue}).`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Attach the four audit fields to a credit object. Centralised so the
+   * unmatched and matched branches stay consistent.
+   */
+  private static attachAuditFields(
+    credit: Record<string, unknown>,
+    source: FinancialFieldsSource,
+    confidence: FinancialFieldsConfidenceMap | null,
+    warnings: string[],
+    candidatePaymentDueAmount: number | null,
+  ): void {
+    credit.financialFieldsSource = source;
+    credit.financialFieldsConfidence = confidence;
+    credit.financialFieldsWarnings = warnings;
+    credit.candidatePaymentDueAmount = candidatePaymentDueAmount;
   }
 
   // -----------------------------------------------------------------------
@@ -580,12 +1047,34 @@ export class CreditBureauExtractionService {
         }
 
         // ── isClosed + monthlyDebtContribution (CLS-001/002/003/004) ──────────
+        //
+        // Layout-aware rule: only feed paymentDueAmount into the
+        // monthly debt computation when its confidence is NOT LOW. When the
+        // layout extractor could not confirm paymentDueAmount (LOW), the
+        // merge step already set it to null; here we additionally null
+        // monthlyDebtContribution and emit an audit warning so the analyst
+        // understands the contribution is intentionally missing (not zero).
         credit.isClosed = credit.status === 'CLOSED';
         if (credit.isClosed) {
           credit.monthlyDebtContribution = 0;
         } else if (credit.status === 'ACTIVE') {
-          credit.monthlyDebtContribution =
-            (credit.paymentDueAmount as number | null) ?? null;
+          const conf = (credit.financialFieldsConfidence ??
+            null) as FinancialFieldsConfidenceMap | null;
+          if (
+            conf &&
+            conf.paymentDueAmount === FinancialFieldsConfidence.LOW
+          ) {
+            // Layout LOW: do NOT compute the contribution — null + warning.
+            credit.monthlyDebtContribution = null;
+            const warnings = (credit.financialFieldsWarnings as string[]) ?? [];
+            const WARNING =
+              'monthlyDebtContribution set to null (paymentDueAmount LOW confidence).';
+            if (!warnings.includes(WARNING)) warnings.push(WARNING);
+            credit.financialFieldsWarnings = warnings;
+          } else {
+            credit.monthlyDebtContribution =
+              (credit.paymentDueAmount as number | null) ?? null;
+          }
         } else {
           credit.monthlyDebtContribution = null;
         }
@@ -667,6 +1156,324 @@ export class CreditBureauExtractionService {
     }
 
     data.riskSummary = riskSummary;
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: payment field disambiguation using OCR text
+  // -----------------------------------------------------------------------
+  // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount.
+  //
+  // Strategy (hybrid position + name matching):
+  //   1. Find ALL "NO APLICA" anchors in the DETALLE section.
+  //   2. For each anchor, extract lastPayment (number before), paymentDue
+  //      (number after followed by PAGO/MENSUAL), AND the nearby institution
+  //      name from the preceding lines.
+  //   3. Match each Gemini credit to its OCR pair by institution name
+  //      similarity (exact > first-two-words > first-word-only).
+  //   4. When multiple credits share the same institution, match by order
+  //      within that group.
+  //
+  // This is more robust than pure index matching because it survives
+  // credits that lack "NO APLICA" (which would shift all subsequent indices).
+  // -----------------------------------------------------------------------
+
+  // -----------------------------------------------------------------------
+  // Types
+  // -----------------------------------------------------------------------
+
+
+  /**
+   * Parses a numeric string that may contain comma thousand separators.
+   * Rejects values > 8 digits (account numbers).
+   */
+  private parseOcrAmount(raw: string): number | null {
+    if (!raw) return null;
+    const cleaned = raw.replace(/,/g, '').trim();
+    if (cleaned.length > 8) return null;
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  }
+
+  /**
+   * Sanity-checks whether a value is a plausible payment amount.
+   * Rejects years, MOP code patterns, installment counts, and outliers.
+   */
+  private isValidPaymentAmount(
+    value: number | null,
+    field: 'due' | 'last',
+  ): boolean {
+    if (value == null || value < 0) return false;
+    if (value >= 2020 && value <= 2031) return false;
+    const str = String(value);
+    if (str.length >= 4 && /^(\d)\1{3,}$/.test(str)) return false;
+    if (
+      field === 'last' &&
+      [12, 24, 36, 48, 60, 72, 84, 96].includes(value)
+    )
+      return false;
+    if (field === 'due' && value > 500_000) return false;
+    if (field === 'last' && value > 10_000_000) return false;
+    return true;
+  }
+
+  /**
+   * Extracts paymentDueAmount from text after a NO APLICA anchor.
+   *
+   * Algorithm:
+   *   1. Find the first PAGO or MENSUAL keyword after NO APLICA.
+   *   2. Scan backward from the keyword for the nearest number (1-9 chars,
+   *      may include commas).
+   *   3. That number is paymentDueAmount — NEVER fall back to lastPaymentAmount.
+   */
+  private extractPaymentDueFromOcr(afterNoAplica: string): number | null {
+    const keywordMatch = afterNoAplica.match(/\b(PAGO|MENSUAL)\b/i);
+    if (!keywordMatch || keywordMatch.index == null) return null;
+
+    const keywordIdx = keywordMatch.index;
+    const beforeKeyword = afterNoAplica.slice(0, keywordIdx);
+    const numberMatches = [...beforeKeyword.matchAll(/([\d,]{1,9})/g)];
+    if (numberMatches.length === 0) return null;
+
+    const lastNumberMatch = numberMatches[numberMatches.length - 1];
+    const candidate = this.parseOcrAmount(lastNumberMatch[1]);
+    if (candidate == null || !this.isValidPaymentAmount(candidate, 'due'))
+      return null;
+
+    return candidate;
+  }
+
+  /**
+   * Extracts the institution name from the text preceding an OCR anchor.
+   * In the credit bureau detail, institution names appear on their own line
+   * with only uppercase letters, spaces, and sometimes "*".
+   */
+  private extractNearbyInstitution(
+    detailOcr: string,
+    anchorIdx: number,
+  ): string {
+    // Look back up to 400 chars before the anchor
+    const start = Math.max(0, anchorIdx - 400);
+    const before = detailOcr.slice(start, anchorIdx);
+    const lines = before.split(/\r?\n/);
+
+    // Walk backwards through lines looking for an institution name.
+    // Institution lines: all-uppercase, 3+ chars, not purely numeric,
+    // and not data lines (which contain dates, amounts, or MOP codes).
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line || line.length < 3) continue;
+
+      const upper = line.toUpperCase();
+
+      // Skip lines that are clearly NOT institution names
+      if (/^\d/.test(upper)) continue; // starts with digit
+      if (/\b(MES|EFMAMJJASOND|CUENTA|PAGO|MENSUAL|CRÉDITO|INDIVIDUAL|REVOLVENTE|COMPRA|TARJETA|LÍNEA|SIN\s+LÍMITE|OTROS|PAGOS\s+FIJOS)\b/i.test(upper)) continue;
+      if (/^\d{4}$/.test(upper)) continue; // year line
+      if (/^[0-9U\-,\s]+$/.test(upper)) continue; // MOP codes or numbers only
+
+      // This looks like an institution name.
+      // Strip trailing account numbers (10+ digit sequences) and asterisks
+      // so "SOFOM INBURSA 4737011813185955" becomes "SOFOM INBURSA"
+      let name = upper.replace(/\s+/g, ' ').trim();
+      name = name.replace(/\s*\*?\s*\d{10,}\s*$/, '').trim();
+      return name;
+    }
+
+    return '';
+  }
+
+  /**
+   * Extracts all payment pairs from the detail section, each with its
+   * nearby institution name for matching.
+   */
+  private extractAllPaymentPairs(
+    detailOcr: string,
+  ): Array<{
+    lastPayment: number | null;
+    paymentDue: number | null;
+    institution: string;
+  }> {
+    const pairs: Array<{
+      lastPayment: number | null;
+      paymentDue: number | null;
+      institution: string;
+    }> = [];
+    const lastPaymentRegex = /([\d,]{1,9})\s+NO\s+APLICA/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = lastPaymentRegex.exec(detailOcr)) !== null) {
+      const lastPayment = this.parseOcrAmount(match[1]);
+
+      // Extract paymentDueAmount after this NO APLICA.
+      // Algorithm: find the PAGO/MENSUAL keyword, then scan backward
+      // for the nearest number. Never fall back to lastPaymentAmount.
+      const after = detailOcr.slice(
+        match.index + match[0].length,
+        match.index + match[0].length + 250,
+      );
+
+      const paymentDue = this.extractPaymentDueFromOcr(after);
+
+      // Extract nearby institution name
+      const institution = this.extractNearbyInstitution(
+        detailOcr,
+        match.index,
+      );
+
+      // Sanity checks
+      const validLast = this.isValidPaymentAmount(lastPayment, 'last');
+      const validDue =
+        paymentDue != null &&
+        this.isValidPaymentAmount(paymentDue, 'due');
+
+      pairs.push({
+        lastPayment: validLast ? lastPayment : null,
+        paymentDue: validDue ? paymentDue : null,
+        institution,
+      });
+    }
+
+    return pairs;
+  }
+
+  /**
+   * Scores how well an OCR institution name matches a Gemini credit's
+   * institution. Higher = better match.
+   *   3 = exact match
+   *   2 = first two words match
+   *   1 = first word matches (len >= 4)
+   *   0 = no match
+   */
+  private institutionMatchScore(
+    ocrInst: string,
+    geminiInst: string,
+  ): number {
+    // Normalize: strip trailing account numbers (10+ digits) from both sides
+    const normalize = (s: string) =>
+      s.toUpperCase().replace(/\s+/g, ' ').replace(/\s*\d{10,}\s*$/, '').trim();
+
+    const a = normalize(ocrInst);
+    const b = normalize(geminiInst);
+    if (!a || !b) return 0;
+    if (a === b) return 3;
+
+    const aWords = a.split(' ');
+    const bWords = b.split(' ');
+    if (
+      aWords.length >= 2 &&
+      bWords.length >= 2 &&
+      aWords[0] === bWords[0] &&
+      aWords[1] === bWords[1]
+    )
+      return 2;
+
+    if (
+      aWords[0].length >= 4 &&
+      bWords[0].length >= 4 &&
+      aWords[0] === bWords[0]
+    )
+      return 1;
+
+    return 0;
+  }
+
+  /**
+   * Main disambiguation entry point.
+   *
+   * Matches each Gemini credit to its OCR payment pair by institution name
+   * similarity. When multiple credits share the same institution, they are
+   * matched in order (first Gemini → first OCR pair for that institution,
+   * second → second, etc.).
+   */
+  private disambiguatePaymentFields(
+    data: Record<string, unknown>,
+    ocrText: string,
+  ): void {
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(credits) || credits.length === 0 || !ocrText) return;
+
+    // ── 1. Locate DETALLE DE CRÉDITOS section ──────────────────────────
+    const upperOcr = ocrText.toUpperCase();
+    let detalleIdx = upperOcr.indexOf('DETALLE DE CRÉDITOS');
+    if (detalleIdx === -1) {
+      detalleIdx = upperOcr.indexOf('DETALLE DE CREDITOS');
+    }
+    if (detalleIdx === -1) return;
+
+    const detailOcr = ocrText.slice(detalleIdx);
+
+    // ── 2. Extract all payment pairs with institution names ────────────
+    const ocrPairs = this.extractAllPaymentPairs(detailOcr);
+    if (ocrPairs.length === 0) return;
+
+    // ── 3. Match each Gemini credit to an OCR pair ─────────────────────
+    // Track which OCR pairs have been consumed, and per-institution counters.
+    const usedPairs = new Set<number>();
+    const instCounters = new Map<string, number>();
+    let corrections = 0;
+
+    for (const credit of credits) {
+      const geminiInst = ((credit.institution as string) ?? '')
+        .toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!geminiInst) continue;
+
+      // Which occurrence of this institution are we on?
+      const instCounter = instCounters.get(geminiInst) ?? 0;
+      instCounters.set(geminiInst, instCounter + 1);
+
+      // Find the Nth best-matching OCR pair for this institution
+      let matchCount = 0;
+      let bestPairIdx = -1;
+
+      for (let i = 0; i < ocrPairs.length; i++) {
+        if (usedPairs.has(i)) continue;
+        const score = this.institutionMatchScore(
+          ocrPairs[i].institution,
+          geminiInst,
+        );
+        if (score >= 1 && matchCount === instCounter) {
+          bestPairIdx = i;
+          break;
+        }
+        if (score >= 1) matchCount++;
+      }
+
+      if (bestPairIdx === -1) continue;
+      usedPairs.add(bestPairIdx);
+
+      const ocr = ocrPairs[bestPairIdx];
+      const geminiDue = credit.paymentDueAmount as number | null;
+      const geminiLast = credit.lastPaymentAmount as number | null;
+      const instLabel =
+        (credit.institution as string) || `credit[${bestPairIdx}]`;
+
+      if (ocr.lastPayment != null && ocr.lastPayment !== geminiLast) {
+        this.logger.warn(
+          `[CreditBureau] DISAMBIGUATE lastPaymentAmount for "${instLabel}": ` +
+            `Gemini=${geminiLast} → OCR=${ocr.lastPayment}`,
+        );
+        credit.lastPaymentAmount = ocr.lastPayment;
+        corrections++;
+      }
+
+      if (ocr.paymentDue != null && ocr.paymentDue !== geminiDue) {
+        this.logger.warn(
+          `[CreditBureau] DISAMBIGUATE paymentDueAmount for "${instLabel}": ` +
+            `Gemini=${geminiDue} → OCR=${ocr.paymentDue}`,
+        );
+        credit.paymentDueAmount = ocr.paymentDue;
+        corrections++;
+      }
+    }
+
+    if (corrections > 0) {
+      this.logger.log(
+        `[CreditBureau] Payment disambiguation: ${corrections} correction(s) ` +
+          `applied across ${credits.length} credits (${ocrPairs.length} OCR pairs)`,
+      );
+    }
   }
 
   // -----------------------------------------------------------------------

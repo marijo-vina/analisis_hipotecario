@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentAiService } from './document-ai.service';
+import { OcrLayout } from './document-ai.types';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
 
@@ -229,13 +230,18 @@ export class DocumentsService {
       data: { documentStatusId: processingStatusId },
     });
 
-    // 6. Call Document AI — catch failures here
+    // 6. Call Document AI — extract text + compact layout together
+    // (Phase 5 of layout-aware-buro-extraction). extractTextWithLayout
+    // returns { ocrText, ocrLayout } from the same Document AI processor;
+    // ocrLayout powers the LayoutFinancialExtractor when the feature flag
+    // is enabled, and is stored additively alongside ocrText.
     let ocrText: string;
+    let ocrLayout: OcrLayout;
     try {
-      ocrText = await this.documentAiService.extractText(
+      ({ ocrText, ocrLayout } = await this.documentAiService.extractTextWithLayout(
         document.fileUrl,
         document.mimeType,
-      );
+      ));
     } catch (aiError) {
       this.logger.error(
         `Document AI processing failed for document ${documentId}: ${(aiError as Error).message}`,
@@ -263,6 +269,11 @@ export class DocumentsService {
         where: { id: documentId },
         data: {
           ocrText,
+          // Prisma Json fields require an index signature (InputJsonValue);
+          // `OcrLayout` is structurally valid JSON but lacks that signature.
+          // `as any` matches the established codebase convention for Json
+          // field writes (see credit-bureau-extraction.service.ts:457).
+          ocrLayout: ocrLayout as any,
           processedAt: new Date(),
           documentStatusId: processedStatusId,
         },

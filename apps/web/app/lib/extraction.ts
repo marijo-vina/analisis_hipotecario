@@ -944,7 +944,48 @@ export function parseBankStatements(
 
 // ── Credit bureau extraction parsing ─────────────────────────────────────
 
-export interface ParsedCreditBureauCredit {
+// ---------------------------------------------------------------------------
+// Layout-aware financial extraction — provenance/confidence audit fields.
+// Phase 1 of `layout-aware-buro-extraction`: pure type contracts only.
+// These mirror the API-side enums in
+// `apps/api/src/documents/document-ai.types.ts`. They are intentionally
+// inlined (not imported cross-app) because apps/web is standalone.
+// ---------------------------------------------------------------------------
+
+/** Per-field confidence of a layout-extracted financial value. */
+export enum FinancialFieldsConfidence {
+  HIGH = "HIGH",
+  MEDIUM = "MEDIUM",
+  LOW = "LOW",
+}
+
+/** Coarse origin of a credit's financial field values. */
+export enum FinancialFieldsSource {
+  LAYOUT = "LAYOUT",
+  GEMINI = "GEMINI",
+  MANUAL_REVIEW = "MANUAL_REVIEW",
+}
+
+/** Per-field confidence map keyed by the 6 financial field names. */
+export interface FinancialFieldsConfidenceMap {
+  currentBalance: FinancialFieldsConfidence;
+  creditLimit: FinancialFieldsConfidence;
+  maxCredit: FinancialFieldsConfidence;
+  lastPaymentAmount: FinancialFieldsConfidence;
+  paymentDueAmount: FinancialFieldsConfidence;
+  pastDueAmount: FinancialFieldsConfidence;
+}
+
+/** Audit metadata added to each credit after layout↔Gemini merge (Phase 4). */
+export interface CreditAuditFields {
+  financialFieldsSource: FinancialFieldsSource | null;
+  financialFieldsConfidence: FinancialFieldsConfidenceMap | null;
+  financialFieldsWarnings: string[];
+  /** Gemini's paymentDueAmount preserved for audit when layout low-confidence nulls it. */
+  candidatePaymentDueAmount: number | null;
+}
+
+export interface ParsedCreditBureauCredit extends CreditAuditFields {
   institution: string | null;
   creditType: string | null;
   classification: string;
@@ -1194,6 +1235,21 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     const hasIdentityTheft = credit.hasIdentityTheft === true;
     const hasSettlementOrDiscount = credit.hasSettlementOrDiscount === true;
 
+    // Layout-aware audit fields (Phase 1 of layout-aware-buro-extraction).
+    // Read defensively so legacy extractedData (no audit fields yet) keeps
+    // rendering: all values default to null/empty until Phase 4 wires them.
+    const ffSourceRaw = credit.financialFieldsSource as string | null | undefined;
+    const financialFieldsSource: FinancialFieldsSource | null =
+      ffSourceRaw && Object.values(FinancialFieldsSource).includes(
+        ffSourceRaw as FinancialFieldsSource,
+      )
+        ? (ffSourceRaw as FinancialFieldsSource)
+        : null;
+    const ffConfRaw = credit.financialFieldsConfidence as
+      | Partial<FinancialFieldsConfidenceMap>
+      | null
+      | undefined;
+
     credits.push({
       institution: (credit.institution as string) ?? null,
       creditType: (credit.creditType as string) ?? null,
@@ -1217,6 +1273,34 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
       isClosed,
       monthlyDebtContribution,
       rawTextReference: (credit.rawTextReference as string) ?? null,
+      // ── Layout-aware audit fields (defaults; Phase 4 populates them) ──
+      financialFieldsSource,
+      financialFieldsConfidence: ffConfRaw
+        ? {
+            currentBalance:
+              (ffConfRaw.currentBalance as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+            creditLimit:
+              (ffConfRaw.creditLimit as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+            maxCredit:
+              (ffConfRaw.maxCredit as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+            lastPaymentAmount:
+              (ffConfRaw.lastPaymentAmount as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+            paymentDueAmount:
+              (ffConfRaw.paymentDueAmount as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+            pastDueAmount:
+              (ffConfRaw.pastDueAmount as FinancialFieldsConfidence) ??
+              FinancialFieldsConfidence.LOW,
+          }
+        : null,
+      financialFieldsWarnings:
+        (credit.financialFieldsWarnings as string[]) ?? [],
+      candidatePaymentDueAmount:
+        (credit.candidatePaymentDueAmount as number) ?? null,
     });
   }
 

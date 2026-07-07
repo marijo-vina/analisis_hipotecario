@@ -74,6 +74,7 @@ describe('DocumentsService', () => {
 
   const mockDocumentAiService = {
     extractText: jest.fn(),
+    extractTextWithLayout: jest.fn(),
   };
 
   const mockGcsService = {
@@ -742,6 +743,13 @@ describe('DocumentsService', () => {
     const mimeType = 'application/pdf';
     const extractedText = 'Contenido extraído del documento';
     const now = new Date('2026-06-18T12:00:00Z');
+    // Compact OcrLayout fixture (Phase 5.1): processDocument persists this
+    // alongside ocrText when extractTextWithLayout() succeeds.
+    const mockOcrLayout = {
+      pages: [
+        { pageNumber: 1, width: 612, height: 792, lines: [], tokens: [] },
+      ],
+    };
 
     const mockDocument = {
       id: documentId,
@@ -773,6 +781,7 @@ describe('DocumentsService', () => {
       mockPrismaService.document.update.mockReset();
       mockPrismaService.document.findUnique.mockReset();
       mockDocumentAiService.extractText.mockReset();
+      mockDocumentAiService.extractTextWithLayout.mockReset();
     });
 
     afterEach(() => {
@@ -797,9 +806,13 @@ describe('DocumentsService', () => {
           documentStatusId: mockProcessedStatus.id,
           documentStatus: mockProcessedStatus,
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
         });
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       const result = await service.processDocument(caseId, documentId);
 
@@ -815,14 +828,15 @@ describe('DocumentsService', () => {
         data: { documentStatusId: mockProcessingStatus.id },
       });
 
-      // Step 3: Call Document AI
-      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+      // Step 3: Call Document AI (layout-aware — Phase 5.1)
+      expect(mockDocumentAiService.extractTextWithLayout).toHaveBeenCalledWith(gcsUri, mimeType);
 
-      // Step 4: Set PROCESSED with ocrText
+      // Step 4: Set PROCESSED with ocrText + ocrLayout
       expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(2, {
         where: { id: documentId },
         data: {
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
           documentStatusId: mockProcessedStatus.id,
         },
@@ -859,10 +873,14 @@ describe('DocumentsService', () => {
           documentStatusId: mockProcessedStatus.id,
           documentStatus: mockProcessedStatus,
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
           processingError: null,
         });
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       const result = await service.processDocument(caseId, documentId);
 
@@ -880,7 +898,7 @@ describe('DocumentsService', () => {
       await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
         'Document is already being processed',
       );
-      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+      expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
     });
 
     it('should reject PROCESSED status with 400', async () => {
@@ -893,7 +911,7 @@ describe('DocumentsService', () => {
       await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
         'Document has already been processed',
       );
-      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+      expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
     });
 
     it('should bypass PROCESSED gate when force=true and proceed to processing (Task 3.1)', async () => {
@@ -922,9 +940,13 @@ describe('DocumentsService', () => {
           documentStatusId: mockProcessedStatus.id,
           documentStatus: mockProcessedStatus,
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
         });
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       const result = await service.processDocument(caseId, documentId, true);
 
@@ -933,7 +955,7 @@ describe('DocumentsService', () => {
         where: { id: documentId },
         data: { documentStatusId: mockProcessingStatus.id },
       });
-      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+      expect(mockDocumentAiService.extractTextWithLayout).toHaveBeenCalledWith(gcsUri, mimeType);
       expect(result.documentStatus.code).toBe('PROCESSED');
       expect(result.ocrText).toBe(extractedText);
     });
@@ -948,7 +970,7 @@ describe('DocumentsService', () => {
       await expect(service.processDocument(caseId, documentId, true)).rejects.toThrow(
         'Document is already being processed',
       );
-      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+      expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
     });
 
     it('should reject PROCESSED status with 400 when force=false (Task 3.3)', async () => {
@@ -961,7 +983,7 @@ describe('DocumentsService', () => {
       await expect(service.processDocument(caseId, documentId, false)).rejects.toThrow(
         'Document has already been processed',
       );
-      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+      expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
     });
 
     it('should process UPLOADED normally with force=true (Task 3.4)', async () => {
@@ -982,9 +1004,13 @@ describe('DocumentsService', () => {
           documentStatusId: mockProcessedStatus.id,
           documentStatus: mockProcessedStatus,
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
         });
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       const result = await service.processDocument(caseId, documentId, true);
 
@@ -993,7 +1019,7 @@ describe('DocumentsService', () => {
         where: { id: documentId },
         data: { documentStatusId: mockProcessingStatus.id },
       });
-      expect(mockDocumentAiService.extractText).toHaveBeenCalledWith(gcsUri, mimeType);
+      expect(mockDocumentAiService.extractTextWithLayout).toHaveBeenCalledWith(gcsUri, mimeType);
       expect(result.documentStatus.code).toBe('PROCESSED');
       expect(result.ocrText).toBe(extractedText);
     });
@@ -1043,7 +1069,7 @@ describe('DocumentsService', () => {
       expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
     });
 
-    it('should set OCR_ERROR status and processingError when extractText() throws', async () => {
+    it('should set OCR_ERROR status and processingError when extractTextWithLayout() throws', async () => {
       mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
       mockPrismaService.documentStatus.findUnique.mockImplementation((args: { where: { code: string } }) => {
         const statusMap: Record<string, typeof mockProcessingStatus> = {
@@ -1063,7 +1089,7 @@ describe('DocumentsService', () => {
           processingError: 'gRPC timeout',
           ocrText: null,
         });
-      mockDocumentAiService.extractText.mockRejectedValue(new Error('gRPC timeout'));
+      mockDocumentAiService.extractTextWithLayout.mockRejectedValue(new Error('gRPC timeout'));
 
       await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
         BadGatewayException,
@@ -1104,10 +1130,14 @@ describe('DocumentsService', () => {
           documentStatusId: mockProcessedStatus.id,
           documentStatus: mockProcessedStatus,
           ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
           processedAt: now,
           processingError: null,
         });
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       const result = await service.processDocument(caseId, documentId);
 
@@ -1137,7 +1167,10 @@ describe('DocumentsService', () => {
       mockPrismaService.document.update
         .mockResolvedValueOnce({ ...mockDocument, documentStatusId: mockProcessingStatus.id, documentStatus: mockProcessingStatus });
 
-      mockDocumentAiService.extractText.mockResolvedValue(extractedText);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
 
       // Second update (PROCESSED) fails with unexpected error
       mockPrismaService.document.update
@@ -1156,6 +1189,173 @@ describe('DocumentsService', () => {
 
       // Verify fallback ERROR status was attempted (3 calls: PROCESSING, PROCESSED-fail, ERROR-fallback)
       expect(mockPrismaService.document.update).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  // =========================================================================
+  // Phase 5.1 — layout-aware extraction wiring (Strict TDD)
+  // processDocument() must call extractTextWithLayout() (not extractText())
+  // and persist ocrLayout alongside ocrText on the PROCESSED update.
+  // =========================================================================
+  describe('processDocument — layout-aware wiring (Phase 5.1)', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-uuid-1';
+    const gcsUri = 'gs://bucket/case-uuid-1/PAYROLL_RECEIPT/doc.pdf';
+    const mimeType = 'application/pdf';
+    const extractedText = 'Contenido extraído del documento';
+    const now = new Date('2026-06-18T12:00:00Z');
+
+    // Minimal valid OcrLayout (compact JSON shape from document-ai.types.ts).
+    const mockOcrLayout = {
+      pages: [
+        {
+          pageNumber: 1,
+          width: 612,
+          height: 792,
+          lines: [],
+          tokens: [],
+        },
+      ],
+    };
+
+    const mockDocument = {
+      id: documentId,
+      mortgageCaseId: caseId,
+      documentTypeId: 1,
+      documentStatusId: 1,
+      fileUrl: gcsUri,
+      storagePath: 'case-uuid-1/PAYROLL_RECEIPT/doc.pdf',
+      mimeType,
+      sizeBytes: 12345,
+      originalName: 'doc.pdf',
+      uploadedById: 'advisor-1',
+      ocrText: null,
+      ocrLayout: null,
+      processedAt: null,
+      processingError: null,
+      documentType: mockDocumentType,
+      documentStatus: mockDocumentStatus,
+      uploadedBy: { id: 'advisor-1', name: 'Test', email: 'test@test.com', role: 'ADVISOR' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    function setupStatusMap() {
+      mockPrismaService.documentStatus.findUnique.mockImplementation(
+        (args: { where: { code: string } }) => {
+          const statusMap: Record<string, typeof mockProcessingStatus> = {
+            PROCESSING: mockProcessingStatus,
+            PROCESSED: mockProcessedStatus,
+            ERROR: mockErrorStatus,
+            OCR_ERROR: mockOcrErrorStatus,
+          };
+          return Promise.resolve(statusMap[args.where.code] || null);
+        },
+      );
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(now);
+      mockPrismaService.document.update.mockReset();
+      mockPrismaService.document.findUnique.mockReset();
+      mockDocumentAiService.extractText.mockReset();
+      mockDocumentAiService.extractTextWithLayout.mockReset();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should call extractTextWithLayout (not extractText) with gcsUri + mimeType', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      setupStatusMap();
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({ ...mockDocument, documentStatus: mockProcessedStatus });
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
+
+      await service.processDocument(caseId, documentId);
+
+      expect(mockDocumentAiService.extractTextWithLayout).toHaveBeenCalledWith(
+        gcsUri,
+        mimeType,
+      );
+      expect(mockDocumentAiService.extractText).not.toHaveBeenCalled();
+    });
+
+    it('should persist ocrLayout alongside ocrText when saving PROCESSED', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      setupStatusMap();
+      const processedDoc = {
+        ...mockDocument,
+        documentStatusId: mockProcessedStatus.id,
+        documentStatus: mockProcessedStatus,
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+        processedAt: now,
+      };
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce(processedDoc);
+      mockDocumentAiService.extractTextWithLayout.mockResolvedValue({
+        ocrText: extractedText,
+        ocrLayout: mockOcrLayout,
+      });
+
+      const result = await service.processDocument(caseId, documentId);
+
+      // PROCESSED update must carry ocrLayout AND ocrText
+      expect(mockPrismaService.document.update).toHaveBeenNthCalledWith(2, {
+        where: { id: documentId },
+        data: {
+          ocrText: extractedText,
+          ocrLayout: mockOcrLayout,
+          processedAt: now,
+          documentStatusId: mockProcessedStatus.id,
+        },
+        include: { documentType: true, documentStatus: true, uploadedBy: true },
+      });
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe(extractedText);
+      expect(result.ocrLayout).toEqual(mockOcrLayout);
+    });
+
+    it('should NOT persist ocrLayout on the OCR_ERROR path (only processingError)', async () => {
+      mockPrismaService.document.findUnique.mockResolvedValue(mockDocument);
+      setupStatusMap();
+      mockPrismaService.document.update
+        .mockResolvedValueOnce({ ...mockDocument, documentStatus: mockProcessingStatus })
+        .mockResolvedValueOnce({
+          ...mockDocument,
+          documentStatusId: mockOcrErrorStatus.id,
+          documentStatus: mockOcrErrorStatus,
+          processingError: 'gRPC timeout',
+        });
+      mockDocumentAiService.extractTextWithLayout.mockRejectedValue(
+        new Error('gRPC timeout'),
+      );
+
+      await expect(service.processDocument(caseId, documentId)).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      // The OCR_ERROR fallback update must NOT include ocrLayout/ocrText
+      expect(mockPrismaService.document.update).toHaveBeenLastCalledWith({
+        where: { id: documentId },
+        data: expect.objectContaining({
+          processingError: 'gRPC timeout',
+          documentStatusId: mockOcrErrorStatus.id,
+        }),
+      });
+      const updateCalls = (mockPrismaService.document.update as jest.Mock).mock
+        .calls as Array<Array<{ data?: Record<string, unknown> }>>;
+      const lastCallData = updateCalls[updateCalls.length - 1][0].data as Record<string, unknown>;
+      expect(lastCallData).not.toHaveProperty('ocrLayout');
+      expect(lastCallData).not.toHaveProperty('ocrText');
     });
   });
 });

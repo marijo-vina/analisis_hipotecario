@@ -11,6 +11,7 @@ import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
+import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 
 @Module({
   imports: [PrismaModule],
@@ -26,6 +27,7 @@ import { CreditScoreExtractionService } from './credit-score-extraction.service'
     BankStatementExtractionService,
     CreditBureauExtractionService,
     CreditScoreExtractionService,
+    LayoutFinancialExtractorService,
   ],
   exports: [DocumentsService, StoragePathService],
 })

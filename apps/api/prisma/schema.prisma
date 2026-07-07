@@ -83,6 +83,10 @@ model Document {
   uploadedById     String
   uploadedBy       User           @relation(fields: [uploadedById], references: [id])
   ocrText          String?
+  /// Compact JSON of Document AI page.tokens[]/lines[] with pixel bounding
+  /// boxes, used by the layout-aware financial extractor. Nullable so the
+  /// migration is zero-downtime (existing rows keep NULL).
+  ocrLayout        Json?
   extractedData    Json?
   processedAt      DateTime?
   processingError  String?
