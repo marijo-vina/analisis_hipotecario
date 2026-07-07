@@ -1,10 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import {
   CreditBureauExtractionService,
   CreditBureauExtractionResult,
 } from './credit-bureau-extraction.service';
+import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import {
+  FinancialFieldsConfidence,
+  FinancialFieldsConfidenceMap,
+  FinancialFieldsSource,
+  LayoutCreditField,
+  LayoutFinancialResult,
+  OcrLayout,
+} from './document-ai.types';
 
 // ---------------------------------------------------------------------------
 // Helpers — mock document builder
@@ -17,6 +27,7 @@ interface MockDocument {
   documentStatus: { id: number; code: string; name: string; order: number };
   ocrText: string | null;
   extractedData: unknown | null;
+  ocrLayout?: OcrLayout | null;
 }
 
 const makeDocument = (
@@ -81,6 +92,7 @@ const createMockExtractionResult = (
   credits: [
     {
       institution: 'BBVA',
+      accountNumber: '1234567890',
       creditType: 'TARJETA DE CREDITO',
       classification: 'REVOLVING',
       status: 'ACTIVE',
@@ -142,6 +154,8 @@ describe('CreditBureauExtractionService', () => {
     documentStatus: { findUnique: jest.Mock };
   };
   let mockGemini: { extractStructuredData: jest.Mock };
+  let mockConfig: { get: jest.Mock };
+  let mockLayoutExtractor: { extract: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -174,11 +188,27 @@ describe('CreditBureauExtractionService', () => {
 
     mockGemini = { extractStructuredData: jest.fn() };
 
+    // USE_LAYOUT_EXTRACTION defaults to false so existing tests behave
+    // exactly as before the layout-aware feature was introduced.
+    mockConfig = {
+      get: jest.fn((key: string) => {
+        if (key === 'USE_LAYOUT_EXTRACTION') return 'false';
+        return undefined;
+      }),
+    };
+
+    mockLayoutExtractor = { extract: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CreditBureauExtractionService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GeminiService, useValue: mockGemini },
+        { provide: ConfigService, useValue: mockConfig },
+        {
+          provide: LayoutFinancialExtractorService,
+          useValue: mockLayoutExtractor,
+        },
       ],
     }).compile();
 
@@ -1476,6 +1506,506 @@ describe('CreditBureauExtractionService', () => {
       expect(
         result.alerts.some((a) => a.code === 'BURO_MINOR_DELINQUENCY'),
       ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Phase 4: mergeLayoutWithGemini() — authority hierarchy + audit fields +
+  // USE_LAYOUT_EXTRACTION feature flag.
+  //
+  // The merge runs inside extract() ONLY when:
+  //   • USE_LAYOUT_EXTRACTION env var is set to 'true', AND
+  //   • document.ocrLayout is non-null.
+  // We exercise it by flipping the ConfigService mock per-test and stubbing
+  // LayoutFinancialExtractorService.extract() with a controlled
+  // LayoutFinancialResult; we then assert on the persisted extractedData.
+  // =========================================================================
+
+  describe('extract — feature flag USE_LAYOUT_EXTRACTION', () => {
+    const ocrLayout: OcrLayout = { pages: [] };
+
+    function buildLayoutResult(
+      credits: LayoutCreditField[],
+      confidence: FinancialFieldsConfidenceMap[],
+    ): LayoutFinancialResult {
+      return { credits, confidence, warnings: [] };
+    }
+
+    function makeConfidence(
+      overrides: Partial<FinancialFieldsConfidenceMap> = {},
+    ): FinancialFieldsConfidenceMap {
+      return {
+        currentBalance: FinancialFieldsConfidence.LOW,
+        creditLimit: FinancialFieldsConfidence.LOW,
+        maxCredit: FinancialFieldsConfidence.LOW,
+        lastPaymentAmount: FinancialFieldsConfidence.LOW,
+        paymentDueAmount: FinancialFieldsConfidence.LOW,
+        pastDueAmount: FinancialFieldsConfidence.LOW,
+        ...overrides,
+      };
+    }
+
+    function buildLayoutCredit(
+      overrides: Omit<Partial<LayoutCreditField>, 'fields'> & {
+        fields?: Partial<LayoutCreditField['fields']>;
+      } = {},
+    ): LayoutCreditField {
+      const baseFields: LayoutCreditField['fields'] = {
+        currentBalance: null,
+        creditLimit: null,
+        maxCredit: null,
+        lastPaymentAmount: null,
+        paymentDueAmount: null,
+        pastDueAmount: null,
+      };
+      return {
+        accountNumber: overrides.accountNumber ?? '1234567890',
+        institution: overrides.institution ?? 'BBVA',
+        orderInBlock: overrides.orderInBlock ?? 0,
+        subsection: overrides.subsection ?? null,
+        fields: {
+          currentBalance: null,
+          creditLimit: null,
+          maxCredit: null,
+          lastPaymentAmount: null,
+          paymentDueAmount: null,
+          pastDueAmount: null,
+          ...(overrides.fields ?? {}),
+        },
+      };
+    }
+
+    it('skips layout merge when flag=false (preserves Gemini-only flow)', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'false' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult([], []),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const credits = ed.credits as Record<string, unknown>[];
+
+      // flag off → layout extractor never invoked and NO audit fields set
+      expect(mockLayoutExtractor.extract).not.toHaveBeenCalled();
+      expect(credits[0].financialFieldsSource).toBeUndefined();
+    });
+
+    it('skips layout merge when ocrLayout is null even if flag=true', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout: null }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      await service.extract('case-1', 'doc-buro-1');
+
+      expect(mockLayoutExtractor.extract).not.toHaveBeenCalled();
+    });
+
+    it('LAYOUT HIGH confidence overrides Gemini value, source=LAYOUT', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].paymentDueAmount).toBe(8775); // LAYOUT won
+      expect(credits[0].financialFieldsSource).toBe(
+        FinancialFieldsSource.LAYOUT,
+      );
+      // Gemini value archived as candidate for audit
+      expect(credits[0].candidatePaymentDueAmount).toBe(2000);
+      const conf = credits[0]
+        .financialFieldsConfidence as FinancialFieldsConfidenceMap;
+      expect(conf.paymentDueAmount).toBe(FinancialFieldsConfidence.HIGH);
+      expect(
+        (credits[0].financialFieldsWarnings as string[]).length,
+      ).toBe(0);
+      // monthlyDebtContribution follows the corrected paymentDueAmount
+      expect(credits[0].monthlyDebtContribution).toBe(8775);
+    });
+
+    it('LAYOUT MEDIUM confidence overrides Gemini, monthlyDebtContribution uses overridden value', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: 1875 },
+            }),
+          ],
+          [
+            makeConfidence({
+              paymentDueAmount: FinancialFieldsConfidence.MEDIUM,
+            }),
+          ],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].paymentDueAmount).toBe(1875); // LAYOUT MEDIUM won
+      expect(credits[0].monthlyDebtContribution).toBe(1875);
+      expect(credits[0].financialFieldsSource).toBe(
+        FinancialFieldsSource.LAYOUT,
+      );
+      expect(credits[0].candidatePaymentDueAmount).toBe(2000);
+      const conf = credits[0]
+        .financialFieldsConfidence as FinancialFieldsConfidenceMap;
+      expect(conf.paymentDueAmount).toBe(FinancialFieldsConfidence.MEDIUM);
+    });
+
+    it('LAYOUT LOW on paymentDueAmount → null + candidatePaymentDueAmount + MANUAL_REVIEW + monthlyDebtContribution null', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: null },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.LOW })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // CRITICAL: paymentDueAmount MUST NOT fall back to Gemini or lastPayment
+      expect(credits[0].paymentDueAmount).toBeNull();
+      expect(credits[0].candidatePaymentDueAmount).toBe(2000);
+      expect(credits[0].needsManualReview).toBe(true);
+      expect(credits[0].financialFieldsSource).toBe(
+        FinancialFieldsSource.MANUAL_REVIEW,
+      );
+      // monthlyDebtContribution MUST be null (do not feed null paymentDue)
+      expect(credits[0].monthlyDebtContribution).toBeNull();
+      const conf = credits[0]
+        .financialFieldsConfidence as FinancialFieldsConfidenceMap;
+      expect(conf.paymentDueAmount).toBe(FinancialFieldsConfidence.LOW);
+      const warnings = credits[0].financialFieldsWarnings as string[];
+      expect(
+        warnings.some((w) =>
+          w.includes('paymentDueAmount'),
+        ),
+      ).toBe(true);
+    });
+
+    it('does NOT fall back to lastPaymentAmount when paymentDueAmount is LOW', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Gemini returned both payment and lastPayment non-zero with lastPayment
+      // equal to a plausible due amount — exactly the misclassification case
+      // that motivated layout authority. Layout marks paymentDueAmount LOW.
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: null, lastPaymentAmount: 49800 },
+            }),
+          ],
+          [
+            makeConfidence({
+              paymentDueAmount: FinancialFieldsConfidence.LOW,
+              lastPaymentAmount: FinancialFieldsConfidence.HIGH,
+            }),
+          ],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            credits: [
+              {
+                institution: 'BBVA',
+                creditType: 'TARJETA',
+                classification: 'REVOLVING',
+                status: 'ACTIVE',
+                currentBalance: 73881,
+                paymentDueAmount: 49800, // ← Gemini mistaken value
+                lastPaymentAmount: 49800,
+                creditLimit: null,
+                currency: 'MXN',
+                paymentHistory: '111000',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+            ],
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // paymentDueAmount never equals Gemini's 49800 and never equals
+      // lastPaymentAmount either (lastPayment is HIGH authority, so it gets
+      // the layout value 49800, but paymentDue stays null)
+      expect(credits[0].paymentDueAmount).toBeNull();
+      expect(credits[0].lastPaymentAmount).toBe(49800);
+      expect(credits[0].candidatePaymentDueAmount).toBe(49800);
+      expect(credits[0].monthlyDebtContribution).toBeNull();
+    });
+
+    it('no layout match → MANUAL_REVIEW, paymentDueAmount nulled, Gemini value archived as candidate', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Layout returns a credit at a different institution (no match).
+      // Two Gemini credits: the first claims the layout slot by orderInBlock
+      // (BBVA/1234567890), the second (OTHER/9999) has NO layout match.
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            credits: [
+              {
+                institution: 'BBVA',
+                creditType: 'TARJETA',
+                classification: 'REVOLVING',
+                status: 'ACTIVE',
+                currentBalance: 73881,
+                paymentDueAmount: 8475,
+                lastPaymentAmount: 1000,
+                creditLimit: 150000,
+                currency: 'MXN',
+                paymentHistory: '111000',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+              {
+                institution: 'OTHER_BANK',
+                accountNumber: '9999',
+                creditType: 'PERSONAL',
+                classification: 'FIXED_PAYMENT',
+                status: 'ACTIVE',
+                currentBalance: 50000,
+                paymentDueAmount: 2000,
+                lastPaymentAmount: 500,
+                creditLimit: null,
+                currency: 'MXN',
+                paymentHistory: '111000',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+            ],
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // Credit[0] (BBVA) matched layout → layout value 8775 wins
+      expect(credits[0].paymentDueAmount).toBe(8775);
+      expect(credits[0].financialFieldsSource).toBe(FinancialFieldsSource.LAYOUT);
+
+      // Credit[1] (OTHER_BANK/9999) had NO layout match → MANUAL_REVIEW
+      expect(credits[1].paymentDueAmount).toBeNull();
+      expect(credits[1].candidatePaymentDueAmount).toBe(2000);
+      expect(credits[1].needsManualReview).toBe(true);
+      expect(credits[1].financialFieldsSource).toBe(
+        FinancialFieldsSource.MANUAL_REVIEW,
+      );
+      expect(credits[1].monthlyDebtContribution).toBeNull();
+    });
+
+    it('fallback match by institution-only warns in financialFieldsWarnings', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Layout credit has NO accountNumber → merge must use institution order
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: null,
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            credits: [
+              {
+                institution: 'BBVA',
+                creditType: 'TARJETA',
+                classification: 'REVOLVING',
+                status: 'ACTIVE',
+                currentBalance: 73881,
+                paymentDueAmount: 8475, // Gemini mistake (layout corrects)
+                lastPaymentAmount: 1000,
+                creditLimit: 150000,
+                currency: 'MXN',
+                paymentHistory: '111000',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+            ],
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].paymentDueAmount).toBe(8775);
+      expect(credits[0].financialFieldsSource).toBe(
+        FinancialFieldsSource.LAYOUT,
+      );
+      const warnings = credits[0].financialFieldsWarnings as string[];
+      expect(
+        warnings.some((w) =>
+          w.toLowerCase().includes('fallback'),
+        ),
+      ).toBe(true);
+    });
+
+    it('preserves Gemini raw data fields (institution/creditType/status) — layout only overrides financial fields', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Layout "institution" should NOT overwrite Gemini's institution string
+      // — only financial fields merge.
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '1234567890',
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].institution).toBe('BBVA'); // Gemini's string kept
+      expect(credits[0].paymentDueAmount).toBe(8775); // layout financial overrode
     });
   });
 });
