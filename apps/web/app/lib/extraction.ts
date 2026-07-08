@@ -976,6 +976,23 @@ export interface FinancialFieldsConfidenceMap {
   pastDueAmount: FinancialFieldsConfidence;
 }
 
+/**
+ * Provenance of a credit's `paymentDueAmount` value (inlined mirror of the
+ * API-side enum in `apps/api/src/documents/document-ai.types.ts`).
+ */
+export enum PaymentDueAmountSource {
+  UNCONFIRMED = "UNCONFIRMED",
+  CONFIRMED_AUTO = "CONFIRMED_AUTO",
+  MANUAL = "MANUAL",
+}
+
+/** Guardrail fields persisted per credit on the JSONB payload. */
+export interface PaymentDueGuardrailFields {
+  paymentDueAmountSource: PaymentDueAmountSource;
+  paymentDueAmountConfirmed: boolean;
+  paymentDueAmountManualOverride: number | null;
+}
+
 /** Audit metadata added to each credit after layout↔Gemini merge (Phase 4). */
 export interface CreditAuditFields {
   financialFieldsSource: FinancialFieldsSource | null;
@@ -983,9 +1000,11 @@ export interface CreditAuditFields {
   financialFieldsWarnings: string[];
   /** Gemini's paymentDueAmount preserved for audit when layout low-confidence nulls it. */
   candidatePaymentDueAmount: number | null;
+  /** True when the backend flagged this credit for human review. */
+  needsManualReview: boolean;
 }
 
-export interface ParsedCreditBureauCredit extends CreditAuditFields {
+export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueGuardrailFields {
   institution: string | null;
   creditType: string | null;
   classification: string;
@@ -1228,6 +1247,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     // Backward-compat: amountToPay falls back to paymentDueAmount for old data
     const amountToPay = paymentDueAmount ?? ((credit.amountToPay as number) ?? null);
     const isClosed = credit.isClosed === true || status === "CLOSED";
+    const needsManualReview = credit.needsManualReview === true;
     const monthlyDebtContribution =
       (credit.monthlyDebtContribution as number) ??
       (isClosed ? 0 : paymentDueAmount) ??
@@ -1301,6 +1321,15 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
         (credit.financialFieldsWarnings as string[]) ?? [],
       candidatePaymentDueAmount:
         (credit.candidatePaymentDueAmount as number) ?? null,
+      needsManualReview,
+      // ── Payment due guardrail fields (Sprint 3 prep) ──
+      paymentDueAmountSource:
+        (credit.paymentDueAmountSource as PaymentDueAmountSource) ??
+        PaymentDueAmountSource.UNCONFIRMED,
+      paymentDueAmountConfirmed:
+        credit.paymentDueAmountConfirmed === true,
+      paymentDueAmountManualOverride:
+        (credit.paymentDueAmountManualOverride as number) ?? null,
     });
   }
 
