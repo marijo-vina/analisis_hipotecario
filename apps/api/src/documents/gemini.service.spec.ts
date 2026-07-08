@@ -246,7 +246,7 @@ describe('GeminiService', () => {
           generationConfig: expect.objectContaining({
             responseMimeType: 'application/json',
             temperature: 0.1,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 16384,
           }),
         }),
       );
