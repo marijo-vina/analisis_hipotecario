@@ -981,9 +981,18 @@ export interface FinancialFieldsConfidenceMap {
  * API-side enum in `apps/api/src/documents/document-ai.types.ts`).
  */
 export enum PaymentDueAmountSource {
+  LAYOUT = "LAYOUT",
+  GEMINI = "GEMINI",
   UNCONFIRMED = "UNCONFIRMED",
   CONFIRMED_AUTO = "CONFIRMED_AUTO",
   MANUAL = "MANUAL",
+}
+
+/** Triple-field pattern for paymentDueAmount — mirrors API types. */
+export interface PaymentDueAmountTriple {
+  paymentDueAmountExtracted: number | null;
+  paymentDueAmountManual: number | null;
+  paymentDueAmountEffective: number | null;
 }
 
 /** Guardrail fields persisted per credit on the JSONB payload. */
@@ -1004,7 +1013,7 @@ export interface CreditAuditFields {
   needsManualReview: boolean;
 }
 
-export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueGuardrailFields {
+export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueGuardrailFields, PaymentDueAmountTriple {
   institution: string | null;
   creditType: string | null;
   classification: string;
@@ -1071,6 +1080,11 @@ export interface ParsedCreditBureau {
   scoreSource: string | null;
   consultationDate: string | null;
   numberOfInquiries: number | null;
+  /** Manual override for inquiries — analyst-captured value. */
+  inquiries24mExtracted: number | null;
+  inquiries24mManual: number | null;
+  inquiries24mEffective: number | null;
+  inquiries24mConfirmed: boolean;
 
   credits: ParsedCreditBureauCredit[];
 
@@ -1122,6 +1136,10 @@ function emptyBuro(doc: Document): ParsedCreditBureau {
     scoreSource: null,
     consultationDate: null,
     numberOfInquiries: null,
+    inquiries24mExtracted: null,
+    inquiries24mManual: null,
+    inquiries24mEffective: null,
+    inquiries24mConfirmed: false,
     credits: [],
     riskSummary: null,
     alerts: [],
@@ -1330,6 +1348,19 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
         credit.paymentDueAmountConfirmed === true,
       paymentDueAmountManualOverride:
         (credit.paymentDueAmountManualOverride as number) ?? null,
+      // ── Triple-field pattern (Sprint 3 manual validation) ──
+      paymentDueAmountExtracted:
+        (credit.paymentDueAmountExtracted as number) ?? paymentDueAmount,
+      paymentDueAmountManual:
+        (credit.paymentDueAmountManual as number) ?? null,
+      // Effective = manual ?? (confirmed ? extracted : null)
+      paymentDueAmountEffective: (() => {
+        const manual = (credit.paymentDueAmountManual as number) ?? null;
+        if (manual !== null) return manual;
+        const confirmed = credit.paymentDueAmountConfirmed === true;
+        if (confirmed) return (credit.paymentDueAmountExtracted as number) ?? paymentDueAmount;
+        return null;
+      })(),
     });
   }
 
@@ -1400,6 +1431,12 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     scoreSource,
     consultationDate,
     numberOfInquiries,
+    inquiries24mExtracted: numberOfInquiries,
+    inquiries24mManual: (ed.inquiries24mManual as number) ?? null,
+    inquiries24mEffective:
+      (ed.inquiries24mManual as number) ??
+      ((ed.inquiries24mConfirmed === true) ? numberOfInquiries : null),
+    inquiries24mConfirmed: ed.inquiries24mConfirmed === true,
     credits,
     riskSummary,
     alerts,
