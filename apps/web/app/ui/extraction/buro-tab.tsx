@@ -427,9 +427,11 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
     ? "bg-red-50/60"
     : isWarning
       ? "bg-amber-50/40"
-      : isClosed
-        ? "bg-slate-50/50"
-        : "";
+      : credit.needsManualReview
+        ? "bg-amber-50/30"
+        : isClosed
+          ? "bg-slate-50/50"
+          : "";
 
   const rowOpacity = isClosed ? "opacity-60" : "";
 
@@ -491,7 +493,24 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
 
       {/* Monto a pagar (solo paymentDueAmount, nunca lastPaymentAmount) */}
       <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
-        {credit.isClosed ? "—" : formatMxn(credit.paymentDueAmount)}
+        {credit.isClosed ? (
+          "—"
+        ) : credit.needsManualReview ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-amber-600 font-semibold" title="Requiere revisión">
+              ⚠️ {formatMxn(credit.paymentDueAmount) ?? "—"}
+            </span>
+            <span className="text-[10px] text-amber-700 bg-amber-50 px-1 rounded">
+              Revisar
+            </span>
+          </span>
+        ) : credit.paymentDueAmountSource === "UNCONFIRMED" && credit.paymentDueAmount == null ? (
+          <span className="text-red-500 text-[11px]" title="Monto a pagar no confirmado">
+            No confirmado
+          </span>
+        ) : (
+          formatMxn(credit.paymentDueAmount)
+        )}
       </td>
 
       {/* Límite */}

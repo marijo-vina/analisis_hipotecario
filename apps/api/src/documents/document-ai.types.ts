@@ -185,3 +185,31 @@ export interface CreditAuditFields {
 
 /** Financial field names that carry per-field confidence. */
 export type FinancialFieldName = keyof LayoutFinancialFields;
+
+// ---------------------------------------------------------------------------
+// Payment Due Amount guardrail — source tracking + manual override
+// ---------------------------------------------------------------------------
+
+/**
+ * Provenance of a credit's `paymentDueAmount` value.
+ * - UNCONFIRMED  : layout LOW/no-match OR Gemini-only path — amount is
+ *                  unreliable and MUST NOT feed `monthlyDebtContribution`.
+ * - CONFIRMED_AUTO: layout HIGH/MEDIUM confirmed the auto-extracted amount.
+ * - MANUAL       : an analyst confirmed or overrode the amount via PATCH.
+ */
+export enum PaymentDueAmountSource {
+  UNCONFIRMED = 'UNCONFIRMED',
+  CONFIRMED_AUTO = 'CONFIRMED_AUTO',
+  MANUAL = 'MANUAL',
+}
+
+/**
+ * Guardrail fields persisted on each credit alongside the audit fields.
+ * These control whether `paymentDueAmount` is allowed to contribute to
+ * `monthlyDebtContribution` aggregation.
+ */
+export interface PaymentDueGuardrailFields {
+  paymentDueAmountSource: PaymentDueAmountSource;
+  paymentDueAmountConfirmed: boolean;
+  paymentDueAmountManualOverride: number | null;
+}

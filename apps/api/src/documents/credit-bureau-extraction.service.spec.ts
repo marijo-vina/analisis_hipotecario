@@ -1251,7 +1251,10 @@ describe('CreditBureauExtractionService', () => {
       const ed = result.extractedData as Record<string, unknown>;
       const credits = ed.credits as Record<string, unknown>[];
       expect(credits[0].isClosed).toBe(false);
-      expect(credits[0].monthlyDebtContribution).toBe(2500);
+      // Guardrail: Gemini-only path defaults to UNCONFIRMED, blocking
+      // monthlyDebtContribution until analyst confirms the amount.
+      expect(credits[0].paymentDueAmountSource).toBe('UNCONFIRMED');
+      expect(credits[0].monthlyDebtContribution).toBeNull();
     });
   });
 

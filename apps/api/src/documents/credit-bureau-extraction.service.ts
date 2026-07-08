@@ -1286,6 +1286,7 @@ export class CreditBureauExtractionService {
         credit.paymentDueAmount = null;
         credit.candidatePaymentDueAmount = geminiDue;
         credit.needsManualReview = true;
+        credit.paymentDueAmountSource = 'UNCONFIRMED';
         CreditBureauExtractionService.attachAuditFields(
           credit,
           FinancialFieldsSource.MANUAL_REVIEW,
@@ -1337,6 +1338,7 @@ export class CreditBureauExtractionService {
             credit.paymentDueAmount = null;
             credit.candidatePaymentDueAmount = geminiDue;
             credit.needsManualReview = true;
+            credit.paymentDueAmountSource = 'UNCONFIRMED';
             criticalNeedsManualReview = true;
           }
           // For non-critical LOW fields: keep the Gemini value untouched.
@@ -1351,6 +1353,7 @@ export class CreditBureauExtractionService {
           fieldConfidence.paymentDueAmount === FinancialFieldsConfidence.MEDIUM)
       ) {
         credit.candidatePaymentDueAmount = geminiDue;
+        credit.paymentDueAmountSource = 'CONFIRMED_AUTO';
       }
 
       // 5. Decide the coarse financialFieldsSource value.
@@ -1540,26 +1543,30 @@ export class CreditBureauExtractionService {
         // ── isClosed + monthlyDebtContribution (CLS-001/002/003/004) ──────────
         //
         // Layout-aware rule: only feed paymentDueAmount into the
-        // monthly debt computation when its confidence is NOT LOW. When the
-        // layout extractor could not confirm paymentDueAmount (LOW), the
-        // merge step already set it to null; here we additionally null
-        // monthlyDebtContribution and emit an audit warning so the analyst
-        // understands the contribution is intentionally missing (not zero).
+        // ── Payment Due Guardrail (Sprint 3 prep) ──────────────────────
+        // Default source for credits that didn't go through layout merge
+        // (Gemini-only path, or legacy extractions): treat as UNCONFIRMED.
+        if (!credit.paymentDueAmountSource) {
+          credit.paymentDueAmountSource = 'UNCONFIRMED';
+        }
+
+        // monthly debt computation: only CONFIRMED_AUTO or MANUAL amounts
+        // are allowed to contribute. UNCONFIRMED and needsManualReview
+        // credits are blocked — the analyst must confirm/override first.
         credit.isClosed = credit.status === 'CLOSED';
         if (credit.isClosed) {
           credit.monthlyDebtContribution = 0;
         } else if (credit.status === 'ACTIVE') {
-          const conf = (credit.financialFieldsConfidence ??
-            null) as FinancialFieldsConfidenceMap | null;
-          if (
-            conf &&
-            conf.paymentDueAmount === FinancialFieldsConfidence.LOW
-          ) {
-            // Layout LOW: do NOT compute the contribution — null + warning.
+          const source = credit.paymentDueAmountSource as string;
+          const needsReview = credit.needsManualReview === true;
+
+          if (source === 'UNCONFIRMED' || needsReview) {
+            // Guardrail: block unconfirmed amounts from liability calc.
             credit.monthlyDebtContribution = null;
             const warnings = (credit.financialFieldsWarnings as string[]) ?? [];
-            const WARNING =
-              'monthlyDebtContribution set to null (paymentDueAmount LOW confidence).';
+            const WARNING = needsReview
+              ? 'monthlyDebtContribution set to null (needsManualReview).'
+              : 'monthlyDebtContribution set to null (paymentDueAmountSource=UNCONFIRMED).';
             if (!warnings.includes(WARNING)) warnings.push(WARNING);
             credit.financialFieldsWarnings = warnings;
           } else {
@@ -2230,6 +2237,75 @@ export class CreditBureauExtractionService {
       const tr = map[a.message];
       return tr ? { ...a, message: tr } : a;
     });
+  }
+
+  /**
+   * Allows an analyst to confirm or manually override a credit's
+   * `paymentDueAmount`. Reads the document, updates the specified credit
+   * index in `extractedData.credits[]`, recalculates
+   * `monthlyDebtContribution`, and persists.
+   *
+   * Called by `PATCH /documents/:id/credits/:index/payment-due`.
+   */
+  async updatePaymentDue(
+    documentId: string,
+    creditIndex: number,
+    body: { paymentDueAmountManualOverride?: number; paymentDueAmountConfirmed?: boolean },
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc || !doc.extractedData) {
+      throw new Error('Document not found or has no extracted data');
+    }
+
+    const data = doc.extractedData as Record<string, unknown>;
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!credits || creditIndex < 0 || creditIndex >= credits.length) {
+      throw new Error(`Credit index ${creditIndex} out of bounds (0-${(credits?.length ?? 0) - 1})`);
+    }
+
+    const credit = credits[creditIndex];
+
+    if (body.paymentDueAmountManualOverride !== undefined) {
+      credit.paymentDueAmount = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountManualOverride = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountSource = 'MANUAL';
+      credit.paymentDueAmountConfirmed = true;
+      credit.needsManualReview = false;
+    } else if (body.paymentDueAmountConfirmed === true) {
+      credit.paymentDueAmountConfirmed = true;
+      // Don't change source — leave as CONFIRMED_AUTO if it was already set,
+      // only upgrade UNCONFIRMED → CONFIRMED_AUTO when confirming.
+      if (credit.paymentDueAmountSource === 'UNCONFIRMED') {
+        credit.paymentDueAmountSource = 'CONFIRMED_AUTO';
+      }
+      credit.needsManualReview = false;
+    }
+
+    // Recalculate monthlyDebtContribution for this credit
+    const status = credit.status as string;
+    const isClosed = status === 'CLOSED';
+    if (isClosed) {
+      credit.monthlyDebtContribution = 0;
+    } else if (status === 'ACTIVE') {
+      const source = credit.paymentDueAmountSource as string;
+      if (source === 'UNCONFIRMED') {
+        credit.monthlyDebtContribution = null;
+      } else {
+        credit.monthlyDebtContribution =
+          (credit.paymentDueAmount as number | null) ?? null;
+      }
+    } else {
+      credit.monthlyDebtContribution = null;
+    }
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data as any },
+    });
+
+    return { creditIndex, credit };
   }
 
 }
