@@ -295,6 +295,70 @@ export async function extractCreditBureau(
 }
 
 /**
+ * Actualiza manualmente el "Monto a pagar" de un crédito específico dentro
+ * de un reporte de Buró de Crédito extraído.
+ *
+ * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/credits/:creditIndex/payment-due`
+ * del backend NestJS. El override manual establece `paymentDueAmountSource = MANUAL`
+ * y recalcula `monthlyDebtContribution`.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function updatePaymentDueManual(
+  caseId: string,
+  documentId: string,
+  creditIndex: number,
+  paymentDueAmountManualOverride: number | null,
+): Promise<{ success: boolean }> {
+  const result = await apiFetch(
+    `/mortgage-cases/${caseId}/documents/${documentId}/credits/${creditIndex}/payment-due`,
+    {
+      method: "PATCH",
+      body: { paymentDueAmountManualOverride },
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al actualizar el monto a pagar",
+    );
+  }
+
+  return { success: true };
+}
+
+/**
+ * Actualiza manualmente el valor de "Consultas 24 meses" de un reporte
+ * de Buró de Crédito extraído.
+ *
+ * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/inquiries`
+ * del backend NestJS.
+ *
+ * @throws {Error} si el backend responde con error o hay fallo de red.
+ */
+export async function updateInquiries24mManual(
+  caseId: string,
+  documentId: string,
+  inquiries24mManual: number | null,
+): Promise<{ success: boolean }> {
+  const result = await apiFetch(
+    `/mortgage-cases/${caseId}/documents/${documentId}/inquiries`,
+    {
+      method: "PATCH",
+      body: { inquiries24mManual },
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al actualizar consultas 24 meses",
+    );
+  }
+
+  return { success: true };
+}
+
+/**
  * Extrae el score crediticio de un documento "Mi Score"
  * usando Gemini AI.
  *

@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -184,6 +185,50 @@ export class DocumentsController {
     const data = await this.creditBureauExtractionService.extract(
       caseId,
       documentId,
+    );
+    return { data };
+  }
+
+  /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/credits/:creditIndex/payment-due
+   *
+   * Allows an analyst to confirm or manually override the `paymentDueAmount`
+   * of a single credit within an extracted bureau report. The override
+   * sets `paymentDueAmountSource = MANUAL` and recalculates
+   * `monthlyDebtContribution` for that credit.
+   */
+  @Patch(':documentId/credits/:creditIndex/payment-due')
+  @HttpCode(200)
+  async updatePaymentDue(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Param('creditIndex', ParseIntPipe) creditIndex: number,
+    @Body() body: { paymentDueAmountManualOverride?: number; paymentDueAmountConfirmed?: boolean },
+  ) {
+    const data = await this.creditBureauExtractionService.updatePaymentDue(
+      documentId,
+      creditIndex,
+      body,
+    );
+    return { data };
+  }
+
+  /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/inquiries
+   *
+   * Allows an analyst to manually set or confirm the "Consultas 24 meses"
+   * value extracted from the bureau report.
+   */
+  @Patch(':documentId/inquiries')
+  @HttpCode(200)
+  async updateInquiries(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Body() body: { inquiries24mManual?: number; inquiries24mConfirmed?: boolean },
+  ) {
+    const data = await this.creditBureauExtractionService.updateInquiries24m(
+      documentId,
+      body,
     );
     return { data };
   }
