@@ -1353,7 +1353,8 @@ export class CreditBureauExtractionService {
           fieldConfidence.paymentDueAmount === FinancialFieldsConfidence.MEDIUM)
       ) {
         credit.candidatePaymentDueAmount = geminiDue;
-        credit.paymentDueAmountSource = 'CONFIRMED_AUTO';
+        credit.paymentDueAmountSource = 'LAYOUT';
+        credit.paymentDueAmountConfirmed = true;
       }
 
       // 5. Decide the coarse financialFieldsSource value.
@@ -1544,35 +1545,38 @@ export class CreditBureauExtractionService {
         //
         // Layout-aware rule: only feed paymentDueAmount into the
         // ── Payment Due Guardrail (Sprint 3 prep) ──────────────────────
+        // ── Triple-field: freeze extracted, compute effective ──────────
+        // paymentDueAmountExtracted is set ONCE (immutable). If already
+        // present from a prior extraction, keep it — re-extraction must
+        // not overwrite a value the analyst may have relied on.
+        if (credit.paymentDueAmountExtracted === undefined) {
+          credit.paymentDueAmountExtracted =
+            (credit.paymentDueAmount as number | null) ?? null;
+        }
+        // Default manual if not set
+        if (credit.paymentDueAmountManual === undefined) {
+          credit.paymentDueAmountManual = null;
+        }
+        // Effective = manual ?? (confirmed ? extracted : null)
+        const manual = credit.paymentDueAmountManual as number | null;
+        const extracted = credit.paymentDueAmountExtracted as number | null;
+        const confirmed = credit.paymentDueAmountConfirmed === true;
+        credit.paymentDueAmountEffective =
+          manual ?? (confirmed ? extracted : null);
+
         // Default source for credits that didn't go through layout merge
-        // (Gemini-only path, or legacy extractions): treat as UNCONFIRMED.
         if (!credit.paymentDueAmountSource) {
           credit.paymentDueAmountSource = 'UNCONFIRMED';
         }
 
-        // monthly debt computation: only CONFIRMED_AUTO or MANUAL amounts
-        // are allowed to contribute. UNCONFIRMED and needsManualReview
-        // credits are blocked — the analyst must confirm/override first.
+        // ── monthly debt computation ────────────────────────────────────
+        // Uses effective exclusively. UNCONFIRMED / needsManualReview
+        // credits have effective=null → monthlyDebtContrib=null.
         credit.isClosed = credit.status === 'CLOSED';
         if (credit.isClosed) {
           credit.monthlyDebtContribution = 0;
         } else if (credit.status === 'ACTIVE') {
-          const source = credit.paymentDueAmountSource as string;
-          const needsReview = credit.needsManualReview === true;
-
-          if (source === 'UNCONFIRMED' || needsReview) {
-            // Guardrail: block unconfirmed amounts from liability calc.
-            credit.monthlyDebtContribution = null;
-            const warnings = (credit.financialFieldsWarnings as string[]) ?? [];
-            const WARNING = needsReview
-              ? 'monthlyDebtContribution set to null (needsManualReview).'
-              : 'monthlyDebtContribution set to null (paymentDueAmountSource=UNCONFIRMED).';
-            if (!warnings.includes(WARNING)) warnings.push(WARNING);
-            credit.financialFieldsWarnings = warnings;
-          } else {
-            credit.monthlyDebtContribution =
-              (credit.paymentDueAmount as number | null) ?? null;
-          }
+          credit.monthlyDebtContribution = credit.paymentDueAmountEffective;
         } else {
           credit.monthlyDebtContribution = null;
         }
@@ -2267,35 +2271,42 @@ export class CreditBureauExtractionService {
 
     const credit = credits[creditIndex];
 
+    // ── Freeze extracted on first write ──────────────────────────────────
+    if (credit.paymentDueAmountExtracted === undefined) {
+      credit.paymentDueAmountExtracted =
+        (credit.paymentDueAmount as number | null) ?? null;
+    }
+
     if (body.paymentDueAmountManualOverride !== undefined) {
+      // Manual override: set the triple fields
       credit.paymentDueAmount = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountManual = body.paymentDueAmountManualOverride;
       credit.paymentDueAmountManualOverride = body.paymentDueAmountManualOverride;
       credit.paymentDueAmountSource = 'MANUAL';
       credit.paymentDueAmountConfirmed = true;
       credit.needsManualReview = false;
     } else if (body.paymentDueAmountConfirmed === true) {
       credit.paymentDueAmountConfirmed = true;
-      // Don't change source — leave as CONFIRMED_AUTO if it was already set,
-      // only upgrade UNCONFIRMED → CONFIRMED_AUTO when confirming.
       if (credit.paymentDueAmountSource === 'UNCONFIRMED') {
         credit.paymentDueAmountSource = 'CONFIRMED_AUTO';
       }
       credit.needsManualReview = false;
     }
 
-    // Recalculate monthlyDebtContribution for this credit
+    // ── Compute effective ────────────────────────────────────────────────
+    const manual = credit.paymentDueAmountManual as number | null;
+    const extracted = credit.paymentDueAmountExtracted as number | null;
+    const confirmed = credit.paymentDueAmountConfirmed === true;
+    credit.paymentDueAmountEffective =
+      manual ?? (confirmed ? extracted : null);
+
+    // ── Recalculate monthlyDebtContribution ──────────────────────────────
     const status = credit.status as string;
     const isClosed = status === 'CLOSED';
     if (isClosed) {
       credit.monthlyDebtContribution = 0;
     } else if (status === 'ACTIVE') {
-      const source = credit.paymentDueAmountSource as string;
-      if (source === 'UNCONFIRMED') {
-        credit.monthlyDebtContribution = null;
-      } else {
-        credit.monthlyDebtContribution =
-          (credit.paymentDueAmount as number | null) ?? null;
-      }
+      credit.monthlyDebtContribution = credit.paymentDueAmountEffective as number | null;
     } else {
       credit.monthlyDebtContribution = null;
     }
@@ -2306,6 +2317,38 @@ export class CreditBureauExtractionService {
     });
 
     return { creditIndex, credit };
+  }
+
+  /**
+   * Allows an analyst to set or confirm the "Consultas 24 meses" value.
+   * Reads the document, updates inquiries24mManual/Confirmed, and persists.
+   */
+  async updateInquiries24m(
+    documentId: string,
+    body: { inquiries24mManual?: number; inquiries24mConfirmed?: boolean },
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc || !doc.extractedData) {
+      throw new Error('Document not found or has no extracted data');
+    }
+
+    const data = doc.extractedData as Record<string, unknown>;
+
+    if (body.inquiries24mManual !== undefined) {
+      data.inquiries24mManual = body.inquiries24mManual;
+      data.inquiries24mConfirmed = true;
+    } else if (body.inquiries24mConfirmed === true) {
+      data.inquiries24mConfirmed = true;
+    }
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data as any },
+    });
+
+    return { inquiries24mManual: data.inquiries24mManual, inquiries24mConfirmed: data.inquiries24mConfirmed };
   }
 
 }

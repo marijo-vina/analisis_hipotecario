@@ -213,6 +213,26 @@ export class DocumentsController {
     return { data };
   }
 
+  /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/inquiries
+   *
+   * Allows an analyst to manually set or confirm the "Consultas 24 meses"
+   * value extracted from the bureau report.
+   */
+  @Patch(':documentId/inquiries')
+  @HttpCode(200)
+  async updateInquiries(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Body() body: { inquiries24mManual?: number; inquiries24mConfirmed?: boolean },
+  ) {
+    const data = await this.creditBureauExtractionService.updateInquiries24m(
+      documentId,
+      body,
+    );
+    return { data };
+  }
+
   @Post(':documentId/extract-score')
   @HttpCode(200)
   async extractCreditScore(

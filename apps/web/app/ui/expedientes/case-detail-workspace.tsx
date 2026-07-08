@@ -183,7 +183,7 @@ export default function CaseDetailWorkspace({
       </div>
 
       {/* ── Datos extraídos ────────────────────────────────────────────── */}
-      <ExtractionSection documents={documents} />
+      <ExtractionSection documents={documents} caseId={caseId} />
 
       {/* ── Drawers (siempre montados, controlados por `open`) ──────────── */}
       <ClientDrawer

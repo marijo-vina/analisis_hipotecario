@@ -1,10 +1,19 @@
+"use client";
+
+import { useState } from "react";
+
 import type { Document } from "@/app/lib/definitions";
 import type { ExtractionAlert } from "@/app/lib/extraction";
 import {
   parseBuro,
+  PaymentDueAmountSource,
   type ParsedCreditBureau,
   type ParsedCreditBureauCredit,
 } from "@/app/lib/extraction";
+import {
+  updatePaymentDueManual,
+  updateInquiries24mManual,
+} from "@/app/actions/documents";
 import EmptyState from "@/app/ui/common/empty-state";
 
 // ---------------------------------------------------------------------------
@@ -204,7 +213,134 @@ function KpiCard({
   );
 }
 
-function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
+/**
+ * EditableInquiriesKpi — KPI card for "Consultas 24 meses" with inline edit.
+ *
+ * Shows the effective value (manual ?? extracted). Click ✎ to edit inline.
+ * Save calls `PATCH .../inquiries` with inquiries24mManual.
+ */
+function EditableInquiriesKpi({
+  effectiveValue,
+  isManual,
+  caseId,
+  documentId,
+  onSave,
+}: {
+  effectiveValue: number | null;
+  isManual: boolean;
+  caseId: string;
+  documentId: string;
+  onSave: (manual: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const displayValue = effectiveValue != null ? `${effectiveValue}` : "—";
+  const subText = isManual ? "Manual · 24 meses" : "Últimos 24 meses";
+
+  async function handleSave() {
+    const parsed = parseInt(editValue, 10);
+    if (isNaN(parsed)) return;
+    setSaving(true);
+    try {
+      await updateInquiries24mManual(caseId, documentId, parsed);
+      onSave(parsed);
+      setEditing(false);
+    } catch {
+      // Error: stay in edit mode so user can retry
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setEditing(false);
+    setEditValue("");
+  }
+
+  function handleStartEdit() {
+    setEditValue(effectiveValue != null ? String(effectiveValue) : "");
+    setEditing(true);
+  }
+
+  if (editing) {
+    return (
+      <div className="flex flex-1 flex-col justify-center gap-0.5 rounded-lg border border-blue-200 bg-white px-3 py-2.5">
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={0}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") handleCancel();
+            }}
+            autoFocus
+            className="w-16 rounded border border-slate-300 px-1 py-0.5 text-sm text-slate-800 focus:border-blue-400 focus:outline-none"
+          />
+          <span className="text-xs text-slate-500">consultas</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "··" : "✓"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={saving}
+            className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-2xl font-bold text-slate-800">
+          {displayValue}
+        </span>
+        <span className="text-xs text-slate-500">consultas</span>
+        <button
+          type="button"
+          onClick={handleStartEdit}
+          className="ml-auto inline-flex items-center rounded px-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          title="Editar consultas 24 meses"
+        >
+          ✎
+        </button>
+      </div>
+      <div className="flex items-center gap-1">
+        {isManual && (
+          <span className="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+            🟢 Manual
+          </span>
+        )}
+        <span className="text-[11px] text-slate-400">{subText}</span>
+      </div>
+    </div>
+  );
+}
+
+function KpiRow({
+  parsed,
+  caseId,
+  onInquiriesUpdate,
+}: {
+  parsed: ParsedCreditBureau;
+  caseId: string;
+  onInquiriesUpdate: (manual: number | null) => void;
+}) {
   const s = parsed.summary;
   const score = parsed.score;
   const scoreIsNull = score == null || parsed.scoreIsExcluded;
@@ -214,6 +350,9 @@ function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
   const band = score != null && !parsed.scoreIsExcluded
     ? scoreBand(score)
     : null;
+
+  const inquiriesEffective =
+    parsed.inquiries24mEffective ?? parsed.numberOfInquiries;
 
   return (
     <div className="flex flex-col gap-2">
@@ -251,15 +390,13 @@ function KpiRow({ parsed }: { parsed: ParsedCreditBureau }) {
           value={`${s.closedCredits}`}
           sub="Créditos cerrados"
         />
-        {/* Consultas */}
-        <KpiCard
-          label="consultas"
-          value={
-            parsed.numberOfInquiries != null
-              ? `${parsed.numberOfInquiries}`
-              : "—"
-          }
-          sub="Últimos 24 meses"
+        {/* Consultas — editable inline */}
+        <EditableInquiriesKpi
+          effectiveValue={inquiriesEffective}
+          isManual={parsed.inquiries24mManual != null}
+          caseId={caseId}
+          documentId={parsed.documentId}
+          onSave={onInquiriesUpdate}
         />
         {/* Alertas */}
         <KpiCard
@@ -411,7 +548,23 @@ function RiskChips({ parsed }: { parsed: ParsedCreditBureau }) {
 // 5. Credits Table (enhanced)
 // ---------------------------------------------------------------------------
 
-function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
+function CreditRow({
+  credit,
+  creditIndex,
+  caseId,
+  documentId,
+  onPaymentDueUpdate,
+}: {
+  credit: ParsedCreditBureauCredit;
+  creditIndex: number;
+  caseId: string;
+  documentId: string;
+  onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const isRisky =
     credit.hasWriteOff ||
     credit.hasFraudFlag ||
@@ -453,6 +606,83 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
   const fullMopTooltip =
     allMopCodes.length > 0 ? allMopCodes.join(" ") : undefined;
 
+  // ── Inline edit handlers ────────────────────────────────────────────────
+  const effectiveForDisplay =
+    credit.paymentDueAmountEffective ?? credit.paymentDueAmount ?? null;
+
+  async function handleSave() {
+    const parsed = parseFloat(editValue);
+    if (isNaN(parsed)) return;
+    setSaving(true);
+    try {
+      await updatePaymentDueManual(caseId, documentId, creditIndex, parsed);
+      onPaymentDueUpdate(creditIndex, parsed);
+      setEditing(false);
+    } catch {
+      // Error: stay in edit mode so user can retry
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setEditing(false);
+    setEditValue("");
+  }
+
+  function handleStartEdit() {
+    setEditValue(
+      effectiveForDisplay != null ? String(effectiveForDisplay) : "",
+    );
+    setEditing(true);
+  }
+
+  // ── Four-state badge ────────────────────────────────────────────────────
+  function renderStateBadge() {
+    if (credit.needsManualReview) {
+      return (
+        <span className="inline-flex items-center rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700" title="Requiere revisión manual">
+          🟡 Revisar
+        </span>
+      );
+    }
+    if (credit.paymentDueAmountSource === PaymentDueAmountSource.UNCONFIRMED) {
+      return (
+        <span className="text-red-500 text-[11px]" title="Monto a pagar no confirmado">
+          No confirmado
+        </span>
+      );
+    }
+    if (credit.paymentDueAmountSource === PaymentDueAmountSource.MANUAL) {
+      return (
+        <span className="inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700" title="Editado manualmente">
+          🟢 Manual
+        </span>
+      );
+    }
+    if (
+      credit.paymentDueAmountSource === PaymentDueAmountSource.CONFIRMED_AUTO ||
+      credit.paymentDueAmountSource === PaymentDueAmountSource.LAYOUT
+    ) {
+      return (
+        <span className="inline-flex items-center rounded bg-slate-50 px-1 py-0.5 text-[10px] font-medium text-slate-500" title="Confirmado automáticamente">
+          ⚪ Auto
+        </span>
+      );
+    }
+    if (
+      credit.paymentDueAmountSource === PaymentDueAmountSource.GEMINI &&
+      !credit.paymentDueAmountConfirmed
+    ) {
+      return (
+        <span className="inline-flex items-center rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-700" title="Extraído por Gemini, sin confirmar">
+          🔵 Extraído
+        </span>
+      );
+    }
+    return null;
+  }
+
   return (
     <tr className={`border-b border-slate-100 ${rowBg} ${rowOpacity} text-[13px]`}>
       {/* Institution */}
@@ -491,25 +721,63 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
         {formatMxn(credit.currentBalance)}
       </td>
 
-      {/* Monto a pagar (solo paymentDueAmount, nunca lastPaymentAmount) */}
+      {/* Monto a pagar — inline edit + four-state badge + empty-field UX */}
       <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
         {credit.isClosed ? (
           "—"
-        ) : credit.needsManualReview ? (
+        ) : editing ? (
           <span className="inline-flex items-center gap-1">
-            <span className="text-amber-600 font-semibold" title="Requiere revisión">
-              ⚠️ {formatMxn(credit.paymentDueAmount) ?? "—"}
-            </span>
-            <span className="text-[10px] text-amber-700 bg-amber-50 px-1 rounded">
-              Revisar
-            </span>
-          </span>
-        ) : credit.paymentDueAmountSource === "UNCONFIRMED" && credit.paymentDueAmount == null ? (
-          <span className="text-red-500 text-[11px]" title="Monto a pagar no confirmado">
-            No confirmado
+            <input
+              type="number"
+              min={0}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave();
+                if (e.key === "Escape") handleCancel();
+              }}
+              autoFocus
+              className="w-20 rounded border border-slate-300 px-1 py-0.5 text-right text-[13px] font-mono text-slate-800 focus:border-blue-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? "··" : "✓"}
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+            >
+              ✕
+            </button>
           </span>
         ) : (
-          formatMxn(credit.paymentDueAmount)
+          <span className="inline-flex items-center gap-1 justify-end">
+            {/* Effective value or empty-field UX */}
+            {effectiveForDisplay != null ? (
+              <span>{formatMxn(effectiveForDisplay)}</span>
+            ) : (
+              <span title="Dato pendiente de validación manual" className="text-slate-400">
+                —
+              </span>
+            )}
+            {/* Four-state badge */}
+            {renderStateBadge()}
+            {/* Edit button */}
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="inline-flex items-center rounded px-0.5 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Editar monto a pagar"
+            >
+              ✎
+            </button>
+          </span>
         )}
       </td>
 
@@ -593,7 +861,15 @@ function CreditRow({ credit }: { credit: ParsedCreditBureauCredit }) {
   );
 }
 
-function CreditsTable({ parsed }: { parsed: ParsedCreditBureau }) {
+function CreditsTable({
+  parsed,
+  caseId,
+  onPaymentDueUpdate,
+}: {
+  parsed: ParsedCreditBureau;
+  caseId: string;
+  onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
+}) {
   if (parsed.credits.length === 0) return null;
 
   const activeCount = parsed.credits.filter(
@@ -639,7 +915,14 @@ function CreditsTable({ parsed }: { parsed: ParsedCreditBureau }) {
           </thead>
           <tbody>
             {parsed.credits.map((credit, i) => (
-              <CreditRow key={i} credit={credit} />
+              <CreditRow
+                key={i}
+                credit={credit}
+                creditIndex={i}
+                caseId={caseId}
+                documentId={parsed.documentId}
+                onPaymentDueUpdate={onPaymentDueUpdate}
+              />
             ))}
           </tbody>
         </table>
@@ -686,7 +969,7 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
         <p className="text-[13px] text-slate-400">Sin datos del acreditado</p>
       )}
 
-      {(parsed.consultationDate || parsed.numberOfInquiries != null) && (
+      {(parsed.consultationDate || (parsed.inquiries24mEffective ?? parsed.numberOfInquiries) != null) && (
         <>
           <hr className="my-2 border-slate-200" />
           <div className="flex flex-col gap-1.5">
@@ -700,13 +983,18 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
                 </span>
               </div>
             )}
-            {parsed.numberOfInquiries != null && (
-              <div className="flex justify-between">
+            {(parsed.inquiries24mEffective ?? parsed.numberOfInquiries) != null && (
+              <div className="flex justify-between items-center">
                 <span className="text-xs text-slate-400">
                   Consultas 24m
                 </span>
                 <span className="text-[13px] font-medium text-slate-800">
-                  {parsed.numberOfInquiries}
+                  {parsed.inquiries24mEffective ?? parsed.numberOfInquiries}
+                  {parsed.inquiries24mManual != null && (
+                    <span className="ml-1 inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700">
+                      🟢 Manual
+                    </span>
+                  )}
                 </span>
               </div>
             )}
@@ -784,10 +1072,46 @@ function CompactAlerts({ parsed }: { parsed: ParsedCreditBureau }) {
 
 interface BuroTabProps {
   documents: Document[];
+  caseId: string;
 }
 
-export default function BuroTab({ documents }: BuroTabProps) {
-  const parsed = parseBuro(documents);
+export default function BuroTab({ documents, caseId }: BuroTabProps) {
+  const [parsed, setParsed] = useState(() => parseBuro(documents));
+
+  // ── Local state update after PATCH payment-due ────────────────────────
+  function handlePaymentDueUpdate(
+    creditIndex: number,
+    manualValue: number | null,
+  ) {
+    setParsed((prev) => {
+      if (!prev) return prev;
+      const newCredits = [...prev.credits];
+      const credit = { ...newCredits[creditIndex] };
+      credit.paymentDueAmountManual = manualValue;
+      credit.paymentDueAmountManualOverride = manualValue;
+      credit.paymentDueAmountSource = PaymentDueAmountSource.MANUAL;
+      credit.paymentDueAmountConfirmed = true;
+      credit.needsManualReview = false;
+      credit.paymentDueAmountEffective = manualValue;
+      credit.paymentDueAmount = manualValue;
+      newCredits[creditIndex] = credit;
+      return { ...prev, credits: newCredits };
+    });
+  }
+
+  // ── Local state update after PATCH inquiries ──────────────────────────
+  function handleInquiriesUpdate(manual: number | null) {
+    setParsed((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        inquiries24mManual: manual,
+        inquiries24mConfirmed: true,
+        inquiries24mEffective: manual,
+        numberOfInquiries: manual ?? prev.numberOfInquiries,
+      };
+    });
+  }
 
   if (!parsed) {
     return (
@@ -807,7 +1131,11 @@ export default function BuroTab({ documents }: BuroTabProps) {
       <BuroHeader parsed={parsed} />
 
       {/* 2. KPI Row */}
-      <KpiRow parsed={parsed} />
+      <KpiRow
+        parsed={parsed}
+        caseId={caseId}
+        onInquiriesUpdate={handleInquiriesUpdate}
+      />
 
       {/* 3. Diagnosis */}
       <DiagnosisCard parsed={parsed} />
@@ -817,7 +1145,11 @@ export default function BuroTab({ documents }: BuroTabProps) {
 
       {/* 5. Two-column: Table + Sidebar */}
       <div className="flex gap-3">
-        <CreditsTable parsed={parsed} />
+        <CreditsTable
+          parsed={parsed}
+          caseId={caseId}
+          onPaymentDueUpdate={handlePaymentDueUpdate}
+        />
         <div className="flex w-64 shrink-0 flex-col gap-3">
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
