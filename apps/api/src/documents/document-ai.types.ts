@@ -185,3 +185,55 @@ export interface CreditAuditFields {
 
 /** Financial field names that carry per-field confidence. */
 export type FinancialFieldName = keyof LayoutFinancialFields;
+
+// ---------------------------------------------------------------------------
+// Payment Due Amount guardrail — source tracking + manual override
+// ---------------------------------------------------------------------------
+
+/**
+ * Provenance of a credit's `paymentDueAmount` value.
+ * - LAYOUT        : deterministic layout extractor produced the amount.
+ * - GEMINI        : Gemini AI model extracted the amount.
+ * - UNCONFIRMED   : layout LOW/no-match OR Gemini-only — unreliable, blocked.
+ * - CONFIRMED_AUTO: layout HIGH/MEDIUM confirmed the auto-extracted amount.
+ * - MANUAL        : an analyst confirmed or overrode the amount via PATCH.
+ */
+export enum PaymentDueAmountSource {
+  LAYOUT = 'LAYOUT',
+  GEMINI = 'GEMINI',
+  UNCONFIRMED = 'UNCONFIRMED',
+  CONFIRMED_AUTO = 'CONFIRMED_AUTO',
+  MANUAL = 'MANUAL',
+}
+
+/**
+ * Triple-field pattern for paymentDueAmount: extracted (immutable),
+ * manual (analyst override), and effective (computed at read time).
+ * Effective = manual ?? (confirmed ? extracted : null).
+ */
+export interface PaymentDueAmountTriple {
+  paymentDueAmountExtracted: number | null;
+  paymentDueAmountManual: number | null;
+  paymentDueAmountEffective: number | null;
+}
+
+/**
+ * Triple-field pattern for inquiries24m: extracted (immutable),
+ * manual (analyst override), and effective (computed at read time).
+ */
+export interface Inquiries24mTriple {
+  inquiries24mExtracted: number | null;
+  inquiries24mManual: number | null;
+  inquiries24mEffective: number | null;
+  inquiries24mConfirmed: boolean;
+}
+
+/**
+ * @deprecated — replaced by PaymentDueAmountTriple + PaymentDueAmountSource.
+ * Kept for backward-compat with existing JSONB data.
+ */
+export interface PaymentDueGuardrailFields {
+  paymentDueAmountSource: PaymentDueAmountSource;
+  paymentDueAmountConfirmed: boolean;
+  paymentDueAmountManualOverride: number | null;
+}

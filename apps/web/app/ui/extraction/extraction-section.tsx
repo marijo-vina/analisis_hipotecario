@@ -17,6 +17,7 @@ import BuroTab from "@/app/ui/extraction/buro-tab";
 
 interface ExtractionSectionProps {
   documents: Document[];
+  caseId: string;
 }
 
 /**
@@ -30,6 +31,7 @@ interface ExtractionSectionProps {
  */
 export default function ExtractionSection({
   documents,
+  caseId,
 }: ExtractionSectionProps) {
   const [activeTab, setActiveTab] = useState<ExtractionCategory>("identidad");
 
@@ -80,7 +82,7 @@ export default function ExtractionSection({
             />
           )}
           {activeTab === "buro" && (
-            <BuroTab documents={docsByCategory.get("buro") ?? []} />
+            <BuroTab documents={docsByCategory.get("buro") ?? []} caseId={caseId} />
           )}
         </div>
       </div>

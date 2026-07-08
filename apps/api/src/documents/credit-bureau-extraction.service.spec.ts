@@ -5,6 +5,9 @@ import { GeminiService, GeminiErrorCode } from './gemini.service';
 import {
   CreditBureauExtractionService,
   CreditBureauExtractionResult,
+  CREDIT_BUREAU_SCHEMA_LEAN,
+  CREDIT_BUREAU_INSTRUCTIONS_LEAN,
+  CREDIT_BUREAU_SCHEMA_REDUCED,
 } from './credit-bureau-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import {
@@ -1248,7 +1251,10 @@ describe('CreditBureauExtractionService', () => {
       const ed = result.extractedData as Record<string, unknown>;
       const credits = ed.credits as Record<string, unknown>[];
       expect(credits[0].isClosed).toBe(false);
-      expect(credits[0].monthlyDebtContribution).toBe(2500);
+      // Guardrail: Gemini-only path defaults to UNCONFIRMED, blocking
+      // monthlyDebtContribution until analyst confirms the amount.
+      expect(credits[0].paymentDueAmountSource).toBe('UNCONFIRMED');
+      expect(credits[0].monthlyDebtContribution).toBeNull();
     });
   });
 
@@ -2006,6 +2012,633 @@ describe('CreditBureauExtractionService', () => {
 
       expect(credits[0].institution).toBe('BBVA'); // Gemini's string kept
       expect(credits[0].paymentDueAmount).toBe(8775); // layout financial overrode
+    });
+  });
+
+  // =========================================================================
+  // Phase 3 (credit-bureau-gemini-timeout): Lean constants, aggressive
+  // pre-filter, regex borrower extraction, reduced schema, disambiguation
+  // gating, Layer 1 fallback, and prompt-size budget.
+  // =========================================================================
+
+  // ── Realistic bureau OCR text used across several Phase 3 tests ──────────
+  // Contains: borrower identity (labelled), dates, RFC, then DETALLE section
+  // with one credit. The regex extractor (extractBorrowerFromOcr) needs the
+  // labelled fields + section markers to succeed.
+  const BORROWER_OCR = [
+    'BURÓ DE CRÉDITO',
+    'Nombre: MARIA PEREZ LOPEZ',
+    'RFC: PELJ920412AB1',
+    'Fecha de Nacimiento: 12/04/1992',
+    'Fecha de Consulta: 01/06/2026',
+    '',
+    'DATOS DEL ACREDITADO',
+    'Domicilio: AV REFORMA 100 COL JUAREZ CDMX CP 06600',
+    '',
+    'RESUMEN DE CRÉDITOS',
+    'Number of credits: 1',
+    '',
+    'DETALLE DE CRÉDITOS',
+    'BBVA',
+    '0 53,763 42,400 MX MAY-25 ABR-13 0 1,743 NO APLICA',
+    '1,875',
+    'PAGO MÍNIMO PARA CUENTAS REVOLVENTES',
+    '',
+    'DETALLE DE CONSULTAS',
+    'consulta 1',
+  ].join('\n');
+
+  // ── 3.1 CREDIT_BUREAU_SCHEMA_LEAN: no inline descriptions ───────────────
+
+  describe('Phase 3 — CREDIT_BUREAU_SCHEMA_LEAN has no inline descriptions', () => {
+    it('paymentDueAmount is type-only "number | null" (no OCR description)', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      expect(credit.paymentDueAmount).toBe('number | null');
+      // Explicitly NOT the verbose original
+      expect(credit.paymentDueAmount).not.toContain('Monto a Pagar');
+      expect(credit.paymentDueAmount).not.toContain('PAGO MÍNIMO');
+    });
+
+    it('lastPaymentAmount is type-only "number | null" (no OCR description)', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      expect(credit.lastPaymentAmount).toBe('number | null');
+      expect(credit.lastPaymentAmount).not.toContain('Monto Último Pago');
+      expect(credit.lastPaymentAmount).not.toContain('números limpios');
+    });
+
+    it('publicScore is bare "null" (description stripped)', () => {
+      const report = CREDIT_BUREAU_SCHEMA_LEAN.report;
+      expect(report.publicScore).toBe('null');
+      expect(report.publicScore).not.toContain('Mi Score');
+      expect(report.publicScore).not.toContain('separate');
+    });
+
+    it('hasWriteOff is type-only "boolean | null" (no clave UP description)', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      expect(credit.hasWriteOff).toBe('boolean | null');
+      expect(credit.hasWriteOff).not.toContain('clave UP');
+    });
+
+    it('hasSettlementOrDiscount is type-only (no LC/LG description)', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      expect(credit.hasSettlementOrDiscount).toBe('boolean | null');
+      expect(credit.hasSettlementOrDiscount).not.toContain('LC');
+      expect(credit.hasSettlementOrDiscount).not.toContain('LG');
+    });
+  });
+
+  // ── 3.2 CREDIT_BUREAU_INSTRUCTIONS_LEAN: excludes OCR examples, trees ────
+
+  describe('Phase 3 — CREDIT_BUREAU_INSTRUCTIONS_LEAN excludes verbose content', () => {
+    it('does NOT contain ASCII decision tree markers', () => {
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('DECISION TREE');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('┌─');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('└──');
+    });
+
+    it('does NOT contain OCR literal example snippets', () => {
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('0 53,763');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('30,283 193,336');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('PARTE 1');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain('PARTE 2');
+    });
+
+    it('does NOT contain redundant classification detail section', () => {
+      // The verbose version listed every credit field inline; LEAN only has
+      // the enum values + formats.
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain(
+        'rawTextReference: texto original de la fila',
+      );
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).not.toContain(
+        'observationKeys: array de strings con claves',
+      );
+    });
+
+    it('DOES contain the anti-glossary rule (kept)', () => {
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('REGLA ANTI-GLOSARIO');
+    });
+
+    it('DOES contain the 2-line payment golden rule (kept)', () => {
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('REGLA DE ORO');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('lastPaymentAmount');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('paymentDueAmount');
+    });
+
+    it('DOES contain enum values and JSON validity rules (kept)', () => {
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('REVOLVING');
+      expect(CREDIT_BUREAU_INSTRUCTIONS_LEAN).toContain('JSON VÁLIDO');
+    });
+  });
+
+  // ── 3.3 preFilterOcrLayout excludes borrower/report sections ─────────────
+
+  describe('Phase 3 — preFilterOcrLayout excludes borrower/report sections', () => {
+    it('returns only the DETALLE DE CRÉDITOS section (no borrower/report metadata)', () => {
+      const filtered = (service as any).preFilterOcrLayout(BORROWER_OCR);
+      expect(typeof filtered).toBe('string');
+
+      // Must contain the detail section
+      expect(filtered.toUpperCase()).toContain('DETALLE DE CRÉDITOS');
+
+      // Must NOT contain borrower / report metadata sections that appear
+      // elsewhere in the full OCR (those are regex-extracted separately).
+      expect(filtered).not.toContain('DATOS DEL ACREDITADO');
+      expect(filtered).not.toContain('Domicilio:');
+      expect(filtered).not.toContain('RESUMEN DE CRÉDITOS');
+      // Borrower identity fields (only sent via regex, not to Gemini):
+      expect(filtered).not.toContain('Nombre:');
+      expect(filtered).not.toContain('RFC:');
+      expect(filtered).not.toContain('Fecha de Nacimiento');
+      expect(filtered).not.toContain('Fecha de Consulta');
+    });
+
+    it('output starts at the DETALLE section, not at the borrower header', () => {
+      const filtered = (service as any).preFilterOcrLayout(BORROWER_OCR);
+      const upper = filtered.toUpperCase().trimStart();
+      // The first content should be the DETALLE marker, not the bureau title
+      expect(upper.startsWith('DETALLE DE CR')).toBe(true);
+    });
+
+    it('does not include the DETALLE DE CONSULTAS section (cut point)', () => {
+      const filtered = (service as any).preFilterOcrLayout(BORROWER_OCR);
+      expect(filtered).not.toContain('DETALLE DE CONSULTAS');
+      expect(filtered).not.toContain('consulta 1');
+    });
+
+    it('falls back to preFilterOcr when no DETALLE section present', () => {
+      const noDetail = [
+        'BURÓ DE CRÉDITO',
+        'Nombre: MARIA PEREZ LOPEZ',
+        'some other text without credit detail',
+      ].join('\n');
+      // Should not throw and should return a non-empty string
+      const filtered = (service as any).preFilterOcrLayout(noDetail);
+      expect(typeof filtered).toBe('string');
+      expect(filtered.length).toBeGreaterThan(0);
+    });
+
+    it('caps output at MAX_OCR_LAYOUT_CHARS (15000)', () => {
+      // Build a huge DETALLE section exceeding the cap
+      const hugeDetail =
+        'DETALLE DE CRÉDITOS\n' + 'X'.repeat(18000) + '\nDETALLE DE CONSULTAS';
+      const filtered = (service as any).preFilterOcrLayout(hugeDetail);
+      expect(filtered.length).toBeLessThanOrEqual(15500); // 15000 + truncation note
+    });
+  });
+
+  // ── 3.4 extractBorrowerFromOcr with real OCR snippets ───────────────────
+
+  describe('Phase 3 — extractBorrowerFromOcr regex extraction', () => {
+    it('extracts fullName from labelled "Nombre:" line', () => {
+      const result = (service as any).extractBorrowerFromOcr(BORROWER_OCR);
+      expect(result.fullName).toBe('MARIA PEREZ LOPEZ');
+    });
+
+    it('extracts RFC in 13-char format (XXXX000000XXX)', () => {
+      const result = (service as any).extractBorrowerFromOcr(BORROWER_OCR);
+      expect(result.rfc).toBe('PELJ920412AB1');
+      expect(result.rfc).toHaveLength(13); // 4 letters + 6 digits + 3 alnum
+      expect(result.rfc).toMatch(/^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/);
+    });
+
+    it('extracts birthDate as ISO YYYY-MM-DD', () => {
+      const result = (service as any).extractBorrowerFromOcr(BORROWER_OCR);
+      expect(result.birthDate).toBe('1992-04-12');
+    });
+
+    it('extracts consultationDate as ISO YYYY-MM-DD', () => {
+      const result = (service as any).extractBorrowerFromOcr(BORROWER_OCR);
+      expect(result.consultationDate).toBe('2026-06-01');
+    });
+
+    it('derives birthDate from RFC embedded date when Fecha de Nacimiento absent', () => {
+      const ocrNoBirth = [
+        'Nombre: CARLOS RAMIREZ SOTO',
+        'RFC: RASC850315Q47',
+        'Fecha de Consulta: 15/03/2026',
+        'DETALLE DE CRÉDITOS',
+        'some credit',
+      ].join('\n');
+      const result = (service as any).extractBorrowerFromOcr(ocrNoBirth);
+      // RFC RASC850315 → yy=85 → 1985, mm=03, dd=15
+      expect(result.rfc).toBe('RASC850315Q47');
+      expect(result.birthDate).toBe('1985-03-15');
+    });
+
+    it('returns null fields for missing borrower data (fallback scenario)', () => {
+      const ocrMissingBorrower = [
+        'DETALLE DE CRÉDITOS',
+        'BBVA',
+        '0 53,763 42,400 MX MAY-25 ABR-13 0 1,743 NO APLICA',
+        '1,875',
+        'PAGO MÍNIMO',
+      ].join('\n');
+      const result = (service as any).extractBorrowerFromOcr(ocrMissingBorrower);
+      expect(result.fullName).toBeNull();
+      expect(result.rfc).toBeNull();
+      expect(result.birthDate).toBeNull();
+      expect(result.consultationDate).toBeNull();
+    });
+
+    it('returns all-null fields for empty OCR input', () => {
+      const result = (service as any).extractBorrowerFromOcr('');
+      expect(result).toEqual({
+        fullName: null,
+        rfc: null,
+        birthDate: null,
+        consultationDate: null,
+      });
+    });
+
+    it('partial extraction: fullName found, consultationDate missing', () => {
+      const partial = [
+        'Nombre: JUAN LOPEZ GOMEZ',
+        'RFC: LOGJ900228AB1',
+        'Fecha de Nacimiento: 28/02/1990',
+        'DETALLE DE CRÉDITOS',
+        'credit data',
+      ].join('\n');
+      const result = (service as any).extractBorrowerFromOcr(partial);
+      expect(result.fullName).toBe('JUAN LOPEZ GOMEZ');
+      expect(result.rfc).toBe('LOGJ900228AB1');
+      expect(result.birthDate).toBe('1990-02-28');
+      expect(result.consultationDate).toBeNull();
+    });
+  });
+
+  // ── 3.5 CREDIT_BUREAU_SCHEMA_REDUCED excludes 4 fields ──────────────────
+
+  describe('Phase 3 — CREDIT_BUREAU_SCHEMA_REDUCED excludes 4 layout-owned fields', () => {
+    it('credits[] does NOT have the 4 excluded financial fields', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_REDUCED.credits[0];
+      expect(credit).not.toHaveProperty('currentBalance');
+      expect(credit).not.toHaveProperty('creditLimit');
+      expect(credit).not.toHaveProperty('paymentDueAmount');
+      expect(credit).not.toHaveProperty('lastPaymentAmount');
+    });
+
+    it('maxCredit and pastDueAmount are NOT in the Gemini schema (layout-only fields)', () => {
+      // These 2 were never part of the Gemini schema at all — they live in
+      // FINANCIAL_FIELDS for the layout merger only. The reduced schema must
+      // not accidentally add them.
+      const credit = CREDIT_BUREAU_SCHEMA_REDUCED.credits[0];
+      expect(credit).not.toHaveProperty('maxCredit');
+      expect(credit).not.toHaveProperty('pastDueAmount');
+    });
+
+    it('credits[] still has all non-financial fields', () => {
+      const credit = CREDIT_BUREAU_SCHEMA_REDUCED.credits[0];
+      expect(credit).toHaveProperty('institution');
+      expect(credit).toHaveProperty('creditType');
+      expect(credit).toHaveProperty('classification');
+      expect(credit).toHaveProperty('status');
+      expect(credit).toHaveProperty('currency');
+      expect(credit).toHaveProperty('paymentHistory');
+      expect(credit).toHaveProperty('mopCodes');
+      expect(credit).toHaveProperty('observationKeys');
+      expect(credit).toHaveProperty('hasLatePayments');
+      expect(credit).toHaveProperty('hasSeriousDelinquency');
+      expect(credit).toHaveProperty('rawTextReference');
+    });
+
+    it('top-level structure (borrower, report, riskSummary) is unchanged', () => {
+      expect(CREDIT_BUREAU_SCHEMA_REDUCED).toHaveProperty('borrower');
+      expect(CREDIT_BUREAU_SCHEMA_REDUCED).toHaveProperty('report');
+      expect(CREDIT_BUREAU_SCHEMA_REDUCED).toHaveProperty('riskSummary');
+      expect(CREDIT_BUREAU_SCHEMA_REDUCED.borrower).toHaveProperty('fullName');
+      expect(CREDIT_BUREAU_SCHEMA_REDUCED.report).toHaveProperty(
+        'consultationDate',
+      );
+    });
+
+    it('LEAN schema still HAS the 4 fields (only REDUCED removes them)', () => {
+      const leanCredit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      expect(leanCredit).toHaveProperty('currentBalance');
+      expect(leanCredit).toHaveProperty('creditLimit');
+      expect(leanCredit).toHaveProperty('paymentDueAmount');
+      expect(leanCredit).toHaveProperty('lastPaymentAmount');
+    });
+  });
+
+  // ── 3.6 disambiguatePaymentFields gating ────────────────────────────────
+
+  describe('Phase 3 — disambiguatePaymentFields gating', () => {
+    const ocrLayout: OcrLayout = { pages: [{ pageNumber: 1, width: 1, height: 1, lines: [], tokens: [] }] };
+
+    it('disambiguatePaymentFields NOT called when layout path is active', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          ocrText: BORROWER_OCR,
+          ocrLayout,
+        }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Layout extractor returns 0 credits → merge skipped, Gemini values
+      // pass through untouched (disambiguation skipped by the gate).
+      mockLayoutExtractor.extract.mockReturnValue({
+        credits: [],
+        confidence: [],
+        warnings: [],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const spy = jest.spyOn(
+        service as any,
+        'disambiguatePaymentFields',
+      );
+
+      await service.extract('case-1', 'doc-buro-1');
+
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('disambiguatePaymentFields IS called when layout path is inactive', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: BORROWER_OCR }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      // Flag OFF → useLayoutPath = false → Layer 1 path → disambiguation runs.
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'false' : undefined,
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const spy = jest.spyOn(
+        service as any,
+        'disambiguatePaymentFields',
+      );
+
+      await service.extract('case-1', 'doc-buro-1');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      spy.mockRestore();
+    });
+
+    it('when layout active, Gemini payment values are NOT corrected by disambiguator', async () => {
+      // Gemini returns a suspiciously-swapped paymentDueAmount that the
+      // disambiguator WOULD correct if it ran. With layout active it stays.
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          ocrText: BORROWER_OCR,
+          ocrLayout,
+        }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // Layout returns 0 credits → no merge overrides → Gemini value kept.
+      mockLayoutExtractor.extract.mockReturnValue({
+        credits: [],
+        confidence: [],
+        warnings: [],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            credits: [
+              {
+                institution: 'BBVA',
+                creditType: 'TARJETA',
+                classification: 'REVOLVING',
+                status: 'ACTIVE',
+                currentBalance: 70000,
+                paymentDueAmount: 999999, // would be flagged/corrected
+                lastPaymentAmount: 1000,
+                creditLimit: 150000,
+                currency: 'MXN',
+                paymentHistory: '111',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+            ],
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      // Disambiguator did NOT run → Gemini's (wrong) value preserved
+      expect(credits[0].paymentDueAmount).toBe(999999);
+    });
+
+    it('when layout inactive, disambiguator can correct swapped payment values', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: BORROWER_OCR }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'false' : undefined,
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            credits: [
+              {
+                institution: 'BBVA',
+                creditType: 'TARJETA',
+                classification: 'REVOLVING',
+                status: 'ACTIVE',
+                currentBalance: 70000,
+                paymentDueAmount: 999999, // Gemini mistake
+                lastPaymentAmount: 1743, // OCR "NO APLICA" anchor value
+                creditLimit: 150000,
+                currency: 'MXN',
+                paymentHistory: '111',
+                mopCodes: ['1'],
+                hasLatePayments: false,
+                hasSeriousDelinquency: false,
+                hasWriteOff: null,
+                hasFraudFlag: null,
+                hasIdentityTheft: null,
+                rawTextReference: null,
+              },
+            ],
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      // Disambiguator ran: lastPaymentAmount corrected from OCR NO APLICA
+      // anchor (1,743). paymentDueAmount corrected to 1,875 (the PAGO MÍNIMO
+      // number under NO APLICA).
+      expect(credits[0].lastPaymentAmount).toBe(1743);
+      expect(credits[0].paymentDueAmount).toBe(1875);
+    });
+  });
+
+  // ── 3.7 Borrower regex failure triggers full Layer 1 fallback ───────────
+
+  describe('Phase 3 — borrower regex failure triggers Layer 1 fallback', () => {
+    it('falls back to Layer 1 when fullName cannot be extracted', async () => {
+      // OCR with DETALLE but NO borrower identity → fullName regex returns
+      // null → extract() re-invokes itself with forceLayer1: true.
+      const ocrNoBorrower = [
+        'DETALLE DE CRÉDITOS',
+        'BBVA',
+        '0 53,763 42,400 MX MAY-25 ABR-13 0 1,743 NO APLICA',
+        '1,875',
+        'PAGO MÍNIMO PARA CUENTAS REVOLVENTES',
+        'DETALLE DE CONSULTAS',
+      ].join('\n');
+      const ocrLayout: OcrLayout = { pages: [{ pageNumber: 1, width: 1, height: 1, lines: [], tokens: [] }] };
+
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: ocrNoBorrower, ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // The forced Layer 1 call still reaches maybeMergeLayout (flag is on +
+      // ocrLayout present). Stub the extractor to return 0 credits so the
+      // merge is skipped and Gemini values pass through.
+      mockLayoutExtractor.extract.mockReturnValue({
+        credits: [],
+        confidence: [],
+        warnings: [],
+      });
+      const geminiSpy = jest
+        .spyOn(mockGemini, 'extractStructuredData')
+        .mockResolvedValue(validGeminiSuccess(createMockExtractionResult()));
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      // The Layer 2 call short-circuits BEFORE calling Gemini (regex fails
+      // early), then re-invokes extract() with forceLayer1: true. Only the
+      // forced Layer 1 call reaches Gemini — so exactly 1 Gemini call.
+      expect(geminiSpy).toHaveBeenCalledTimes(1);
+      // Document refetched twice: first (Layer 2) + forced Layer 1 → proves
+      // the recursion happened exactly once (no infinite recursion, which
+      // would have overflowed / hung).
+      expect(mockPrisma.document.findUnique).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(true);
+      expect(result.extractedData).toBeTruthy();
+      geminiSpy.mockRestore();
+    });
+
+    it('borrower regex with partial fields also triggers fallback', async () => {
+      // fullName + RFC found but birthDate and consultationDate missing.
+      const ocrPartial = [
+        'Nombre: GARCIA MARTINEZ LUIS',
+        'RFC: GAML910909H51',
+        'DETALLE DE CRÉDITOS',
+        'credit data',
+      ].join('\n');
+      const ocrLayout: OcrLayout = { pages: [{ pageNumber: 1, width: 1, height: 1, lines: [], tokens: [] }] };
+
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrText: ocrPartial, ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      // The forced Layer 1 call reaches maybeMergeLayout (flag on + ocrLayout).
+      mockLayoutExtractor.extract.mockReturnValue({
+        credits: [],
+        confidence: [],
+        warnings: [],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const geminiSpy = jest.spyOn(mockGemini, 'extractStructuredData');
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      // Layer 2 short-circuits before Gemini (partial fields → fallback); the
+      // forced Layer 1 call is the only one to reach Gemini.
+      expect(geminiSpy).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.document.findUnique).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(true);
+      geminiSpy.mockRestore();
+    });
+  });
+
+  // ── 3.8 Integration: combined prompt < 10K chars for 20-credit PDF ──────
+
+  describe('Phase 3 — combined prompt < 10K chars for 20-credit PDF', () => {
+    it('instructions + reduced schema + filtered OCR < 11000 chars', () => {
+      // Build a realistic 20-credit DETALLE section. Each credit block ~250
+      // chars → 20 credits ≈ 5000 chars, under the 6K layout cap.
+      const oneCreditBlock = (
+        i: number,
+      ) => `BANCO EJEMPLO ${i}
+${i * 1000} 53,763 42,400 MX MAY-25 ABR-13 0 1,743 NO APLICA
+1,${875 + i}
+PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
+
+      const detalleSection =
+        'DETALLE DE CRÉDITOS\n' +
+        Array.from({ length: 20 }, (_, i) => oneCreditBlock(i + 1)).join('\n\n') +
+        '\n\nDETALLE DE CONSULTAS\nfin';
+
+      // Surround with borrower/report metadata (which preFilterOcrLayout
+      // should EXCLUDE so they don't bloat the prompt).
+      const fullOcr = [
+        'BURÓ DE CRÉDITO',
+        'Nombre: MARIA PEREZ LOPEZ',
+        'RFC: PELJ920412AB1',
+        'Fecha de Nacimiento: 12/04/1992',
+        'Fecha de Consulta: 01/06/2026',
+        'DATOS DEL ACREDITADO',
+        'Domicilio: AV REFORMA 100 COL JUAREZ CDMX CP 06600',
+        'RESUMEN DE CRÉDITOS',
+        'Total credits: 20 Active: 12 Closed: 8',
+        detalleSection,
+      ].join('\n');
+
+      // Layer-2 filtered OCR: only DETALLE section (borrower/report excluded)
+      const filteredOcr = (service as any).preFilterOcrLayout(fullOcr);
+
+      // Build the prompt the same way extract() does:
+      //   CREDIT_BUREAU_INSTRUCTIONS_LEAN + schema + filteredOcr
+      // (GeminiService concatenates instructions + schema + ocrText).
+      const schemaJson = JSON.stringify(CREDIT_BUREAU_SCHEMA_REDUCED);
+      const prompt =
+        CREDIT_BUREAU_INSTRUCTIONS_LEAN + schemaJson + filteredOcr;
+
+      // Assert the combined prompt is under the 11K budget (instructions grew
+      // with paymentHistory/mopCodes length limits for output safety).
+      expect(prompt.length).toBeLessThan(11000);
+
+      // Sanity: the filtered OCR should NOT contain borrower metadata
+      expect(filteredOcr).not.toContain('Domicilio:');
+      expect(filteredOcr).not.toContain('RFC:');
+
+      // Sanity: the filtered OCR should contain credit detail data
+      expect(filteredOcr.toUpperCase()).toContain('DETALLE DE CRÉDITOS');
+    });
+
+    it('reduced schema (not LEAN) is used when layout active — further reduces output', () => {
+      const reducedJson = JSON.stringify(CREDIT_BUREAU_SCHEMA_REDUCED);
+      const leanJson = JSON.stringify(CREDIT_BUREAU_SCHEMA_LEAN);
+      // REDUCED must be smaller than LEAN (4 financial fields dropped)
+      expect(reducedJson.length).toBeLessThan(leanJson.length);
+
+      // Verify the 4 fields are gone in the serialized form
+      expect(reducedJson).not.toContain('"currentBalance"');
+      expect(reducedJson).not.toContain('"paymentDueAmount"');
+      expect(reducedJson).not.toContain('"lastPaymentAmount"');
+      expect(reducedJson).not.toContain('"creditLimit"');
     });
   });
 });

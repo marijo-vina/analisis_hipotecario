@@ -85,7 +85,9 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   '  lastPaymentAmount: número del OCR que está SOLO, sin texto descriptivo.',
   '  currency ("MXN" por defecto),',
   '  paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
+  '    ⚠️ LÍMITE: máximo 72 caracteres (equivale a 6 años). Si el OCR muestra más, truncá a los últimos 72.',
   '  mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
+  '    ⚠️ LÍMITE: máximo 72 elementos. Si hay más, tomá solo los últimos 72.',
   '  observationKeys: array de strings con claves de observación que aparezcan',
   '    ASOCIADAS DIRECTAMENTE a este crédito (no del glosario). Ej: ["UP","LC"].',
   '  rawTextReference: texto original de la fila del crédito en el reporte.',
@@ -103,8 +105,52 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   '',
   '─── JSON VÁLIDO ───',
   'El JSON de salida DEBE ser parseable. Reglas estrictas:',
-  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222".',
-  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"].',
+  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222". Máximo 72 chars.',
+  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"]. Máximo 72 elementos.',
+  '- NUNCA pongas texto crudo del OCR fuera de comillas en el JSON.',
+  '- El JSON debe cerrar correctamente con }.',
+].join('\n');
+
+// ---------------------------------------------------------------------------
+// Trimmed instructions — keeps only: anti-glossary rule, 2-line payment
+// golden rule, date/amount formats, enum values, JSON rules.
+// Removes: OCR literal examples, ASCII decision tree, redundant explanatory
+// sections. Reduces prompt size by ~2,000 chars.
+// ---------------------------------------------------------------------------
+// Exported for direct-import testing (Phase 3 task 3.2).
+export const CREDIT_BUREAU_INSTRUCTIONS_LEAN = [
+  'Reporte de Buró de Crédito (México). Extraé ÚNICAMENTE datos crudos de este documento.',
+  '',
+  '─── REGLA ANTI-GLOSARIO ───',
+  'IGNORÁ completamente secciones de glosario, leyendas, definiciones, instructivos,',
+  'notas al pie, textos legales, promocionales o explicativos. Ej: "¿Qué significa el',
+  'histórico de pagos?", tablas de claves de observación, definiciones generales de Buró.',
+  'Solo extraé datos de las secciones del acreditado: Resumen de Créditos, Detalle de',
+  'Créditos, Datos del Acreditado, Detalle de Consultas.',
+  '',
+  '─── ⚠️ REGLA DE ORO (PAGOS) ───',
+  'lastPaymentAmount = el número PEGADO a "NO APLICA" en la línea de datos.',
+  'paymentDueAmount  = el número SOLITARIO que tiene texto debajo.',
+  'NUNCA INVIERTAS ESTOS CAMPOS. NUNCA uses el mismo número para ambos.',
+  '',
+  '─── Formatos ───',
+  'Fechas: YYYY-MM-DD. Montos: números decimales sin $ ni comas.',
+  'currency: "MXN" por defecto.',
+  'paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
+  '  ⚠️ LÍMITE: máximo 72 caracteres (equivale a 6 años de historial mensual).',
+  '  Si el OCR muestra más, truncá a los últimos 72.',
+  'mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
+  '  ⚠️ LÍMITE: máximo 72 elementos. Si hay más, tomá solo los últimos 72.',
+  '',
+  '─── Enums ───',
+  'classification: REVOLVING | FIXED_PAYMENT | MORTGAGE | AUTO | PERSONAL_LOAN',
+  '  | DEPARTMENT_STORE | NON_BANK_SERVICE | UNKNOWN',
+  'status: ACTIVE | CLOSED | UNKNOWN',
+  '',
+  '─── JSON VÁLIDO ───',
+  'El JSON de salida DEBE ser parseable. Reglas estrictas:',
+  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222". Máximo 72 chars.',
+  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"]. Máximo 72 elementos.',
   '- NUNCA pongas texto crudo del OCR fuera de comillas en el JSON.',
   '- El JSON debe cerrar correctamente con }.',
 ].join('\n');
@@ -206,6 +252,164 @@ const CREDIT_BUREAU_SCHEMA = {
 };
 
 // ---------------------------------------------------------------------------
+// Schema — same structure as CREDIT_BUREAU_SCHEMA but with ALL inline
+// descriptions stripped from values. Reduces prompt size by ~800 chars.
+// ---------------------------------------------------------------------------
+// Exported for direct-import testing (Phase 3 task 3.1).
+export const CREDIT_BUREAU_SCHEMA_LEAN: typeof CREDIT_BUREAU_SCHEMA = {
+  schemaVersion: '1.0',
+  documentType: 'CREDIT_BUREAU_REPORT',
+  extractionMetadata: {
+    sourceDocumentId: null,
+    mortgageCaseId: null,
+    ocrProcessedAt: null,
+    extractedAt: null,
+    model: null,
+    confidence: 0.0,
+  },
+  documentRequirementContext: {
+    incomeBehavior: 'NOT_APPLICABLE',
+    requiredPayrollReceiptMonths: null,
+    requiredBankStatementMonths: null,
+    detectedDocumentMonths: null,
+    isRequirementSatisfied: null,
+    requirementNotes: null,
+  },
+  borrower: {
+    fullName: 'string | null',
+    birthDate: 'YYYY-MM-DD | null',
+    rfc: 'string | null',
+    lastReportedAddress: 'string | null',
+  },
+  report: {
+    consultationDate: 'YYYY-MM-DD | null',
+    numberOfInquiries: 'number | null',
+    publicScore: 'null',
+  },
+  credits: [
+    {
+      institution: 'string | null',
+      creditType: 'string | null',
+      classification:
+        'REVOLVING | FIXED_PAYMENT | MORTGAGE | AUTO | PERSONAL_LOAN | DEPARTMENT_STORE | NON_BANK_SERVICE | UNKNOWN',
+      status: 'ACTIVE | CLOSED | UNKNOWN',
+      currentBalance: 'number | null',
+      paymentDueAmount: 'number | null',
+      lastPaymentAmount: 'number | null',
+      creditLimit: 'number | null',
+      currency: 'MXN',
+      paymentHistory: 'string | null',
+      mopCodes: [],
+      observationKeys: [],
+      hasLatePayments: 'boolean | null',
+      hasSeriousDelinquency: 'boolean | null',
+      hasWriteOff: 'boolean | null',
+      hasSettlementOrDiscount: 'boolean | null',
+      hasFraudFlag: 'boolean | null',
+      hasIdentityTheft: 'boolean | null',
+      isClosed: 'boolean | null',
+      monthlyDebtContribution: 'number | null',
+      rawTextReference: 'string | null',
+    },
+  ],
+  riskSummary: {
+    hasWriteOff: 'boolean | null',
+    hasSettlementOrDiscount: 'boolean | null',
+    hasFraudFlag: 'boolean | null',
+    hasIdentityTheft: 'boolean | null',
+    hasMinorDelinquency: 'boolean | null',
+    hasSeriousDelinquency: 'boolean | null',
+    hasPreventiveKeys: 'boolean | null',
+    possibleHomonym: 'boolean | null',
+    riskNotes: 'string | null',
+  },
+  missingFields: [],
+};
+
+// ---------------------------------------------------------------------------
+// Reduced schema — clone of CREDIT_BUREAU_SCHEMA_LEAN minus the 4 financial
+// fields owned by the layout extractor (currentBalance, creditLimit,
+// paymentDueAmount, lastPaymentAmount). Used only when the layout path is
+// active so Gemini output shrinks ~40%. `maxCredit` and `pastDueAmount` are
+// NOT part of the Gemini schema (they live in FINANCIAL_FIELDS for the
+// layout merger), so they are not touched here.
+// ---------------------------------------------------------------------------
+// Exported for direct-import testing (Phase 3 task 3.5).
+export const CREDIT_BUREAU_SCHEMA_REDUCED: Omit<
+  typeof CREDIT_BUREAU_SCHEMA_LEAN,
+  'credits'
+> & {
+  credits: Omit<
+    (typeof CREDIT_BUREAU_SCHEMA_LEAN.credits)[number],
+    'currentBalance' | 'creditLimit' | 'paymentDueAmount' | 'lastPaymentAmount'
+  >[];
+} = {
+  schemaVersion: '1.0',
+  documentType: 'CREDIT_BUREAU_REPORT',
+  extractionMetadata: {
+    sourceDocumentId: null,
+    mortgageCaseId: null,
+    ocrProcessedAt: null,
+    extractedAt: null,
+    model: null,
+    confidence: 0.0,
+  },
+  documentRequirementContext: {
+    incomeBehavior: 'NOT_APPLICABLE',
+    requiredPayrollReceiptMonths: null,
+    requiredBankStatementMonths: null,
+    detectedDocumentMonths: null,
+    isRequirementSatisfied: null,
+    requirementNotes: null,
+  },
+  borrower: {
+    fullName: 'string | null',
+    birthDate: 'YYYY-MM-DD | null',
+    rfc: 'string | null',
+    lastReportedAddress: 'string | null',
+  },
+  report: {
+    consultationDate: 'YYYY-MM-DD | null',
+    numberOfInquiries: 'number | null',
+    publicScore: 'null',
+  },
+  credits: [
+    {
+      institution: 'string | null',
+      creditType: 'string | null',
+      classification:
+        'REVOLVING | FIXED_PAYMENT | MORTGAGE | AUTO | PERSONAL_LOAN | DEPARTMENT_STORE | NON_BANK_SERVICE | UNKNOWN',
+      status: 'ACTIVE | CLOSED | UNKNOWN',
+      currency: 'MXN',
+      paymentHistory: 'string | null',
+      mopCodes: [],
+      observationKeys: [],
+      hasLatePayments: 'boolean | null',
+      hasSeriousDelinquency: 'boolean | null',
+      hasWriteOff: 'boolean | null',
+      hasSettlementOrDiscount: 'boolean | null',
+      hasFraudFlag: 'boolean | null',
+      hasIdentityTheft: 'boolean | null',
+      isClosed: 'boolean | null',
+      monthlyDebtContribution: 'number | null',
+      rawTextReference: 'string | null',
+    },
+  ],
+  riskSummary: {
+    hasWriteOff: 'boolean | null',
+    hasSettlementOrDiscount: 'boolean | null',
+    hasFraudFlag: 'boolean | null',
+    hasIdentityTheft: 'boolean | null',
+    hasMinorDelinquency: 'boolean | null',
+    hasSeriousDelinquency: 'boolean | null',
+    hasPreventiveKeys: 'boolean | null',
+    possibleHomonym: 'boolean | null',
+    riskNotes: 'string | null',
+  },
+  missingFields: [],
+};
+
+// ---------------------------------------------------------------------------
 // Mi Score exclusion codes mapping (used by CreditScoreExtractionService)
 // ---------------------------------------------------------------------------
 export const SCORE_EXCLUSION_REASONS: Record<number, string> = {
@@ -250,6 +454,27 @@ const FINANCIAL_FIELDS: FinancialFieldName[] = [
   'paymentDueAmount',
   'pastDueAmount',
 ];
+
+// ---------------------------------------------------------------------------
+// Cap for the layout-aware OCR pre-filter. Layer 2 sends only the
+// "DETALLE DE CRÉDITOS" section to Gemini (~5K chars) instead of the full
+// 15K outfit — borrower/report metadata is regex-extracted separately.
+// ---------------------------------------------------------------------------
+const MAX_OCR_LAYOUT_CHARS = 15000;
+
+// ---------------------------------------------------------------------------
+// Regex-extracted borrower/report metadata — used by the layout-aware path
+// (Layer 2) so Gemini can be fed only the "DETALLE DE CRÉDITOS" section
+// without losing borrower identity. Each field is `null` when the regex
+// cannot confirm a value; callers must fall back to Layer 1 when any field
+// is null.
+// ---------------------------------------------------------------------------
+interface RegexBorrowerFields {
+  fullName: string | null;
+  rfc: string | null;
+  birthDate: string | null;
+  consultationDate: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Extraction result envelope
@@ -370,9 +595,213 @@ export class CreditBureauExtractionService {
     return filtered;
   }
 
+  /**
+   * Layout-aware OCR pre-filter: extracts ONLY the "DETALLE DE CRÉDITOS"
+   * section for Gemini. Used when `shouldUseLayoutPath()` is true — the
+   * borrower/report metadata is regex-extracted separately
+   * (`extractBorrowerFromOcr`) so Gemini never needs those sections.
+   *
+   * Returns ~5K chars of high-signal credit data instead of the full 15K.
+   * When the detail section cannot be located, falls back to `preFilterOcr`
+   * so extraction still produces a usable (if larger) prompt.
+   */
+  private preFilterOcrLayout(raw: string): string {
+    const upper = raw.toUpperCase();
+
+    const DETAIL_START = ['DETALLE DE CRÉDITOS', 'DETALLE DE CREDITOS'];
+    // NOTE: "DECLARATIVA" intentionally excluded — it can appear inside
+    // credit-detail text (e.g. "cuenta declarativa") and would cut off
+    // remaining credits prematurely.
+    const CUT_AFTER = [
+      'DETALLE DE CONSULTAS',
+      '¿ QUÉ SIGNIFICA',
+      'QUÉ SIGNIFICA EL HISTÓRICO',
+      'QUÉ SIGNIFICA EL HISTORICO',
+      'CLAVES DE OBSERVACIÓN',
+      'CLAVES DE OBSERVACION',
+      'INFORMACIÓN SOBRE LA ELIMINACIÓN',
+      'INFORMACION SOBRE LA ELIMINACION',
+      'OTRAS SOCIEDADES DE INFORMACIÓN',
+      'OTRAS SOCIEDADES DE INFORMACION',
+      'DOCUMENTO SIN VALOR PROBATORIO',
+    ];
+
+    let detailStart = -1;
+    for (const marker of DETAIL_START) {
+      detailStart = upper.indexOf(marker);
+      if (detailStart !== -1) break;
+    }
+    if (detailStart === -1) {
+      // No detail section — fall back to the standard pre-filter so the
+      // prompt stays usable even if the layout path was chosen optimistically.
+      return this.preFilterOcr(raw, MAX_OCR_LAYOUT_CHARS);
+    }
+
+    let cutPoint = raw.length;
+    for (const marker of CUT_AFTER) {
+      const idx = upper.indexOf(marker, detailStart + 1);
+      if (idx !== -1 && idx < cutPoint) {
+        cutPoint = idx;
+      }
+    }
+
+    const detailChunk = raw.slice(detailStart, cutPoint);
+    if (detailChunk.length > MAX_OCR_LAYOUT_CHARS) {
+      return (
+        detailChunk.slice(0, MAX_OCR_LAYOUT_CHARS) +
+        `\n\n[OCR truncado — ${detailChunk.length - MAX_OCR_LAYOUT_CHARS} caracteres omitidos]`
+      );
+    }
+    return detailChunk;
+  }
+
+  /**
+   * Regex-extracts borrower/report metadata from the FULL OCR text so the
+   * layout path can send only "DETALLE DE CRÉDITOS" to Gemini without losing
+   * borrower identity. Returns `null` per field when the regex cannot
+   * confirm a value — callers must fall back to Layer 1 when any field is
+   * null because the Layer 2 OCR trim removes the borrower/report sections.
+   */
+  private extractBorrowerFromOcr(raw: string): RegexBorrowerFields {
+    const result: RegexBorrowerFields = {
+      fullName: null,
+      rfc: null,
+      birthDate: null,
+      consultationDate: null,
+    };
+    if (!raw) return result;
+
+    const upper = raw.toUpperCase();
+
+    // ── fullName ───────────────────────────────────────────────────────
+    // Bureau layouts vary: labelled ("Nombre: <NAME>"), or a name line
+    // immediately after "DATOS DEL ACREDITADO" / "DATOS GENERALES".
+    const LABELLED_NAME =
+      /\b(?:NOMBRE|NOMBRE\(S\)|APELLIDOS?)\s*[:：]\s*([A-ZÑÁÉÍÓÚÄËÏÖÜ][A-ZÑÁÉÍÓÚÄËÏÖÜ .]{2,})/i;
+    const labelledName = raw.match(LABELLED_NAME);
+    if (labelledName) {
+      const name = labelledName[1].replace(/[.]+$/, '').trim();
+      if (name.length >= 3) {
+        result.fullName = name.toUpperCase();
+      }
+    }
+
+    if (!result.fullName) {
+      const borrowerSectionMarkers = [
+        'DATOS DEL ACREDITADO',
+        'DATOS GENERALES',
+      ];
+      for (const marker of borrowerSectionMarkers) {
+        const idx = upper.indexOf(marker);
+        if (idx === -1) continue;
+        const after = raw.slice(idx, idx + 600);
+        for (const line of after.split(/\r?\n/).slice(1)) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          // Skip label-ish lines, account-number lines, and date lines.
+          if (/[:：]/.test(trimmed) && trimmed.length <= 30) continue;
+          if (/^\d/.test(trimmed)) continue;
+          if (/\d{2}[/.\-]\d{2}[/.\-]\d{4}/.test(trimmed)) continue;
+          if (/^[A-ZÑÁÉÍÓÚÄËÏÖÜ\s.]+$/.test(trimmed) && trimmed.length >= 3) {
+            const words = trimmed
+              .split(/\s+/)
+              .filter((w) => /[A-ZÑ]/i.test(w));
+            if (words.length >= 2) {
+              result.fullName = trimmed.replace(/[.]+$/, '').trim().toUpperCase();
+              break;
+            }
+          }
+        }
+        if (result.fullName) break;
+      }
+    }
+
+    // ── rfc ───────────────────────────────────────────────────────────
+    // Prefer "RFC:" labelled value; fall back to a standalone RFC pattern.
+    const rfcLabelled = raw.match(
+      /\bRFC\s*[:：]\s*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/i,
+    );
+    if (rfcLabelled) {
+      result.rfc = rfcLabelled[1].toUpperCase();
+    } else {
+      const rfcMatch = raw.match(/\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/);
+      if (rfcMatch) {
+        result.rfc = rfcMatch[1].toUpperCase();
+      }
+    }
+
+    // ── birthDate ──────────────────────────────────────────────────────
+    const birthIdx = upper.indexOf('FECHA DE NACIMIENTO');
+    if (birthIdx !== -1) {
+      const after = raw.slice(birthIdx, birthIdx + 200);
+      const dateMatch = after.match(
+        /(\d{2}[/.\-]\d{2}[/.\-]\d{4}|\d{4}[/.\-]\d{2}[/.\-]\d{2})/,
+      );
+      if (dateMatch) {
+        result.birthDate = this.normalizeOcrDate(dateMatch[1]);
+      }
+    }
+    // Derive from the RFC embedded date (person RFC: YYMMDD at chars 5-10).
+    if (!result.birthDate && result.rfc) {
+      const rfcDate = result.rfc.match(/^[A-ZÑ&]{3,4}(\d{6})[A-Z0-9]{3}$/i);
+      if (rfcDate) {
+        const digits = rfcDate[1];
+        const yy = parseInt(digits.slice(0, 2), 10);
+        const mm = digits.slice(2, 4);
+        const dd = digits.slice(4, 6);
+        // Century heuristic: ≥50 → 19xx, else 20xx (birth dates).
+        const year = yy >= 50
+          ? `19${String(yy).padStart(2, '0')}`
+          : `20${String(yy).padStart(2, '0')}`;
+        result.birthDate = `${year}-${mm}-${dd}`;
+      }
+    }
+
+    // ── consultationDate ───────────────────────────────────────────────
+    const consultIdx = upper.indexOf('FECHA DE CONSULTA');
+    if (consultIdx !== -1) {
+      const after = raw.slice(consultIdx, consultIdx + 200);
+      const dateMatch = after.match(
+        /(\d{2}[/.\-]\d{2}[/.\-]\d{4}|\d{4}[/.\-]\d{2}[/.\-]\d{2})/,
+      );
+      if (dateMatch) {
+        result.consultationDate = this.normalizeOcrDate(dateMatch[1]);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Normalizes an OCR date fragment to ISO `YYYY-MM-DD`. Accepts
+   * `DD/MM/YYYY`, `DD-MM-YYYY`, and `YYYY-MM-DD` / `YYYY/MM/DD`.
+   */
+  private normalizeOcrDate(dateStr: string): string | null {
+    const m1 = dateStr.match(/^(\d{2})[/.\-](\d{2})[/.\-](\d{4})$/);
+    if (m1) {
+      return `${m1[3]}-${m1[2]}-${m1[1]}`;
+    }
+    const m2 = dateStr.match(/^(\d{4})[/.\-](\d{2})[/.\-](\d{2})$/);
+    if (m2) {
+      return `${m2[1]}-${m2[2]}-${m2[3]}`;
+    }
+    return null;
+  }
+
+  /**
+   * Extraction entry point.
+   *
+   * `privateOptions.forceLayer1` is an internal hook used by the Layer 2
+   * borrower-regex fallback: when regex extraction cannot confirm every
+   * borrower field, `extract()` re-invokes itself with `forceLayer1: true`
+   * to run the full Layer 1 pipeline (full OCR + LEAN schema +
+   * disambiguation). The forced call skips the regex attempt so there is no
+   * risk of infinite recursion.
+   */
   async extract(
     caseId: string,
     documentId: string,
+    privateOptions: { forceLayer1?: boolean } = {},
   ): Promise<CreditBureauExtractionResult> {
     // ── 1. Fetch document with type + status ───────────────────────────
     const document = await this.prisma.document.findUnique({
@@ -442,20 +871,58 @@ export class CreditBureauExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Pre-filter OCR: strip boilerplate, inquiries, glossary, legal ──
-    //    Gemini chokes on long PDFs. Keep only the credit-detail sections +
-    //    borrower data, capped at 15K chars. This reduces Gemini's input
-    //    to the highest-signal content and avoids GEMINI_INVALID_JSON caused
-    //    by output-size overflow from processing irrelevant sections.
-    const MAX_OCR_CHARS = 15000;
-    const ocrText = this.preFilterOcr(document.ocrText, MAX_OCR_CHARS);
+    // ── 6. Determine extraction path (Layer 1 vs Layer 2) ───────────────
+    const ocrLayout = document.ocrLayout as OcrLayout | null;
+    const useLayoutPath =
+      this.shouldUseLayoutPath(ocrLayout) && !privateOptions.forceLayer1;
 
-    // ── 7. Call Gemini with specialized instructions ────────────────────
+    // Layer 2 (layout-aware): regex-extract borrower/report metadata from
+    // the FULL OCR text so Gemini can be fed only "DETALLE DE CRÉDITOS".
+    // If any borrower field is null, fall back to the full Layer 1 pipeline
+    // (full OCR + LEAN schema + disambiguation) — Gemini needs the full
+    // document to recover borrower data. The forced call sets
+    // `forceLayer1: true` so the regex attempt is NOT retried (no recursion).
+    let borrowerFields: RegexBorrowerFields | null = null;
+    if (useLayoutPath) {
+      borrowerFields = this.extractBorrowerFromOcr(document.ocrText);
+      const allPresent =
+        borrowerFields.fullName != null &&
+        borrowerFields.rfc != null &&
+        borrowerFields.birthDate != null &&
+        borrowerFields.consultationDate != null;
+      if (!allPresent) {
+        this.logger.warn(
+          `[CreditBureau] Borrower regex extraction incomplete for doc ${documentId} ` +
+            `(fullName=${borrowerFields.fullName}, rfc=${borrowerFields.rfc}, ` +
+            `birthDate=${borrowerFields.birthDate}, consultationDate=${borrowerFields.consultationDate}) ` +
+            `— falling back to Layer 1 (full OCR + LEAN schema).`,
+        );
+        return this.extract(caseId, documentId, { forceLayer1: true });
+      }
+    }
+
+    // ── 7. Pre-filter OCR ──────────────────────────────────────────────
+    // Layer 1: keep borrower + summary + detail (15K cap).
+    // Layer 2: keep ONLY "DETALLE DE CRÉDITOS" (~5K) — borrower/report is
+    // regex-extracted above, so Gemini never sees those sections.
+    const MAX_OCR_CHARS = 15000;
+    const ocrText = useLayoutPath
+      ? this.preFilterOcrLayout(document.ocrText)
+      : this.preFilterOcr(document.ocrText, MAX_OCR_CHARS);
+
+    // ── 8. Call Gemini with LEAN instructions + (LEAN | REDUCED) schema ─
+    // Layer 1 (always-on): LEAN schema + LEAN instructions replace the
+    // verbose originals to cut prompt size from ~20K to ~8K chars.
+    // Layer 2 (layout-active): REDUCED schema drops 4 financial fields the
+    // layout extractor owns so Gemini output shrinks ~40%.
+    const schema = useLayoutPath
+      ? { ...CREDIT_BUREAU_SCHEMA_REDUCED }
+      : { ...CREDIT_BUREAU_SCHEMA_LEAN };
     const geminiResult = await this.geminiService.extractStructuredData(
       ocrText,
       document.documentType.code,
-      { ...CREDIT_BUREAU_SCHEMA },
-      CREDIT_BUREAU_INSTRUCTIONS,
+      schema,
+      CREDIT_BUREAU_INSTRUCTIONS_LEAN,
     );
 
     if (!geminiResult.success) {
@@ -491,18 +958,33 @@ export class CreditBureauExtractionService {
 
     const data = geminiResult.extractedData as Record<string, unknown>;
 
-    // ── 7. Disambiguate payment fields using OCR text ───────────────────
-    // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount.
-    // This step cross-references the raw OCR text to correct misclassifications
+    // ── Layer 2: populate borrower/report from regex extraction ────────
+    // Gemini only saw "DETALLE DE CRÉDITOS" in the layout path, so its
+    // borrower/report fields are unreliable. Overwrite them with the
+    // regex-extracted values (already guaranteed non-null by the fallback
+    // above) so the output is complete without a second Gemini call.
+    if (borrowerFields) {
+      const borrower = (data.borrower ?? {}) as Record<string, unknown>;
+      borrower.fullName = borrowerFields.fullName;
+      borrower.rfc = borrowerFields.rfc;
+      borrower.birthDate = borrowerFields.birthDate;
+      data.borrower = borrower;
+      const report = (data.report ?? {}) as Record<string, unknown>;
+      report.consultationDate = borrowerFields.consultationDate;
+      data.report = report;
+    }
+
+    // ── 9. Disambiguate payment fields using OCR text (Layer 1 only) ──
+    // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount. This
+    // step cross-references the raw OCR text to correct misclassifications
     // before normalization runs.
     //
-    // NOTE: the regex disambiguator is intentionally still active during the
-    // layout-aware rollout (Phase 4). Layout authority for paymentDueAmount
-    // is applied AFTER this in mergeLayoutWithGemini(); the regex method only
-    // still meaningfully corrects lastPaymentAmount once layout is the
-    // authoritative source for paymentDueAmount. Removal of the regex
-    // disambiguator is deferred to Phase 7 (after 10+ validated PDFs).
-    this.disambiguatePaymentFields(data, document.ocrText);
+    // SKIPPED when the layout path is active: the layout extractor owns
+    // financial field authority and could conflict with the regex
+    // disambiguator. Layout authority is applied next in mergeLayoutWithGemini().
+    if (!useLayoutPath) {
+      this.disambiguatePaymentFields(data, document.ocrText);
+    }
 
     // ── 7b. Layout-aware merge (feature-flagged) ───────────────────────
     // When USE_LAYOUT_EXTRACTION is enabled and the document has an
@@ -639,6 +1121,15 @@ export class CreditBureauExtractionService {
   private isLayoutExtractionEnabled(): boolean {
     const v = this.configService.get<string>('USE_LAYOUT_EXTRACTION') ?? 'false';
     return String(v).toLowerCase() === 'true';
+  }
+
+  /**
+   * Returns true when layout extraction is enabled AND the document has
+   * page-level layout data available. Used to gate the layout-aware path
+   * (aggressive pre-filter, reduced schema, disambiguation bypass).
+   */
+  private shouldUseLayoutPath(ocrLayout: OcrLayout | null): boolean {
+    return this.isLayoutExtractionEnabled() && !!(ocrLayout?.pages?.length);
   }
 
   /**
@@ -795,6 +1286,7 @@ export class CreditBureauExtractionService {
         credit.paymentDueAmount = null;
         credit.candidatePaymentDueAmount = geminiDue;
         credit.needsManualReview = true;
+        credit.paymentDueAmountSource = 'UNCONFIRMED';
         CreditBureauExtractionService.attachAuditFields(
           credit,
           FinancialFieldsSource.MANUAL_REVIEW,
@@ -846,6 +1338,7 @@ export class CreditBureauExtractionService {
             credit.paymentDueAmount = null;
             credit.candidatePaymentDueAmount = geminiDue;
             credit.needsManualReview = true;
+            credit.paymentDueAmountSource = 'UNCONFIRMED';
             criticalNeedsManualReview = true;
           }
           // For non-critical LOW fields: keep the Gemini value untouched.
@@ -860,6 +1353,8 @@ export class CreditBureauExtractionService {
           fieldConfidence.paymentDueAmount === FinancialFieldsConfidence.MEDIUM)
       ) {
         credit.candidatePaymentDueAmount = geminiDue;
+        credit.paymentDueAmountSource = 'LAYOUT';
+        credit.paymentDueAmountConfirmed = true;
       }
 
       // 5. Decide the coarse financialFieldsSource value.
@@ -1049,32 +1544,39 @@ export class CreditBureauExtractionService {
         // ── isClosed + monthlyDebtContribution (CLS-001/002/003/004) ──────────
         //
         // Layout-aware rule: only feed paymentDueAmount into the
-        // monthly debt computation when its confidence is NOT LOW. When the
-        // layout extractor could not confirm paymentDueAmount (LOW), the
-        // merge step already set it to null; here we additionally null
-        // monthlyDebtContribution and emit an audit warning so the analyst
-        // understands the contribution is intentionally missing (not zero).
+        // ── Payment Due Guardrail (Sprint 3 prep) ──────────────────────
+        // ── Triple-field: freeze extracted, compute effective ──────────
+        // paymentDueAmountExtracted is set ONCE (immutable). If already
+        // present from a prior extraction, keep it — re-extraction must
+        // not overwrite a value the analyst may have relied on.
+        if (credit.paymentDueAmountExtracted === undefined) {
+          credit.paymentDueAmountExtracted =
+            (credit.paymentDueAmount as number | null) ?? null;
+        }
+        // Default manual if not set
+        if (credit.paymentDueAmountManual === undefined) {
+          credit.paymentDueAmountManual = null;
+        }
+        // Effective = manual ?? (confirmed ? extracted : null)
+        const manual = credit.paymentDueAmountManual as number | null;
+        const extracted = credit.paymentDueAmountExtracted as number | null;
+        const confirmed = credit.paymentDueAmountConfirmed === true;
+        credit.paymentDueAmountEffective =
+          manual ?? (confirmed ? extracted : null);
+
+        // Default source for credits that didn't go through layout merge
+        if (!credit.paymentDueAmountSource) {
+          credit.paymentDueAmountSource = 'UNCONFIRMED';
+        }
+
+        // ── monthly debt computation ────────────────────────────────────
+        // Uses effective exclusively. UNCONFIRMED / needsManualReview
+        // credits have effective=null → monthlyDebtContrib=null.
         credit.isClosed = credit.status === 'CLOSED';
         if (credit.isClosed) {
           credit.monthlyDebtContribution = 0;
         } else if (credit.status === 'ACTIVE') {
-          const conf = (credit.financialFieldsConfidence ??
-            null) as FinancialFieldsConfidenceMap | null;
-          if (
-            conf &&
-            conf.paymentDueAmount === FinancialFieldsConfidence.LOW
-          ) {
-            // Layout LOW: do NOT compute the contribution — null + warning.
-            credit.monthlyDebtContribution = null;
-            const warnings = (credit.financialFieldsWarnings as string[]) ?? [];
-            const WARNING =
-              'monthlyDebtContribution set to null (paymentDueAmount LOW confidence).';
-            if (!warnings.includes(WARNING)) warnings.push(WARNING);
-            credit.financialFieldsWarnings = warnings;
-          } else {
-            credit.monthlyDebtContribution =
-              (credit.paymentDueAmount as number | null) ?? null;
-          }
+          credit.monthlyDebtContribution = credit.paymentDueAmountEffective;
         } else {
           credit.monthlyDebtContribution = null;
         }
@@ -1739,6 +2241,114 @@ export class CreditBureauExtractionService {
       const tr = map[a.message];
       return tr ? { ...a, message: tr } : a;
     });
+  }
+
+  /**
+   * Allows an analyst to confirm or manually override a credit's
+   * `paymentDueAmount`. Reads the document, updates the specified credit
+   * index in `extractedData.credits[]`, recalculates
+   * `monthlyDebtContribution`, and persists.
+   *
+   * Called by `PATCH /documents/:id/credits/:index/payment-due`.
+   */
+  async updatePaymentDue(
+    documentId: string,
+    creditIndex: number,
+    body: { paymentDueAmountManualOverride?: number; paymentDueAmountConfirmed?: boolean },
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc || !doc.extractedData) {
+      throw new Error('Document not found or has no extracted data');
+    }
+
+    const data = doc.extractedData as Record<string, unknown>;
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!credits || creditIndex < 0 || creditIndex >= credits.length) {
+      throw new Error(`Credit index ${creditIndex} out of bounds (0-${(credits?.length ?? 0) - 1})`);
+    }
+
+    const credit = credits[creditIndex];
+
+    // ── Freeze extracted on first write ──────────────────────────────────
+    if (credit.paymentDueAmountExtracted === undefined) {
+      credit.paymentDueAmountExtracted =
+        (credit.paymentDueAmount as number | null) ?? null;
+    }
+
+    if (body.paymentDueAmountManualOverride !== undefined) {
+      // Manual override: set the triple fields
+      credit.paymentDueAmount = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountManual = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountManualOverride = body.paymentDueAmountManualOverride;
+      credit.paymentDueAmountSource = 'MANUAL';
+      credit.paymentDueAmountConfirmed = true;
+      credit.needsManualReview = false;
+    } else if (body.paymentDueAmountConfirmed === true) {
+      credit.paymentDueAmountConfirmed = true;
+      if (credit.paymentDueAmountSource === 'UNCONFIRMED') {
+        credit.paymentDueAmountSource = 'CONFIRMED_AUTO';
+      }
+      credit.needsManualReview = false;
+    }
+
+    // ── Compute effective ────────────────────────────────────────────────
+    const manual = credit.paymentDueAmountManual as number | null;
+    const extracted = credit.paymentDueAmountExtracted as number | null;
+    const confirmed = credit.paymentDueAmountConfirmed === true;
+    credit.paymentDueAmountEffective =
+      manual ?? (confirmed ? extracted : null);
+
+    // ── Recalculate monthlyDebtContribution ──────────────────────────────
+    const status = credit.status as string;
+    const isClosed = status === 'CLOSED';
+    if (isClosed) {
+      credit.monthlyDebtContribution = 0;
+    } else if (status === 'ACTIVE') {
+      credit.monthlyDebtContribution = credit.paymentDueAmountEffective as number | null;
+    } else {
+      credit.monthlyDebtContribution = null;
+    }
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data as any },
+    });
+
+    return { creditIndex, credit };
+  }
+
+  /**
+   * Allows an analyst to set or confirm the "Consultas 24 meses" value.
+   * Reads the document, updates inquiries24mManual/Confirmed, and persists.
+   */
+  async updateInquiries24m(
+    documentId: string,
+    body: { inquiries24mManual?: number; inquiries24mConfirmed?: boolean },
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc || !doc.extractedData) {
+      throw new Error('Document not found or has no extracted data');
+    }
+
+    const data = doc.extractedData as Record<string, unknown>;
+
+    if (body.inquiries24mManual !== undefined) {
+      data.inquiries24mManual = body.inquiries24mManual;
+      data.inquiries24mConfirmed = true;
+    } else if (body.inquiries24mConfirmed === true) {
+      data.inquiries24mConfirmed = true;
+    }
+
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data as any },
+    });
+
+    return { inquiries24mManual: data.inquiries24mManual, inquiries24mConfirmed: data.inquiries24mConfirmed };
   }
 
 }
