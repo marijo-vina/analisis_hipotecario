@@ -2174,12 +2174,12 @@ describe('CreditBureauExtractionService', () => {
       expect(filtered.length).toBeGreaterThan(0);
     });
 
-    it('caps output at MAX_OCR_LAYOUT_CHARS (6000)', () => {
+    it('caps output at MAX_OCR_LAYOUT_CHARS (15000)', () => {
       // Build a huge DETALLE section exceeding the cap
       const hugeDetail =
-        'DETALLE DE CRÉDITOS\n' + 'X'.repeat(8000) + '\nDETALLE DE CONSULTAS';
+        'DETALLE DE CRÉDITOS\n' + 'X'.repeat(18000) + '\nDETALLE DE CONSULTAS';
       const filtered = (service as any).preFilterOcrLayout(hugeDetail);
-      expect(filtered.length).toBeLessThanOrEqual(6500); // 6000 + truncation note
+      expect(filtered.length).toBeLessThanOrEqual(15500); // 15000 + truncation note
     });
   });
 
@@ -2573,7 +2573,7 @@ describe('CreditBureauExtractionService', () => {
   // ── 3.8 Integration: combined prompt < 10K chars for 20-credit PDF ──────
 
   describe('Phase 3 — combined prompt < 10K chars for 20-credit PDF', () => {
-    it('instructions + reduced schema + filtered OCR < 10000 chars', () => {
+    it('instructions + reduced schema + filtered OCR < 11000 chars', () => {
       // Build a realistic 20-credit DETALLE section. Each credit block ~250
       // chars → 20 credits ≈ 5000 chars, under the 6K layout cap.
       const oneCreditBlock = (
@@ -2613,8 +2613,9 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
       const prompt =
         CREDIT_BUREAU_INSTRUCTIONS_LEAN + schemaJson + filteredOcr;
 
-      // Assert the combined prompt is under the 10K budget.
-      expect(prompt.length).toBeLessThan(10000);
+      // Assert the combined prompt is under the 11K budget (instructions grew
+      // with paymentHistory/mopCodes length limits for output safety).
+      expect(prompt.length).toBeLessThan(11000);
 
       // Sanity: the filtered OCR should NOT contain borrower metadata
       expect(filteredOcr).not.toContain('Domicilio:');

@@ -85,7 +85,9 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   '  lastPaymentAmount: número del OCR que está SOLO, sin texto descriptivo.',
   '  currency ("MXN" por defecto),',
   '  paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
+  '    ⚠️ LÍMITE: máximo 72 caracteres (equivale a 6 años). Si el OCR muestra más, truncá a los últimos 72.',
   '  mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
+  '    ⚠️ LÍMITE: máximo 72 elementos. Si hay más, tomá solo los últimos 72.',
   '  observationKeys: array de strings con claves de observación que aparezcan',
   '    ASOCIADAS DIRECTAMENTE a este crédito (no del glosario). Ej: ["UP","LC"].',
   '  rawTextReference: texto original de la fila del crédito en el reporte.',
@@ -103,8 +105,8 @@ const CREDIT_BUREAU_INSTRUCTIONS = [
   '',
   '─── JSON VÁLIDO ───',
   'El JSON de salida DEBE ser parseable. Reglas estrictas:',
-  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222".',
-  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"].',
+  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222". Máximo 72 chars.',
+  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"]. Máximo 72 elementos.',
   '- NUNCA pongas texto crudo del OCR fuera de comillas en el JSON.',
   '- El JSON debe cerrar correctamente con }.',
 ].join('\n');
@@ -135,7 +137,10 @@ export const CREDIT_BUREAU_INSTRUCTIONS_LEAN = [
   'Fechas: YYYY-MM-DD. Montos: números decimales sin $ ni comas.',
   'currency: "MXN" por defecto.',
   'paymentHistory: string crudo del Histórico de Pagos, sin interpretar.',
+  '  ⚠️ LÍMITE: máximo 72 caracteres (equivale a 6 años de historial mensual).',
+  '  Si el OCR muestra más, truncá a los últimos 72.',
   'mopCodes: array de strings con códigos MOP del historial. Valores: 0-9, U, -.',
+  '  ⚠️ LÍMITE: máximo 72 elementos. Si hay más, tomá solo los últimos 72.',
   '',
   '─── Enums ───',
   'classification: REVOLVING | FIXED_PAYMENT | MORTGAGE | AUTO | PERSONAL_LOAN',
@@ -144,8 +149,8 @@ export const CREDIT_BUREAU_INSTRUCTIONS_LEAN = [
   '',
   '─── JSON VÁLIDO ───',
   'El JSON de salida DEBE ser parseable. Reglas estrictas:',
-  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222".',
-  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"].',
+  '- paymentHistory debe ser un string ENTRE COMILLAS: "111000222". Máximo 72 chars.',
+  '- mopCodes debe ser un array de strings: ["1","1","1","0","U"]. Máximo 72 elementos.',
   '- NUNCA pongas texto crudo del OCR fuera de comillas en el JSON.',
   '- El JSON debe cerrar correctamente con }.',
 ].join('\n');
@@ -455,7 +460,7 @@ const FINANCIAL_FIELDS: FinancialFieldName[] = [
 // "DETALLE DE CRÉDITOS" section to Gemini (~5K chars) instead of the full
 // 15K outfit — borrower/report metadata is regex-extracted separately.
 // ---------------------------------------------------------------------------
-const MAX_OCR_LAYOUT_CHARS = 6000;
+const MAX_OCR_LAYOUT_CHARS = 15000;
 
 // ---------------------------------------------------------------------------
 // Regex-extracted borrower/report metadata — used by the layout-aware path
@@ -604,9 +609,11 @@ export class CreditBureauExtractionService {
     const upper = raw.toUpperCase();
 
     const DETAIL_START = ['DETALLE DE CRÉDITOS', 'DETALLE DE CREDITOS'];
+    // NOTE: "DECLARATIVA" intentionally excluded — it can appear inside
+    // credit-detail text (e.g. "cuenta declarativa") and would cut off
+    // remaining credits prematurely.
     const CUT_AFTER = [
       'DETALLE DE CONSULTAS',
-      'DECLARATIVA',
       '¿ QUÉ SIGNIFICA',
       'QUÉ SIGNIFICA EL HISTÓRICO',
       'QUÉ SIGNIFICA EL HISTORICO',

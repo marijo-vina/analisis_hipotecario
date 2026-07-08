@@ -38,7 +38,7 @@ export interface ExtractionResult {
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_LOCATION = 'us-central1';
 const DEFAULT_TIMEOUT_MS = 60000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
 
 /** HTTP status codes that indicate a temporary server-side overload. */
 const RETRYABLE_STATUSES = new Set([429, 503]);
