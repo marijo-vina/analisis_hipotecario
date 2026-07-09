@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CaseAnalysisModule } from './case-analysis/case-analysis.module';
 import { ClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
@@ -18,6 +19,7 @@ import { DocumentsModule } from './documents/documents.module';
     CatalogsModule,
     MortgageCasesModule,
     DocumentsModule,
+    CaseAnalysisModule,
   ],
   controllers: [AppController],
   providers: [AppService],
