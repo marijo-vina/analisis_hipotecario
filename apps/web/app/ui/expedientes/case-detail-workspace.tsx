@@ -11,6 +11,7 @@ import ClientDrawer from "@/app/ui/expedientes/client-drawer";
 import CaseDetailDrawer from "@/app/ui/expedientes/case-detail-drawer";
 import DocumentBrowser from "@/app/ui/documents/document-browser";
 import ExtractionSection from "@/app/ui/extraction/extraction-section";
+import AnalysisSection from "@/app/ui/expedientes/analysis-section";
 
 // ── Tipos locales ──────────────────────────────────────────────────────────
 
@@ -184,6 +185,9 @@ export default function CaseDetailWorkspace({
 
       {/* ── Datos extraídos ────────────────────────────────────────────── */}
       <ExtractionSection documents={documents} caseId={caseId} />
+
+      {/* ── Análisis del expediente (Sprint 3) ──────────────────────────── */}
+      <AnalysisSection caseId={caseId} statusCode={statusCode} />
 
       {/* ── Drawers (siempre montados, controlados por `open`) ──────────── */}
       <ClientDrawer

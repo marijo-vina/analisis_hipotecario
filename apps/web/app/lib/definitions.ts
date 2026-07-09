@@ -123,3 +123,58 @@ export interface Document {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---- Analysis (Sprint 3 HU-09) --------------------------------------------
+
+export interface FieldComparison {
+  fieldName: string;
+  originalValue: Record<string, string | null>;
+  normalizedValue: Record<string, string | null>;
+  status: "MATCH" | "MISMATCH" | "NOT_AVAILABLE";
+  severity: "INFO" | "WARNING" | "ERROR";
+  alerts: string[];
+}
+
+export interface AnalysisDetail {
+  sources: string[];
+  fields: FieldComparison[];
+}
+
+export interface AnalysisAlert {
+  id: string;
+  ruleCode: string;
+  severity: string;
+  field: string;
+  message: string;
+}
+
+export interface AnalysisRun {
+  id: string;
+  executionStatus: "PENDING" | "RUNNING" | "COMPLETED" | "ERROR";
+  outcome: "PASS" | "PARTIAL" | "FAIL";
+  detail: AnalysisDetail;
+  triggeredBy: string;
+  createdAt: string;
+  alerts?: AnalysisAlert[];
+  reviewDecisions?: ReviewDecision[];
+}
+
+export interface ReviewDecision {
+  id: string;
+  action: "MARK_FALSE_POSITIVE" | "CONFIRM_ISSUE" | "CANCEL_CASE";
+  justification?: string | null;
+  decidedBy: string;
+  decidedAt: string;
+}
+
+export interface AnalysisResult {
+  runId: string;
+  executionStatus: string;
+  outcome: "PASS" | "PARTIAL" | "FAIL";
+  summary: string;
+  detail: AnalysisDetail;
+  executionMetadata: {
+    timestamp: string;
+    triggeredBy: string;
+  };
+}
