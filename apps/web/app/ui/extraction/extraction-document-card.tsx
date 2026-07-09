@@ -69,6 +69,8 @@ export interface ExtractionDocumentCardProps {
   isExpired?: boolean;
   /** Triggers document consultation drawer (the card's "Validar manualmente"). */
   onValidate?: (document: Document) => void;
+  /** When true, the card is always expanded — no collapse toggle shown. */
+  alwaysExpanded?: boolean;
 }
 
 /**
@@ -91,6 +93,7 @@ export default function ExtractionDocumentCard({
   defaultExpanded,
   isExpired,
   onValidate,
+  alwaysExpanded = false,
 }: ExtractionDocumentCardProps) {
   // Auto-expand when there are alerts (SPEC-5) unless overridden.
   const [expanded, setExpanded] = useState(
@@ -208,32 +211,38 @@ export default function ExtractionDocumentCard({
     <Card>
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          className="flex items-center gap-2 text-left"
-        >
-          <svg
-            className={`h-4 w-4 text-gf-text-muted transition-transform ${
-              expanded ? "rotate-90" : ""
-            }`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
+        {alwaysExpanded ? (
           <span className="text-sm font-semibold text-gf-text">
             {document.originalName}
           </span>
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="flex items-center gap-2 text-left"
+          >
+            <svg
+              className={`h-4 w-4 text-gf-text-muted transition-transform ${
+                expanded ? "rotate-90" : ""
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            <span className="text-sm font-semibold text-gf-text">
+              {document.originalName}
+            </span>
+          </button>
+        )}
 
         <div className="flex items-center gap-2">
           {isExpired && (
@@ -263,7 +272,7 @@ export default function ExtractionDocumentCard({
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────── */}
-      {expanded && (
+      {(expanded || alwaysExpanded) && (
         <div className="mt-4">
           <FieldGrid fields={gridFields} />
 
