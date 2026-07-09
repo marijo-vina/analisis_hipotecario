@@ -1,4 +1,4 @@
-import { normalizeText } from './normalize';
+import { normalizeText, namesMatch } from './normalize';
 import type { NormalizeMode } from './normalize';
 
 describe('normalizeText', () => {
@@ -76,5 +76,34 @@ describe('normalizeText', () => {
     ])('identifier mode: %p → %p', (input, expected) => {
       expect(normalizeText(input, 'identifier')).toBe(expected);
     });
+  });
+});
+
+describe('namesMatch', () => {
+  it('matches when tokens are identical (same order)', () => {
+    expect(namesMatch('JOSE PEREZ GARCIA', 'JOSE PEREZ GARCIA')).toBe(true);
+  });
+
+  it('matches when tokens are in different order (INE scenario)', () => {
+    // INE: "PEREZ GARCIA JOSE" vs Payroll: "JOSE PEREZ GARCIA"
+    expect(namesMatch('PEREZ GARCIA JOSE', 'JOSE PEREZ GARCIA')).toBe(true);
+  });
+
+  it('matches with varying amounts of whitespace after normalization', () => {
+    expect(namesMatch('JOSE  PEREZ   GARCIA', 'JOSE PEREZ GARCIA')).toBe(true);
+  });
+
+  it('does NOT match when tokens differ', () => {
+    expect(namesMatch('JOSE PEREZ GARCIA', 'JUAN PEREZ GARCIA')).toBe(false);
+  });
+
+  it('does NOT match when one name has extra tokens', () => {
+    expect(namesMatch('JOSE PEREZ', 'JOSE PEREZ GARCIA')).toBe(false);
+  });
+
+  it('does NOT match when one value is null', () => {
+    expect(namesMatch(null, 'JOSE PEREZ')).toBe(false);
+    expect(namesMatch('JOSE PEREZ', null)).toBe(false);
+    expect(namesMatch(null, null)).toBe(false);
   });
 });
