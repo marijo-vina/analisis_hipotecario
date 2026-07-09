@@ -192,7 +192,14 @@ export class IdentityMatchRule implements AnalysisRule {
     return map;
   }
 
-  /** Collect, for one field, the participating per-source field values. */
+  /** Collect, for one field, the participating per-source field values.
+   *
+   *  Policy (per user refinement):
+   *  - RFC and CURP are OPTIONAL in Client. If the client record has no value
+   *    (null / empty / whitespace), the client source is OMITTED from
+   *    comparison for that field — it never generates a mismatch.
+   *  - fullName is always required in Client (canonical field).
+   */
   private collectFieldValues(
     fieldName: IdentityField,
     client: PrismaClientLike,
@@ -213,13 +220,19 @@ export class IdentityMatchRule implements AnalysisRule {
       });
     }
 
-    // Client is always a participating reference for the identity fields.
+    // Client: only include if the field HAS a value (RFC/CURP are optional).
     const clientRaw = (client as Record<string, unknown>)[fieldName] as string | null | undefined;
-    values.push({
-      sourceKey: 'client',
-      raw: clientRaw == null ? null : String(clientRaw),
-      normalized: clientRaw == null || clientRaw.trim() === '' ? null : normalizeText(clientRaw, mode),
-    });
+    const hasClientValue = clientRaw != null && String(clientRaw).trim() !== '';
+
+    if (fieldName === 'fullName' || hasClientValue) {
+      // Always include client entry in originalValue/normalizedValue maps
+      // so the frontend can show "No capturado" for empty optional fields.
+      values.push({
+        sourceKey: 'client',
+        raw: clientRaw == null ? null : String(clientRaw),
+        normalized: hasClientValue ? normalizeText(clientRaw, mode) : null,
+      });
+    }
 
     return values;
   }
@@ -247,7 +260,28 @@ export class IdentityMatchRule implements AnalysisRule {
     let outcome: AnalysisOutcome = 'PASS';
     let outcomeSeverity: Severity = 'INFO';
 
+    const clientValue = present.find((v) => v.sourceKey === 'client');
+
     if (present.length < 2) {
+      // Cannot compare with <2 sources. Exception: if a single document
+      // has the value and client was omitted (optional field), still mark
+      // as MATCH with a suggestion.
+      if (present.length === 1 && !clientValue && (fieldName === 'rfc' || fieldName === 'curp')) {
+        status = 'MATCH';
+        fieldAlerts.push('CLIENT_FIELD_OMITTED');
+        alerts.push({
+          ruleCode: 'CLIENT_FIELD_OMITTED',
+          severity: 'INFO',
+          field: fieldName,
+          message: `${fieldName.toUpperCase()}: completar en datos del cliente con base en documento validado`,
+        });
+        return {
+          field: { fieldName, originalValue, normalizedValue, status, severity, alerts: fieldAlerts },
+          alerts,
+          outcome,
+          outcomeSeverity,
+        };
+      }
       // Cannot compare — keep NOT_AVAILABLE, contribute nothing to outcome.
       return {
         field: { fieldName, originalValue, normalizedValue, status, severity, alerts: fieldAlerts },
@@ -261,7 +295,6 @@ export class IdentityMatchRule implements AnalysisRule {
       present.filter((v) => v.sourceKey !== 'client').map((v) => v.normalized),
     );
     const docValues = present.filter((v) => v.sourceKey !== 'client');
-    const clientValue = present.find((v) => v.sourceKey === 'client');
 
     status = 'MATCH'; // provisional; downgraded below if discrepancies found.
 
@@ -273,12 +306,12 @@ export class IdentityMatchRule implements AnalysisRule {
           severity = 'ERROR';
           outcome = 'FAIL';
           outcomeSeverity = 'ERROR';
-          fieldAlerts.push('IDENTITY_MISMATCH');
+          fieldAlerts.push('DOCUMENT_CONFLICT');
           alerts.push({
-            ruleCode: 'IDENTITY_MISMATCH',
+            ruleCode: 'DOCUMENT_CONFLICT',
             severity: 'ERROR',
             field: fieldName,
-            message: `Diferencia en ${fieldName.toUpperCase()} entre documentos`,
+            message: `${fieldName.toUpperCase()}: conflicto entre documentos — las fuentes no coinciden`,
           });
         } else {
           // fullName mismatch among documents → PARTIAL / WARNING.
@@ -290,26 +323,25 @@ export class IdentityMatchRule implements AnalysisRule {
             ruleCode: 'NAME_MISMATCH',
             severity: 'WARNING',
             field: fieldName,
-            message: 'Coincidencia por nombre',
+            message: 'Nombre: los documentos no coinciden — se requiere revisión',
           });
         }
       } else {
-        // ── Documents agree → compare Client against document consensus ──
+        // ── Documents agree ────────────────────────────────────────────────
         const consensus = docValues[0].normalized!;
         if (clientValue && clientValue.normalized !== consensus) {
+          // Client has a value but it differs from document consensus.
           status = 'MISMATCH';
           if (fieldName === 'rfc' || fieldName === 'curp') {
-            // Client-document mismatch is PARTIAL (operational reference),
-            // never FAIL — Client is not absolute legal truth.
             severity = 'WARNING';
             outcome = 'PARTIAL';
             outcomeSeverity = 'WARNING';
-            fieldAlerts.push('CLIENT_DOCUMENT_MISMATCH');
+            fieldAlerts.push('EXPEDIENTE_VS_DOCUMENTOS');
             alerts.push({
-              ruleCode: 'CLIENT_DOCUMENT_MISMATCH',
+              ruleCode: 'EXPEDIENTE_VS_DOCUMENTOS',
               severity: 'WARNING',
               field: fieldName,
-              message: `Client ${fieldName.toUpperCase()} difiere de los documentos`,
+              message: `${fieldName.toUpperCase()}: el valor en expediente difiere de los documentos`,
             });
           } else {
             severity = 'WARNING';
@@ -320,36 +352,44 @@ export class IdentityMatchRule implements AnalysisRule {
               ruleCode: 'NAME_MISMATCH',
               severity: 'WARNING',
               field: fieldName,
-              message: 'Coincidencia por nombre',
+              message: 'Nombre: el expediente difiere de los documentos',
             });
           }
         } else if (clientValue && clientValue.normalized === consensus) {
           status = 'MATCH';
           severity = 'INFO';
         } else {
-          // No client value present; documents agree → MATCH.
+          // No client value present.
           status = 'MATCH';
           severity = 'INFO';
+          // For RFC/CURP: suggest completing the field in client data
+          if (fieldName === 'rfc' || fieldName === 'curp') {
+            fieldAlerts.push('CLIENT_FIELD_OMITTED');
+            alerts.push({
+              ruleCode: 'CLIENT_FIELD_OMITTED',
+              severity: 'INFO',
+              field: fieldName,
+              message: `${fieldName.toUpperCase()}: completar en datos del cliente con base en documentos validados`,
+            });
+          }
         }
       }
     } else {
-      // Only the Client + a single document available for this field.
-      // Pairwise comparison Client-vs-single-doc. Not a doc-vs-doc mismatch,
-      // so a discrepancy is treated as Client-document mismatch (PARTIAL).
-      const singleDoc = docValues[0];
-      if (clientValue) {
+      // Only one document available for this field (or none).
+      const singleDoc = docValues.length === 1 ? docValues[0] : null;
+      if (singleDoc && clientValue) {
         if (clientValue.normalized !== singleDoc.normalized) {
           status = 'MISMATCH';
           if (fieldName === 'rfc' || fieldName === 'curp') {
             severity = 'WARNING';
             outcome = 'PARTIAL';
             outcomeSeverity = 'WARNING';
-            fieldAlerts.push('CLIENT_DOCUMENT_MISMATCH');
+            fieldAlerts.push('EXPEDIENTE_VS_DOCUMENTOS');
             alerts.push({
-              ruleCode: 'CLIENT_DOCUMENT_MISMATCH',
+              ruleCode: 'EXPEDIENTE_VS_DOCUMENTOS',
               severity: 'WARNING',
               field: fieldName,
-              message: `Client ${fieldName.toUpperCase()} difiere de los documentos`,
+              message: `${fieldName.toUpperCase()}: el valor en expediente difiere del documento`,
             });
           } else {
             severity = 'WARNING';
@@ -360,13 +400,32 @@ export class IdentityMatchRule implements AnalysisRule {
               ruleCode: 'NAME_MISMATCH',
               severity: 'WARNING',
               field: fieldName,
-              message: 'Coincidencia por nombre',
+              message: 'Nombre: el expediente difiere del documento',
             });
           }
         } else {
           status = 'MATCH';
           severity = 'INFO';
         }
+      } else if (singleDoc && !clientValue) {
+        // Document has value but client doesn't (optional field omitted).
+        status = 'MATCH';
+        severity = 'INFO';
+        if (fieldName === 'rfc' || fieldName === 'curp') {
+          fieldAlerts.push('CLIENT_FIELD_OMITTED');
+          alerts.push({
+            ruleCode: 'CLIENT_FIELD_OMITTED',
+            severity: 'INFO',
+            field: fieldName,
+            message: `${fieldName.toUpperCase()}: completar en datos del cliente con base en documento validado`,
+          });
+        }
+      } else if (!singleDoc && clientValue) {
+        // Only client has the value, no docs → self-match is meaningless.
+        status = 'NOT_AVAILABLE';
+      } else if (!singleDoc && !clientValue) {
+        // No doc and no client value → NOT_AVAILABLE.
+        status = 'NOT_AVAILABLE';
       } else {
         // No client value; single document cannot self-compare → NOT_AVAILABLE.
         status = 'NOT_AVAILABLE';

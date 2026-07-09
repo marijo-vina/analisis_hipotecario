@@ -343,6 +343,10 @@ function ValidationTable({
                       >
                         {value}
                       </span>
+                    ) : source === "client" && fieldName !== "fullName" ? (
+                      <span className="text-xs text-blue-600 italic">
+                        No capturado
+                      </span>
                     ) : (
                       <span className="text-xs text-gf-text-muted italic">
                         —
@@ -447,100 +451,148 @@ function IdentitySummaryCard({
       {hasIssues && (
         <div className="space-y-3 mt-3">
           {mismatches.map((mismatch) => {
-            // Encontrar qué documento difiere del consenso
-            const normValues = Object.entries(mismatch.normalizedValue).filter(
+            const isDocConflict = mismatch.alerts.includes("DOCUMENT_CONFLICT");
+            const isExpedienteVsDocs = mismatch.alerts.includes("EXPEDIENTE_VS_DOCUMENTOS");
+            const isNameMismatch = mismatch.alerts.includes("NAME_MISMATCH");
+
+            // Collect all sources with non-null normalized values
+            const entries = Object.entries(mismatch.normalizedValue).filter(
               ([, v]) => v !== null,
             );
-            // Encontrar pares que discrepan
-            const pairs: { source: string; value: string; expected: string }[] = [];
-            const nonClientValues = normValues.filter(([k]) => k !== "client");
-            const clientValue = normValues.find(([k]) => k === "client")?.[1] ?? null;
+            const docEntries = entries.filter(([k]) => k !== "client");
+            const clientEntry = entries.find(([k]) => k === "client");
 
-            if (nonClientValues.length >= 2) {
-              const uniqueValues = new Set(nonClientValues.map(([, v]) => v));
-              if (uniqueValues.size > 1) {
-                // Documento vs documento: mostrar el que difiere del primero
-                const firstVal = nonClientValues[0][1];
-                for (const [src, val] of nonClientValues) {
-                  if (val !== firstVal) {
-                    pairs.push({
-                      source: src,
-                      value: mismatch.originalValue[src] ?? "—",
-                      expected: (mismatch.originalValue[nonClientValues[0][0]] as string) ?? firstVal,
-                    });
-                  }
-                }
-              }
-            }
-            if (pairs.length === 0 && clientValue) {
-              // Client vs documento
-              for (const [src, val] of nonClientValues) {
-                if (val !== clientValue) {
-                  pairs.push({
-                    source: src,
-                    value: mismatch.originalValue[src] ?? "—",
-                    expected: mismatch.originalValue["client"] ?? clientValue,
-                  });
-                }
-              }
+            if (isDocConflict) {
+              // ── Conflicto entre documentos ───────────────────────────
+              return (
+                <div
+                  key={mismatch.fieldName}
+                  className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
+                >
+                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                    Conflicto entre documentos
+                  </p>
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <div className="min-w-[60px]">
+                      <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
+                      <p className="text-sm font-semibold text-gf-red uppercase">
+                        {mismatch.fieldName}
+                      </p>
+                    </div>
+                    {docEntries.map(([src,]) => (
+                      <div key={src}>
+                        <p className="text-[10px] text-gf-text-muted uppercase">
+                          {SOURCE_LABELS[src] ?? src}
+                        </p>
+                        <p className="text-sm font-medium text-gf-red">
+                          {mismatch.originalValue[src] ?? "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gf-text-muted mt-2">
+                    Las fuentes no coinciden. La asesora debe revisar los
+                    documentos originales para determinar el valor correcto.
+                  </p>
+                </div>
+              );
             }
 
+            if (isExpedienteVsDocs) {
+              // ── Expediente vs documentos ─────────────────────────────
+              return (
+                <div
+                  key={mismatch.fieldName}
+                  className="bg-white rounded-lg border border-yellow-200 bg-yellow-50/30 px-3 py-2.5"
+                >
+                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                    Expediente vs documentos
+                  </p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    <div className="min-w-[60px]">
+                      <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
+                      <p className="text-sm font-semibold text-yellow-700 uppercase">
+                        {mismatch.fieldName}
+                      </p>
+                    </div>
+                    {clientEntry && (
+                      <div>
+                        <p className="text-[10px] text-gf-text-muted uppercase">
+                          Valor en expediente
+                        </p>
+                        <p className="text-sm font-medium text-gf-red">
+                          {mismatch.originalValue["client"] ?? "—"}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] text-gf-text-muted uppercase">
+                        Valor detectado en documentos
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {docEntries.map(([src,]) => (
+                          <span key={src} className="text-sm font-medium text-green-700">
+                            {mismatch.originalValue[src] ?? "—"}
+                            <span className="text-[10px] text-gf-text-muted ml-1">
+                              ({SOURCE_LABELS[src] ?? src})
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gf-text-muted mt-2">
+                    El expediente es referencia operativa, no verdad legal
+                    absoluta. Verificar documentos originales.
+                  </p>
+                </div>
+              );
+            }
+
+            // ── Name mismatch (genérico) ───────────────────────────────
             return (
               <div
                 key={mismatch.fieldName}
-                className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
+                className="bg-white rounded-lg border border-yellow-200 px-3 py-2.5"
               >
                 <div className="flex items-start gap-4 flex-wrap">
                   <div className="min-w-[80px]">
-                    <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-                      Campo
-                    </p>
-                    <p className="text-sm font-semibold text-gf-red uppercase">
+                    <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
+                    <p className="text-sm font-semibold text-yellow-700 uppercase">
                       {mismatch.fieldName}
                     </p>
                   </div>
-                  {pairs.length > 0 ? (
-                    pairs.map((pair) => (
-                      <div key={pair.source} className="flex items-start gap-4 flex-wrap">
-                        <div>
-                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-                            Documento
-                          </p>
-                          <p className="text-sm font-medium text-gf-text">
-                            {SOURCE_LABELS[pair.source] ?? pair.source}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-                            Valor encontrado
-                          </p>
-                          <p className="text-sm font-medium text-gf-red">
-                            {pair.value}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-                            Valor esperado
-                          </p>
-                          <p className="text-sm font-medium text-green-700">
-                            {pair.expected}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-gf-text-muted">
-                      Los valores difieren entre fuentes.
-                    </p>
-                  )}
+                  {docEntries.map(([src,]) => (
+                    <div key={src}>
+                      <p className="text-[10px] text-gf-text-muted uppercase">
+                        {SOURCE_LABELS[src] ?? src}
+                      </p>
+                      <p className="text-sm font-medium text-gf-text">
+                        {mismatch.originalValue[src] ?? "—"}
+                      </p>
+                    </div>
+                  ))}
                 </div>
+                <p className="text-[11px] text-gf-text-muted mt-2">
+                  Los valores detectados no coinciden. Se requiere revisión.
+                </p>
               </div>
             );
           })}
 
           <p className="text-[11px] text-gf-text-muted mt-2">
-            La asesora debe revisar cada discrepancia y decidir si es un falso
-            positivo o requiere ajuste en los documentos.
+            La asesora debe revisar cada discrepancia y decidir si requiere
+            ajuste en los documentos o si es un falso positivo.
+          </p>
+        </div>
+      )}
+
+      {/* CLIENT_FIELD_OMITTED — sugerencia para completar datos */}
+      {fields.some((f) => f.alerts.includes("CLIENT_FIELD_OMITTED")) && (
+        <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <p className="text-xs text-blue-700">
+            Completar RFC/CURP en datos del cliente con base en documentos
+            validados.
           </p>
         </div>
       )}
