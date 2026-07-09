@@ -218,19 +218,14 @@ export default function AnalysisSection({
         />
       </div>
 
-      {/* ── Origen del problema (si hay FAIL/PARTIAL) ──────────────────── */}
-      {run.outcome !== "PASS" && (
-        <ProblemOrigin fields={run.detail.fields} />
-      )}
-
       {/* ── Tabla comparativa ──────────────────────────────────────────── */}
       <ValidationTable
         sources={run.detail.sources}
         fields={run.detail.fields}
       />
 
-      {/* ── Resumen de identidad ───────────────────────────────────────── */}
-      <IdentitySummaryCard fields={run.detail.fields} />
+      {/* ── Resumen de identidad (incluye detalle de discrepancias) ────── */}
+      <IdentitySummaryCard fields={run.detail.fields} sources={run.detail.sources} />
 
       {/* ── Acciones de asesora ────────────────────────────────────────── */}
       <ActionsGroup
@@ -282,57 +277,6 @@ function StatusBadge({
       <span className="text-xs text-gf-text-muted">{label}</span>
       <span className="font-semibold">{value}</span>
     </div>
-  );
-}
-
-function ProblemOrigin({ fields }: { fields: FieldComparison[] }) {
-  const mismatches = fields.filter((f) => f.status === "MISMATCH");
-  if (mismatches.length === 0) return null;
-
-  // Tomar la primera discrepancia para mostrar
-  const first = mismatches[0];
-  const sources = Object.keys(first.normalizedValue).filter(
-    (k) => first.normalizedValue[k] !== null,
-  );
-  const docSource = sources.find((s) => s !== "client") ?? sources[0];
-
-  return (
-    <Card className="border-red-200 bg-white">
-      <div className="flex items-start gap-6 flex-wrap">
-        <div>
-          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-            Documento con discrepancia
-          </p>
-          <p className="text-sm font-medium text-gf-text">
-            {SOURCE_LABELS[docSource] ?? docSource}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-            Campo afectado
-          </p>
-          <p className="text-sm font-semibold text-gf-red uppercase">
-            {first.fieldName}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-            Valor en documento
-          </p>
-          <p className="text-sm font-medium text-gf-red">
-            {docSource ? (first.originalValue[docSource] ?? "—") : "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
-            Valor esperado
-          </p>
-          <p className="text-sm font-medium text-green-700">
-            {first.normalizedValue["client"] ?? "—"}
-          </p>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -450,11 +394,16 @@ function FieldStatusBadge({
   );
 }
 
-function IdentitySummaryCard({ fields }: { fields: FieldComparison[] }) {
+function IdentitySummaryCard({
+  fields,
+  sources,
+}: {
+  fields: FieldComparison[];
+  sources: string[];
+}) {
   const matchCount = fields.filter((f) =>
-    Object.values(f.normalizedValue).some(
-      (v) => v !== null,
-    ) && f.status === "MATCH",
+    Object.values(f.normalizedValue).some((v) => v !== null) &&
+    f.status === "MATCH",
   ).length;
   const mismatchCount = fields.filter((f) => f.status === "MISMATCH").length;
   const unavailableCount = fields.filter(
@@ -462,18 +411,21 @@ function IdentitySummaryCard({ fields }: { fields: FieldComparison[] }) {
   ).length;
 
   const hasIssues = mismatchCount > 0;
+  const mismatches = fields.filter((f) => f.status === "MISMATCH");
 
   return (
     <Card
-      className={hasIssues ? "border-red-200 bg-red-50/30" : "border-green-200 bg-green-50/30"}
+      className={
+        hasIssues
+          ? "border-red-200 bg-red-50/30"
+          : "border-green-200 bg-green-50/30"
+      }
     >
       {/* MiniStats */}
       <div className="flex items-center gap-4 mb-3">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-500" />
-          <span className="text-xs text-gf-text">
-            {matchCount} coinciden
-          </span>
+          <span className="text-xs text-gf-text">{matchCount} coinciden</span>
         </div>
         <span className="text-xs text-gf-text-muted">|</span>
         <div className="flex items-center gap-1.5">
@@ -491,11 +443,106 @@ function IdentitySummaryCard({ fields }: { fields: FieldComparison[] }) {
         </div>
       </div>
 
+      {/* Detalle de cada discrepancia */}
       {hasIssues && (
-        <p className="text-[11px] text-gf-text-muted">
-          Si existieran múltiples discrepancias, se mostrarían aquí con detalle
-          de cada campo y documento afectado.
-        </p>
+        <div className="space-y-3 mt-3">
+          {mismatches.map((mismatch) => {
+            // Encontrar qué documento difiere del consenso
+            const normValues = Object.entries(mismatch.normalizedValue).filter(
+              ([, v]) => v !== null,
+            );
+            // Encontrar pares que discrepan
+            const pairs: { source: string; value: string; expected: string }[] = [];
+            const nonClientValues = normValues.filter(([k]) => k !== "client");
+            const clientValue = normValues.find(([k]) => k === "client")?.[1] ?? null;
+
+            if (nonClientValues.length >= 2) {
+              const uniqueValues = new Set(nonClientValues.map(([, v]) => v));
+              if (uniqueValues.size > 1) {
+                // Documento vs documento: mostrar el que difiere del primero
+                const firstVal = nonClientValues[0][1];
+                for (const [src, val] of nonClientValues) {
+                  if (val !== firstVal) {
+                    pairs.push({
+                      source: src,
+                      value: mismatch.originalValue[src] ?? "—",
+                      expected: (mismatch.originalValue[nonClientValues[0][0]] as string) ?? firstVal,
+                    });
+                  }
+                }
+              }
+            }
+            if (pairs.length === 0 && clientValue) {
+              // Client vs documento
+              for (const [src, val] of nonClientValues) {
+                if (val !== clientValue) {
+                  pairs.push({
+                    source: src,
+                    value: mismatch.originalValue[src] ?? "—",
+                    expected: mismatch.originalValue["client"] ?? clientValue,
+                  });
+                }
+              }
+            }
+
+            return (
+              <div
+                key={mismatch.fieldName}
+                className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
+              >
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div className="min-w-[80px]">
+                    <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
+                      Campo
+                    </p>
+                    <p className="text-sm font-semibold text-gf-red uppercase">
+                      {mismatch.fieldName}
+                    </p>
+                  </div>
+                  {pairs.length > 0 ? (
+                    pairs.map((pair) => (
+                      <div key={pair.source} className="flex items-start gap-4 flex-wrap">
+                        <div>
+                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
+                            Documento
+                          </p>
+                          <p className="text-sm font-medium text-gf-text">
+                            {SOURCE_LABELS[pair.source] ?? pair.source}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
+                            Valor encontrado
+                          </p>
+                          <p className="text-sm font-medium text-gf-red">
+                            {pair.value}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gf-text-muted uppercase tracking-wide">
+                            Valor esperado
+                          </p>
+                          <p className="text-sm font-medium text-green-700">
+                            {pair.expected}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gf-text-muted">
+                      Los valores difieren entre fuentes.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          <p className="text-[11px] text-gf-text-muted mt-2">
+            La asesora debe revisar cada discrepancia y decidir si es un falso
+            positivo o requiere ajuste en los documentos.
+          </p>
+        </div>
       )}
 
       {!hasIssues && (
