@@ -235,6 +235,7 @@ export default function AnalysisSection({
         hasExistingDecision={
           (run.reviewDecisions?.length ?? 0) > 0
         }
+        onReprocess={handleAnalyze}
       />
     </div>
   );
@@ -453,6 +454,8 @@ function IdentitySummaryCard({
           {mismatches.map((mismatch) => {
             const isDocConflict = mismatch.alerts.includes("DOCUMENT_CONFLICT");
             const isExpedienteVsDocs = mismatch.alerts.includes("EXPEDIENTE_VS_DOCUMENTOS");
+            const isNameOrderDiff = mismatch.alerts.includes("NAME_ORDER_DIFF");
+            const isNameNonStd = mismatch.alerts.includes("NAME_NONSTANDARD_CHAR");
             const isNameMismatch = mismatch.alerts.includes("NAME_MISMATCH");
 
             // Collect all sources with non-null normalized values
@@ -493,6 +496,67 @@ function IdentitySummaryCard({
                   <p className="text-[11px] text-gf-text-muted mt-2">
                     Las fuentes no coinciden. La asesora debe revisar los
                     documentos originales para determinar el valor correcto.
+                  </p>
+                </div>
+              );
+            }
+
+            if (isNameNonStd) {
+              // ── Carácter no estándar en documento fuente ─────────────
+              return (
+                <div
+                  key={mismatch.fieldName}
+                  className="bg-white rounded-lg border border-amber-200 bg-amber-50/30 px-3 py-2.5"
+                >
+                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                    Nombre con carácter no estándar
+                  </p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {docEntries.map(([src,]) => (
+                      <div key={src}>
+                        <p className="text-[10px] text-gf-text-muted uppercase">
+                          {SOURCE_LABELS[src] ?? src}
+                        </p>
+                        <p className="text-sm font-medium text-gf-text">
+                          {mismatch.originalValue[src] ?? "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gf-text-muted mt-2">
+                    El documento fuente contiene caracteres no estándar en el
+                    nombre (ej. #, @). No es error de OCR — revisar el
+                    documento original.
+                  </p>
+                </div>
+              );
+            }
+
+            if (isNameOrderDiff) {
+              // ── Coincide con orden distinto (INE: apellidos primero) ──
+              return (
+                <div
+                  key={mismatch.fieldName}
+                  className="bg-white rounded-lg border border-blue-200 bg-blue-50/30 px-3 py-2.5"
+                >
+                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                    Coincide con orden distinto
+                  </p>
+                  <div className="flex items-start gap-4 flex-wrap">
+                    {docEntries.map(([src,]) => (
+                      <div key={src}>
+                        <p className="text-[10px] text-gf-text-muted uppercase">
+                          {SOURCE_LABELS[src] ?? src}
+                        </p>
+                        <p className="text-sm font-medium text-gf-text">
+                          {mismatch.originalValue[src] ?? "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gf-text-muted mt-2">
+                    El INE lista apellidos primero. Los tokens coinciden —
+                    validación parcial, no es un error.
                   </p>
                 </div>
               );
@@ -611,6 +675,7 @@ function ActionsGroup({
   isSubmitting,
   error,
   hasExistingDecision,
+  onReprocess,
 }: {
   onReviewDecision: (
     action: ReviewDecision["action"],
@@ -619,6 +684,7 @@ function ActionsGroup({
   isSubmitting: boolean;
   error: string | null;
   hasExistingDecision: boolean;
+  onReprocess: () => Promise<void>;
 }) {
   const [showJustification, setShowJustification] = useState(false);
   const [justification, setJustification] = useState("");
@@ -653,9 +719,18 @@ function ActionsGroup({
           variant="secondary"
           type="button"
           disabled={isSubmitting}
+          onClick={onReprocess}
+        >
+          {isSubmitting ? "..." : "🔄 Reprocesar análisis"}
+        </Button>
+
+        <Button
+          variant="secondary"
+          type="button"
+          disabled={isSubmitting}
           onClick={() => onReviewDecision("CONFIRM_ISSUE")}
         >
-          {isSubmitting ? "..." : "✅ Confirmar"}
+          {isSubmitting ? "..." : "✅ Confirmar revisión"}
         </Button>
 
         {!showJustification ? (
@@ -697,26 +772,11 @@ function ActionsGroup({
             </Button>
           </span>
         )}
-
-        <div className="flex-1" />
-
-        <Button
-          variant="destructive"
-          type="button"
-          disabled={isSubmitting}
-          onClick={() => onReviewDecision("CANCEL_CASE")}
-        >
-          ⚠️ Cancelar expediente
-        </Button>
       </div>
 
       {error && (
         <p className="text-xs text-gf-red mt-2">{error}</p>
       )}
-
-      <p className="text-[11px] text-gf-text-muted mt-3">
-        La cancelación requerirá confirmación mediante un modal.
-      </p>
     </Card>
   );
 }

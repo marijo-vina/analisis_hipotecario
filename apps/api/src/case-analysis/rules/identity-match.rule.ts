@@ -6,7 +6,7 @@ import type {
   RuleResult,
   Severity,
 } from '../analysis-rule.interface';
-import { normalizeText, namesMatch } from '../normalize';
+import { normalizeText, namesMatch, classifyNameMatch, hasNonStandardChars } from '../normalize';
 import type { NormalizeMode } from '../normalize';
 
 /** Minimal overlap with the Prisma `Client` model — kept loose for testability. */
@@ -343,17 +343,47 @@ export class IdentityMatchRule implements AnalysisRule {
             message: `${fieldName.toUpperCase()}: conflicto entre documentos — las fuentes no coinciden`,
           });
         } else {
-          // fullName mismatch among documents → PARTIAL / WARNING.
+          // ── fullName: distinguish order-diff from token-diff ──────────────
+          const nameClass = classifyNameMatch(
+            docValues[0].normalized,
+            docValues[1].normalized,
+          );
+          const hasNonStd = docValues.some((v) =>
+            hasNonStandardChars(v.raw),
+          );
+
           severity = 'WARNING';
           outcome = 'PARTIAL';
           outcomeSeverity = 'WARNING';
-          fieldAlerts.push('NAME_MISMATCH');
-          alerts.push({
-            ruleCode: 'NAME_MISMATCH',
-            severity: 'WARNING',
-            field: fieldName,
-            message: 'Nombre: los documentos no coinciden — se requiere revisión',
-          });
+
+          if (hasNonStd) {
+            fieldAlerts.push('NAME_NONSTANDARD_CHAR');
+            alerts.push({
+              ruleCode: 'NAME_NONSTANDARD_CHAR',
+              severity: 'WARNING',
+              field: fieldName,
+              message:
+                'Nombre: carácter no estándar en documento fuente — requiere revisión',
+            });
+          } else if (nameClass === 'token-order-diff') {
+            fieldAlerts.push('NAME_ORDER_DIFF');
+            alerts.push({
+              ruleCode: 'NAME_ORDER_DIFF',
+              severity: 'WARNING',
+              field: fieldName,
+              message:
+                'Nombre: coincide con orden distinto entre documentos (INE: apellidos primero)',
+            });
+          } else {
+            fieldAlerts.push('NAME_MISMATCH');
+            alerts.push({
+              ruleCode: 'NAME_MISMATCH',
+              severity: 'WARNING',
+              field: fieldName,
+              message:
+                'Nombre: los documentos no coinciden — se requiere revisión',
+            });
+          }
         }
       } else {
         // ── Documents agree ────────────────────────────────────────────────
@@ -377,16 +407,46 @@ export class IdentityMatchRule implements AnalysisRule {
               message: `${fieldName.toUpperCase()}: el valor en expediente difiere de los documentos`,
             });
           } else {
+            // ── fullName: client vs docs — distinguish order-diff ──────────
+            const nameClass = classifyNameMatch(
+              clientValue.normalized,
+              consensus,
+            );
+            const hasNonStd =
+              hasNonStandardChars(clientValue.raw) ||
+              docValues.some((v) => hasNonStandardChars(v.raw));
+
             severity = 'WARNING';
             outcome = 'PARTIAL';
             outcomeSeverity = 'WARNING';
-            fieldAlerts.push('NAME_MISMATCH');
-            alerts.push({
-              ruleCode: 'NAME_MISMATCH',
-              severity: 'WARNING',
-              field: fieldName,
-              message: 'Nombre: el expediente difiere de los documentos',
-            });
+
+            if (hasNonStd) {
+              fieldAlerts.push('NAME_NONSTANDARD_CHAR');
+              alerts.push({
+                ruleCode: 'NAME_NONSTANDARD_CHAR',
+                severity: 'WARNING',
+                field: fieldName,
+                message:
+                  'Nombre: carácter no estándar en documento fuente — requiere revisión',
+              });
+            } else if (nameClass === 'token-order-diff') {
+              fieldAlerts.push('NAME_ORDER_DIFF');
+              alerts.push({
+                ruleCode: 'NAME_ORDER_DIFF',
+                severity: 'WARNING',
+                field: fieldName,
+                message:
+                  'Nombre: el expediente y los documentos coinciden con orden distinto',
+              });
+            } else {
+              fieldAlerts.push('NAME_MISMATCH');
+              alerts.push({
+                ruleCode: 'NAME_MISMATCH',
+                severity: 'WARNING',
+                field: fieldName,
+                message: 'Nombre: el expediente difiere de los documentos',
+              });
+            }
           }
         } else if (clientValue && this.valuesMatch(clientValue.normalized!, consensus, fieldName)) {
           status = 'MATCH';
@@ -425,16 +485,46 @@ export class IdentityMatchRule implements AnalysisRule {
               message: `${fieldName.toUpperCase()}: el valor en expediente difiere del documento`,
             });
           } else {
+            // ── fullName: single doc vs client ─────────────────────────────
+            const nameClass = classifyNameMatch(
+              clientValue.normalized,
+              singleDoc.normalized,
+            );
+            const hasNonStd =
+              hasNonStandardChars(clientValue.raw) ||
+              hasNonStandardChars(singleDoc.raw);
+
             severity = 'WARNING';
             outcome = 'PARTIAL';
             outcomeSeverity = 'WARNING';
-            fieldAlerts.push('NAME_MISMATCH');
-            alerts.push({
-              ruleCode: 'NAME_MISMATCH',
-              severity: 'WARNING',
-              field: fieldName,
-              message: 'Nombre: el expediente difiere del documento',
-            });
+
+            if (hasNonStd) {
+              fieldAlerts.push('NAME_NONSTANDARD_CHAR');
+              alerts.push({
+                ruleCode: 'NAME_NONSTANDARD_CHAR',
+                severity: 'WARNING',
+                field: fieldName,
+                message:
+                  'Nombre: carácter no estándar en documento fuente — requiere revisión',
+              });
+            } else if (nameClass === 'token-order-diff') {
+              fieldAlerts.push('NAME_ORDER_DIFF');
+              alerts.push({
+                ruleCode: 'NAME_ORDER_DIFF',
+                severity: 'WARNING',
+                field: fieldName,
+                message:
+                  'Nombre: el expediente y el documento coinciden con orden distinto',
+              });
+            } else {
+              fieldAlerts.push('NAME_MISMATCH');
+              alerts.push({
+                ruleCode: 'NAME_MISMATCH',
+                severity: 'WARNING',
+                field: fieldName,
+                message: 'Nombre: el expediente difiere del documento',
+              });
+            }
           }
         } else {
           status = 'MATCH';
