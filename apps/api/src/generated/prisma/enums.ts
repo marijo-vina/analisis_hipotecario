@@ -17,6 +17,34 @@ export const Role = {
 export type Role = (typeof Role)[keyof typeof Role]
 
 
+export const AnalysisExecutionStatus = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  COMPLETED: 'COMPLETED',
+  ERROR: 'ERROR'
+} as const
+
+export type AnalysisExecutionStatus = (typeof AnalysisExecutionStatus)[keyof typeof AnalysisExecutionStatus]
+
+
+export const AnalysisOutcome = {
+  PASS: 'PASS',
+  PARTIAL: 'PARTIAL',
+  FAIL: 'FAIL'
+} as const
+
+export type AnalysisOutcome = (typeof AnalysisOutcome)[keyof typeof AnalysisOutcome]
+
+
+export const ReviewDecisionAction = {
+  MARK_FALSE_POSITIVE: 'MARK_FALSE_POSITIVE',
+  CONFIRM_ISSUE: 'CONFIRM_ISSUE',
+  CANCEL_CASE: 'CANCEL_CASE'
+} as const
+
+export type ReviewDecisionAction = (typeof ReviewDecisionAction)[keyof typeof ReviewDecisionAction]
+
+
 export const PersonType = {
   SALARIED: 'SALARIED'
 } as const

@@ -38,6 +38,21 @@ export type MortgageCase = Prisma.MortgageCaseModel
  */
 export type Document = Prisma.DocumentModel
 /**
+ * Model AnalysisRun
+ * 
+ */
+export type AnalysisRun = Prisma.AnalysisRunModel
+/**
+ * Model AnalysisAlert
+ * 
+ */
+export type AnalysisAlert = Prisma.AnalysisAlertModel
+/**
+ * Model ReviewDecision
+ * 
+ */
+export type ReviewDecision = Prisma.ReviewDecisionModel
+/**
  * Model DocumentType
  * 
  */

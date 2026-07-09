@@ -27,6 +27,25 @@ enum Role {
   ADVISOR
 }
 
+enum AnalysisExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  ERROR
+}
+
+enum AnalysisOutcome {
+  PASS
+  PARTIAL
+  FAIL
+}
+
+enum ReviewDecisionAction {
+  MARK_FALSE_POSITIVE
+  CONFIRM_ISSUE
+  CANCEL_CASE
+}
+
 model Client {
   id               String         @id @default(uuid())
   firstName        String
@@ -59,6 +78,7 @@ model MortgageCase {
   propertyValue   Decimal?
   notes           String?
   documents       Document[]
+  analysisRuns    AnalysisRun[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -92,6 +112,39 @@ model Document {
   processingError  String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+}
+
+model AnalysisRun {
+  id              String                   @id @default(uuid())
+  mortgageCaseId  String
+  mortgageCase    MortgageCase             @relation(fields: [mortgageCaseId], references: [id])
+  executionStatus AnalysisExecutionStatus
+  outcome         AnalysisOutcome
+  detail          Json
+  triggeredBy     String
+  alerts          AnalysisAlert[]
+  reviewDecisions ReviewDecision[]
+  createdAt       DateTime                 @default(now())
+}
+
+model AnalysisAlert {
+  id        String       @id @default(uuid())
+  runId     String
+  run       AnalysisRun  @relation(fields: [runId], references: [id])
+  ruleCode  String
+  severity  String
+  field     String
+  message   String
+}
+
+model ReviewDecision {
+  id            String               @id @default(uuid())
+  runId         String
+  run           AnalysisRun          @relation(fields: [runId], references: [id])
+  action        ReviewDecisionAction
+  justification String?
+  decidedBy     String
+  decidedAt     DateTime             @default(now())
 }
 
 model DocumentType {
