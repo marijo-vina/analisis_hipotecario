@@ -55,6 +55,9 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   Document: 'Document',
+  AnalysisRun: 'AnalysisRun',
+  AnalysisAlert: 'AnalysisAlert',
+  ReviewDecision: 'ReviewDecision',
   DocumentType: 'DocumentType',
   DocumentStatus: 'DocumentStatus',
   CreditType: 'CreditType',
@@ -149,6 +152,43 @@ export const DocumentScalarFieldEnum = {
 export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
 
 
+export const AnalysisRunScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  executionStatus: 'executionStatus',
+  outcome: 'outcome',
+  detail: 'detail',
+  triggeredBy: 'triggeredBy',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalysisRunScalarFieldEnum = (typeof AnalysisRunScalarFieldEnum)[keyof typeof AnalysisRunScalarFieldEnum]
+
+
+export const AnalysisAlertScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  ruleCode: 'ruleCode',
+  severity: 'severity',
+  field: 'field',
+  message: 'message'
+} as const
+
+export type AnalysisAlertScalarFieldEnum = (typeof AnalysisAlertScalarFieldEnum)[keyof typeof AnalysisAlertScalarFieldEnum]
+
+
+export const ReviewDecisionScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  action: 'action',
+  justification: 'justification',
+  decidedBy: 'decidedBy',
+  decidedAt: 'decidedAt'
+} as const
+
+export type ReviewDecisionScalarFieldEnum = (typeof ReviewDecisionScalarFieldEnum)[keyof typeof ReviewDecisionScalarFieldEnum]
+
+
 export const DocumentTypeScalarFieldEnum = {
   id: 'id',
   code: 'code',
@@ -203,6 +243,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

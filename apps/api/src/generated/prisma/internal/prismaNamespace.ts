@@ -388,6 +388,9 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   Document: 'Document',
+  AnalysisRun: 'AnalysisRun',
+  AnalysisAlert: 'AnalysisAlert',
+  ReviewDecision: 'ReviewDecision',
   DocumentType: 'DocumentType',
   DocumentStatus: 'DocumentStatus',
   CreditType: 'CreditType',
@@ -407,7 +410,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "client" | "mortgageCase" | "document" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
+    modelProps: "user" | "client" | "mortgageCase" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -704,6 +707,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.DocumentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.DocumentCountAggregateOutputType> | number
+        }
+      }
+    }
+    AnalysisRun: {
+      payload: Prisma.$AnalysisRunPayload<ExtArgs>
+      fields: Prisma.AnalysisRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AnalysisRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AnalysisRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        findFirst: {
+          args: Prisma.AnalysisRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AnalysisRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        findMany: {
+          args: Prisma.AnalysisRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>[]
+        }
+        create: {
+          args: Prisma.AnalysisRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        createMany: {
+          args: Prisma.AnalysisRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AnalysisRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>[]
+        }
+        delete: {
+          args: Prisma.AnalysisRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        update: {
+          args: Prisma.AnalysisRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.AnalysisRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AnalysisRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AnalysisRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.AnalysisRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisRunPayload>
+        }
+        aggregate: {
+          args: Prisma.AnalysisRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAnalysisRun>
+        }
+        groupBy: {
+          args: Prisma.AnalysisRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalysisRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AnalysisRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalysisRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    AnalysisAlert: {
+      payload: Prisma.$AnalysisAlertPayload<ExtArgs>
+      fields: Prisma.AnalysisAlertFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AnalysisAlertFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AnalysisAlertFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        findFirst: {
+          args: Prisma.AnalysisAlertFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AnalysisAlertFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        findMany: {
+          args: Prisma.AnalysisAlertFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>[]
+        }
+        create: {
+          args: Prisma.AnalysisAlertCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        createMany: {
+          args: Prisma.AnalysisAlertCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AnalysisAlertCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>[]
+        }
+        delete: {
+          args: Prisma.AnalysisAlertDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        update: {
+          args: Prisma.AnalysisAlertUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        deleteMany: {
+          args: Prisma.AnalysisAlertDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AnalysisAlertUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AnalysisAlertUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>[]
+        }
+        upsert: {
+          args: Prisma.AnalysisAlertUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalysisAlertPayload>
+        }
+        aggregate: {
+          args: Prisma.AnalysisAlertAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAnalysisAlert>
+        }
+        groupBy: {
+          args: Prisma.AnalysisAlertGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalysisAlertGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AnalysisAlertCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalysisAlertCountAggregateOutputType> | number
+        }
+      }
+    }
+    ReviewDecision: {
+      payload: Prisma.$ReviewDecisionPayload<ExtArgs>
+      fields: Prisma.ReviewDecisionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ReviewDecisionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ReviewDecisionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        findFirst: {
+          args: Prisma.ReviewDecisionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ReviewDecisionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        findMany: {
+          args: Prisma.ReviewDecisionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>[]
+        }
+        create: {
+          args: Prisma.ReviewDecisionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        createMany: {
+          args: Prisma.ReviewDecisionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ReviewDecisionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>[]
+        }
+        delete: {
+          args: Prisma.ReviewDecisionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        update: {
+          args: Prisma.ReviewDecisionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        deleteMany: {
+          args: Prisma.ReviewDecisionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ReviewDecisionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ReviewDecisionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>[]
+        }
+        upsert: {
+          args: Prisma.ReviewDecisionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReviewDecisionPayload>
+        }
+        aggregate: {
+          args: Prisma.ReviewDecisionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateReviewDecision>
+        }
+        groupBy: {
+          args: Prisma.ReviewDecisionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReviewDecisionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ReviewDecisionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReviewDecisionCountAggregateOutputType> | number
         }
       }
     }
@@ -1114,6 +1339,43 @@ export const DocumentScalarFieldEnum = {
 export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
 
 
+export const AnalysisRunScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  executionStatus: 'executionStatus',
+  outcome: 'outcome',
+  detail: 'detail',
+  triggeredBy: 'triggeredBy',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalysisRunScalarFieldEnum = (typeof AnalysisRunScalarFieldEnum)[keyof typeof AnalysisRunScalarFieldEnum]
+
+
+export const AnalysisAlertScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  ruleCode: 'ruleCode',
+  severity: 'severity',
+  field: 'field',
+  message: 'message'
+} as const
+
+export type AnalysisAlertScalarFieldEnum = (typeof AnalysisAlertScalarFieldEnum)[keyof typeof AnalysisAlertScalarFieldEnum]
+
+
+export const ReviewDecisionScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  action: 'action',
+  justification: 'justification',
+  decidedBy: 'decidedBy',
+  decidedAt: 'decidedAt'
+} as const
+
+export type ReviewDecisionScalarFieldEnum = (typeof ReviewDecisionScalarFieldEnum)[keyof typeof ReviewDecisionScalarFieldEnum]
+
+
 export const DocumentTypeScalarFieldEnum = {
   id: 'id',
   code: 'code',
@@ -1168,6 +1430,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -1296,6 +1565,48 @@ export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'J
  * Reference to a field of type 'QueryMode'
  */
 export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'AnalysisExecutionStatus'
+ */
+export type EnumAnalysisExecutionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AnalysisExecutionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'AnalysisExecutionStatus[]'
+ */
+export type ListEnumAnalysisExecutionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AnalysisExecutionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'AnalysisOutcome'
+ */
+export type EnumAnalysisOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AnalysisOutcome'>
+    
+
+
+/**
+ * Reference to a field of type 'AnalysisOutcome[]'
+ */
+export type ListEnumAnalysisOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AnalysisOutcome[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ReviewDecisionAction'
+ */
+export type EnumReviewDecisionActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReviewDecisionAction'>
+    
+
+
+/**
+ * Reference to a field of type 'ReviewDecisionAction[]'
+ */
+export type ListEnumReviewDecisionActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReviewDecisionAction[]'>
     
 
 
@@ -1433,6 +1744,9 @@ export type GlobalOmitConfig = {
   client?: Prisma.ClientOmit
   mortgageCase?: Prisma.MortgageCaseOmit
   document?: Prisma.DocumentOmit
+  analysisRun?: Prisma.AnalysisRunOmit
+  analysisAlert?: Prisma.AnalysisAlertOmit
+  reviewDecision?: Prisma.ReviewDecisionOmit
   documentType?: Prisma.DocumentTypeOmit
   documentStatus?: Prisma.DocumentStatusOmit
   creditType?: Prisma.CreditTypeOmit
