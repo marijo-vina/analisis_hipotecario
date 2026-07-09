@@ -272,6 +272,39 @@ describe('IdentityMatchRule', () => {
       expect(nameField?.normalizedValue['official-id']).toBe('JOSE PEREZ GARCIA');
       expect(nameField?.normalizedValue['payroll']).toBe('JOSE PEREZ GARCIA');
     });
+
+    it('matches fullName across documents with different token order (INE scenario)', async () => {
+      // INE: "GARCIA LOPEZ MARIA" (apellidos primero)
+      // Payroll: "MARIA GARCIA LOPEZ" (nombre natural)
+      const docs = [
+        doc('INE', { identity: { fullName: 'GARCIA LOPEZ MARIA', curp: 'PEJ900315HYNRLN08' } }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'MARIA GARCIA LOPEZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(
+        client({ fullName: 'MARIA GARCIA LOPEZ' }),
+        docs,
+      );
+
+      expect(result.outcome).toBe('PASS');
+      const nameField = result.detail.fields.find((f) => f.fieldName === 'fullName');
+      expect(nameField?.status).toBe('MATCH');
+    });
+
+    it('still detects real name mismatch despite different word count', async () => {
+      const docs = [
+        doc('INE', { identity: { fullName: 'PEREZ GARCIA JOSE', curp: 'PEJ900315HYNRLN08' } }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(client({ fullName: 'PEREZ GARCIA' }), docs);
+
+      const nameField = result.detail.fields.find((f) => f.fieldName === 'fullName');
+      // Different token count → not a match
+      expect(nameField?.status).toBe('MISMATCH');
+    });
   });
 
   describe('detail structure stability', () => {

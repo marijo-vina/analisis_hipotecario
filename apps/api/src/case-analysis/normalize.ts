@@ -47,3 +47,33 @@ export function normalizeText(
   // 5. Trim
   return result.trim();
 }
+
+/**
+ * Token-set comparison for fullName.
+ *
+ * INE lists names as "PaternalLastName MaternalLastName FirstName(s)"
+ * while other documents use "FirstName(s) PaternalLastName MaternalLastName".
+ * Direct string comparison would flag a false mismatch.
+ *
+ * This function splits each normalized name into tokens (words) and
+ * returns true when both sets are identical — same words, any order.
+ * No fuzzy matching: tokens must be exact after normalization.
+ */
+export function namesMatch(
+  a: string | null,
+  b: string | null,
+): boolean {
+  if (a == null || b == null) return false;
+  if (a === b) return true; // fast path
+
+  const tokensA = new Set(a.split(' ').filter(Boolean));
+  const tokensB = new Set(b.split(' ').filter(Boolean));
+
+  if (tokensA.size !== tokensB.size) return false;
+
+  for (const token of tokensA) {
+    if (!tokensB.has(token)) return false;
+  }
+
+  return true;
+}

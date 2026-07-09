@@ -6,7 +6,7 @@ import type {
   RuleResult,
   Severity,
 } from '../analysis-rule.interface';
-import { normalizeText } from '../normalize';
+import { normalizeText, namesMatch } from '../normalize';
 import type { NormalizeMode } from '../normalize';
 
 /** Minimal overlap with the Prisma `Client` model — kept loose for testability. */
@@ -237,6 +237,23 @@ export class IdentityMatchRule implements AnalysisRule {
     return values;
   }
 
+  /** Compare two normalized values with field-type awareness.
+   *
+   *  For fullName: uses token-set comparison (namesMatch) to handle
+   *  INE's "lastname firstname" vs other docs' "firstname lastname" ordering.
+   *  For RFC/CURP: uses strict string equality.
+   */
+  private valuesMatch(
+    a: string,
+    b: string,
+    fieldName: IdentityField,
+  ): boolean {
+    if (fieldName === 'fullName') {
+      return namesMatch(a, b);
+    }
+    return a === b;
+  }
+
   /** Compare a single field across participating sources and classify. */
   private compareField(
     fieldName: IdentityField,
@@ -294,12 +311,24 @@ export class IdentityMatchRule implements AnalysisRule {
     const distinctDocValues = new Set(
       present.filter((v) => v.sourceKey !== 'client').map((v) => v.normalized),
     );
+    // For fullName: token-set comparison tolerates INE's "lastname firstname" ordering.
     const docValues = present.filter((v) => v.sourceKey !== 'client');
+
+    /** Check whether all document values are pairwise-equal for this field. */
+    const allDocsMatch = (): boolean => {
+      if (docValues.length < 2) return true;
+      const first = docValues[0].normalized!;
+      return docValues.every((v) => this.valuesMatch(v.normalized!, first, fieldName));
+    };
 
     status = 'MATCH'; // provisional; downgraded below if discrepancies found.
 
     if (docValues.length >= 2) {
-      if (distinctDocValues.size > 1) {
+      const docsDisagree = fieldName === 'fullName'
+        ? !allDocsMatch()
+        : distinctDocValues.size > 1;
+
+      if (docsDisagree) {
         // ── Document-vs-document mismatch ──────────────────────────────────
         status = 'MISMATCH';
         if (fieldName === 'rfc' || fieldName === 'curp') {
@@ -329,7 +358,11 @@ export class IdentityMatchRule implements AnalysisRule {
       } else {
         // ── Documents agree ────────────────────────────────────────────────
         const consensus = docValues[0].normalized!;
-        if (clientValue && clientValue.normalized !== consensus) {
+        const clientDiffers = clientValue
+          ? !this.valuesMatch(clientValue.normalized!, consensus, fieldName)
+          : false;
+
+        if (clientDiffers) {
           // Client has a value but it differs from document consensus.
           status = 'MISMATCH';
           if (fieldName === 'rfc' || fieldName === 'curp') {
@@ -355,7 +388,7 @@ export class IdentityMatchRule implements AnalysisRule {
               message: 'Nombre: el expediente difiere de los documentos',
             });
           }
-        } else if (clientValue && clientValue.normalized === consensus) {
+        } else if (clientValue && this.valuesMatch(clientValue.normalized!, consensus, fieldName)) {
           status = 'MATCH';
           severity = 'INFO';
         } else {
@@ -378,7 +411,7 @@ export class IdentityMatchRule implements AnalysisRule {
       // Only one document available for this field (or none).
       const singleDoc = docValues.length === 1 ? docValues[0] : null;
       if (singleDoc && clientValue) {
-        if (clientValue.normalized !== singleDoc.normalized) {
+        if (!this.valuesMatch(clientValue.normalized!, singleDoc.normalized!, fieldName)) {
           status = 'MISMATCH';
           if (fieldName === 'rfc' || fieldName === 'curp') {
             severity = 'WARNING';
