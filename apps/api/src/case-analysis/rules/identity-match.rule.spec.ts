@@ -29,7 +29,7 @@ describe('IdentityMatchRule', () => {
   });
 
   describe('all fields present and matching', () => {
-    it('returns PASS when official-id, payroll and client agree on rfc/curp/name', async () => {
+    it('returns PASS when documents and client agree', async () => {
       const docs = [
         doc('INE', {
           identity: {
@@ -72,8 +72,8 @@ describe('IdentityMatchRule', () => {
     });
   });
 
-  describe('RFC mismatch between documents', () => {
-    it('returns FAIL with IDENTITY_MISMATCH alert when official-id and payroll rfc differ', async () => {
+  describe('RFC/CURP conflict between documents', () => {
+    it('returns FAIL with DOCUMENT_CONFLICT when rfc differs between documents', async () => {
       const docs = [
         doc('INE', {
           identity: { fullName: 'JOSE PEREZ', rfc: 'XAXX010101000', curp: 'PEJ900315HYNRLN08' },
@@ -89,14 +89,10 @@ describe('IdentityMatchRule', () => {
       const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
       expect(rfcField?.status).toBe('MISMATCH');
       expect(rfcField?.severity).toBe('ERROR');
-      expect(rfcField?.alerts).toContain('IDENTITY_MISMATCH');
-      const alert = result.alerts.find((a) => a.ruleCode === 'IDENTITY_MISMATCH');
-      expect(alert).toBeDefined();
-      expect(alert?.severity).toBe('ERROR');
-      expect(alert?.field).toBe('rfc');
+      expect(rfcField?.alerts).toContain('DOCUMENT_CONFLICT');
     });
 
-    it('returns FAIL when CURP mismatches between official-id and payroll', async () => {
+    it('returns FAIL when CURP conflicts between documents', async () => {
       const docs = [
         doc('INE', { identity: { fullName: 'JOSE PEREZ', curp: 'AAA900315HYNRLN08' } }),
         doc('PAYROLL_RECEIPT', {
@@ -108,12 +104,12 @@ describe('IdentityMatchRule', () => {
       expect(result.outcome).toBe('FAIL');
       const curpField = result.detail.fields.find((f) => f.fieldName === 'curp');
       expect(curpField?.status).toBe('MISMATCH');
-      expect(curpField?.alerts).toContain('IDENTITY_MISMATCH');
+      expect(curpField?.alerts).toContain('DOCUMENT_CONFLICT');
     });
   });
 
   describe('name-only mismatch (RFC/CURP match)', () => {
-    it('returns PARTIAL with WARNING when fullName differs but RFC matches across sources', async () => {
+    it('returns PARTIAL with NAME_MISMATCH when fullName differs but RFC matches', async () => {
       const docs = [
         doc('INE', { identity: { fullName: 'JOSE PEREZ GARCIA', curp: 'PEJ900315HYNRLN08' } }),
         doc('PAYROLL_RECEIPT', {
@@ -130,8 +126,8 @@ describe('IdentityMatchRule', () => {
     });
   });
 
-  describe('Client as operational reference', () => {
-    it('returns PARTIAL when all documents agree on rfc but client rfc differs', async () => {
+  describe('Expediente vs documentos (client has value, docs agree, client differs)', () => {
+    it('returns PARTIAL with EXPEDIENTE_VS_DOCUMENTOS when docs agree but client rfc differs', async () => {
       const docs = [
         doc('INE', { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } }),
         doc('CREDIT_BUREAU_REPORT', { borrower: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC' } }),
@@ -144,12 +140,11 @@ describe('IdentityMatchRule', () => {
       expect(result.outcome).toBe('PARTIAL');
       const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
       expect(rfcField?.status).toBe('MISMATCH');
-      expect(rfcField?.alerts).toContain('CLIENT_DOCUMENT_MISMATCH');
-      // RFC doc-doc consensus exists, so no IDENTITY_MISMATCH
-      expect(rfcField?.alerts).not.toContain('IDENTITY_MISMATCH');
+      expect(rfcField?.alerts).toContain('EXPEDIENTE_VS_DOCUMENTOS');
+      expect(rfcField?.alerts).not.toContain('DOCUMENT_CONFLICT');
     });
 
-    it('does not auto-cancel (alert severity is WARNING, not ERROR)', async () => {
+    it('severity is WARNING (not ERROR) — expediente is operational reference', async () => {
       const docs = [
         doc('INE', { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } }),
         doc('PAYROLL_RECEIPT', {
@@ -158,15 +153,76 @@ describe('IdentityMatchRule', () => {
       ];
       const result = await rule.execute(client({ rfc: 'XAXX010101000' }), docs);
 
-      const clientAlert = result.alerts.find((a) => a.ruleCode === 'CLIENT_DOCUMENT_MISMATCH');
-      expect(clientAlert?.severity).toBe('WARNING');
+      const alert = result.alerts.find((a) => a.ruleCode === 'EXPEDIENTE_VS_DOCUMENTOS');
+      expect(alert?.severity).toBe('WARNING');
       expect(result.outcome).toBe('PARTIAL');
     });
   });
 
+  describe('Client RFC/CURP optional — empty field omitted from comparison', () => {
+    it('returns PASS with CLIENT_FIELD_OMITTED when docs match but client has no RFC', async () => {
+      const docs = [
+        doc('INE', { identity: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' } }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(client({ rfc: null, fullName: 'JOSE PEREZ' }), docs);
+
+      expect(result.outcome).toBe('PASS');
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).toBe('MATCH');
+      const alert = result.alerts.find((a) => a.ruleCode === 'CLIENT_FIELD_OMITTED' && a.field === 'rfc');
+      expect(alert).toBeDefined();
+      expect(alert?.severity).toBe('INFO');
+    });
+
+    it('returns PASS with CLIENT_FIELD_OMITTED when docs match but client CURP is empty string', async () => {
+      const docs = [
+        doc('INE', { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(client({ curp: '', fullName: 'JOSE PEREZ' }), docs);
+
+      expect(result.outcome).toBe('PASS');
+      const alert = result.alerts.find((a) => a.ruleCode === 'CLIENT_FIELD_OMITTED' && a.field === 'curp');
+      expect(alert).toBeDefined();
+    });
+
+    it('still returns FAIL when docs conflict on RFC even if client has no RFC', async () => {
+      const docs = [
+        doc('INE', { identity: { fullName: 'JOSE PEREZ', rfc: 'XAXX010101000', curp: 'PEJ900315HYNRLN08' } }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'JOSE PEREZ', rfc: 'XAXX010102000', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(client({ rfc: null }), docs);
+
+      expect(result.outcome).toBe('FAIL');
+      const alert = result.alerts.find((a) => a.ruleCode === 'DOCUMENT_CONFLICT' && a.field === 'rfc');
+      expect(alert).toBeDefined();
+    });
+
+    it('client is omitted from rfc comparison when rfc is whitespace only — suggests completing', async () => {
+      const docs = [
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(client({ rfc: '   ', fullName: 'JOSE PEREZ' }), docs);
+
+      // Single doc has rfc, client omitted → docs can self-match with client suggestion
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).toBe('MATCH');
+      const alert = result.alerts.find((a) => a.ruleCode === 'CLIENT_FIELD_OMITTED' && a.field === 'rfc');
+      expect(alert).toBeDefined();
+    });
+  });
+
   describe('NOT_AVAILABLE handling', () => {
-    it('marks curp NOT_AVAILABLE when bank-statement is the only curp candidate', async () => {
-      // Only a bank-statement present: it structurally lacks curp → curp has <2 doc sources.
+    it('marks curp NOT_AVAILABLE when only bank-statement is present (lacks curp structurally)', async () => {
       const docs = [
         doc('BANK_STATEMENT', { accountHolder: { fullName: 'JOSE PEREZ' } }),
       ];
@@ -174,36 +230,27 @@ describe('IdentityMatchRule', () => {
 
       const curpField = result.detail.fields.find((f) => f.fieldName === 'curp');
       expect(curpField?.status).toBe('NOT_AVAILABLE');
-      // Absent field must not cause FAIL.
       expect(result.outcome).not.toBe('FAIL');
     });
 
-    it('still compares rfc across documents even when bank-statement lacks curp', async () => {
+    it('compares rfc across docs even when bank-statement lacks curp', async () => {
       const docs = [
         doc('BANK_STATEMENT', { accountHolder: { fullName: 'JOSE PEREZ' } }),
         doc('PAYROLL_RECEIPT', {
           employee: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
         }),
       ];
-      // Client matches the documents so cross-source comparison is clean (PASS).
       const result = await rule.execute(
         client({ fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' }),
         docs,
       );
 
-      // fullName comparable across bank-statement + payroll → docs agree → MATCH
       const nameField = result.detail.fields.find((f) => f.fieldName === 'fullName');
       expect(nameField?.status).toBe('MATCH');
-      // rfc: only payroll carries it among documents (bank-statement lacks rfc),
-      // so doc-doc consensus is just payroll; client also matches → MATCH.
-      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
-      expect(rfcField?.status).toBe('MATCH');
     });
 
     it('returns PASS when no comparable fields are available', async () => {
-      // No documents at all → PASS / INFO.
       const result = await rule.execute(client(), []);
-
       expect(result.outcome).toBe('PASS');
       expect(result.severity).toBe('INFO');
     });
@@ -212,9 +259,6 @@ describe('IdentityMatchRule', () => {
   describe('normalization during comparison', () => {
     it('treats accented/spaced variants as equal', async () => {
       const docs = [
-        // Spacing/accent variants that normalize identically. Note: per the
-        // spec, '-' is *removed* (not replaced with space), so 'PÉREZ-GARCÍA'
-        // → 'PEREZGARCIA'. Use a space-free form in both sources to get MATCH.
         doc('INE', { identity: { fullName: '  José  Pérez García ', curp: 'PEJ900315HYNRLN08' } }),
         doc('PAYROLL_RECEIPT', {
           employee: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
@@ -225,7 +269,6 @@ describe('IdentityMatchRule', () => {
       expect(result.outcome).toBe('PASS');
       const nameField = result.detail.fields.find((f) => f.fieldName === 'fullName');
       expect(nameField?.status).toBe('MATCH');
-      // Normalized values captured per source
       expect(nameField?.normalizedValue['official-id']).toBe('JOSE PEREZ GARCIA');
       expect(nameField?.normalizedValue['payroll']).toBe('JOSE PEREZ GARCIA');
     });
