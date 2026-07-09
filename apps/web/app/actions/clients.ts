@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/app/lib/api";
 import type { Client, ActionState } from "@/app/lib/definitions";
 
@@ -84,6 +85,7 @@ export async function createClient(
   });
 
   if (result.ok) {
+    revalidatePath("/dashboard/expedientes/nuevo");
     redirect("/dashboard/clientes");
   }
 
@@ -125,6 +127,7 @@ export async function updateClient(
   });
 
   if (result.ok) {
+    revalidatePath("/dashboard/expedientes/nuevo");
     redirect(`/dashboard/clientes/${clientId}`);
   }
 
