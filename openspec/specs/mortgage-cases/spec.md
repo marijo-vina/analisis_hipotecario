@@ -18,8 +18,8 @@ Backend API specification for mortgage case management. Provides endpoints for c
 
 | ID | Priority | Requirement |
 |----|----------|-------------|
-| FR-0501 | P0 | Seed MUST define 8 case statuses ordered 1-8: `PENDING_DOCUMENTS`, `DOCUMENTS_UPLOADED`, `PROCESSING`, `DATA_EXTRACTED`, `IN_REVIEW`, `REPORT_GENERATED`, `OBSERVED`, `CLOSED` |
-| FR-0502 | P0 | Seed MUST upsert 8 new statuses first, THEN remap existing cases from old→new status codes, THEN delete old status codes no longer in catalog |
+| FR-0501 | P0 | Seed MUST define 9 case statuses ordered 1-9: `PENDING_DOCUMENTS`, `DOCUMENTS_UPLOADED`, `PROCESSING`, `DATA_EXTRACTED`, `IN_REVIEW`, `REQUIRES_REVIEW`, `REPORT_GENERATED`, `OBSERVED`, `CLOSED` |
+| FR-0502 | P0 | Seed MUST upsert 9 new statuses first, THEN remap existing cases from old→new status codes, THEN delete old status codes no longer in catalog |
 | FR-0503 | P0 | `PATCH /mortgage-cases/:id` with valid `{ statusCode }` MUST update `statusId` and return 200 with full includes (`client`, `advisor`, `creditType`, `status`) |
 | FR-0504 | P0 | `PATCH /mortgage-cases/:id` with `statusCode` not in `@IsIn` set MUST return 400 "Invalid status code" |
 | FR-0505 | P0 | `PATCH /mortgage-cases/:id` with non-existent case id MUST return 404 "Mortgage case not found" |
@@ -29,7 +29,11 @@ Backend API specification for mortgage case management. Provides endpoints for c
 | FR-0509 | P0 | PATCH 200 response MUST include `client`, `advisor`, `creditType`, `status` relations for immediate UI update |
 | FR-0510 | P1 | `updatedAt` MUST auto-reflect status change timestamp (Prisma `@updatedAt`) |
 | FR-0515 | P1 | `POST /mortgage-cases` MUST still default new cases to `PENDING_DOCUMENTS` — no regression |
-| FR-0516 | P1 | `GET /case-statuses` MUST return all 8 updated statuses in `order` ascending |
+| FR-0516 | P1 | `GET /case-statuses` MUST return all 9 updated statuses in `order` ascending |
+| FR-0601 | P0 | `POST /mortgage-cases/:caseId/analyze` triggers synchronous identity-match analysis, returns `AnalysisResult` with `outcome`, `detail`, and `executionMetadata` |
+| FR-0602 | P0 | `GET /mortgage-cases/:caseId/analysis/latest` returns most recent `AnalysisRun` with structured `detail` (sources, fields, values, statuses, alerts) |
+| FR-0603 | P0 | `POST /mortgage-cases/:caseId/analysis/:runId/review-decision` accepts actions: `CONFIRM_ISSUE`, `MARK_FALSE_POSITIVE` (with justification), `CANCEL_CASE` |
+| FR-0604 | P0 | When latest `AnalysisRun.outcome` is `FAIL`, case status transitions to `REQUIRES_REVIEW`, blocking ONLY automatic financial-engine advance |
 
 ### Non-Functional
 
@@ -74,9 +78,35 @@ Backend API specification for mortgage case management. Provides endpoints for c
 - WHEN service queries `CaseStatus` by code
 - THEN 400, `message` "Status code not found"
 
-### FR-0515 — Regression: create still defaults PENDING_DOCUMENTS
+### FR-0516 — List updated statuses
 
-- GIVEN valid create payload → WHEN `POST /mortgage-cases` → THEN new case has `status.code === "PENDING_DOCUMENTS"`
+- GIVEN database with REQUIRES_REVIEW status
+- WHEN `GET /case-statuses`
+- THEN returns all 9 statuses in order, including REQUIRES_REVIEW at position 6
+
+### FR-0601 — Analyze endpoint
+
+- GIVEN a case with documents where all identity fields match after normalization
+- WHEN `POST /mortgage-cases/:id/analyze`
+- THEN 200 with `AnalysisResult` containing `outcome: PASS`, `executionStatus: COMPLETED`, structured `detail`
+
+### FR-0602 — Get latest analysis
+
+- GIVEN a case with two completed AnalysisRuns
+- WHEN `GET /mortgage-cases/:id/analysis/latest`
+- THEN 200 with the most recent AnalysisRun
+
+### FR-0603 — Review decision
+
+- GIVEN an AnalysisRun with outcome FAIL
+- WHEN `POST /mortgage-cases/:id/analysis/:runId/review-decision` with `{ "action": "CONFIRM_ISSUE" }`
+- THEN 200 with recorded decision; case status updates to REVIEWED
+
+### FR-0604 — FAIL gates financial engine
+
+- GIVEN a case with latest AnalysisRun outcome FAIL
+- WHEN automatic advancement to financial engine is attempted
+- THEN advancement is blocked; case status remains REQUIRES_REVIEW
 
 ---
 
@@ -126,6 +156,62 @@ Response 404:
 { "message": "Mortgage case not found", "error": "Not Found", "statusCode": 404 }
 ```
 
+### POST /mortgage-cases/:caseId/analyze
+
+```
+POST /mortgage-cases/:caseId/analyze
+Authorization: Bearer <token>
+
+Response 200:
+{
+  "runId": "uuid",
+  "executionStatus": "COMPLETED",
+  "outcome": "PASS" | "PARTIAL" | "FAIL",
+  "summary": "...",
+  "detail": {
+    "sources": ["official-id", "payroll", "bank-statement", "credit-bureau", "client"],
+    "fields": [
+      {
+        "fieldName": "fullName",
+        "originalValue": { "official-id": "...", "payroll": "...", ... },
+        "normalizedValue": { "official-id": "...", "payroll": "...", ... },
+        "status": "MATCH" | "MISMATCH" | "NOT_AVAILABLE",
+        "severity": "ERROR" | "WARNING" | "INFO",
+        "alerts": ["DOCUMENT_CONFLICT" | "NAME_ORDER_DIFF" | ...]
+      }
+    ]
+  },
+  "executionMetadata": { "timestamp": "...", "triggeredBy": "userId" }
+}
+```
+
+### GET /mortgage-cases/:caseId/analysis/latest
+
+```
+GET /mortgage-cases/:caseId/analysis/latest
+Authorization: Bearer <token>
+
+Response 200 (has runs): { AnalysisRun object }
+Response 404: { "message": "No analysis runs found", "error": "Not Found", "statusCode": 404 }
+```
+
+### POST /mortgage-cases/:caseId/analysis/:runId/review-decision
+
+```
+POST /mortgage-cases/:caseId/analysis/:runId/review-decision
+Authorization: Bearer <token>
+Content-Type: application/json
+
+Request:
+{ "action": "CONFIRM_ISSUE" | "MARK_FALSE_POSITIVE" | "CANCEL_CASE", "justification"?: "..." }
+
+Response 200:
+{ "id": "uuid", "action": "...", "justification": "...", "decidedBy": "userId", "decidedAt": "..." }
+
+Response 400:
+{ "message": "Justification required for false positive", "error": "Bad Request", "statusCode": 400 }
+```
+
 ---
 
 ## 4. Data Changes
@@ -139,9 +225,10 @@ Response 404:
 | 3 | PROCESSING | En procesamiento |
 | 4 | DATA_EXTRACTED | Datos extraídos |
 | 5 | IN_REVIEW | En revisión |
-| 6 | REPORT_GENERATED | Reporte generado |
-| 7 | OBSERVED | Observado |
-| 8 | CLOSED | Cerrado |
+| 6 | REQUIRES_REVIEW | Requiere revisión |
+| 7 | REPORT_GENERATED | Reporte generado |
+| 8 | OBSERVED | Observado |
+| 9 | CLOSED | Cerrado |
 
 ### Migration: Old → New status mapping
 
