@@ -4,14 +4,11 @@ import EmptyState from "@/app/ui/common/empty-state";
 import EstadosSummaryBar from "@/app/ui/extraction/estados-summary-bar";
 import EstadosStatementCard from "@/app/ui/extraction/estados-statement-card";
 import EstadosProviders from "@/app/ui/extraction/estados-providers";
-import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import EstadosMesesMovimientos from "@/app/ui/extraction/estados-meses-movimientos";
 
 interface EstadosTabProps {
   /** BANK_STATEMENT documents for this category */
   documents: Document[];
-  /** ALL documents (needed for cross-category conciliación with payroll) */
-  allDocuments?: Document[];
 }
 
 /**
@@ -23,7 +20,6 @@ interface EstadosTabProps {
  */
 export default function EstadosTab({
   documents,
-  allDocuments,
 }: EstadosTabProps) {
   const parsed = parseBankStatements(documents);
 
@@ -54,18 +50,6 @@ export default function EstadosTab({
       {/* ── Providers (only when >0) ─────────────────────────────────── */}
       {parsed.allProviders.length > 0 && (
         <EstadosProviders providers={parsed.allProviders} />
-      )}
-
-      {/* ── Conciliación with payroll ────────────────────────────────── */}
-      {allDocuments && allDocuments.length > 0 && (
-        <EstadosConciliacion
-          allDeposits={parsed.allDeposits}
-          payrollDocs={
-            allDocuments.filter(
-              (d) => d.documentType.code === "PAYROLL_RECEIPT",
-            ) ?? []
-          }
-        />
       )}
 
       {/* ── Months coverage + other movements ────────────────────────── */}
