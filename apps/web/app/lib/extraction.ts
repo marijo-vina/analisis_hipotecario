@@ -574,6 +574,7 @@ export interface ParsedBankStatement {
 
   // Account holder
   accountHolder: string | null;
+  accountHolderRfc: string | null;
 
   // Period
   periodStart: string | null;
@@ -645,6 +646,7 @@ function emptyStatement(doc: Document): ParsedBankStatement {
     clabe: null,
     isJointAccount: null,
     accountHolder: null,
+    accountHolderRfc: null,
     periodStart: null,
     periodEnd: null,
     cutoffDate: null,
@@ -743,6 +745,7 @@ export function parseBankStatements(
     // ── Account holder ──────────────────────────────────────────────────
     const holder = (ed.accountHolder as Record<string, unknown>) ?? {};
     const accountHolder = (holder.fullName as string) ?? null;
+    const accountHolderRfc = (holder.rfc as string) ?? null;
     const isJointAccount =
       (holder.isJointAccount as boolean) ?? null;
 
@@ -889,6 +892,7 @@ export function parseBankStatements(
       clabe,
       isJointAccount,
       accountHolder,
+      accountHolderRfc,
       periodStart: ps,
       periodEnd: pe,
       cutoffDate: cutoff,

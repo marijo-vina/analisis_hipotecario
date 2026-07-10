@@ -30,6 +30,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
   },
   "accountHolder": {
     "fullName": "string | null",
+    "rfc": "string | null",
     "isJointAccount": "boolean | null"
   },
   "bank": {
@@ -168,6 +169,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
   },
   "accountHolder": {
     "fullName": "MARIA JOSE PEREZ LOPEZ",
+    "rfc": "PELM920512XYZ",
     "isJointAccount": false
   },
   "bank": {

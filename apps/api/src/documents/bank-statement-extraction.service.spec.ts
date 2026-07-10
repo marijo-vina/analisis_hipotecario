@@ -61,6 +61,7 @@ const createMockExtractionResult = (
   },
   accountHolder: {
     fullName: 'MARIA PEREZ',
+    rfc: 'PEMJ900101ABC',
     isJointAccount: false,
   },
   bank: {
