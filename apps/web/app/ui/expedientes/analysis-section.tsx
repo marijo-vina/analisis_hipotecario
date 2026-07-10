@@ -687,9 +687,6 @@ function ActionsGroup({
   error: string | null;
   hasExistingDecision: boolean;
 }) {
-  const [showJustification, setShowJustification] = useState(false);
-  const [justification, setJustification] = useState("");
-
   if (hasExistingDecision) {
     return (
       <Card className="bg-gf-bg-secondary">
@@ -735,46 +732,6 @@ function ActionsGroup({
         >
           {isSubmitting ? "..." : "✅ Confirmar revisión"}
         </Button>
-
-        {!showJustification ? (
-          <Button
-            variant="secondary"
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => setShowJustification(true)}
-          >
-            ✅ Marcar como falso positivo
-          </Button>
-        ) : (
-          <span className="inline-flex items-center gap-2">
-            <input
-              type="text"
-              className="px-2 py-1 text-sm border border-gf-border rounded"
-              placeholder="Justificación"
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-            />
-            <Button
-              variant="primary"
-              type="button"
-              disabled={isSubmitting || !justification.trim()}
-              onClick={() => {
-                onReviewDecision("MARK_FALSE_POSITIVE", justification);
-                setShowJustification(false);
-                setJustification("");
-              }}
-            >
-              Confirmar
-            </Button>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => setShowJustification(false)}
-            >
-              Cancelar
-            </Button>
-          </span>
-        )}
       </div>
 
       {error && <p className="text-xs text-gf-red mt-2">{error}</p>}
