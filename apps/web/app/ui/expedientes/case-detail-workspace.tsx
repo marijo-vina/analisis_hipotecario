@@ -187,7 +187,7 @@ export default function CaseDetailWorkspace({
       <ExtractionSection documents={documents} caseId={caseId} />
 
       {/* ── Análisis del expediente (Sprint 3) ──────────────────────────── */}
-      <AnalysisSection caseId={caseId} statusCode={statusCode} />
+      <AnalysisSection caseId={caseId} statusCode={statusCode} documents={documents} />
 
       {/* ── Drawers (siempre montados, controlados por `open`) ──────────── */}
       <ClientDrawer

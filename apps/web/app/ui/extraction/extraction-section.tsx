@@ -78,7 +78,6 @@ export default function ExtractionSection({
           {activeTab === "estados" && (
             <EstadosTab
               documents={docsByCategory.get("estados") ?? []}
-              allDocuments={documents}
             />
           )}
           {activeTab === "buro" && (

@@ -7,29 +7,42 @@ import {
   fetchLatestAnalysis,
   submitReviewDecision,
 } from "@/app/actions/analysis";
+import { parseBankStatements } from "@/app/lib/extraction";
 import type {
   AnalysisRun,
   FieldComparison,
   ReviewDecision,
+  Document,
 } from "@/app/lib/definitions";
 import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
+import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 
-// ── Tipos locales ────────────────────────────────────────────────────────────
+// ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
   caseId: string;
   statusCode: string;
+  /** All documents in the case (needed for conciliación cross-tab) */
+  documents: Document[];
 }
+
+type TabId = "validaciones" | "motor" | "bancos";
 
 type UiState =
   | { phase: "loading" }
-  | { phase: "idle" } // sin análisis previo
+  | { phase: "idle" }
   | { phase: "analyzing" }
   | { phase: "result"; run: AnalysisRun }
   | { phase: "error"; message: string };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "validaciones", label: "Validaciones" },
+  { id: "motor", label: "Motor financiero" },
+  { id: "bancos", label: "Bancos / Viabilidad" },
+];
 
 const SOURCE_LABELS: Record<string, string> = {
   "official-id": "INE",
@@ -47,54 +60,56 @@ const SOURCE_ICONS: Record<string, string> = {
   client: "📋",
 };
 
-const OUTCOME_BADGE: Record<string, { label: string; className: string }> = {
-  PASS: { label: "Cumple", className: "bg-green-100 text-green-800" },
-  PARTIAL: {
-    label: "Validación parcial",
-    className: "bg-yellow-100 text-yellow-800",
-  },
-  FAIL: { label: "No cumple", className: "bg-red-100 text-red-800" },
-};
-
 const FIELD_STATUS_BADGE: Record<
   string,
   { label: string; className: string }
 > = {
   MATCH: { label: "Coincide", className: "bg-green-50 text-green-700" },
-  MISMATCH: {
-    label: "No coincide",
-    className: "bg-red-50 text-red-700",
-  },
+  MISMATCH: { label: "No coincide", className: "bg-red-50 text-red-700" },
   NOT_AVAILABLE: {
     label: "No disponible",
     className: "bg-gray-100 text-gray-500",
   },
 };
 
-// ── Componente ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isResultState(
+  state: UiState,
+): state is { phase: "result"; run: AnalysisRun } {
+  return state.phase === "result";
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 
 export default function AnalysisSection({
   caseId,
   statusCode,
+  documents,
 }: AnalysisSectionProps) {
+  const [activeTab, setActiveTab] = useState<TabId>("validaciones");
   const [state, setState] = useState<UiState>({ phase: "loading" });
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [operationalStatus, setOperationalStatus] = useState(statusCode);
 
-  // Cargar el último análisis al montar
+  // Cargar último análisis al montar
   const loadLatest = useCallback(async () => {
     setState({ phase: "loading" });
     const res = await fetchLatestAnalysis(caseId);
     if (!res.success) {
-      setState({ phase: "error", message: res.error ?? "Error desconocido" });
+      setState({ phase: "error", message: res.error ?? "Error" });
       return;
     }
     if (res.data) {
       setState({ phase: "result", run: res.data });
+      setOperationalStatus(
+        res.data.outcome === "FAIL" ? "REQUIRES_REVIEW" : statusCode,
+      );
     } else {
       setState({ phase: "idle" });
     }
-  }, [caseId]);
+  }, [caseId, statusCode]);
 
   useEffect(() => {
     loadLatest();
@@ -109,7 +124,6 @@ export default function AnalysisSection({
       setState({ phase: "error", message: res.error ?? "Error" });
       return;
     }
-    // Recargar para obtener el run completo con alerts
     await loadLatest();
   };
 
@@ -132,154 +146,269 @@ export default function AnalysisSection({
       setActionError(res.error ?? "Error");
       return;
     }
+    if (action === "CONFIRM_ISSUE") {
+      setOperationalStatus("REVIEWED");
+    }
     await loadLatest();
   };
 
+  // Conciliación data
+  const bankStatementDocs = documents.filter(
+    (d) => d.documentType.code === "BANK_STATEMENT",
+  );
+  const payrollDocs = documents.filter(
+    (d) => d.documentType.code === "PAYROLL_RECEIPT",
+  );
+  const bankParsed = parseBankStatements(bankStatementDocs);
+
   // ── Render ──────────────────────────────────────────────────────────────
 
-  if (state.phase === "loading") {
-    return (
-      <div className="mb-4">
-        <AnalysisDivider />
+  return (
+    <div className="mb-4">
+      {/* ── Título ──────────────────────────────────────────────────────── */}
+      <h2 className="text-base font-semibold text-gf-text mb-3">
+        Análisis del expediente
+      </h2>
+
+      {/* ── Tabs ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center border-b border-gf-border mb-4">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.id
+                ? "border-gf-red text-gf-red"
+                : "border-transparent text-gf-text-muted hover:text-gf-text"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        <div className="flex-1 border-b-2 border-transparent" />
+      </div>
+
+      {/* ── Contenido del tab ───────────────────────────────────────────── */}
+      {activeTab === "validaciones" && (
+        <ValidacionesTab
+          state={state}
+          operationalStatus={operationalStatus}
+          onAnalyze={handleAnalyze}
+          onReviewDecision={handleReviewDecision}
+          isReviewSubmitting={reviewSubmitting}
+          actionError={actionError}
+          allDeposits={bankParsed.allDeposits}
+          payrollDocs={payrollDocs}
+        />
+      )}
+
+      {activeTab === "motor" && (
         <Card>
-          <p className="text-sm text-gf-text-muted animate-pulse">
-            Cargando análisis...
+          <p className="text-sm text-gf-text-muted">
+            Motor financiero — disponible en una fase posterior del Sprint 3.
           </p>
         </Card>
-      </div>
+      )}
+
+      {activeTab === "bancos" && (
+        <Card>
+          <p className="text-sm text-gf-text-muted">
+            Bancos / Viabilidad — disponible en una fase posterior del Sprint 3.
+          </p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── Tab Validaciones ──────────────────────────────────────────────────────────
+
+function ValidacionesTab({
+  state,
+  operationalStatus,
+  onAnalyze,
+  onReviewDecision,
+  isReviewSubmitting,
+  actionError,
+  allDeposits,
+  payrollDocs,
+}: {
+  state: UiState;
+  operationalStatus: string;
+  onAnalyze: () => Promise<void>;
+  onReviewDecision: (
+    action: ReviewDecision["action"],
+    justification?: string,
+  ) => Promise<void>;
+  isReviewSubmitting: boolean;
+  actionError: string | null;
+  allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
+  payrollDocs: Document[];
+}) {
+  return (
+    <div className="space-y-6">
+      {/* ── A) Validación de identidad ──────────────────────────────────── */}
+      <section>
+        <h3 className="text-sm font-semibold text-gf-text mb-3">
+          Validación de identidad
+        </h3>
+        <IdentityValidationSection
+          state={state}
+          operationalStatus={operationalStatus}
+          onAnalyze={onAnalyze}
+          onReviewDecision={onReviewDecision}
+          isReviewSubmitting={isReviewSubmitting}
+          actionError={actionError}
+        />
+      </section>
+
+      {/* ── B) Conciliación nómina vs banco ─────────────────────────────── */}
+      <section>
+        <h3 className="text-sm font-semibold text-gf-text mb-3">
+          Conciliación nómina vs banco
+        </h3>
+        {allDeposits.length > 0 && payrollDocs.length > 0 ? (
+          <EstadosConciliacion
+            allDeposits={allDeposits}
+            payrollDocs={payrollDocs}
+          />
+        ) : (
+          <Card>
+            <p className="text-sm text-gf-text-muted">
+              Sin datos suficientes para conciliación. Se requieren estados de
+              cuenta y recibos de nómina procesados.
+            </p>
+          </Card>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ── Sección: Validación de identidad ──────────────────────────────────────────
+
+function IdentityValidationSection({
+  state,
+  operationalStatus,
+  onAnalyze,
+  onReviewDecision,
+  isReviewSubmitting,
+  actionError,
+}: {
+  state: UiState;
+  operationalStatus: string;
+  onAnalyze: () => Promise<void>;
+  onReviewDecision: (
+    action: ReviewDecision["action"],
+    justification?: string,
+  ) => Promise<void>;
+  isReviewSubmitting: boolean;
+  actionError: string | null;
+}) {
+  if (state.phase === "loading") {
+    return (
+      <Card>
+        <p className="text-sm text-gf-text-muted animate-pulse">
+          Cargando análisis...
+        </p>
+      </Card>
     );
   }
 
   if (state.phase === "error") {
     return (
-      <div className="mb-4">
-        <AnalysisDivider />
-        <Card className="border-red-200 bg-red-50">
-          <p className="text-sm text-red-700">{state.message}</p>
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={loadLatest}
-          >
-            Reintentar
-          </Button>
-        </Card>
-      </div>
+      <Card className="border-red-200 bg-red-50">
+        <p className="text-sm text-red-700">{state.message}</p>
+        <Button variant="secondary" type="button" onClick={onAnalyze}>
+          Reintentar
+        </Button>
+      </Card>
     );
   }
 
   if (state.phase === "idle" || state.phase === "analyzing") {
-    const isAnalyzing = state.phase === "analyzing";
     return (
-      <div className="mb-4">
-        <AnalysisDivider />
-        <Card>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-gf-text">
-                Análisis del expediente
-              </h3>
-              <p className="text-xs text-gf-text-muted mt-1">
-                Sin analizar — Ejecuta el análisis para validar la identidad
-                del cliente.
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              type="button"
-              disabled={isAnalyzing}
-              onClick={handleAnalyze}
-            >
-              {isAnalyzing ? "Analizando..." : "Analizar expediente"}
-            </Button>
-          </div>
-        </Card>
-      </div>
+      <Card>
+        <p className="text-sm text-gf-text-muted mb-3">
+          Sin analizar — ejecuta las validaciones para comparar identidad entre
+          documentos.
+        </p>
+        <Button
+          variant="primary"
+          type="button"
+          disabled={state.phase === "analyzing"}
+          onClick={onAnalyze}
+        >
+          {state.phase === "analyzing"
+            ? "Analizando..."
+            : "Validar expediente"}
+        </Button>
+      </Card>
     );
   }
 
-  // state.phase === "result"
-  const { run } = state;
+  const { run } = state as { phase: "result"; run: AnalysisRun };
+
   return (
-    <div className="mb-4 space-y-4">
-      <AnalysisDivider />
+    <div className="space-y-4">
+      {/* ── Estado operativo ────────────────────────────────────────── */}
+      <OperationalStatusBadge status={operationalStatus} />
 
-      {/* ── Barra de estado operativo ──────────────────────────────────── */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <StatusBadge
-          label="Estado operativo"
-          value={statusCode === "REQUIRES_REVIEW" ? "Requiere revisión" : statusCode}
-          variant="operational"
-        />
-        <StatusBadge
-          label="Validación"
-          value={OUTCOME_BADGE[run.outcome]?.label ?? run.outcome}
-          variant={run.outcome === "FAIL" ? "fail" : run.outcome === "PARTIAL" ? "partial" : "pass"}
-        />
-      </div>
-
-      {/* ── Tabla comparativa ──────────────────────────────────────────── */}
+      {/* ── Tabla comparativa ────────────────────────────────────────── */}
       <ValidationTable
         sources={run.detail.sources}
         fields={run.detail.fields}
       />
 
-      {/* ── Resumen de identidad (incluye detalle de discrepancias) ────── */}
-      <IdentitySummaryCard fields={run.detail.fields} sources={run.detail.sources} />
+      {/* ── Resumen de identidad ──────────────────────────────────────── */}
+      <IdentitySummaryCard
+        fields={run.detail.fields}
+        sources={run.detail.sources}
+      />
 
-      {/* ── Acciones de asesora ────────────────────────────────────────── */}
+      {/* ── Acciones ──────────────────────────────────────────────────── */}
       <ActionsGroup
-        onReviewDecision={handleReviewDecision}
-        isSubmitting={reviewSubmitting}
+        onReviewDecision={onReviewDecision}
+        onReprocess={onAnalyze}
+        isSubmitting={isReviewSubmitting}
         error={actionError}
-        hasExistingDecision={
-          (run.reviewDecisions?.length ?? 0) > 0
-        }
-        onReprocess={handleAnalyze}
+        hasExistingDecision={(run.reviewDecisions?.length ?? 0) > 0}
       />
     </div>
   );
 }
 
-// ── Sub-componentes ────────────────────────────────────────────────────────
+// ── Badge de estado operativo ─────────────────────────────────────────────────
 
-function AnalysisDivider() {
-  return (
-    <div className="flex items-center gap-3 mb-3">
-      <div className="flex-1 h-px bg-gf-red/20" />
-      <span className="text-xs font-semibold uppercase tracking-wider text-gf-text-muted whitespace-nowrap">
-        Análisis del expediente
-      </span>
-      <div className="flex-1 h-px bg-gf-red/20" />
-    </div>
-  );
-}
+function OperationalStatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    REQUIRES_REVIEW: {
+      label: "Requiere revisión",
+      className: "bg-yellow-50 border-yellow-200 text-yellow-800",
+    },
+    REVIEWED: {
+      label: "Revisado",
+      className: "bg-green-50 border-green-200 text-green-800",
+    },
+  };
 
-function StatusBadge({
-  label,
-  value,
-  variant,
-}: {
-  label: string;
-  value: string;
-  variant: "operational" | "pass" | "partial" | "fail";
-}) {
-  const colors: Record<string, string> = {
-    operational: "bg-yellow-50 border-yellow-200 text-yellow-800",
-    pass: "bg-green-50 border-green-200 text-green-800",
-    partial: "bg-yellow-50 border-yellow-200 text-yellow-800",
-    fail: "bg-red-50 border-red-200 text-red-800",
+  const cfg = config[status] ?? {
+    label: status,
+    className: "bg-gray-50 border-gray-200 text-gray-600",
   };
 
   return (
     <div
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm ${colors[variant]}`}
+      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm ${cfg.className}`}
     >
-      <span className="text-xs text-gf-text-muted">{label}</span>
-      <span className="font-semibold">{value}</span>
+      <span className="text-xs text-current/60">Estado operativo</span>
+      <span className="font-semibold">{cfg.label}</span>
     </div>
   );
 }
+
+// ── Tabla comparativa ─────────────────────────────────────────────────────────
 
 function ValidationTable({
   sources,
@@ -296,16 +425,16 @@ function ValidationTable({
             <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[170px]">
               Documento
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide">
+            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
               Nombre
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide">
+            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
               RFC
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide">
+            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
               CURP
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[130px]">
+            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase w-[130px]">
               Estado
             </th>
           </tr>
@@ -314,13 +443,11 @@ function ValidationTable({
           {sources.map((source) => (
             <tr
               key={source}
-              className="border-b border-gf-border last:border-0 hover:bg-gf-bg-hover transition-colors"
+              className="border-b border-gf-border last:border-0 hover:bg-gf-bg-hover"
             >
               <td className="px-3 py-2.5">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="text-xs">
-                    {SOURCE_ICONS[source] ?? "📄"}
-                  </span>
+                  <span className="text-xs">{SOURCE_ICONS[source] ?? "📄"}</span>
                   <span className="text-xs font-medium text-gf-text">
                     {SOURCE_LABELS[source] ?? source}
                   </span>
@@ -329,18 +456,12 @@ function ValidationTable({
               {(["fullName", "rfc", "curp"] as const).map((fieldName) => {
                 const field = fields.find((f) => f.fieldName === fieldName);
                 const value = field?.originalValue[source];
-                const status = field?.status;
-                const isMismatch =
-                  status === "MISMATCH" && value != null;
+                const isMismatch = field?.status === "MISMATCH" && value != null;
                 return (
                   <td key={fieldName} className="px-3 py-2.5">
                     {value != null ? (
                       <span
-                        className={`text-xs ${
-                          isMismatch
-                            ? "text-gf-red font-medium"
-                            : "text-gf-text"
-                        }`}
+                        className={`text-xs ${isMismatch ? "text-gf-red font-medium" : "text-gf-text"}`}
                       >
                         {value}
                       </span>
@@ -349,9 +470,7 @@ function ValidationTable({
                         No capturado
                       </span>
                     ) : (
-                      <span className="text-xs text-gf-text-muted italic">
-                        —
-                      </span>
+                      <span className="text-xs text-gf-text-muted italic">—</span>
                     )}
                   </td>
                 );
@@ -374,9 +493,6 @@ function FieldStatusBadge({
   fields: FieldComparison[];
   source: string;
 }) {
-  // Determinar estado por fuente: si TODOS los campos son MATCH → Coincide,
-  // si alguno es MISMATCH → No coincide,
-  // si todos son NOT_AVAILABLE → No disponible
   const statuses = fields.map((f) => f.status);
   if (statuses.every((s) => s === "NOT_AVAILABLE")) {
     return (
@@ -399,22 +515,23 @@ function FieldStatusBadge({
   );
 }
 
+// ── IdentitySummaryCard ───────────────────────────────────────────────────────
+
 function IdentitySummaryCard({
   fields,
-  sources,
 }: {
   fields: FieldComparison[];
   sources: string[];
 }) {
-  const matchCount = fields.filter((f) =>
-    Object.values(f.normalizedValue).some((v) => v !== null) &&
-    f.status === "MATCH",
+  const matchCount = fields.filter(
+    (f) =>
+      Object.values(f.normalizedValue).some((v) => v !== null) &&
+      f.status === "MATCH",
   ).length;
   const mismatchCount = fields.filter((f) => f.status === "MISMATCH").length;
   const unavailableCount = fields.filter(
     (f) => f.status === "NOT_AVAILABLE",
   ).length;
-
   const hasIssues = mismatchCount > 0;
   const mismatches = fields.filter((f) => f.status === "MISMATCH");
 
@@ -426,7 +543,6 @@ function IdentitySummaryCard({
           : "border-green-200 bg-green-50/30"
       }
     >
-      {/* MiniStats */}
       <div className="flex items-center gap-4 mb-3">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -448,71 +564,36 @@ function IdentitySummaryCard({
         </div>
       </div>
 
-      {/* Detalle de cada discrepancia */}
       {hasIssues && (
         <div className="space-y-3 mt-3">
           {mismatches.map((mismatch) => {
             const isDocConflict = mismatch.alerts.includes("DOCUMENT_CONFLICT");
-            const isExpedienteVsDocs = mismatch.alerts.includes("EXPEDIENTE_VS_DOCUMENTOS");
-            const isNameOrderDiff = mismatch.alerts.includes("NAME_ORDER_DIFF");
-            const isNameNonStd = mismatch.alerts.includes("NAME_NONSTANDARD_CHAR");
-            const isNameMismatch = mismatch.alerts.includes("NAME_MISMATCH");
+            const isExpedienteVsDocs = mismatch.alerts.includes(
+              "EXPEDIENTE_VS_DOCUMENTOS",
+            );
+            const isNameOrderDiff =
+              mismatch.alerts.includes("NAME_ORDER_DIFF");
+            const isNameNonStd = mismatch.alerts.includes(
+              "NAME_NONSTANDARD_CHAR",
+            );
 
-            // Collect all sources with non-null normalized values
             const entries = Object.entries(mismatch.normalizedValue).filter(
               ([, v]) => v !== null,
             );
             const docEntries = entries.filter(([k]) => k !== "client");
             const clientEntry = entries.find(([k]) => k === "client");
 
-            if (isDocConflict) {
-              // ── Conflicto entre documentos ───────────────────────────
-              return (
-                <div
-                  key={mismatch.fieldName}
-                  className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
-                >
-                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
-                    Conflicto entre documentos
-                  </p>
-                  <div className="flex items-start gap-3 flex-wrap">
-                    <div className="min-w-[60px]">
-                      <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
-                      <p className="text-sm font-semibold text-gf-red uppercase">
-                        {mismatch.fieldName}
-                      </p>
-                    </div>
-                    {docEntries.map(([src,]) => (
-                      <div key={src}>
-                        <p className="text-[10px] text-gf-text-muted uppercase">
-                          {SOURCE_LABELS[src] ?? src}
-                        </p>
-                        <p className="text-sm font-medium text-gf-red">
-                          {mismatch.originalValue[src] ?? "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-gf-text-muted mt-2">
-                    Las fuentes no coinciden. La asesora debe revisar los
-                    documentos originales para determinar el valor correcto.
-                  </p>
-                </div>
-              );
-            }
-
             if (isNameNonStd) {
-              // ── Carácter no estándar en documento fuente ─────────────
               return (
                 <div
                   key={mismatch.fieldName}
                   className="bg-white rounded-lg border border-amber-200 bg-amber-50/30 px-3 py-2.5"
                 >
-                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
                     Nombre con carácter no estándar
                   </p>
                   <div className="flex items-start gap-4 flex-wrap">
-                    {docEntries.map(([src,]) => (
+                    {docEntries.map(([src]) => (
                       <div key={src}>
                         <p className="text-[10px] text-gf-text-muted uppercase">
                           {SOURCE_LABELS[src] ?? src}
@@ -524,26 +605,24 @@ function IdentitySummaryCard({
                     ))}
                   </div>
                   <p className="text-[11px] text-gf-text-muted mt-2">
-                    El documento fuente contiene caracteres no estándar en el
-                    nombre (ej. #, @). No es error de OCR — revisar el
-                    documento original.
+                    El documento fuente contiene caracteres no estándar (ej. #,
+                    @). Revisar el documento original.
                   </p>
                 </div>
               );
             }
 
             if (isNameOrderDiff) {
-              // ── Coincide con orden distinto (INE: apellidos primero) ──
               return (
                 <div
                   key={mismatch.fieldName}
                   className="bg-white rounded-lg border border-blue-200 bg-blue-50/30 px-3 py-2.5"
                 >
-                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
                     Coincide con orden distinto
                   </p>
                   <div className="flex items-start gap-4 flex-wrap">
-                    {docEntries.map(([src,]) => (
+                    {docEntries.map(([src]) => (
                       <div key={src}>
                         <p className="text-[10px] text-gf-text-muted uppercase">
                           {SOURCE_LABELS[src] ?? src}
@@ -556,25 +635,62 @@ function IdentitySummaryCard({
                   </div>
                   <p className="text-[11px] text-gf-text-muted mt-2">
                     El INE lista apellidos primero. Los tokens coinciden —
-                    validación parcial, no es un error.
+                    validación parcial.
+                  </p>
+                </div>
+              );
+            }
+
+            if (isDocConflict) {
+              return (
+                <div
+                  key={mismatch.fieldName}
+                  className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
+                >
+                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
+                    Conflicto entre documentos
+                  </p>
+                  <div className="flex items-start gap-3 flex-wrap">
+                    <div className="min-w-[60px]">
+                      <p className="text-[10px] text-gf-text-muted uppercase">
+                        Campo
+                      </p>
+                      <p className="text-sm font-semibold text-gf-red uppercase">
+                        {mismatch.fieldName}
+                      </p>
+                    </div>
+                    {docEntries.map(([src]) => (
+                      <div key={src}>
+                        <p className="text-[10px] text-gf-text-muted uppercase">
+                          {SOURCE_LABELS[src] ?? src}
+                        </p>
+                        <p className="text-sm font-medium text-gf-red">
+                          {mismatch.originalValue[src] ?? "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gf-text-muted mt-2">
+                    Las fuentes no coinciden. Revisar documentos originales.
                   </p>
                 </div>
               );
             }
 
             if (isExpedienteVsDocs) {
-              // ── Expediente vs documentos ─────────────────────────────
               return (
                 <div
                   key={mismatch.fieldName}
                   className="bg-white rounded-lg border border-yellow-200 bg-yellow-50/30 px-3 py-2.5"
                 >
-                  <p className="text-[10px] text-gf-text-muted uppercase tracking-wide mb-2">
+                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
                     Expediente vs documentos
                   </p>
                   <div className="flex items-start gap-4 flex-wrap">
                     <div className="min-w-[60px]">
-                      <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
+                      <p className="text-[10px] text-gf-text-muted uppercase">
+                        Campo
+                      </p>
                       <p className="text-sm font-semibold text-yellow-700 uppercase">
                         {mismatch.fieldName}
                       </p>
@@ -594,8 +710,11 @@ function IdentitySummaryCard({
                         Valor detectado en documentos
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {docEntries.map(([src,]) => (
-                          <span key={src} className="text-sm font-medium text-green-700">
+                        {docEntries.map(([src]) => (
+                          <span
+                            key={src}
+                            className="text-sm font-medium text-green-700"
+                          >
                             {mismatch.originalValue[src] ?? "—"}
                             <span className="text-[10px] text-gf-text-muted ml-1">
                               ({SOURCE_LABELS[src] ?? src})
@@ -606,14 +725,13 @@ function IdentitySummaryCard({
                     </div>
                   </div>
                   <p className="text-[11px] text-gf-text-muted mt-2">
-                    El expediente es referencia operativa, no verdad legal
-                    absoluta. Verificar documentos originales.
+                    El expediente es referencia operativa. Verificar documentos
+                    originales.
                   </p>
                 </div>
               );
             }
 
-            // ── Name mismatch (genérico) ───────────────────────────────
             return (
               <div
                 key={mismatch.fieldName}
@@ -621,12 +739,14 @@ function IdentitySummaryCard({
               >
                 <div className="flex items-start gap-4 flex-wrap">
                   <div className="min-w-[80px]">
-                    <p className="text-[10px] text-gf-text-muted uppercase">Campo</p>
+                    <p className="text-[10px] text-gf-text-muted uppercase">
+                      Campo
+                    </p>
                     <p className="text-sm font-semibold text-yellow-700 uppercase">
                       {mismatch.fieldName}
                     </p>
                   </div>
-                  {docEntries.map(([src,]) => (
+                  {docEntries.map(([src]) => (
                     <div key={src}>
                       <p className="text-[10px] text-gf-text-muted uppercase">
                         {SOURCE_LABELS[src] ?? src}
@@ -651,7 +771,6 @@ function IdentitySummaryCard({
         </div>
       )}
 
-      {/* CLIENT_FIELD_OMITTED — sugerencia para completar datos */}
       {fields.some((f) => f.alerts.includes("CLIENT_FIELD_OMITTED")) && (
         <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
           <p className="text-xs text-blue-700">
@@ -670,21 +789,23 @@ function IdentitySummaryCard({
   );
 }
 
+// ── ActionsGroup ──────────────────────────────────────────────────────────────
+
 function ActionsGroup({
   onReviewDecision,
+  onReprocess,
   isSubmitting,
   error,
   hasExistingDecision,
-  onReprocess,
 }: {
   onReviewDecision: (
     action: ReviewDecision["action"],
     justification?: string,
   ) => Promise<void>;
+  onReprocess: () => Promise<void>;
   isSubmitting: boolean;
   error: string | null;
   hasExistingDecision: boolean;
-  onReprocess: () => Promise<void>;
 }) {
   const [showJustification, setShowJustification] = useState(false);
   const [justification, setJustification] = useState("");
@@ -709,7 +830,9 @@ function ActionsGroup({
           type="button"
           disabled={isSubmitting}
           onClick={() =>
-            (document.getElementById("documentos") as HTMLElement)?.scrollIntoView({ behavior: "smooth" })
+            document
+              .getElementById("documentos")
+              ?.scrollIntoView({ behavior: "smooth" })
           }
         >
           📄 Revisar documentos
@@ -774,17 +897,7 @@ function ActionsGroup({
         )}
       </div>
 
-      {error && (
-        <p className="text-xs text-gf-red mt-2">{error}</p>
-      )}
+      {error && <p className="text-xs text-gf-red mt-2">{error}</p>}
     </Card>
   );
-}
-
-// ── Type guard ────────────────────────────────────────────────────────────
-
-function isResultState(
-  state: UiState,
-): state is { phase: "result"; run: AnalysisRun } {
-  return state.phase === "result";
 }
