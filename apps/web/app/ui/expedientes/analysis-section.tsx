@@ -103,8 +103,15 @@ export default function AnalysisSection({
     }
     if (res.data) {
       setState({ phase: "result", run: res.data });
+      const hasConfirmedReview = res.data.reviewDecisions?.some(
+        (d) => d.action === "CONFIRM_ISSUE",
+      );
       setOperationalStatus(
-        res.data.outcome === "FAIL" ? "REQUIRES_REVIEW" : statusCode,
+        res.data.outcome === "FAIL" && !hasConfirmedReview
+          ? "REQUIRES_REVIEW"
+          : hasConfirmedReview
+            ? "REVIEWED"
+            : statusCode,
       );
     } else {
       setState({ phase: "idle" });
@@ -355,16 +362,16 @@ function IdentityValidationSection({
       {/* ── Estado operativo ────────────────────────────────────────── */}
       <OperationalStatusBadge status={operationalStatus} />
 
-      {/* ── Tabla comparativa ────────────────────────────────────────── */}
-      <ValidationTable
-        sources={run.detail.sources}
-        fields={run.detail.fields}
-      />
-
-      {/* ── Resumen de identidad ──────────────────────────────────────── */}
+      {/* ── Resumen de identidad (discrepancias) ────────────────────────── */}
       <IdentitySummaryCard
         fields={run.detail.fields}
         sources={run.detail.sources}
+      />
+
+      {/* ── Tabla comparativa completa ──────────────────────────────────── */}
+      <ValidationTable
+        sources={run.detail.sources}
+        fields={run.detail.fields}
       />
 
       {/* ── Acciones ──────────────────────────────────────────────────── */}
@@ -408,7 +415,7 @@ function OperationalStatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Tabla comparativa ─────────────────────────────────────────────────────────
+// ── Tabla comparativa (colapsable) ────────────────────────────────────────────
 
 function ValidationTable({
   sources,
@@ -417,103 +424,108 @@ function ValidationTable({
   sources: string[];
   fields: FieldComparison[];
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <Card className="!p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-gf-bg-secondary">
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[170px] border-b border-gf-border">
-              Documento
-            </th>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
-              NOMBRE
-            </th>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
-              RFC
-            </th>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
-              CURP
-            </th>
-            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[130px] border-b border-gf-border">
-              Estado
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sources.map((source) => (
-            <tr
-              key={source}
-              className="border-b border-gf-border/60 hover:bg-gf-bg-hover transition-colors"
-            >
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="text-xs">{SOURCE_ICONS[source] ?? "📄"}</span>
-                  <span className="text-xs font-medium text-gf-text">
-                    {SOURCE_LABELS[source] ?? source}
-                  </span>
-                </span>
-              </td>
-              {(["fullName", "rfc", "curp"] as const).map((fieldName) => {
-                const field = fields.find((f) => f.fieldName === fieldName);
-                const value = field?.originalValue[source];
-                const isMismatch = field?.status === "MISMATCH" && value != null;
-                return (
-                  <td key={fieldName} className="px-4 py-2.5">
-                    {value != null ? (
-                      <span
-                        className={`text-xs ${isMismatch ? "text-gf-red font-medium" : "text-gf-text"}`}
-                      >
-                        {value}
-                      </span>
-                    ) : source === "client" && fieldName !== "fullName" ? (
-                      <span className="text-xs text-blue-600 italic">
-                        No capturado
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gf-text-muted italic">—</span>
-                    )}
-                  </td>
-                );
-              })}
-              <td className="px-4 py-2.5">
-                <FieldStatusBadge fields={fields} source={source} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    </Card>
-  );
-}
+      {/* ── Toggle button ──────────────────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gf-bg-hover transition-colors"
+      >
+        <svg
+          className={`h-4 w-4 text-gf-text-muted transition-transform ${expanded ? "rotate-90" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+        <span className="text-xs font-medium text-gf-text-muted uppercase tracking-wide">
+          {expanded ? "Ocultar detalles" : "Ver detalles"}
+        </span>
+        <span className="text-[10px] text-gf-text-muted/60">
+          — comparativa completa de todos los documentos
+        </span>
+      </button>
 
-function FieldStatusBadge({
-  fields,
-  source,
-}: {
-  fields: FieldComparison[];
-  source: string;
-}) {
-  const statuses = fields.map((f) => f.status);
-  if (statuses.every((s) => s === "NOT_AVAILABLE")) {
-    return (
-      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
-        No disponible
-      </span>
-    );
-  }
-  if (statuses.some((s) => s === "MISMATCH")) {
-    return (
-      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700">
-        No coincide
-      </span>
-    );
-  }
-  return (
-    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700">
-      Coincide
-    </span>
+      {/* ── Collapsible table ──────────────────────────────────────────── */}
+      {expanded && (
+        <div className="overflow-x-auto border-t border-gf-border">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gf-bg-secondary">
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[170px] border-b border-gf-border">
+                  Documento
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
+                  NOMBRE
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
+                  RFC
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
+                  CURP
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.map((source) => (
+                <tr
+                  key={source}
+                  className="border-b border-gf-border/60 hover:bg-gf-bg-hover transition-colors"
+                >
+                  <td className="px-4 py-2.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-xs">
+                        {SOURCE_ICONS[source] ?? "📄"}
+                      </span>
+                      <span className="text-xs font-medium text-gf-text">
+                        {SOURCE_LABELS[source] ?? source}
+                      </span>
+                    </span>
+                  </td>
+                  {(["fullName", "rfc", "curp"] as const).map((fieldName) => {
+                    const field = fields.find(
+                      (f) => f.fieldName === fieldName,
+                    );
+                    const value = field?.originalValue[source];
+                    const isMismatch =
+                      field?.status === "MISMATCH" && value != null;
+                    return (
+                      <td key={fieldName} className="px-4 py-2.5">
+                        {value != null ? (
+                          <span
+                            className={`text-xs ${isMismatch ? "text-gf-red font-medium" : "text-gf-text"}`}
+                          >
+                            {value}
+                          </span>
+                        ) : source === "client" &&
+                          fieldName !== "fullName" ? (
+                          <span className="text-xs text-blue-600 italic">
+                            No capturado
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gf-text-muted italic">
+                            —
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
 

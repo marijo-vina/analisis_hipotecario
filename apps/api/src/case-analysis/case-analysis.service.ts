@@ -121,7 +121,7 @@ export class CaseAnalysisService {
     return this.prisma.analysisRun.findFirst({
       where: { mortgageCaseId: caseId },
       orderBy: { createdAt: 'desc' },
-      include: { alerts: true },
+      include: { alerts: true, reviewDecisions: true },
     });
   }
 
