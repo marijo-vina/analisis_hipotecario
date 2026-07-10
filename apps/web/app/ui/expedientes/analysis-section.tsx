@@ -164,7 +164,7 @@ export default function AnalysisSection({
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 mt-8">
       {/* ── Título ──────────────────────────────────────────────────────── */}
       <h2 className="text-base font-semibold text-gf-text mb-3">
         Análisis del expediente
@@ -418,23 +418,24 @@ function ValidationTable({
   fields: FieldComparison[];
 }) {
   return (
-    <div className="overflow-x-auto">
+    <Card className="!p-0 overflow-hidden">
+      <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="bg-gf-bg-secondary rounded-t-lg">
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[170px]">
+          <tr className="bg-gf-bg-secondary">
+            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[170px] border-b border-gf-border">
               Documento
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
+            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
               Nombre
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
+            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
               RFC
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase">
+            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
               CURP
             </th>
-            <th className="text-left px-3 py-2 text-xs font-medium text-gf-text-muted uppercase w-[130px]">
+            <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide w-[130px] border-b border-gf-border">
               Estado
             </th>
           </tr>
@@ -443,9 +444,9 @@ function ValidationTable({
           {sources.map((source) => (
             <tr
               key={source}
-              className="border-b border-gf-border last:border-0 hover:bg-gf-bg-hover"
+              className="border-b border-gf-border/60 hover:bg-gf-bg-hover transition-colors"
             >
-              <td className="px-3 py-2.5">
+              <td className="px-4 py-2.5">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="text-xs">{SOURCE_ICONS[source] ?? "📄"}</span>
                   <span className="text-xs font-medium text-gf-text">
@@ -458,7 +459,7 @@ function ValidationTable({
                 const value = field?.originalValue[source];
                 const isMismatch = field?.status === "MISMATCH" && value != null;
                 return (
-                  <td key={fieldName} className="px-3 py-2.5">
+                  <td key={fieldName} className="px-4 py-2.5">
                     {value != null ? (
                       <span
                         className={`text-xs ${isMismatch ? "text-gf-red font-medium" : "text-gf-text"}`}
@@ -475,7 +476,7 @@ function ValidationTable({
                   </td>
                 );
               })}
-              <td className="px-3 py-2.5">
+              <td className="px-4 py-2.5">
                 <FieldStatusBadge fields={fields} source={source} />
               </td>
             </tr>
@@ -483,6 +484,7 @@ function ValidationTable({
         </tbody>
       </table>
     </div>
+    </Card>
   );
 }
 
