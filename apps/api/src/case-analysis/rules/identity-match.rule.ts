@@ -388,11 +388,8 @@ export class IdentityMatchRule implements AnalysisRule {
       } else {
         // ── Documents agree ────────────────────────────────────────────────
         const consensus = docValues[0].normalized!;
-        const clientDiffers = clientValue
-          ? !this.valuesMatch(clientValue.normalized!, consensus, fieldName)
-          : false;
 
-        if (clientDiffers) {
+        if (clientValue && !this.valuesMatch(clientValue.normalized!, consensus, fieldName)) {
           // Client has a value but it differs from document consensus.
           status = 'MISMATCH';
           if (fieldName === 'rfc' || fieldName === 'curp') {
