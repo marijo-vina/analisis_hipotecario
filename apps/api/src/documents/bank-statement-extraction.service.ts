@@ -28,6 +28,9 @@ const BANK_STATEMENT_INSTRUCTIONS = [
   '─── Titular (accountHolder) ───',
   '  fullName: nombre completo del titular de la cuenta. Buscar: TITULAR, NOMBRE DEL TITULAR,',
   '    NOMBRE, Cuenta de. Normalizar a MAYÚSCULAS.',
+  '  rfc: RFC del titular de la cuenta (12-13 caracteres). Buscar: RFC, RFC TITULAR,',
+  '    RFC CUENTAHABIENTE, RFC CLIENTE. Puede aparecer en el encabezado o junto al nombre.',
+  '    Pista de regex RFC: [A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}. Si no hay match claro, usar null.',
   '  isJointAccount: true si el estado de cuenta muestra dos o más titulares, "cuenta mancomunada",',
   '    "cuenta conjunta", o múltiples nombres con "Y" entre ellos. false si hay un solo titular claro.',
   '    null si no es evidente.',
@@ -179,6 +182,7 @@ const BANK_STATEMENT_SCHEMA = {
   },
   accountHolder: {
     fullName: 'string | null',
+    rfc: 'string | null',
     isJointAccount: 'boolean | null',
   },
   bank: {
@@ -466,6 +470,15 @@ export class BankStatementExtractionService {
       string,
       unknown
     >;
+    const accountHolder = (data.accountHolder ?? {}) as Record<string, unknown>;
+
+    // ── RFC validation for accountHolder ───────────────────────────────────
+    const accountRfc = accountHolder.rfc as string | undefined | null;
+    if (accountRfc != null && accountRfc !== '') {
+      accountHolder.rfc = this.validateRfc(accountRfc);
+    } else if (accountRfc === '') {
+      accountHolder.rfc = null;
+    }
 
     // ── RFC validation for payrollDeposits[] ─────────────────────────────
     if (Array.isArray(payrollDeposits)) {
@@ -772,6 +785,12 @@ export class BankStatementExtractionService {
       (accountHolder.fullName as string)?.trim() === ''
     ) {
       missing.push('accountHolder.fullName');
+    }
+    if (
+      !accountHolder.rfc ||
+      (accountHolder.rfc as string)?.trim() === ''
+    ) {
+      missing.push('accountHolder.rfc');
     }
 
     // Bank info

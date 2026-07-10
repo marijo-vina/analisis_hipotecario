@@ -87,7 +87,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     documentTypeCode: 'BANK_STATEMENT',
     extract: {
       fullName: (d) => get(d, ['accountHolder', 'fullName']),
-      rfc: () => null, // Bank statement has no holder-level RFC to compare.
+      rfc: (d) => get(d, ['accountHolder', 'rfc']),
       curp: () => null, // Bank statement structurally lacks CURP.
     },
   },
