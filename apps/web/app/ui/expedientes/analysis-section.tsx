@@ -427,7 +427,7 @@ function ValidationTable({
               Documento
             </th>
             <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
-              Nombre
+              NOMBRE
             </th>
             <th className="text-left px-4 py-2.5 text-xs font-medium text-gf-text-muted uppercase tracking-wide border-b border-gf-border">
               RFC
@@ -536,6 +536,32 @@ function IdentitySummaryCard({
   ).length;
   const hasIssues = mismatchCount > 0;
   const mismatches = fields.filter((f) => f.status === "MISMATCH");
+  const [showDetails, setShowDetails] = useState(hasIssues);
+
+  // Build discrepancy table rows
+  const discrepancyRows = mismatches.map((mismatch) => {
+    const alertList = mismatch.alerts;
+    let observation = "Requiere revisión";
+    if (alertList.includes("DOCUMENT_CONFLICT")) observation = "Conflicto entre documentos";
+    else if (alertList.includes("EXPEDIENTE_VS_DOCUMENTOS")) observation = "Expediente vs documentos";
+    else if (alertList.includes("NAME_ORDER_DIFF")) observation = "Validación parcial — orden distinto";
+    else if (alertList.includes("NAME_NONSTANDARD_CHAR")) observation = "Carácter no estándar";
+
+    const fieldLabel =
+      mismatch.fieldName === "fullName" ? "NOMBRE" : mismatch.fieldName.toUpperCase();
+
+    const getVal = (source: string) => mismatch.originalValue[source] ?? "—";
+
+    return { fieldLabel, observation, mismatch, getVal };
+  });
+
+  const COLUMNS = [
+    { key: "payroll", label: "NÓMINA" },
+    { key: "official-id", label: "INE" },
+    { key: "bank-statement", label: "EDO. CUENTA" },
+    { key: "credit-bureau", label: "BURÓ" },
+    { key: "client", label: "EXPEDIENTE" },
+  ] as const;
 
   return (
     <Card
@@ -545,7 +571,12 @@ function IdentitySummaryCard({
           : "border-green-200 bg-green-50/30"
       }
     >
-      <div className="flex items-center gap-4 mb-3">
+      {/* Header — collapsible */}
+      <button
+        type="button"
+        onClick={() => setShowDetails((v) => !v)}
+        className="w-full flex items-center gap-4 text-left"
+      >
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-500" />
           <span className="text-xs text-gf-text">{matchCount} coinciden</span>
@@ -553,223 +584,70 @@ function IdentitySummaryCard({
         <span className="text-xs text-gf-text-muted">|</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-red-500" />
-          <span className="text-xs text-gf-text">
-            {mismatchCount} discrepancias
-          </span>
+          <span className="text-xs text-gf-text">{mismatchCount} discrepancias</span>
         </div>
         <span className="text-xs text-gf-text-muted">|</span>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-gray-300" />
-          <span className="text-xs text-gf-text">
-            {unavailableCount} no comparable
-          </span>
+          <span className="text-xs text-gf-text">{unavailableCount} no comparable</span>
         </div>
-      </div>
+        {hasIssues && (
+          <svg
+            className={`ml-auto h-4 w-4 text-gf-text-muted transition-transform ${showDetails ? "rotate-90" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        )}
+      </button>
 
-      {hasIssues && (
-        <div className="space-y-3 mt-3">
-          {mismatches.map((mismatch) => {
-            const isDocConflict = mismatch.alerts.includes("DOCUMENT_CONFLICT");
-            const isExpedienteVsDocs = mismatch.alerts.includes(
-              "EXPEDIENTE_VS_DOCUMENTOS",
-            );
-            const isNameOrderDiff =
-              mismatch.alerts.includes("NAME_ORDER_DIFF");
-            const isNameNonStd = mismatch.alerts.includes(
-              "NAME_NONSTANDARD_CHAR",
-            );
-
-            const entries = Object.entries(mismatch.normalizedValue).filter(
-              ([, v]) => v !== null,
-            );
-            const docEntries = entries.filter(([k]) => k !== "client");
-            const clientEntry = entries.find(([k]) => k === "client");
-
-            if (isNameNonStd) {
-              return (
-                <div
-                  key={mismatch.fieldName}
-                  className="bg-white rounded-lg border border-amber-200 bg-amber-50/30 px-3 py-2.5"
-                >
-                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
-                    Nombre con carácter no estándar
-                  </p>
-                  <div className="flex items-start gap-4 flex-wrap">
-                    {docEntries.map(([src]) => (
-                      <div key={src}>
-                        <p className="text-[10px] text-gf-text-muted uppercase">
-                          {SOURCE_LABELS[src] ?? src}
-                        </p>
-                        <p className="text-sm font-medium text-gf-text">
-                          {mismatch.originalValue[src] ?? "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-gf-text-muted mt-2">
-                    El documento fuente contiene caracteres no estándar (ej. #,
-                    @). Revisar el documento original.
-                  </p>
-                </div>
-              );
-            }
-
-            if (isNameOrderDiff) {
-              return (
-                <div
-                  key={mismatch.fieldName}
-                  className="bg-white rounded-lg border border-blue-200 bg-blue-50/30 px-3 py-2.5"
-                >
-                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
-                    Coincide con orden distinto
-                  </p>
-                  <div className="flex items-start gap-4 flex-wrap">
-                    {docEntries.map(([src]) => (
-                      <div key={src}>
-                        <p className="text-[10px] text-gf-text-muted uppercase">
-                          {SOURCE_LABELS[src] ?? src}
-                        </p>
-                        <p className="text-sm font-medium text-gf-text">
-                          {mismatch.originalValue[src] ?? "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-gf-text-muted mt-2">
-                    El INE lista apellidos primero. Los tokens coinciden —
-                    validación parcial.
-                  </p>
-                </div>
-              );
-            }
-
-            if (isDocConflict) {
-              return (
-                <div
-                  key={mismatch.fieldName}
-                  className="bg-white rounded-lg border border-red-200 px-3 py-2.5"
-                >
-                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
-                    Conflicto entre documentos
-                  </p>
-                  <div className="flex items-start gap-3 flex-wrap">
-                    <div className="min-w-[60px]">
-                      <p className="text-[10px] text-gf-text-muted uppercase">
-                        Campo
-                      </p>
-                      <p className="text-sm font-semibold text-gf-red uppercase">
-                        {mismatch.fieldName}
-                      </p>
-                    </div>
-                    {docEntries.map(([src]) => (
-                      <div key={src}>
-                        <p className="text-[10px] text-gf-text-muted uppercase">
-                          {SOURCE_LABELS[src] ?? src}
-                        </p>
-                        <p className="text-sm font-medium text-gf-red">
-                          {mismatch.originalValue[src] ?? "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-gf-text-muted mt-2">
-                    Las fuentes no coinciden. Revisar documentos originales.
-                  </p>
-                </div>
-              );
-            }
-
-            if (isExpedienteVsDocs) {
-              return (
-                <div
-                  key={mismatch.fieldName}
-                  className="bg-white rounded-lg border border-yellow-200 bg-yellow-50/30 px-3 py-2.5"
-                >
-                  <p className="text-[10px] text-gf-text-muted uppercase mb-2">
-                    Expediente vs documentos
-                  </p>
-                  <div className="flex items-start gap-4 flex-wrap">
-                    <div className="min-w-[60px]">
-                      <p className="text-[10px] text-gf-text-muted uppercase">
-                        Campo
-                      </p>
-                      <p className="text-sm font-semibold text-yellow-700 uppercase">
-                        {mismatch.fieldName}
-                      </p>
-                    </div>
-                    {clientEntry && (
-                      <div>
-                        <p className="text-[10px] text-gf-text-muted uppercase">
-                          Valor en expediente
-                        </p>
-                        <p className="text-sm font-medium text-gf-red">
-                          {mismatch.originalValue["client"] ?? "—"}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-[10px] text-gf-text-muted uppercase">
-                        Valor detectado en documentos
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {docEntries.map(([src]) => (
-                          <span
-                            key={src}
-                            className="text-sm font-medium text-green-700"
-                          >
-                            {mismatch.originalValue[src] ?? "—"}
-                            <span className="text-[10px] text-gf-text-muted ml-1">
-                              ({SOURCE_LABELS[src] ?? src})
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gf-text-muted mt-2">
-                    El expediente es referencia operativa. Verificar documentos
-                    originales.
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={mismatch.fieldName}
-                className="bg-white rounded-lg border border-yellow-200 px-3 py-2.5"
-              >
-                <div className="flex items-start gap-4 flex-wrap">
-                  <div className="min-w-[80px]">
-                    <p className="text-[10px] text-gf-text-muted uppercase">
-                      Campo
-                    </p>
-                    <p className="text-sm font-semibold text-yellow-700 uppercase">
-                      {mismatch.fieldName}
-                    </p>
-                  </div>
-                  {docEntries.map(([src]) => (
-                    <div key={src}>
-                      <p className="text-[10px] text-gf-text-muted uppercase">
-                        {SOURCE_LABELS[src] ?? src}
-                      </p>
-                      <p className="text-sm font-medium text-gf-text">
-                        {mismatch.originalValue[src] ?? "—"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[11px] text-gf-text-muted mt-2">
-                  Los valores detectados no coinciden. Se requiere revisión.
-                </p>
-              </div>
-            );
-          })}
-
-          <p className="text-[11px] text-gf-text-muted mt-2">
-            La asesora debe revisar cada discrepancia y decidir si requiere
-            ajuste en los documentos o si es un falso positivo.
-          </p>
+      {/* ── Tabla de discrepancias (colapsable) ────────────────────────── */}
+      {hasIssues && showDetails && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-white/60">
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gf-text uppercase border-b border-gf-border/60">CAMPO</th>
+                {COLUMNS.map((col) => (
+                  <th key={col.key} className="text-left px-3 py-2 text-xs font-semibold text-gf-text uppercase border-b border-gf-border/60">{col.label}</th>
+                ))}
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gf-text uppercase border-b border-gf-border/60 whitespace-nowrap">OBSERVACIÓN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {discrepancyRows.map((row) => (
+                <tr key={row.mismatch.fieldName} className="border-b border-gf-border/40 hover:bg-white/40 transition-colors">
+                  <td className="px-3 py-2 text-xs font-semibold text-gf-red uppercase">{row.fieldLabel}</td>
+                  {COLUMNS.map((col) => {
+                    const val = row.getVal(col.key);
+                    const isClient = col.key === "client";
+                    const normVal = row.mismatch.normalizedValue[col.key];
+                    const isPresent = normVal != null;
+                    return (
+                      <td key={col.key} className="px-3 py-2">
+                        {isPresent ? (
+                          <span className="text-xs text-gf-text">{val}</span>
+                        ) : isClient && row.mismatch.fieldName !== "fullName" ? (
+                          <span className="text-xs text-blue-600 italic">No capturado</span>
+                        ) : (
+                          <span className="text-xs text-gf-text-muted">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
+                      row.mismatch.alerts.includes("DOCUMENT_CONFLICT") ? "bg-red-50 text-red-700" :
+                      row.mismatch.alerts.includes("NAME_ORDER_DIFF") ? "bg-blue-50 text-blue-700" :
+                      row.mismatch.alerts.includes("NAME_NONSTANDARD_CHAR") ? "bg-amber-50 text-amber-700" :
+                      "bg-yellow-50 text-yellow-700"
+                    }`}>{row.observation}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-gf-text-muted mt-3">La asesora debe revisar cada discrepancia y decidir si requiere ajuste en los documentos o si es un falso positivo.</p>
         </div>
       )}
 
