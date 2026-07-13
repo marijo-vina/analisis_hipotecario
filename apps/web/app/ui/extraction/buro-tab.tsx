@@ -660,6 +660,20 @@ function CreditRow({
         </span>
       );
     }
+    if (credit.paymentDueAmountSource === PaymentDueAmountSource.BAND_MATCH) {
+      return (
+        <span className="inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700" title="Extracción por coordenadas">
+          ✅ Coord.
+        </span>
+      );
+    }
+    if (credit.paymentDueAmountSource === PaymentDueAmountSource.RESCUE) {
+      return (
+        <span className="inline-flex items-center rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700" title="Rescate por coordenadas — verificar">
+          ⚠️ Rescate
+        </span>
+      );
+    }
     if (
       credit.paymentDueAmountSource === PaymentDueAmountSource.CONFIRMED_AUTO ||
       credit.paymentDueAmountSource === PaymentDueAmountSource.LAYOUT

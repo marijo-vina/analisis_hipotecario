@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# POC: credit bureau PDF coordinate extraction
+experiments/buro-pdf-coordinate-poc/samples/
+experiments/buro-pdf-coordinate-poc/output/

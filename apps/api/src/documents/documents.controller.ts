@@ -26,6 +26,8 @@ import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
+import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { GcsService } from './gcs.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
@@ -37,6 +39,8 @@ export class DocumentsController {
     private readonly bankStatementExtractionService: BankStatementExtractionService,
     private readonly creditBureauExtractionService: CreditBureauExtractionService,
     private readonly creditScoreExtractionService: CreditScoreExtractionService,
+    private readonly coordinateExtractionService: CoordinateExtractionService,
+    private readonly gcsService: GcsService,
   ) {}
 
   @Post()
@@ -244,5 +248,53 @@ export class DocumentsController {
       documentId,
     );
     return { data };
+  }
+
+/**
+   * DEV-ONLY: Coordinate-based extraction (POC v3.1 integration).
+   * Reads the document from GCS, extracts coordinate words via pdfjs-dist,
+   * and returns structured credits with band-based payment amounts.
+   */
+  @Post(':documentId/coordinate-extract')
+  @HttpCode(200)
+  async coordinateExtract(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    // Reuse existing extraction flow to get the PDF buffer from GCS
+    const doc = await this.documentsService.findOneByCase(caseId, documentId);
+    if (!doc || !doc.storagePath) {
+      throw new BadRequestException('Document not found or missing storage path.');
+    }
+
+    // Read raw PDF bytes from GCS
+    const pdfBuffer = await this.gcsService.downloadFile(doc.storagePath);
+    const result = await this.coordinateExtractionService.extract(
+      pdfBuffer,
+      doc.originalName,
+    );
+
+    // Persist in extractedData for the UI to consume
+    await this.documentsService.patchExtractedData(documentId, {
+      coordinateExtraction: {
+        extractedAt: new Date().toISOString(),
+        sourceFile: result.sourceFile,
+        totalPages: result.totalPages,
+        columnsDetected: result.columnsDetected,
+        credits: result.credits.map((c) => ({
+          institution: c.institution,
+          paymentDueAmount: c.paymentDueAmount,
+          paymentSource: c.paymentSource,
+          pastDueAmount: c.pastDueAmount,
+          lastPaymentAmount: c.lastPaymentAmount,
+          currentBalance: c.currentBalance,
+          maxCredit: c.maxCredit,
+          creditLimit: c.creditLimit,
+        })),
+        warnings: result.warnings,
+      },
+    });
+
+    return { data: result };
   }
 }

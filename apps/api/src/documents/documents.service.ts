@@ -301,6 +301,22 @@ export class DocumentsService {
     }
   }
 
+  /**
+   * Merge coordinate extraction results into Document.extractedData.
+   * Uses deep merge: existing keys are preserved, coordinateExtraction is added.
+   */
+  async patchExtractedData(
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        extractedData: data as any,
+      },
+    });
+  }
+
   private async resolveStatusId(code: string): Promise<number> {
     const status = await this.prisma.documentStatus.findUnique({
       where: { code },

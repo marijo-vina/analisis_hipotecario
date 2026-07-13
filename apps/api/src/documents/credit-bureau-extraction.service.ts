@@ -3,6 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { GcsService } from './gcs.service';
+import {
+  CoordinateCredit,
+  CoordinateExtractionResult,
+} from './coordinate-extraction.types';
 import {
   FinancialFieldsConfidence,
   FinancialFieldsConfidenceMap,
@@ -12,6 +18,7 @@ import {
   LayoutFinancialFields,
   LayoutFinancialResult,
   OcrLayout,
+  PaymentDueAmountSource,
 } from './document-ai.types';
 
 // ---------------------------------------------------------------------------
@@ -500,6 +507,8 @@ export class CreditBureauExtractionService {
     private readonly geminiService: GeminiService,
     private readonly configService: ConfigService,
     private readonly layoutExtractor: LayoutFinancialExtractorService,
+    private readonly coordinateExtractor: CoordinateExtractionService,
+    private readonly gcsService: GcsService,
   ) {}
 
   static isCreditBureauDocument(documentTypeCode: string): boolean {
@@ -901,6 +910,36 @@ export class CreditBureauExtractionService {
       }
     }
 
+    // ── 6b. Coordinate grid extraction (feature-flagged) ─────────────
+    // Downloads the raw PDF from GCS and runs the coordinate grid extractor
+    // BEFORE the Gemini call. BAND_MATCH values are merged AFTER Gemini
+    // returns (see mergeCoordinateResults below) so they overwrite Gemini's
+    // paymentDueAmount. Any error → log warning + fall through to the
+    // Gemini-only pipeline (never break the flow).
+    let coordinateResult: CoordinateExtractionResult | null = null;
+    if (this.isCoordinateExtractionEnabled()) {
+      try {
+        if (document.storagePath) {
+          const pdfBuffer =
+            await this.gcsService.downloadFile(document.storagePath);
+          coordinateResult = await this.coordinateExtractor.extract(
+            pdfBuffer,
+            document.originalName,
+          );
+          this.logger.log(
+            `[CreditBureau] Coordinate extraction: ${coordinateResult.credits.length} credits ` +
+              `(${coordinateResult.credits.filter((c) => c.paymentSource === PaymentDueAmountSource.BAND_MATCH).length} BAND_MATCH) ` +
+              `for doc ${documentId}`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `[CreditBureau] Coordinate extraction failed — falling back to Gemini-only: ${(err as Error).message}`,
+        );
+        coordinateResult = null;
+      }
+    }
+
     // ── 7. Pre-filter OCR ──────────────────────────────────────────────
     // Layer 1: keep borrower + summary + detail (15K cap).
     // Layer 2: keep ONLY "DETALLE DE CRÉDITOS" (~5K) — borrower/report is
@@ -994,6 +1033,15 @@ export class CreditBureauExtractionService {
     // When the flag is off (default), the existing Gemini-only flow is
     // preserved and no audit fields are populated.
     this.maybeMergeLayout(data, document.ocrLayout as OcrLayout | null);
+
+    // ── 7c. Coordinate grid merge ─────────────────────────────────────
+    // When coordinate extraction ran (6b above), merge BAND_MATCH values
+    // onto Gemini credits — they are authoritative and overwrite whatever
+    // Gemini returned for paymentDueAmount. RESCUE/UNCONFIRMED defer to
+    // Gemini. Runs AFTER the layout merge so BAND_MATCH has final say.
+    if (coordinateResult) {
+      this.mergeCoordinateResults(data, coordinateResult);
+    }
 
     // ── 8. Normalize credit bureau fields ──────────────────────────────
     this.normalizeCreditBureau(data);
@@ -1121,6 +1169,18 @@ export class CreditBureauExtractionService {
   private isLayoutExtractionEnabled(): boolean {
     const v = this.configService.get<string>('USE_LAYOUT_EXTRACTION') ?? 'false';
     return String(v).toLowerCase() === 'true';
+  }
+
+  /**
+   * Feature-flag gate for the coordinate grid extractor. Resolves
+   * `COORDINATE_EXTRACTION_ENABLED` from the NestJS ConfigService. Defaults
+   * to `true` (production-ready) — opt-out by setting the env var to `false`.
+   */
+  private isCoordinateExtractionEnabled(): boolean {
+    const v =
+      this.configService.get<string>('COORDINATE_EXTRACTION_ENABLED') ??
+      'true';
+    return String(v).toLowerCase() !== 'false';
   }
 
   /**
@@ -1402,6 +1462,125 @@ export class CreditBureauExtractionService {
     credit.financialFieldsConfidence = confidence;
     credit.financialFieldsWarnings = warnings;
     credit.candidatePaymentDueAmount = candidatePaymentDueAmount;
+  }
+
+  // -----------------------------------------------------------------------
+  // Coordinate grid merge — BAND_MATCH authority for paymentDueAmount
+  // -----------------------------------------------------------------------
+  //
+  // `mergeCoordinateResults` overwrites Gemini's `paymentDueAmount` for
+  // credits where the coordinate grid extractor produced a BAND_MATCH (the
+  // value was found inside the paymentDueAmount column band — deterministic).
+  // RESCUE / UNCONFIRMED coordinate values are NOT authoritative and defer
+  // to Gemini (Gemini value wins).
+  //
+  // Merge key: normalized institution name (strip non-alphanumeric + uppercase).
+  // Fallback: positional order (Nth Gemini credit → Nth unclaimed coordinate
+  // credit) — mirrors the layout merge strategy so PDFs where the coordinate
+  // extractor reads institutions imperfectly still match by row position.
+  // Credits with no coordinate match → Gemini stays untouched.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Normalize an institution name for merge-key matching: strip
+   * non-alphanumeric chars + uppercase. OCR vs coordinate extractor often
+   * differ only in punctuation/space/case.
+   */
+  private static normInstitution(institution: string): string {
+    return institution.replace(/[^0-9A-ZÑa-zñ]/g, '').toUpperCase();
+  }
+
+  /**
+   * Parse a raw coordinate amount string (e.g. "8,775" or "0") into a
+   * number. Returns null for empty/unparseable strings.
+   */
+  private parseCoordinateAmount(raw: string): number | null {
+    if (!raw) return null;
+    const cleaned = raw.replace(/[^0-9.-]/g, '');
+    if (cleaned === '' || cleaned === '-') return null;
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+  }
+
+  /**
+   * Merge coordinate grid credits onto Gemini credits. Mutates
+   * `data.credits[]` in place. Only BAND_MATCH values overwrite — RESCUE
+   * and UNCONFIRMED defer to Gemini.
+   */
+  private mergeCoordinateResults(
+    data: Record<string, unknown>,
+    coordinateResult: CoordinateExtractionResult,
+  ): void {
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(credits) || credits.length === 0) return;
+
+    const coordCredits = coordinateResult.credits;
+    if (coordCredits.length === 0) return;
+
+    // Build per-institution ordered queues for the fallback matcher.
+    const institutionQueues = new Map<string, number[]>();
+    for (let i = 0; i < coordCredits.length; i++) {
+      const rawInst = coordCredits[i].institution ?? '';
+      const inst = CreditBureauExtractionService.normInstitution(rawInst);
+      if (!inst) continue;
+      if (!institutionQueues.has(inst)) institutionQueues.set(inst, []);
+      institutionQueues.get(inst)!.push(i);
+    }
+    const institutionConsumed = new Map<string, number>();
+    const claimed = new Set<number>();
+
+    for (const credit of credits) {
+      const gInstRaw = (credit.institution as string | undefined) ?? '';
+      const gInst = CreditBureauExtractionService.normInstitution(gInstRaw);
+
+      let matchIdx = -1;
+
+      // a) Match by normalized institution name.
+      if (gInst && institutionQueues.has(gInst)) {
+        const queue = institutionQueues.get(gInst)!;
+        const consumed = institutionConsumed.get(gInst) ?? 0;
+        for (let q = consumed; q < queue.length; q++) {
+          if (!claimed.has(queue[q])) {
+            matchIdx = queue[q];
+            institutionConsumed.set(gInst, q + 1);
+            break;
+          }
+        }
+      }
+
+      // b) Fallback: positional order (Nth Gemini credit → Nth unclaimed
+      //    coordinate credit). Handles PDFs where institution names don't
+      //    match between Gemini and the coordinate extractor.
+      if (matchIdx === -1) {
+        const geminiPos = credits.indexOf(credit);
+        const unclaimed = coordCredits
+          .map((_, i) => i)
+          .filter((i) => !claimed.has(i));
+        if (geminiPos < unclaimed.length) {
+          matchIdx = unclaimed[geminiPos];
+        }
+      }
+
+      // No coordinate match → Gemini stays untouched.
+      if (matchIdx === -1) continue;
+
+      claimed.add(matchIdx);
+      const cc = coordCredits[matchIdx];
+
+      // BAND_MATCH → authoritative: overwrite Gemini's paymentDueAmount.
+      // Skip Gemini for this field entirely — the coordinate value wins.
+      if (cc.paymentSource === PaymentDueAmountSource.BAND_MATCH) {
+        const parsed = this.parseCoordinateAmount(cc.paymentDueAmount);
+        if (parsed !== null) {
+          credit.paymentDueAmount = parsed;
+          credit.paymentDueAmountSource = PaymentDueAmountSource.BAND_MATCH;
+          credit.paymentDueAmountConfirmed = true;
+          credit.candidatePaymentDueAmount =
+            (credit.paymentDueAmount as number | null) ?? null;
+        }
+      }
+      // RESCUE / UNCONFIRMED → defer to Gemini, do nothing.
+    }
   }
 
   // -----------------------------------------------------------------------
