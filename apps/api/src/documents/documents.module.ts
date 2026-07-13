@@ -12,6 +12,7 @@ import { BankStatementExtractionService } from './bank-statement-extraction.serv
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import { CoordinateExtractionService } from './coordinate-extraction.service';
 
 @Module({
   imports: [PrismaModule],
@@ -28,6 +29,7 @@ import { LayoutFinancialExtractorService } from './layout-financial-extractor.se
     CreditBureauExtractionService,
     CreditScoreExtractionService,
     LayoutFinancialExtractorService,
+    CoordinateExtractionService,
   ],
   exports: [DocumentsService, StoragePathService],
 })

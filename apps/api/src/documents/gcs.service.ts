@@ -56,4 +56,15 @@ export class GcsService {
       throw new BadGatewayException('File storage service unavailable');
     }
   }
+
+  async downloadFile(storagePath: string): Promise<Buffer> {
+    try {
+      const bucket = this.storage.bucket(this.bucketName);
+      const file = bucket.file(storagePath);
+      const [contents] = await file.download();
+      return contents;
+    } catch (error) {
+      throw new NotFoundException('El documento no está disponible');
+    }
+  }
 }

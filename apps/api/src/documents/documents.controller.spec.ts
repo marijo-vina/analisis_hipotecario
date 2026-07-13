@@ -11,6 +11,8 @@ import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
+import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { GcsService } from './gcs.service';
 
 describe('DocumentsController', () => {
   let controller: DocumentsController;
@@ -45,6 +47,14 @@ describe('DocumentsController', () => {
     extract: jest.fn(),
   };
 
+  const mockCoordinateExtractionService = {
+    extract: jest.fn(),
+  };
+
+  const mockGcsService = {
+    downloadFile: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -74,6 +84,14 @@ describe('DocumentsController', () => {
         {
           provide: CreditScoreExtractionService,
           useValue: mockCreditScoreExtractionService,
+        },
+        {
+          provide: CoordinateExtractionService,
+          useValue: mockCoordinateExtractionService,
+        },
+        {
+          provide: GcsService,
+          useValue: mockGcsService,
         },
       ],
     }).compile();

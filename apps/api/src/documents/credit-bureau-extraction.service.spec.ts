@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
@@ -10,6 +11,12 @@ import {
   CREDIT_BUREAU_SCHEMA_REDUCED,
 } from './credit-bureau-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { GcsService } from './gcs.service';
+import {
+  CoordinateCredit,
+  CoordinateExtractionResult,
+} from './coordinate-extraction.types';
 import {
   FinancialFieldsConfidence,
   FinancialFieldsConfidenceMap,
@@ -17,6 +24,7 @@ import {
   LayoutCreditField,
   LayoutFinancialResult,
   OcrLayout,
+  PaymentDueAmountSource,
 } from './document-ai.types';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +39,8 @@ interface MockDocument {
   ocrText: string | null;
   extractedData: unknown | null;
   ocrLayout?: OcrLayout | null;
+  storagePath?: string | null;
+  originalName?: string;
 }
 
 const makeDocument = (
@@ -53,6 +63,8 @@ const makeDocument = (
   ocrText:
     'BURÓ DE CRÉDITO\nNombre: MARIA PEREZ LOPEZ\nRFC: PELJ920412AB1\nScore: 685\nBBVA TARJETA CREDITO SALDO 100000 PAGO 2000',
   extractedData: null,
+  storagePath: 'bureau/doc-buro-1.pdf',
+  originalName: 'buro-report.pdf',
   ...overrides,
 });
 
@@ -159,6 +171,8 @@ describe('CreditBureauExtractionService', () => {
   let mockGemini: { extractStructuredData: jest.Mock };
   let mockConfig: { get: jest.Mock };
   let mockLayoutExtractor: { extract: jest.Mock };
+  let mockCoordinateExtractor: { extract: jest.Mock };
+  let mockGcs: { downloadFile: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -196,11 +210,17 @@ describe('CreditBureauExtractionService', () => {
     mockConfig = {
       get: jest.fn((key: string) => {
         if (key === 'USE_LAYOUT_EXTRACTION') return 'false';
+        // Coordinate extraction defaults to OFF in existing tests so the
+        // Gemini-only flow is preserved unless a test flips it on.
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'false';
         return undefined;
       }),
     };
 
     mockLayoutExtractor = { extract: jest.fn() };
+
+    mockCoordinateExtractor = { extract: jest.fn() };
+    mockGcs = { downloadFile: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -212,6 +232,11 @@ describe('CreditBureauExtractionService', () => {
           provide: LayoutFinancialExtractorService,
           useValue: mockLayoutExtractor,
         },
+        {
+          provide: CoordinateExtractionService,
+          useValue: mockCoordinateExtractor,
+        },
+        { provide: GcsService, useValue: mockGcs },
       ],
     }).compile();
 
@@ -2639,6 +2664,191 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
       expect(reducedJson).not.toContain('"paymentDueAmount"');
       expect(reducedJson).not.toContain('"lastPaymentAmount"');
       expect(reducedJson).not.toContain('"creditLimit"');
+    });
+  });
+
+  // =========================================================================
+  // Coordinate grid extraction integration — PR #1 (Phase 2 testing)
+  //
+  // Exercises the wiring between CreditBureauExtractionService and
+  // CoordinateExtractionService/GcsService. The coordinate extractor downloads
+  // the raw PDF from GCS and runs BEFORE Gemini; BAND_MATCH values overwrite
+  // Gemini's paymentDueAmount after Gemini returns. RESCUE/UNCONFIRMED defer
+  // to Gemini. Any error in the coordinate path falls through gracefully.
+  // =========================================================================
+
+  describe('extract — coordinate extraction integration', () => {
+    /**
+     * Build a CoordinateExtractionResult with one credit matching the baseline
+     * Gemini credit (BBVA, accountNumber 1234567890).
+     */
+    function makeCoordinateResult(
+      paymentDueAmount: string,
+      paymentSource: PaymentDueAmountSource,
+      institution = 'BBVA',
+    ): CoordinateExtractionResult {
+      const credit: CoordinateCredit = {
+        institution,
+        accountNumber: '1234567890',
+        creditType: null,
+        paymentType: null,
+        creditLimit: '',
+        maxCredit: '',
+        currentBalance: '',
+        pastDueAmount: '',
+        lastPaymentAmount: '',
+        paymentDueAmount,
+        paymentSource,
+      };
+      return {
+        sourceFile: 'buro-report.pdf',
+        totalPages: 1,
+        totalWords: 100,
+        columnsDetected: ['paymentDueAmount'],
+        sectionsFound: 1,
+        credits: [credit],
+        warnings: [],
+      };
+    }
+
+    /** Stub GCS download returning a fake PDF buffer. */
+    function stubGcsDownload(): void {
+      mockGcs.downloadFile.mockResolvedValue(Buffer.from('%PDF-1.4 fake'));
+    }
+
+    it('BAND_MATCH coordinate result overwrites Gemini paymentDueAmount', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      mockCoordinateExtractor.extract.mockResolvedValue(
+        makeCoordinateResult('8775', PaymentDueAmountSource.BAND_MATCH),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // Coordinate BAND_MATCH won (8775), not Gemini's 2000
+      expect(credits[0].paymentDueAmount).toBe(8775);
+      expect(credits[0].paymentDueAmountSource).toBe(
+        PaymentDueAmountSource.BAND_MATCH,
+      );
+      expect(credits[0].paymentDueAmountConfirmed).toBe(true);
+      // Effective follows the triple pattern (confirmed ? extracted : null)
+      expect(credits[0].paymentDueAmountEffective).toBe(8775);
+      // Gemini's original value archived for audit
+      expect(credits[0].candidatePaymentDueAmount).toBe(8775);
+    });
+
+    it('RESCUE coordinate result defers to Gemini, Gemini value wins', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      mockCoordinateExtractor.extract.mockResolvedValue(
+        makeCoordinateResult('9999', PaymentDueAmountSource.RESCUE),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // Gemini value (2000) wins — RESCUE is not authoritative
+      expect(credits[0].paymentDueAmount).toBe(2000);
+      expect(credits[0].paymentDueAmountSource).not.toBe(
+        PaymentDueAmountSource.RESCUE,
+      );
+    });
+
+    it('UNCONFIRMED coordinate result defers to Gemini, coordinate value NOT used', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      mockCoordinateExtractor.extract.mockResolvedValue(
+        makeCoordinateResult('5555', PaymentDueAmountSource.UNCONFIRMED),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // Gemini value (2000) wins — UNCONFIRMED is not authoritative
+      expect(credits[0].paymentDueAmount).toBe(2000);
+      // The coordinate value (5555) was NOT used — only BAND_MATCH overwrites
+      expect(credits[0].paymentDueAmount).not.toBe(5555);
+    });
+
+    it('COORDINATE_EXTRACTION_ENABLED=false skips coordinate extraction entirely', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'false';
+        return 'false';
+      });
+      stubGcsDownload();
+      mockCoordinateExtractor.extract.mockResolvedValue(
+        makeCoordinateResult('8775', PaymentDueAmountSource.BAND_MATCH),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      // Flag off → never downloaded from GCS, never called extractor
+      expect(mockGcs.downloadFile).not.toHaveBeenCalled();
+      expect(mockCoordinateExtractor.extract).not.toHaveBeenCalled();
+      // Gemini value preserved
+      expect(credits[0].paymentDueAmount).toBe(2000);
+    });
+
+    it('GCS downloadFile rejection falls back gracefully to Gemini-only', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      // GCS throws — should NOT break the Gemini path
+      mockGcs.downloadFile.mockRejectedValue(
+        new NotFoundException('document not found'),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      // GCS was attempted but the extraction still succeeded
+      expect(mockGcs.downloadFile).toHaveBeenCalled();
+      expect(mockCoordinateExtractor.extract).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      // Gemini value preserved (no coordinate overwrite)
+      expect(credits[0].paymentDueAmount).toBe(2000);
     });
   });
 });

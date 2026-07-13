@@ -201,6 +201,10 @@ export type FinancialFieldName = keyof LayoutFinancialFields;
 export enum PaymentDueAmountSource {
   LAYOUT = 'LAYOUT',
   GEMINI = 'GEMINI',
+  /** Coordinate grid extraction — value found inside the paymentDueAmount band */
+  BAND_MATCH = 'BAND_MATCH',
+  /** Coordinate grid extraction — value rescued from boundary zone */
+  RESCUE = 'RESCUE',
   UNCONFIRMED = 'UNCONFIRMED',
   CONFIRMED_AUTO = 'CONFIRMED_AUTO',
   MANUAL = 'MANUAL',
