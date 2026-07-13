@@ -125,100 +125,36 @@ function BuroHeader({ parsed }: { parsed: ParsedCreditBureau }) {
     parsed.statusCode === "DATA_EXTRACTED";
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+    <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-gf-border bg-gf-surface px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-slate-800">
+          <h2 className="text-[15px] font-semibold text-gf-text">
             Buró de crédito
           </h2>
           {isProcessed && (
-            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+            <span className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600">
               Procesado
             </span>
           )}
         </div>
-        <p className="text-[13px] text-slate-500">
+        <p className="text-[11px] text-gf-text-muted">
           Datos extraídos del Reporte de Buró de Crédito Especial
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        {parsed.consultationDate && (
-          <span className="text-[13px] text-slate-500">
-            Consulta: {parsed.consultationDate}
-          </span>
-        )}
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
-        >
-          Ver OCR
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 2. KPI Row
-// ---------------------------------------------------------------------------
-
-function KpiCard({
-  label,
-  value,
-  sub,
-  accent = "neutral",
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  accent?: "orange" | "red" | "neutral";
-}) {
-  const border =
-    accent === "orange"
-      ? "border-orange-200"
-      : accent === "red"
-        ? "border-red-200"
-        : "border-slate-200";
-
-  const textColor =
-    accent === "orange"
-      ? "text-orange-600"
-      : accent === "red"
-        ? "text-red-600"
-        : "text-slate-800";
-
-  return (
-    <div
-      className={`flex flex-1 flex-col justify-center gap-0.5 rounded-lg border bg-white px-3 py-2.5 ${border}`}
-    >
-      <div className="flex items-baseline gap-1.5">
-        <span className={`text-2xl font-bold ${textColor}`}>{value}</span>
-        <span className="text-xs text-slate-500">{label}</span>
-      </div>
-      {accent !== "neutral" && (
-        <div className="flex items-center gap-1">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              accent === "orange" ? "bg-orange-500" : "bg-red-500"
-            }`}
-          />
-          <span className={`text-[11px] ${textColor}`}>{sub}</span>
-        </div>
-      )}
-      {accent === "neutral" && (
-        <span className="text-[11px] text-slate-400">{sub}</span>
+      {parsed.consultationDate && (
+        <span className="text-[11px] text-gf-text-muted">
+          Consulta: {parsed.consultationDate}
+        </span>
       )}
     </div>
   );
 }
 
-/**
- * EditableInquiriesKpi — KPI card for "Consultas 24 meses" with inline edit.
- *
- * Shows the effective value (manual ?? extracted). Click ✎ to edit inline.
- * Save calls `PATCH .../inquiries` with inquiries24mManual.
- */
+// ---------------------------------------------------------------------------
+// 2. KPI Row (inline inquiries editor)
+// ---------------------------------------------------------------------------
+
 function EditableInquiriesKpi({
   effectiveValue,
   isManual,
@@ -355,72 +291,34 @@ function KpiRow({
     parsed.inquiries24mEffective ?? parsed.numberOfInquiries;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        {/* Score */}
-        <KpiCard
-          label="Score"
-          value={scoreIsNull ? "—" : `${score}`}
-          sub={
-            scoreIsNull
-              ? "Score no disponible"
-              : band
-                ? band.label
-                : "No disponible"
-          }
-          accent={
-            band
-              ? band.label.includes("alto") || band.label.includes("muy alto")
-                ? "red"
-                : band.label.includes("medio")
-                  ? "orange"
-                  : "neutral"
-              : "neutral"
-          }
-        />
-        {/* Activos */}
-        <KpiCard
-          label="activos"
-          value={`${s.activeCredits}`}
-          sub="Créditos activos"
-        />
-        {/* Cerrados */}
-        <KpiCard
-          label="cerrados"
-          value={`${s.closedCredits}`}
-          sub="Créditos cerrados"
-        />
-        {/* Consultas — editable inline */}
-        <EditableInquiriesKpi
-          effectiveValue={inquiriesEffective}
-          isManual={parsed.inquiries24mManual != null}
-          caseId={caseId}
-          documentId={parsed.documentId}
-          onSave={onInquiriesUpdate}
-        />
-        {/* Alertas */}
-        <KpiCard
-          label="alertas"
-          value={`${s.totalAlerts}`}
-          sub={
-            s.totalCritical > 0
-              ? `${s.totalCritical} crítica${s.totalCritical !== 1 ? "s" : ""}`
-              : "Sin alertas críticas"
-          }
-          accent="red"
-        />
-      </div>
-
-      {/* Score source label + null-score note */}
-      {scoreIsNull ? (
-        <p className="text-[11px] text-slate-400">
-          El cliente no adjuntó documento Mi Score.
-        </p>
-      ) : parsed.scoreSource === "CREDIT_SCORE" ? (
-        <p className="text-[11px] text-slate-500">
-          Fuente: Mi Score
-        </p>
-      ) : null}
+    <div className="flex gap-4 rounded-[var(--radius-md)] border border-gf-border bg-gf-surface p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      {[
+        {
+          label: "Score",
+          value: scoreIsNull ? "—" : `${score}`,
+          sub: scoreIsNull ? "No disponible" : band?.label ?? "—",
+          accent: band?.label.includes("alto") || band?.label.includes("muy alto") ? "red" as const
+            : band?.label.includes("medio") ? "orange" as const : "neutral" as const,
+        },
+        { label: "activos", value: `${s.activeCredits}`, sub: "Créditos activos", accent: "neutral" as const },
+        { label: "cerrados", value: `${s.closedCredits}`, sub: "Créditos cerrados", accent: "neutral" as const },
+      ].map((kpi) => (
+        <div key={kpi.label} className="flex flex-1 flex-col gap-1">
+          <span className={`text-[26px] font-bold ${kpi.accent === "red" ? "text-red-600" : kpi.accent === "orange" ? "text-amber-600" : "text-gf-text"}`}>
+            {kpi.value}
+          </span>
+          <span className="text-[11px] text-gf-text-soft">{kpi.label}</span>
+          <span className="text-[11px] text-gf-text-muted">{kpi.sub}</span>
+        </div>
+      ))}
+      <div className="w-px bg-gf-border" />
+      <EditableInquiriesKpi
+        effectiveValue={inquiriesEffective}
+        isManual={parsed.inquiries24mManual != null}
+        caseId={caseId}
+        documentId={parsed.documentId}
+        onSave={onInquiriesUpdate}
+      />
     </div>
   );
 }
@@ -432,8 +330,6 @@ function KpiRow({
 function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
   const r = parsed.riskSummary;
 
-  // Determine risk level from riskSummary flags ONLY (DX-001/002/003).
-  // Score-based risk messages must NOT appear when score is null.
   let riskLevel: "Alto" | "Medio" | "Bajo" = "Bajo";
   let riskMessage = "Sin indicadores de riesgo detectados.";
 
@@ -444,9 +340,6 @@ function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
     } else if (r.hasMinorDelinquency || r.hasPreventiveKeys || r.possibleHomonym) {
       riskLevel = "Medio";
       riskMessage = "Se recomienda revisar el historial crediticio con atención.";
-    } else {
-      riskLevel = "Bajo";
-      riskMessage = "Sin indicadores de riesgo detectados.";
     }
   }
 
@@ -465,21 +358,16 @@ function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
         : "bg-emerald-100 text-emerald-700";
 
   return (
-    <div className={`rounded-lg border px-4 py-3 ${bgColor}`}>
+    <div className={`rounded-[var(--radius-md)] border ${bgColor} px-5 py-4`}>
       <div className="flex items-center gap-2 mb-1">
-        <h3 className="text-sm font-semibold text-slate-700">
+        <h3 className="text-[13px] font-semibold text-gf-text">
           Diagnóstico preliminar de Buró
         </h3>
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${chipColor}`}
-        >
+        <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-[10px] font-semibold ${chipColor}`}>
           Riesgo {riskLevel.toLowerCase()}
         </span>
       </div>
-      <p className="text-[13px] text-slate-600">{riskMessage}</p>
-      <p className="mt-1 text-[11px] text-slate-400">
-        Cálculo de pasivos se realizará en Sprint 3 · Pasivo mensual preliminar pendiente de validación
-      </p>
+      <p className="text-[12px] text-gf-text-muted">{riskMessage}</p>
     </div>
   );
 }
@@ -550,13 +438,13 @@ function RiskChips({ parsed }: { parsed: ParsedCreditBureau }) {
 
 function CreditRow({
   credit,
-  creditIndex,
+  creditNumber,
   caseId,
   documentId,
   onPaymentDueUpdate,
 }: {
   credit: ParsedCreditBureauCredit;
-  creditIndex: number;
+  creditNumber: number;
   caseId: string;
   documentId: string;
   onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
@@ -564,36 +452,31 @@ function CreditRow({
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mopExpanded, setMopExpanded] = useState(false);
 
   const isRisky =
     credit.hasWriteOff ||
     credit.hasFraudFlag ||
     credit.hasSeriousDelinquency;
 
-  const isWarning =
-    !isRisky && credit.hasLatePayments;
-
-  // Closed credits get muted styling (CLS-001 visual indicator)
+  const isWarning = !isRisky && credit.hasLatePayments;
   const isClosed = credit.isClosed;
 
   const rowBg = isRisky
     ? "bg-red-50/60"
     : isWarning
       ? "bg-amber-50/40"
-      : credit.needsManualReview
-        ? "bg-amber-50/30"
-        : isClosed
-          ? "bg-slate-50/50"
-          : "";
+      : isClosed
+        ? "bg-gf-bg/50 opacity-60"
+        : credit.needsManualReview
+          ? "bg-amber-50/30"
+          : "odd:bg-white even:bg-gf-bg/30";
 
-  const rowOpacity = isClosed ? "opacity-60" : "";
-
-  // Build MOP badges from mopCodes or paymentHistory (with compact view)
+  // Build MOP badges
   const MAX_VISIBLE_MOP = 12;
   const allMopCodes: string[] = (() => {
     if (credit.mopCodes.length > 0) return credit.mopCodes;
     if (credit.paymentHistory) {
-      // Split paymentHistory into individual characters, filter valid MOP codes
       return credit.paymentHistory
         .replace(/\s/g, "")
         .split("")
@@ -601,12 +484,7 @@ function CreditRow({
     }
     return [];
   })();
-  const visibleMopCodes = allMopCodes.slice(-MAX_VISIBLE_MOP);
-  const hiddenCount = allMopCodes.length - MAX_VISIBLE_MOP;
-  const fullMopTooltip =
-    allMopCodes.length > 0 ? allMopCodes.join(" ") : undefined;
 
-  // ── Inline edit handlers ────────────────────────────────────────────────
   const effectiveForDisplay =
     credit.paymentDueAmountEffective ?? credit.paymentDueAmount ?? null;
 
@@ -615,11 +493,10 @@ function CreditRow({
     if (isNaN(parsed)) return;
     setSaving(true);
     try {
-      await updatePaymentDueManual(caseId, documentId, creditIndex, parsed);
-      onPaymentDueUpdate(creditIndex, parsed);
+      await updatePaymentDueManual(caseId, documentId, creditNumber, parsed);
+      onPaymentDueUpdate(creditNumber, parsed);
       setEditing(false);
     } catch {
-      // Error: stay in edit mode so user can retry
     } finally {
       setSaving(false);
     }
@@ -631,45 +508,42 @@ function CreditRow({
   }
 
   function handleStartEdit() {
-    setEditValue(
-      effectiveForDisplay != null ? String(effectiveForDisplay) : "",
-    );
+    setEditValue(effectiveForDisplay != null ? String(effectiveForDisplay) : "");
     setEditing(true);
   }
 
-  // ── Four-state badge ────────────────────────────────────────────────────
   function renderStateBadge() {
     if (credit.needsManualReview) {
       return (
-        <span className="inline-flex items-center rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700" title="Requiere revisión manual">
+        <span className="inline-flex items-center rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700" title="Requiere revisión manual">
           🟡 Revisar
         </span>
       );
     }
     if (credit.paymentDueAmountSource === PaymentDueAmountSource.UNCONFIRMED) {
       return (
-        <span className="text-red-500 text-[11px]" title="Monto a pagar no confirmado">
+        <span className="text-[10px] text-red-500" title="Monto a pagar no confirmado">
           No confirmado
         </span>
       );
     }
     if (credit.paymentDueAmountSource === PaymentDueAmountSource.MANUAL) {
       return (
-        <span className="inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700" title="Editado manualmente">
-          🟢 Manual
+        <span className="inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700" title="Editado manualmente">
+          ✏️ Manual
         </span>
       );
     }
     if (credit.paymentDueAmountSource === PaymentDueAmountSource.BAND_MATCH) {
       return (
-        <span className="inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700" title="Extracción por coordenadas">
+        <span className="inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-600" title="Extracción por coordenadas">
           ✅ Coord.
         </span>
       );
     }
     if (credit.paymentDueAmountSource === PaymentDueAmountSource.RESCUE) {
       return (
-        <span className="inline-flex items-center rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700" title="Rescate por coordenadas — verificar">
+        <span className="inline-flex items-center rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700" title="Rescate por coordenadas — verificar">
           ⚠️ Rescate
         </span>
       );
@@ -679,7 +553,7 @@ function CreditRow({
       credit.paymentDueAmountSource === PaymentDueAmountSource.LAYOUT
     ) {
       return (
-        <span className="inline-flex items-center rounded bg-slate-50 px-1 py-0.5 text-[10px] font-medium text-slate-500" title="Confirmado automáticamente">
+        <span className="inline-flex items-center rounded bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500" title="Confirmado automáticamente">
           ⚪ Auto
         </span>
       );
@@ -689,8 +563,8 @@ function CreditRow({
       !credit.paymentDueAmountConfirmed
     ) {
       return (
-        <span className="inline-flex items-center rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-700" title="Extraído por Gemini, sin confirmar">
-          🔵 Extraído
+        <span className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700" title="Extraído por Gemini, sin confirmar">
+          🤖 Gemini
         </span>
       );
     }
@@ -698,47 +572,49 @@ function CreditRow({
   }
 
   return (
-    <tr className={`border-b border-slate-100 ${rowBg} ${rowOpacity} text-[13px]`}>
+    <tr className={`border-b border-gf-border/50 ${rowBg} text-[13px]`}>
+      {/* # */}
+      <td className="py-2.5 pl-4 pr-1 w-8">
+        <span className="text-[13px] font-semibold text-gf-text-muted">
+          {creditNumber}.
+        </span>
+      </td>
+
       {/* Institution */}
-      <td className="py-2 pl-3 pr-1">
-        <span className="font-medium text-slate-800">
+      <td className="py-2.5 px-1">
+        <span className="font-semibold text-gf-text">
           {credit.institution ?? "—"}
         </span>
         {isClosed && (
-          <span className="ml-1 inline-flex items-center rounded bg-slate-200 px-1 py-0.5 text-[9px] font-medium text-slate-500 align-middle">
+          <span className="ml-1.5 inline-flex items-center rounded bg-gf-bg px-1.5 py-0.5 text-[9px] font-medium text-gf-text-muted">
             Cerrado
           </span>
         )}
       </td>
 
       {/* Type chip */}
-      <td className="py-2 px-1">
-        <span
-          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${classificationChipColor(credit.classification)}`}
-        >
-          {CLASSIFICATION_LABELS[credit.classification] ??
-            credit.classification}
+      <td className="py-2.5 px-1">
+        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium ${classificationChipColor(credit.classification)}`}>
+          {CLASSIFICATION_LABELS[credit.classification] ?? credit.classification}
         </span>
       </td>
 
       {/* Status chip */}
-      <td className="py-2 px-1 text-center">
-        <span
-          className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${statusChipColor(credit.status)}`}
-        >
+      <td className="py-2.5 px-1 text-center">
+        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium ${statusChipColor(credit.status)}`}>
           {STATUS_LABELS[credit.status] ?? credit.status}
         </span>
       </td>
 
       {/* Saldo actual */}
-      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
+      <td className="py-2.5 px-1 text-right font-mono tabular-nums text-gf-text">
         {formatMxn(credit.currentBalance)}
       </td>
 
-      {/* Monto a pagar — inline edit + four-state badge + empty-field UX */}
-      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
-        {credit.isClosed ? (
-          "—"
+      {/* Monto a pagar */}
+      <td className="py-2.5 px-1 text-right tabular-nums text-gf-text">
+        {isClosed ? (
+          <span className="text-gf-text-soft">—</span>
         ) : editing ? (
           <span className="inline-flex items-center gap-1">
             <input
@@ -751,127 +627,166 @@ function CreditRow({
                 if (e.key === "Escape") handleCancel();
               }}
               autoFocus
-              className="w-20 rounded border border-slate-300 px-1 py-0.5 text-right text-[13px] font-mono text-slate-800 focus:border-blue-400 focus:outline-none"
+              className="w-20 rounded border border-gf-border px-1.5 py-0.5 text-right font-mono text-[13px] text-gf-text focus:border-blue-400 focus:outline-none"
             />
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50">
               {saving ? "··" : "✓"}
             </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={saving}
-              className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-50"
-            >
+            <button type="button" onClick={handleCancel} disabled={saving} className="inline-flex items-center rounded bg-gf-bg px-1.5 py-0.5 text-[10px] font-medium text-gf-text-muted hover:bg-gf-border/50 disabled:opacity-50">
               ✕
             </button>
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 justify-end">
-            {/* Effective value or empty-field UX */}
+          <span className="inline-flex items-center gap-1.5 justify-end">
             {effectiveForDisplay != null ? (
-              <span>{formatMxn(effectiveForDisplay)}</span>
+              <span className="font-semibold">{formatMxn(effectiveForDisplay)}</span>
             ) : (
-              <span title="Dato pendiente de validación manual" className="text-slate-400">
-                —
-              </span>
+              <span title="Dato pendiente" className="text-gf-text-soft">—</span>
             )}
-            {/* Four-state badge */}
             {renderStateBadge()}
-            {/* Edit button */}
-            <button
-              type="button"
-              onClick={handleStartEdit}
-              className="inline-flex items-center rounded px-0.5 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              title="Editar monto a pagar"
-            >
+            <button type="button" onClick={handleStartEdit} className="inline-flex items-center rounded px-0.5 text-[11px] text-gf-text-soft hover:bg-gf-bg hover:text-gf-text-muted" title="Editar monto a pagar">
               ✎
             </button>
           </span>
         )}
       </td>
 
-      {/* Límite */}
-      <td className="py-2 px-1 text-right font-mono text-[13px] tabular-nums text-gray-900">
+      {/* Límite / crédito */}
+      <td className="py-2.5 px-1 text-right font-mono tabular-nums text-gf-text">
         {formatMxn(credit.creditLimit)}
       </td>
 
-      {/* MOP */}
-      <td className="py-2 px-1">
-        <div className="flex flex-wrap gap-0.5">
-          {visibleMopCodes.length > 0
-            ? visibleMopCodes.map((code, i) => (
-                <span
-                  key={i}
-                  className={`inline-flex h-[20px] w-[20px] items-center justify-center rounded-sm text-[10px] font-bold ${mopBadgeColor(code)}`}
-                  title={`MOP ${code}`}
-                >
-                  {code}
-                </span>
-              ))
-            : allMopCodes.length === 0
-              ? "—"
-              : null}
-          {hiddenCount > 0 && (
-            <span
-              className="inline-flex h-[20px] items-center rounded-sm bg-slate-100 px-1 text-[10px] font-medium text-slate-500 cursor-help"
-              title={fullMopTooltip}
+      {/* MOP — collapsible button */}
+      <td className="py-2.5 px-1">
+        {allMopCodes.length > 0 ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => setMopExpanded(!mopExpanded)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gf-border bg-white px-2.5 py-1 text-[10px] font-medium text-gf-text-muted hover:bg-gf-bg transition-colors"
             >
-              +{hiddenCount}
-            </span>
-          )}
-        </div>
+              <span>{allMopCodes.length} MOPs</span>
+              <span className={`text-[9px] transition-transform ${mopExpanded ? "rotate-90" : ""}`}>▸</span>
+            </button>
+            {mopExpanded && (
+              <div className="mt-1.5 flex flex-wrap gap-0.5 max-w-[200px]">
+                {allMopCodes.map((code, i) => (
+                  <span
+                    key={i}
+                    className={`inline-flex h-[20px] w-[20px] items-center justify-center rounded-sm text-[10px] font-bold ${mopBadgeColor(code)}`}
+                    title={`MOP ${code}`}
+                  >
+                    {code}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-[11px] text-gf-text-soft">—</span>
+        )}
       </td>
 
       {/* Flags */}
-      <td className="py-2 pl-1 pr-3">
-        <div className="flex gap-0.5">
-          {credit.hasWriteOff && (
-            <span
-              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
-              title="Quebranto"
-            >
-              Q
-            </span>
-          )}
-          {credit.hasFraudFlag && (
-            <span
-              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
-              title="Fraude"
-            >
-              F
-            </span>
-          )}
-          {credit.hasSeriousDelinquency && (
-            <span
-              className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700"
-              title="Mora grave"
-            >
-              M
-            </span>
-          )}
-          {credit.hasLatePayments &&
-            !credit.hasSeriousDelinquency && (
-              <span
-                className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-amber-100 text-[10px] font-bold text-amber-700"
-                title="Atraso"
-              >
-                A
-              </span>
-            )}
-          {!credit.hasLatePayments &&
-            !credit.hasWriteOff &&
-            !credit.hasFraudFlag &&
-            !credit.hasSeriousDelinquency && (
-              <span className="text-[11px] text-emerald-600">✓</span>
-            )}
+      <td className="py-2.5 pl-1 pr-4 text-center">
+        <div className="flex justify-center gap-0.5">
+          {credit.hasWriteOff && <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700" title="Quebranto">Q</span>}
+          {credit.hasFraudFlag && <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700" title="Fraude">F</span>}
+          {credit.hasSeriousDelinquency && <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-red-100 text-[10px] font-bold text-red-700" title="Mora grave">M</span>}
+          {credit.hasLatePayments && !credit.hasSeriousDelinquency && <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm bg-amber-100 text-[10px] font-bold text-amber-700" title="Atraso">A</span>}
+          {!credit.hasLatePayments && !credit.hasWriteOff && !credit.hasFraudFlag && !credit.hasSeriousDelinquency && <span className="text-[11px] text-emerald-600">✓</span>}
         </div>
       </td>
     </tr>
+  );
+}
+
+// ── Known banking institutions for splitting ──────────────────────────────
+const BANKING_INSTITUTIONS = /santander|sofom|inbursa|banamex|banorte|bbva|hsbc|amex|scotiabank|banco|amexco/i;
+
+function isBankingCredit(credit: ParsedCreditBureauCredit): boolean {
+  return BANKING_INSTITUTIONS.test(credit.institution ?? "");
+}
+
+function SectionHeader({
+  title,
+  count,
+  accent,
+}: {
+  title: string;
+  count: number;
+  accent: "red" | "purple";
+}) {
+  const barColor = accent === "red" ? "bg-[#dc2626]" : "bg-[#7c3aed]";
+  const badgeBg = accent === "red" ? "bg-[#fef2f2]" : "bg-[#f5f3ff]";
+  const badgeText = accent === "red" ? "text-[#b0002a]" : "text-[#7c3aed]";
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`h-[18px] w-[3px] rounded-sm ${barColor}`} />
+      <h3 className="text-[15px] font-semibold text-gf-text">{title}</h3>
+      <span className={`inline-flex items-center rounded-xl px-2.5 py-0.5 text-[11px] font-semibold ${badgeBg} ${badgeText}`}>
+        {count} créditos
+      </span>
+    </div>
+  );
+}
+
+function CreditTableSection({
+  title,
+  credits,
+  accent,
+  caseId,
+  documentId,
+  globalStartIndex,
+  onPaymentDueUpdate,
+}: {
+  title: string;
+  credits: ParsedCreditBureauCredit[];
+  accent: "red" | "purple";
+  caseId: string;
+  documentId: string;
+  globalStartIndex: number;
+  onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
+}) {
+  if (credits.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <SectionHeader title={title} count={credits.length} accent={accent} />
+
+      <div className="overflow-hidden rounded-[var(--radius-md)] border border-gf-border bg-gf-surface shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gf-border bg-gf-bg text-left text-[11px] font-medium text-gf-text-soft">
+                <th className="py-2.5 pl-4 pr-1 w-8">#</th>
+                <th className="py-2.5 px-1">Institución</th>
+                <th className="py-2.5 px-1">Tipo</th>
+                <th className="py-2.5 px-1 text-center">Estado</th>
+                <th className="py-2.5 px-1 text-right">Saldo actual</th>
+                <th className="py-2.5 px-1 text-right">Monto a pagar</th>
+                <th className="py-2.5 px-1 text-right">Límite / crédito</th>
+                <th className="py-2.5 px-1">MOP</th>
+                <th className="py-2.5 pl-1 pr-4 text-center">Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {credits.map((credit, i) => (
+                <CreditRow
+                  key={i}
+                  credit={credit}
+                  creditNumber={globalStartIndex + i + 1}
+                  caseId={caseId}
+                  documentId={documentId}
+                  onPaymentDueUpdate={(ci, mv) => onPaymentDueUpdate(globalStartIndex + ci, mv)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -886,61 +801,29 @@ function CreditsTable({
 }) {
   if (parsed.credits.length === 0) return null;
 
-  const activeCount = parsed.credits.filter(
-    (c) => c.status === "ACTIVE",
-  ).length;
-  const closedCount = parsed.credits.filter(
-    (c) => c.status === "CLOSED",
-  ).length;
+  const bankingCredits = parsed.credits.filter(isBankingCredit);
+  const nonBankingCredits = parsed.credits.filter((c) => !isBankingCredit(c));
 
   return (
-    <div className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
-      {/* Title bar */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
-        <h3 className="text-sm font-semibold text-slate-800">
-          Créditos ({parsed.credits.length})
-        </h3>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[11px] text-slate-500">
-            <span className="inline-block h-2 w-2 rounded-sm bg-emerald-400" />
-            {activeCount} activos
-          </span>
-          <span className="flex items-center gap-1 text-[11px] text-slate-500">
-            <span className="inline-block h-2 w-2 rounded-sm bg-slate-300" />
-            {closedCount} cerrados
-          </span>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-medium text-slate-500">
-              <th className="py-2 pl-3 pr-1">Institución</th>
-              <th className="py-2 px-1">Tipo</th>
-              <th className="py-2 px-1 text-center">Estado</th>
-              <th className="py-2 px-1 text-right">Saldo actual</th>
-              <th className="py-2 px-1 text-right">Monto a pagar</th>
-              <th className="py-2 px-1 text-right">Límite / crédito</th>
-              <th className="py-2 px-1">MOP</th>
-              <th className="py-2 pl-1 pr-3">Flags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parsed.credits.map((credit, i) => (
-              <CreditRow
-                key={i}
-                credit={credit}
-                creditIndex={i}
-                caseId={caseId}
-                documentId={parsed.documentId}
-                onPaymentDueUpdate={onPaymentDueUpdate}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-col gap-5">
+      <CreditTableSection
+        title="Créditos Bancarios"
+        credits={bankingCredits}
+        accent="red"
+        caseId={caseId}
+        documentId={parsed.documentId}
+        globalStartIndex={0}
+        onPaymentDueUpdate={onPaymentDueUpdate}
+      />
+      <CreditTableSection
+        title="Créditos No Bancarios"
+        credits={nonBankingCredits}
+        accent="purple"
+        caseId={caseId}
+        documentId={parsed.documentId}
+        globalStartIndex={0}
+        onPaymentDueUpdate={(ci, mv) => onPaymentDueUpdate(bankingCredits.length + ci, mv)}
+      />
     </div>
   );
 }
@@ -953,60 +836,54 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
   const b = parsed.borrower;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-      <h3 className="text-sm font-semibold text-slate-800 mb-2">
+    <div className="rounded-[var(--radius-md)] border border-gf-border bg-gf-surface p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <h3 className="text-[13px] font-semibold text-gf-text mb-3">
         Datos del acreditado
       </h3>
 
       {b ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2.5">
           <div className="flex justify-between">
-            <span className="text-xs text-slate-400">Nombre</span>
-            <span className="text-[13px] font-medium text-slate-800">
+            <span className="text-[11px] text-gf-text-soft">Nombre</span>
+            <span className="text-[12px] font-medium text-gf-text">
               {b.fullName ?? "—"}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-xs text-slate-400">RFC</span>
-            <span className="text-[13px] font-mono text-slate-800">
+            <span className="text-[11px] text-gf-text-soft">RFC</span>
+            <span className="text-[12px] font-mono text-gf-text">
               {b.rfc ?? "—"}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-xs text-slate-400">Nacimiento</span>
-            <span className="text-[13px] font-medium text-slate-800">
+            <span className="text-[11px] text-gf-text-soft">Nacimiento</span>
+            <span className="text-[12px] font-medium text-gf-text">
               {b.birthDate ?? "—"}
             </span>
           </div>
         </div>
       ) : (
-        <p className="text-[13px] text-slate-400">Sin datos del acreditado</p>
+        <p className="text-[12px] text-gf-text-muted">Sin datos del acreditado</p>
       )}
 
       {(parsed.consultationDate || (parsed.inquiries24mEffective ?? parsed.numberOfInquiries) != null) && (
         <>
-          <hr className="my-2 border-slate-200" />
-          <div className="flex flex-col gap-1.5">
+          <div className="my-3 border-t border-gf-border" />
+          <div className="flex flex-col gap-2.5">
             {parsed.consultationDate && (
               <div className="flex justify-between">
-                <span className="text-xs text-slate-400">
-                  Fecha consulta
-                </span>
-                <span className="text-[13px] font-medium text-slate-800">
-                  {parsed.consultationDate}
-                </span>
+                <span className="text-[11px] text-gf-text-soft">Fecha consulta</span>
+                <span className="text-[12px] font-medium text-gf-text">{parsed.consultationDate}</span>
               </div>
             )}
             {(parsed.inquiries24mEffective ?? parsed.numberOfInquiries) != null && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-400">
-                  Consultas 24m
-                </span>
-                <span className="text-[13px] font-medium text-slate-800">
+                <span className="text-[11px] text-gf-text-soft">Consultas 24m</span>
+                <span className="text-[12px] font-medium text-gf-text">
                   {parsed.inquiries24mEffective ?? parsed.numberOfInquiries}
                   {parsed.inquiries24mManual != null && (
-                    <span className="ml-1 inline-flex items-center rounded bg-green-50 px-1 py-0.5 text-[10px] font-medium text-green-700">
-                      🟢 Manual
+                    <span className="ml-1.5 inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-600">
+                      ✏️ Manual
                     </span>
                   )}
                 </span>
@@ -1016,7 +893,7 @@ function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
         </>
       )}
 
-      <p className="mt-2 text-[10px] text-slate-400 leading-tight">
+      <p className="mt-3 text-[10px] text-gf-text-soft leading-tight">
         Datos extraídos automáticamente; validar contra el reporte original.
       </p>
     </div>
@@ -1054,24 +931,19 @@ function CompactAlerts({ parsed }: { parsed: ParsedCreditBureau }) {
   if (parsed.alerts.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-slate-800">
-          Alertas
-        </h3>
-        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+    <div className="rounded-[var(--radius-md)] border border-gf-border bg-gf-surface p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[13px] font-semibold text-gf-text">Alertas</h3>
+        <span className="inline-flex items-center rounded-xl bg-[#fef2f2] px-2.5 py-0.5 text-[10px] font-semibold text-[#dc2626]">
           {parsed.alerts.length} alerta{parsed.alerts.length !== 1 ? "s" : ""}
         </span>
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         {parsed.alerts.slice(0, 6).map((alert, i) => (
           <CompactAlertItem key={i} alert={alert} />
         ))}
         {parsed.alerts.length > 6 && (
-          <button
-            type="button"
-            className="text-[11px] text-slate-400 hover:text-slate-600 mt-1"
-          >
+          <button type="button" className="text-[11px] text-gf-text-muted hover:text-gf-text mt-1">
             Ver {parsed.alerts.length - 6} alertas más
           </button>
         )}
@@ -1140,31 +1012,21 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* 1. Header */}
+    <div className="flex flex-col gap-5">
       <BuroHeader parsed={parsed} />
-
-      {/* 2. KPI Row */}
-      <KpiRow
-        parsed={parsed}
-        caseId={caseId}
-        onInquiriesUpdate={handleInquiriesUpdate}
-      />
-
-      {/* 3. Diagnosis */}
+      <KpiRow parsed={parsed} caseId={caseId} onInquiriesUpdate={handleInquiriesUpdate} />
       <DiagnosisCard parsed={parsed} />
-
-      {/* 4. Risk Chips */}
       <RiskChips parsed={parsed} />
 
-      {/* 5. Two-column: Table + Sidebar */}
-      <div className="flex gap-3">
-        <CreditsTable
-          parsed={parsed}
-          caseId={caseId}
-          onPaymentDueUpdate={handlePaymentDueUpdate}
-        />
-        <div className="flex w-64 shrink-0 flex-col gap-3">
+      <div className="flex gap-5">
+        <div className="flex-1 min-w-0">
+          <CreditsTable
+            parsed={parsed}
+            caseId={caseId}
+            onPaymentDueUpdate={handlePaymentDueUpdate}
+          />
+        </div>
+        <div className="flex w-64 shrink-0 flex-col gap-4">
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
         </div>
