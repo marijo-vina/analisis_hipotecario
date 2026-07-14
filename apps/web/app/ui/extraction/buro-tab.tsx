@@ -585,11 +585,6 @@ function CreditRow({
         <span className="font-semibold text-gf-text">
           {credit.institution ?? "—"}
         </span>
-        {isClosed && (
-          <span className="ml-1.5 inline-flex items-center rounded bg-gf-bg px-1.5 py-0.5 text-[9px] font-medium text-gf-text-muted">
-            Cerrado
-          </span>
-        )}
       </td>
 
       {/* Type chip */}
@@ -701,11 +696,13 @@ function CreditRow({
   );
 }
 
-// ── Known banking institutions for splitting ──────────────────────────────
-const BANKING_INSTITUTIONS = /santander|sofom|inbursa|banamex|banorte|bbva|hsbc|amex|scotiabank|banco|amexco/i;
-
+// ── Banking / Non-banking split ─────────────────────────────────────────
+// Uses Gemini's classification field (backed by coordinate extraction's
+// section-type detection from PDF labels). More reliable than institution
+// name heuristics (e.g., "AMEX" matches both banking AMEXCO BANK and
+// non-banking AMEX services / AMEX COMPANY).
 function isBankingCredit(credit: ParsedCreditBureauCredit): boolean {
-  return BANKING_INSTITUTIONS.test(credit.institution ?? "");
+  return credit.classification !== "NON_BANK_SERVICE";
 }
 
 function SectionHeader({
@@ -759,7 +756,7 @@ function CreditTableSection({
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gf-border bg-gf-bg text-left text-[11px] font-medium text-gf-text-soft">
+              <tr className="border-b border-gf-border bg-gf-bg text-left text-xs font-semibold text-gf-text">
                 <th className="py-2.5 pl-4 pr-1 w-8">#</th>
                 <th className="py-2.5 px-1">Institución</th>
                 <th className="py-2.5 px-1">Tipo</th>

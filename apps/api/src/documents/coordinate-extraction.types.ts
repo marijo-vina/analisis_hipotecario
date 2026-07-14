@@ -50,6 +50,42 @@ export interface CoordinateCredit {
 
   /** Provenance of paymentDueAmount */
   paymentSource: PaymentDueAmountSource;
+
+  /**
+   * MOP (Method of Payment) codes extracted from the `paymentHistory` column.
+   * Each entry is a single character (0-9, U, -, N, etc.) from the column cells.
+   * Empty array when the column is absent.
+   */
+  mopCodes: string[];
+
+  /**
+   * Credit status normalized to an enum.
+   * `ACTIVE` — Vigente / Al corriente / ACTIVO
+   * `CLOSED` — Cerrado / Liquidado / Castigado / CERRADO
+   * `UNKNOWN` — no status text found or unmatched
+   */
+  status: 'ACTIVE' | 'CLOSED' | 'UNKNOWN';
+
+  /**
+   * Section classification inferred from the PDF layout.
+   * Detected from "CRÉDITOS BANCARIOS" / "CRÉDITOS NO BANCARIOS" labels
+   * immediately above the column headers. `unknown` when no label found.
+   */
+  sectionType: 'banking' | 'non_banking' | 'unknown';
+}
+
+/**
+ * A single numbered entry from the "RESUMEN DE CRÉDITOS" summary section.
+ * The `index` is the global 1-based credit number assigned by the bureau.
+ * Merged into detail credits by positional order: summary[K] → combined credit list[K].
+ */
+export interface SummaryEntry {
+  /** Global 1-based credit number as printed in the summary section. */
+  index: number;
+  /** Institution name as printed in the summary (may differ from detail table format). */
+  institution: string;
+  /** Normalized status parsed from Spanish text in the summary. */
+  status: 'ACTIVE' | 'CLOSED' | 'UNKNOWN';
 }
 
 /**

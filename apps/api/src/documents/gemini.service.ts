@@ -140,6 +140,51 @@ export class GeminiService {
     return parts.join('\n');
   }
 
+  /**
+   * Attempts to salvage a truncated JSON response by closing unclosed
+   * brackets, braces, and strings. Used when the model hits MAX_TOKENS
+   * and cuts off mid-output (common with large credit bureau responses
+   * where the missingFields array grows with each credit).
+   */
+  private salvageTruncatedJson(text: string): Record<string, unknown> {
+    let salvaged = text.trim();
+
+    // Remove trailing comma if present (most common truncation point)
+    salvaged = salvaged.replace(/,\s*$/, '');
+
+    // Count unclosed structures
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (const ch of salvaged) {
+      if (escapeNext) { escapeNext = false; continue; }
+      if (ch === '\\') { escapeNext = true; continue; }
+      if (ch === '"' && !escapeNext) { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') braceDepth++;
+      if (ch === '}') braceDepth--;
+      if (ch === '[') bracketDepth++;
+      if (ch === ']') bracketDepth--;
+    }
+
+    // Close any unclosed string
+    if (inString) {
+      salvaged += '"';
+    }
+
+    // Close unclosed arrays before objects (arrays are inside objects)
+    for (let i = 0; i < bracketDepth; i++) {
+      salvaged += ']';
+    }
+    for (let i = 0; i < braceDepth; i++) {
+      salvaged += '}';
+    }
+
+    return JSON.parse(salvaged) as Record<string, unknown>;
+  }
+
   private parseJsonResponse(text: string): Record<string, unknown> {
     if (!text || text.trim() === '') {
       throw new Error(GeminiErrorCode.GEMINI_EMPTY_RESPONSE);
@@ -151,29 +196,42 @@ export class GeminiService {
       cleaned = fenceMatch[1].trim();
     }
 
+    // First attempt: direct parse
     try {
       return JSON.parse(cleaned) as Record<string, unknown>;
     } catch {
-      throw new Error(GeminiErrorCode.GEMINI_INVALID_JSON);
+      // Second attempt: salvage truncated JSON (model hit MAX_TOKENS)
+      try {
+        return this.salvageTruncatedJson(cleaned);
+      } catch {
+        throw new Error(GeminiErrorCode.GEMINI_INVALID_JSON);
+      }
     }
   }
 
   /**
    * Extracts the text response from a Vertex AI GenerateContentResult.
    * Vertex AI returns: response.candidates[0].content.parts[0].text
+   *
+   * Also checks the candidate's finishReason and returns it alongside
+   * the text so callers can handle MAX_TOKENS (truncated output).
    */
   private extractText(result: {
     response: {
       candidates?: Array<{
         content?: { parts?: Array<{ text?: string }> };
+        finishReason?: string;
       }>;
     };
-  }): string {
+  }): { text: string; finishReason: string } {
     const candidate = result.response.candidates?.[0];
     if (!candidate?.content?.parts?.length) {
       throw new Error(GeminiErrorCode.GEMINI_EMPTY_RESPONSE);
     }
-    return candidate.content.parts[0].text ?? '';
+    return {
+      text: candidate.content.parts[0].text ?? '',
+      finishReason: candidate.finishReason ?? 'UNKNOWN',
+    };
   }
 
   /**
@@ -262,7 +320,17 @@ export class GeminiService {
         }
 
         const genResult = await this.executeRequest(model, prompt);
-        const rawText = this.extractText(genResult);
+        const { text: rawText, finishReason } = this.extractText(genResult);
+
+        // Detect truncated output — the model hit its token limit.
+        // Log as warning (not error) because the salvage logic in
+        // parseJsonResponse can often recover the partial JSON.
+        if (finishReason === 'MAX_TOKENS') {
+          this.logger.warn(
+            `[Gemini] Response truncated (MAX_TOKENS) for ${documentType}. ` +
+              `Raw length: ${rawText.length} chars. Attempting JSON salvage.`,
+          );
+        }
 
         try {
           const extracted = this.parseJsonResponse(rawText);

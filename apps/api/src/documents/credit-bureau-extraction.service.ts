@@ -1568,7 +1568,9 @@ export class CreditBureauExtractionService {
       const cc = coordCredits[matchIdx];
 
       // BAND_MATCH → authoritative: overwrite Gemini's paymentDueAmount.
-      // Skip Gemini for this field entirely — the coordinate value wins.
+      // RESCUE / UNCONFIRMED → defer to Gemini, do nothing.
+
+      // ── paymentDueAmount ──────────────────────────────────────────────
       if (cc.paymentSource === PaymentDueAmountSource.BAND_MATCH) {
         const parsed = this.parseCoordinateAmount(cc.paymentDueAmount);
         if (parsed !== null) {
@@ -1579,7 +1581,48 @@ export class CreditBureauExtractionService {
             (credit.paymentDueAmount as number | null) ?? null;
         }
       }
-      // RESCUE / UNCONFIRMED → defer to Gemini, do nothing.
+
+      // ── creditLimit (with maxCredit fallback) ─────────────────────────
+      // Mexican credit bureaus interchange "Crédito Máximo" and "Límite de
+      // Crédito". The coordinate extractor captures the value under whichever
+      // column header the PDF uses. We try creditLimit first, fall back to
+      // maxCredit, and only overwrite Gemini when it returned null/zero.
+      const coordLimitRaw = cc.creditLimit || cc.maxCredit;
+      if (coordLimitRaw) {
+        const parsed = this.parseCoordinateAmount(coordLimitRaw);
+        if (parsed !== null && (credit.creditLimit == null || (credit.creditLimit as number) === 0)) {
+          credit.creditLimit = parsed;
+        }
+      }
+
+      // ── mopCodes ──────────────────────────────────────────────────────
+      // Gemini often returns empty mopCodes for bottom-half credits where
+      // OCR degrades. The coordinate extractor captures these reliably from
+      // the paymentHistory column grid cells.
+      const gMop = credit.mopCodes as string[] | undefined;
+      if (cc.mopCodes.length > 0 && (!gMop || gMop.length === 0)) {
+        credit.mopCodes = cc.mopCodes;
+      }
+
+      // ── status ────────────────────────────────────────────────────────
+      // Summary status from extractSummaryStatuses is authoritative (merged
+      // globally by positional index in the coordinate orchestrator).
+      // Overwrite Gemini when coordinate has ACTIVE/CLOSED and Gemini is
+      // UNKNOWN or missing.
+      if (cc.status !== 'UNKNOWN') {
+        const gStatus = credit.status as string | undefined;
+        if (!gStatus || gStatus === 'UNKNOWN') {
+          credit.status = cc.status;
+        }
+      }
+
+      // ── classification (section type) ──────────────────────────────────
+      // The PDF section label ("CRÉDITOS BANCARIOS" / "CRÉDITOS NO
+      // BANCARIOS") is deterministic — it's printed on the page. Use it
+      // as the authoritative classification source over Gemini's guess.
+      if (cc.sectionType === 'non_banking') {
+        credit.classification = 'NON_BANK_SERVICE';
+      }
     }
   }
 
