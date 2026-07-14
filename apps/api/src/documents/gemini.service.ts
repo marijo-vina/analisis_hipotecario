@@ -152,13 +152,9 @@ export class GeminiService {
     // Remove trailing comma if present (most common truncation point)
     salvaged = salvaged.replace(/,\s*$/, '');
 
-    // Remove trailing incomplete key-value pair (e.g., '"creditType":')
-    salvaged = salvaged.replace(/,\s*"[^"]*"\s*:\s*$/g, '');
-    // Also handle if it's the only key-value in an object
-    salvaged = salvaged.replace(/"[^"]*"\s*:\s*$/g, '').replace(/,\s*$/, '');
-
-    // Track open/close order with a stack to close in correct nesting
-    const stack: string[] = [];
+    // Count unclosed structures
+    let braceDepth = 0;
+    let bracketDepth = 0;
     let inString = false;
     let escapeNext = false;
 
@@ -167,8 +163,10 @@ export class GeminiService {
       if (ch === '\\') { escapeNext = true; continue; }
       if (ch === '"' && !escapeNext) { inString = !inString; continue; }
       if (inString) continue;
-      if (ch === '{' || ch === '[') stack.push(ch);
-      if (ch === '}' || ch === ']') stack.pop();
+      if (ch === '{') braceDepth++;
+      if (ch === '}') braceDepth--;
+      if (ch === '[') bracketDepth++;
+      if (ch === ']') bracketDepth--;
     }
 
     // Close any unclosed string
@@ -176,9 +174,12 @@ export class GeminiService {
       salvaged += '"';
     }
 
-    // Close in reverse nesting order (innermost first)
-    for (let i = stack.length - 1; i >= 0; i--) {
-      salvaged += stack[i] === '{' ? '}' : ']';
+    // Close unclosed arrays before objects (arrays are inside objects)
+    for (let i = 0; i < bracketDepth; i++) {
+      salvaged += ']';
+    }
+    for (let i = 0; i < braceDepth; i++) {
+      salvaged += '}';
     }
 
     return JSON.parse(salvaged) as Record<string, unknown>;
