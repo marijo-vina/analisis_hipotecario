@@ -183,16 +183,27 @@ export class PayrollBankMatchingService {
         return this.matchByRfc(receipt, sameRfc, used, receiptRfc, paymentDate, candidates);
       }
 
-      // ── Paso 3: RFC presente pero difiere en todos los depositos con RFC ──
+      // ── Paso 3: separar candidatos con RFC diferente vs sin RFC ──────────
       const diffRfc = candidates.filter(
         (d) => normalizeRfc(d.detectedPayerRfc) != null,
       );
+      const noRfc = candidates.filter(
+        (d) => normalizeRfc(d.detectedPayerRfc) == null,
+      );
+
+      // Intentar fallback con depositos SIN RFC primero (caso comun:
+      // el estado de cuenta no muestra el RFC del pagador).
+      if (noRfc.length > 0) {
+        return this.matchByFallback(receipt, noRfc, used, paymentDate);
+      }
+
+      // Todos los depositos tienen RFC diferente → RFC_INCOMPATIBLE.
       if (diffRfc.length > 0) {
         return this.rfcIncompatible(receipt, diffRfc, used, receiptRfc, paymentDate);
       }
 
-      // ── Paso 4: receipt tiene RFC pero ningun deposito tiene RFC ──────────
-      return this.matchByFallback(receipt, candidates, used, paymentDate);
+      // Sin candidatos → NOT_MATCHED.
+      return this.notMatched(receipt.index, paymentDate);
     }
 
     // receipt sin RFC → fallback obligatorio.
