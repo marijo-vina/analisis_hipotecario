@@ -102,7 +102,12 @@ export class BankarizationValidationRule implements AnalysisRule {
         receipts.push({
           index: receiptIndex++,
           netIncome: (income.netIncome as number) ?? null,
-          paymentDate: (period.paymentDate as string) ?? null,
+          // paymentDate: Gemini no siempre detecta la fecha de pago explícita.
+          // Fallback a periodEndDate (el pago suele coincidir con el cierre del periodo).
+          paymentDate:
+            (period.paymentDate as string) ??
+            (period.periodEndDate as string) ??
+            null,
           employerRfc: (employer.rfc as string) ?? null,
           employerName: (employer.legalName as string) ?? null,
         });
