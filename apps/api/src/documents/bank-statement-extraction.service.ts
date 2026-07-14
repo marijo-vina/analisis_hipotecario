@@ -689,6 +689,20 @@ export class BankStatementExtractionService {
       });
     }
 
+    // ── BANK_NO_TITULAR_RFC — accountHolder.rfc is null (Sprint 3 identity validation) ──
+    const accountRfc = accountHolder.rfc as string | undefined | null;
+    if (!accountRfc || String(accountRfc).trim() === '') {
+      alerts.push({
+        code: 'BANK_NO_TITULAR_RFC',
+        severity: 'WARNING',
+        category: 'IDENTITY',
+        message:
+          'No se detectó el RFC del titular en el estado de cuenta. La validación de identidad contra INE, nómina y buró quedará incompleta.',
+        field: 'accountHolder.rfc',
+        requiresManualReview: true,
+      });
+    }
+
     // ── BANK_FEWER_MONTHS_THAN_REQUIRED — detectedDocumentMonths < required ──
     const detectedMonths = documentRequirementContext.detectedDocumentMonths as
       | number
@@ -876,6 +890,10 @@ export class BankStatementExtractionService {
       // Payroll mismatch
       PAYROLL_MISMATCH: 'BANK_PAYROLL_MISMATCH',
       payroll_mismatch: 'BANK_PAYROLL_MISMATCH',
+      // No titular RFC
+      NO_TITULAR_RFC: 'BANK_NO_TITULAR_RFC',
+      no_titular_rfc: 'BANK_NO_TITULAR_RFC',
+      MISSING_TITULAR_RFC: 'BANK_NO_TITULAR_RFC',
     };
 
     for (const a of data.alerts as ExtractionAlert[]) {
