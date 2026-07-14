@@ -805,18 +805,33 @@ export class CreditBureauExtractionService {
 
   /**
    * Extracts the consultation date from page 1 of the OCR text.
-   * Looks for "FECHA DE CONSULTA" followed by a DD/MM/YYYY date.
+   * Looks for "FECHA DE CONSULTA" followed by a date in either
+   * DD-MMM-YYYY (Spanish months) or DD/MM/YYYY format.
    */
   private extractConsultationDateFromOcr(ocrText: string): string | null {
     if (!ocrText) return null;
     const consultIdx = ocrText.toUpperCase().indexOf('FECHA DE CONSULTA');
     if (consultIdx === -1) return null;
     const after = ocrText.slice(consultIdx, consultIdx + 200);
+
+    // Try Spanish month format: "22-AGO-2025"
+    const spanishMatch = after.match(
+      /\b(\d{2})-(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-(\d{4})\b/i,
+    );
+    if (spanishMatch) {
+      const day = spanishMatch[1];
+      const month = CreditBureauExtractionService.SPANISH_MONTHS[spanishMatch[2].toUpperCase()];
+      const year = spanishMatch[3];
+      if (month) return `${year}-${String(month).padStart(2, '0')}-${day}`;
+    }
+
+    // Try numeric format: "22/08/2025" or "22-08-2025"
     const dateMatch = after.match(
       /(\d{2})[/.\-](\d{2})[/.\-](\d{4})/,
     );
-    if (!dateMatch) return null;
-    return this.normalizeOcrDate(dateMatch[1]);
+    if (dateMatch) return this.normalizeOcrDate(dateMatch[1]);
+
+    return null;
   }
 
   /**
