@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
+import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { CaseAnalysisService } from './case-analysis.service';
 import type { RuleResult } from './analysis-rule.interface';
 
@@ -38,6 +39,19 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockBankarizationRule = {
+    ruleId: 'bankarization-validation',
+    execute: jest.fn(),
+  };
+
+  const mockBankarizationPassResult: RuleResult = {
+    ruleId: 'bankarization-validation',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: ['payroll', 'bank-statement', 'client'], fields: [] },
+    alerts: [],
+  };
+
   const buildCase = (overrides: Record<string, unknown> = {}) => ({
     id: 'case-1',
     clientId: 'client-1',
@@ -68,11 +82,15 @@ describe('CaseAnalysisService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // La bancarizacion (HU-10) tambien se ejecuta; default PASS para que el
+    // agregado reciba un RuleResult valido sin que cada test lo configure.
+    mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CaseAnalysisService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
+        { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
       ],
     }).compile();
     service = module.get<CaseAnalysisService>(CaseAnalysisService);

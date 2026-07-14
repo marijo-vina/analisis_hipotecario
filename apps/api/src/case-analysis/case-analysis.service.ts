@@ -5,6 +5,7 @@ import type {
   RuleResult,
 } from './analysis-rule.interface';
 import { IdentityMatchRule } from './rules/identity-match.rule';
+import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { ReviewDecisionDto } from './dto/review-decision.dto';
 
 /** Loaded mortgage case shape used by the orchestrator. */
@@ -52,10 +53,12 @@ export class CaseAnalysisService {
   constructor(
     private readonly prisma: PrismaService,
     identityMatchRule: IdentityMatchRule,
+    bankarizationValidationRule: BankarizationValidationRule,
   ) {
-    // MVP rule registry. Future Sprint 3 rules (income, liability, bank
-    // viability) register here without touching the controller.
-    this.rules = [identityMatchRule];
+    // Rule registry. HU-10 adds bankarization-validation (nomina vs depositos)
+    // despues del identity-match. Future Sprint 3/4 rules (income, liability,
+    // bank viability) register here without touching the controller.
+    this.rules = [identityMatchRule, bankarizationValidationRule];
   }
 
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
