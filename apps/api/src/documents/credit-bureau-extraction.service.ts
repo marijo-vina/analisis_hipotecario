@@ -797,6 +797,68 @@ export class CreditBureauExtractionService {
     return null;
   }
 
+  /** Spanish month abbreviations → numeric month (1-based). */
+  private static readonly SPANISH_MONTHS: Record<string, number> = {
+    ENE: 1, FEB: 2, MAR: 3, ABR: 4, MAY: 5, JUN: 6,
+    JUL: 7, AGO: 8, SEP: 9, OCT: 10, NOV: 11, DIC: 12,
+  };
+
+  /**
+   * Counts inquiries in the "DETALLE DE CONSULTAS" section that fall within
+   * 12 months of the consultation date.
+   *
+   * Dates in this section use Spanish month abbreviations:
+   * `DD-MMM-YYYY` (e.g. `22-AGO-2025`).
+   *
+   * @returns the count, or `null` if the section or date is unparseable
+   */
+  private countInquiriesFromOcr(
+    ocrText: string,
+    consultationDateIso: string | null,
+  ): number | null {
+    if (!ocrText || !consultationDateIso) return null;
+
+    // Parse the consultation date (ISO: YYYY-MM-DD)
+    const consultDate = new Date(consultationDateIso + 'T00:00:00');
+    if (isNaN(consultDate.getTime())) return null;
+
+    // 12 months before consultation date
+    const cutoff = new Date(consultDate);
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+
+    // Locate the "DETALLE DE CONSULTAS" section
+    const sectionIdx = ocrText.indexOf('DETALLE DE CONSULTAS');
+    if (sectionIdx === -1) return null;
+
+    // Extract all Spanish-format dates after the section header.
+    // Pattern: DD-MMM-YYYY with valid Spanish month abbreviations.
+    const datePattern = /\b(\d{2})-(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-(\d{4})\b/gi;
+    const sectionText = ocrText.slice(sectionIdx);
+
+    let count = 0;
+    let match: RegExpExecArray | null;
+    while ((match = datePattern.exec(sectionText)) !== null) {
+      const day = parseInt(match[1], 10);
+      const month = CreditBureauExtractionService.SPANISH_MONTHS[match[2].toUpperCase()];
+      const year = parseInt(match[3], 10);
+
+      if (!month || isNaN(day) || isNaN(year)) continue;
+
+      const inquiryDate = new Date(year, month - 1, day);
+      if (isNaN(inquiryDate.getTime())) continue;
+
+      // Count if within [cutoff, consultationDate]
+      if (inquiryDate >= cutoff && inquiryDate <= consultDate) {
+        count++;
+      }
+    }
+
+    this.logger.log(
+      `[CreditBureau] Inquiries in last 12 months: ${count} (consultation=${consultationDateIso})`,
+    );
+    return count;
+  }
+
   /**
    * Extraction entry point.
    *
@@ -1010,6 +1072,18 @@ export class CreditBureauExtractionService {
       data.borrower = borrower;
       const report = (data.report ?? {}) as Record<string, unknown>;
       report.consultationDate = borrowerFields.consultationDate;
+
+      // ── Deterministic inquiry count from DETALLE DE CONSULTAS ─────────
+      // Gemini's numberOfInquiries is unreliable. We parse consultation
+      // dates from the OCR text and count those within the last 12 months.
+      const inquiryCount = this.countInquiriesFromOcr(
+        document.ocrText,
+        borrowerFields.consultationDate,
+      );
+      if (inquiryCount !== null) {
+        report.numberOfInquiries = inquiryCount;
+      }
+
       data.report = report;
     }
 
