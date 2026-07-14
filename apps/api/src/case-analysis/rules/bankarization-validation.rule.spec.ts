@@ -231,7 +231,7 @@ describe('BankarizationValidationRule', () => {
     expect(result.alerts.some((a) => a.ruleCode === 'BANK_PAYROLL_MISMATCH')).toBe(true);
   });
 
-  it('incluye los resultados por recibo en detail.fields con status normalizado', async () => {
+  it('NO incluye resultados en detail.fields (los resultados van en alerts y la UI de conciliacion)', async () => {
     mockMatch.match.mockReturnValue([
       { receiptIndex: 0, status: 'MATCHED', method: 'RFC', candidateDepositId: '0-0', candidateAmount: 10000, candidateDate: '2026-07-02', candidateConcept: 'NOMINA', score: null, scotiabankExcluded: false, traceability: { rule: 'RFC_MATCH' } } as PayrollMatchResult,
     ]);
@@ -239,15 +239,9 @@ describe('BankarizationValidationRule', () => {
 
     const result = await rule.execute({} as never, [payrollDoc(), bankDoc()]);
 
-    const field = result.detail.fields.find(
-      (f) => f.fieldName === 'bankarization:result:0',
-    );
-    expect(field).toBeDefined();
-    expect(field?.status).toBe('MATCH');
-    // normalizedValue lleva el resultado bancarization estructurado
-    const nv = field?.normalizedValue as Record<string, unknown>;
-    expect(nv).toBeDefined();
-    expect(nv['status']).toBe('MATCHED');
-    expect(nv['method']).toBe('RFC');
+    // detail.fields debe estar vacio: los resultados de bancarizacion no se muestran
+    // en la tabla de identidad cross-document. La UI de conciliacion (estados-conciliacion.tsx)
+    // consume los documentos extraidos directamente, no los FieldComparison.
+    expect(result.detail.fields).toEqual([]);
   });
 });
