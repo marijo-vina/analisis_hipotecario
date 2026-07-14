@@ -1,6 +1,13 @@
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll } from "@/app/lib/extraction";
+import {
+  reconcilePreview,
+  STATUS_LABELS,
+  METHOD_LABELS,
+  type PreviewReceiptResult,
+  type PreviewStatus,
+} from "@/app/lib/bankarization-preview";
 import Card from "@/app/ui/common/card";
 
 interface EstadosConciliacionProps {
@@ -11,12 +18,16 @@ interface EstadosConciliacionProps {
 const TOLERANCE_PCT = 5;
 
 /**
- * Sprint 2 — Conciliación PRELIMINAR con nómina.
+ * HU-10 — Conciliación por recibo de nómina vs depósitos.
  *
- * Compara depósitos de nómina detectados en estados de cuenta contra
- * ingresos netos de recibos de nómina. Los resultados son INFORMATIVOS;
- * las reglas financieras definitivas y la normalización de empleadores
- * se implementarán en Sprint 3.
+ * Reemplaza los totales agregados por una vista individual: cada recibo se
+ * reconcilia contra el mejor depósito mediante matching determinista
+ * (RFC-first, fallback 3 reglas + score, bidireccional 1:1, detección de
+ * pagadoras y regla Scotiabank). Muestra estado, método, candidato vinculado
+ * y alertas por recibo.
+ *
+ * Esta comparación es PRELIMINAR e informativa; la validación auditable y
+ * definitiva es la regla `bankarization-validation` del backend.
  */
 export default function EstadosConciliacion({
   allDeposits,
@@ -25,119 +36,68 @@ export default function EstadosConciliacion({
   const payrollParsed = parsePayroll(payrollDocs);
   const payrollReceipts = payrollParsed.receipts.filter((r) => r.hasData);
 
-  const totalDeposits = allDeposits.reduce(
-    (sum, d) => sum + (d.amount ?? 0),
-    0,
-  );
+  if (allDeposits.length === 0 && payrollReceipts.length === 0) {
+    return null;
+  }
+
+  const results = reconcilePreview(payrollReceipts, allDeposits);
+
+  // ── Resumen agregado (informativo) ─────────────────────────────────────
   const totalNetIncome = payrollReceipts.reduce(
     (sum, r) => sum + (r.ingresoNeto ?? 0),
     0,
   );
-
-  if (totalDeposits === 0 && totalNetIncome === 0) {
-    return null;
-  }
-
-  const difference = totalDeposits - totalNetIncome;
-  const diffPct =
-    totalNetIncome > 0
-      ? Math.abs((difference / totalNetIncome) * 100)
-      : totalDeposits > 0
-        ? 100
-        : 0;
-  const withinTolerance = diffPct <= TOLERANCE_PCT;
-
-  // ── Per-employer breakdown (informative only) ─────────────────────────
-  const employerMap = new Map<
-    string,
-    {
-      employerName: string;
-      employerRfc: string | null;
-      totalDeposited: number;
-      totalNetIncome: number;
-    }
-  >();
-
-  for (const dep of allDeposits) {
-    const key = dep.employerRfc ?? normalizeName(dep.employerName);
-    if (!employerMap.has(key)) {
-      employerMap.set(key, {
-        employerName: dep.employerName ?? "Desconocido",
-        employerRfc: dep.employerRfc,
-        totalDeposited: 0,
-        totalNetIncome: 0,
-      });
-    }
-    employerMap.get(key)!.totalDeposited += dep.amount ?? 0;
-  }
-
-  for (const receipt of payrollReceipts) {
-    if (!receipt.empleador) continue;
-    const key =
-      receipt.empleador.rfc !== "—"
-        ? receipt.empleador.rfc
-        : normalizeName(receipt.empleador.nombre);
-    if (!employerMap.has(key)) {
-      employerMap.set(key, {
-        employerName: receipt.empleador.nombre,
-        employerRfc:
-          receipt.empleador.rfc !== "—" ? receipt.empleador.rfc : null,
-        totalDeposited: 0,
-        totalNetIncome: 0,
-      });
-    }
-    employerMap.get(key)!.totalNetIncome += receipt.ingresoNeto ?? 0;
-  }
-
-  const employerRows = Array.from(employerMap.values()).filter(
-    (e) => e.totalDeposited > 0 || e.totalNetIncome > 0,
-  );
-
-  // Detect potential duplicates (same normalized name, different key)
-  const nameCounts = new Map<string, number>();
-  for (const row of employerRows) {
-    const norm = normalizeName(row.employerName);
-    nameCounts.set(norm, (nameCounts.get(norm) ?? 0) + 1);
-  }
-  const hasNormalizationNeeded = Array.from(nameCounts.values()).some(
-    (c) => c > 1,
-  );
+  const conciledCount = results.filter(
+    (r) => r.status === "MATCHED" || r.status === "PROVIDER_MIRROR_CONFIRMED",
+  ).length;
 
   return (
     <Card className="space-y-5 p-6">
-      {/* ── Header — Sprint 2 scope ──────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="h-3.5 w-3.5 rounded-full bg-blue-400" />
         <span className="text-base font-semibold text-gf-text">
-          Conciliación preliminar con nómina
+          Conciliación nómina vs depósitos
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
           <span className="h-2 w-2 rounded-full bg-blue-400" />
-          Preliminar — requiere validación
+          Por recibo — preliminar
         </span>
       </div>
 
-      {/* ── Scope note ────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-4 py-2.5">
         <p className="text-xs text-blue-700">
-          Esta comparación es informativa. La conciliación definitiva y sus
-          reglas financieras se implementarán en Sprint 3.
+          Conciliación preliminar por recibo. La validación auditable y
+          definitiva la ejecuta la regla <code>bankarization-validation</code>{" "}
+          del backend al correr el análisis.
         </p>
       </div>
 
       <p className="text-[13px] text-gf-text-muted">
-        Comparación entre depósitos de nómina detectados en estados de cuenta
-        y los ingresos netos reportados en recibos de nómina procesados.
+        Comparación individual entre cada recibo de nómina y el mejor depósito
+        bancario detectado (matching RFC → fallback, tolerancia ±2 días y ≤5%).
       </p>
 
-      {/* ── Comparison cards — neutral styling ────────────────────────── */}
+      {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl bg-gf-bg p-4">
           <span className="text-[11px] font-medium text-gf-text-muted">
-            DEPÓSITOS DETECTADOS ({allDeposits.length} EE.CC.)
+            RECIBOS PROCESADOS
           </span>
           <p className="mt-1 text-2xl font-bold text-gf-text">
-            {fmtCurrency(totalDeposits)}
+            {payrollReceipts.length}
+          </p>
+          <span className="text-xs text-gf-text-muted">
+            {conciledCount} conciliado(s)
+          </span>
+        </div>
+
+        <div className="rounded-xl bg-gf-bg p-4">
+          <span className="text-[11px] font-medium text-gf-text-muted">
+            DEPÓSITOS DETECTADOS
+          </span>
+          <p className="mt-1 text-2xl font-bold text-gf-text">
+            {allDeposits.length}
           </p>
           <span className="text-xs text-gf-text-muted">
             {allDeposits.length} depósitos de nómina
@@ -146,148 +106,202 @@ export default function EstadosConciliacion({
 
         <div className="rounded-xl bg-gf-bg p-4">
           <span className="text-[11px] font-medium text-gf-text-muted">
-            INGRESO NETO (RECIBOS NÓMINA)
+            INGRESO NETO (RECIBOS)
           </span>
           <p className="mt-1 text-2xl font-bold text-gf-text">
             {fmtCurrency(totalNetIncome)}
           </p>
           <span className="text-xs text-gf-text-muted">
-            {payrollReceipts.length} recibos procesados
-          </span>
-        </div>
-
-        {/* Difference — neutral, no success/failure judgment */}
-        <div className="rounded-xl bg-blue-50 p-4">
-          <span className="text-[11px] font-medium text-blue-600">
-            DIFERENCIA
-          </span>
-          <p className="mt-1 text-2xl font-bold text-blue-600">
-            {difference >= 0 ? "+" : ""}
-            {fmtCurrency(difference)}
-          </p>
-          <span className="inline-block rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">
-            {withinTolerance
-              ? `${diffPct.toFixed(1)}% — dentro del margen de ${TOLERANCE_PCT}%`
-              : `${diffPct.toFixed(1)}% — excede el margen de ${TOLERANCE_PCT}%`}
+            tolerancia {TOLERANCE_PCT}%
           </span>
         </div>
       </div>
 
-      {/* ── Employer breakdown (informative, no conclusions) ──────────── */}
-      {employerRows.length > 0 && (
-        <>
-          <hr className="border-gf-border" />
+      {/* ── Vista por recibo ───────────────────────────────────────────── */}
+      <hr className="border-gf-border" />
 
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gf-text">
+            Conciliación por recibo
+          </span>
+          <span className="text-xs text-gf-text-muted">
+            (matching determinista: RFC → fallback 3 reglas → pagadora)
+          </span>
+        </div>
+
+        {results.length === 0 ? (
+          <p className="text-sm text-gf-text-muted py-2">
+            No hay recibos procesados para conciliar.
+          </p>
+        ) : (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gf-text">
-                Comparación por empleador
-              </span>
-              <span className="text-xs text-gf-text-muted">
-                (matching preliminar — sujeto a normalización en Sprint 3)
-              </span>
-            </div>
-
-            {/* Table header */}
-            <div className="flex items-center gap-4 px-2 text-[11px] font-semibold text-gf-text-soft">
-              <span className="w-44">EMPLEADOR</span>
-              <span className="w-28 text-right">DEPÓSITOS</span>
-              <span className="w-28 text-right">NÓMINA</span>
-              <span className="w-20 text-right">DIF.</span>
-              <span className="w-28 text-right">ESTADO</span>
-            </div>
-
-            {employerRows.map((row, i) => {
-              const rowDiff = row.totalDeposited - row.totalNetIncome;
-              const rowPct =
-                row.totalNetIncome > 0
-                  ? Math.abs((rowDiff / row.totalNetIncome) * 100)
-                  : row.totalDeposited > 0
-                    ? 100
-                    : 0;
-              const rowWithinTol = rowPct <= TOLERANCE_PCT;
-
-              // Key without RFC means the employer was matched by name only
-              const needsNormalization =
-                !row.employerRfc || hasNormalizationNeeded;
-
-              return (
-                <div
-                  key={`${row.employerRfc ?? row.employerName}-${i}`}
-                  className="flex items-center gap-4 rounded-lg bg-gf-bg px-3 py-2.5 text-sm"
-                >
-                  {/* Employer name */}
-                  <div className="w-44 flex flex-col gap-0.5 min-w-0">
-                    <span className="text-[13px] font-semibold text-gf-text truncate">
-                      {row.employerName}
-                    </span>
-                    <span className="text-[11px] text-gf-text-soft">
-                      {row.employerRfc ?? "RFC no detectado"}
-                    </span>
-                  </div>
-
-                  <span className="w-28 text-right text-sm font-semibold text-gf-text">
-                    {fmtCurrency(row.totalDeposited)}
-                  </span>
-                  <span className="w-28 text-right text-sm font-semibold text-gf-text">
-                    {fmtCurrency(row.totalNetIncome)}
-                  </span>
-                  <span className="w-20 text-right text-[13px] font-medium text-gf-text-muted">
-                    {rowDiff >= 0 ? "+" : ""}
-                    {fmtCurrency(rowDiff)}
-                  </span>
-
-                  {/* Status — neutral, preliminary */}
-                  <span className="w-28 text-right rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
-                    {needsNormalization
-                      ? "Pend. normalizar"
-                      : rowWithinTol
-                        ? `Var. ${rowPct.toFixed(1)}%`
-                        : `Dif. ${rowPct.toFixed(1)}%`}
-                  </span>
-                </div>
-              );
-            })}
+            {results.map((r) => (
+              <ReceiptRow key={`${r.receiptOriginalName}-${r.receiptIndex}`} r={r} />
+            ))}
           </div>
-        </>
-      )}
-
-      {/* ── Normalization note ────────────────────────────────────────── */}
-      {hasNormalizationNeeded && (
-        <div className="rounded-lg bg-blue-50/50 px-4 py-3">
-          <p className="text-xs text-blue-700">
-            Se detectaron empleadores con nombres similares que podrían
-            corresponder a la misma entidad. La normalización de empleadores
-            y el matching definitivo se implementarán en Sprint 3.
-          </p>
-        </div>
-      )}
-
-      {/* ── Discrepancy note — neutral wording ────────────────────────── */}
-      {!withinTolerance && (
-        <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-4 py-3">
-          <p className="text-xs text-blue-700">
-            Coincidencia pendiente de confirmar. La normalización final de
-            empleadores y reglas definitivas de conciliación se implementarán
-            en Sprint 3.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </Card>
   );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Fila por recibo ──────────────────────────────────────────────────────────
 
-/** Normalize an employer name for loose matching (Sprint 2). */
-function normalizeName(name: string | null | undefined): string {
-  if (!name) return "desconocido";
-  return name
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .replace(/[.,;:]/g, "")
-    .trim();
+function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
+  return (
+    <div className="rounded-lg bg-gf-bg px-4 py-3 space-y-2.5">
+      {/* Encabezado de la fila */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] font-semibold text-gf-text truncate max-w-[280px]">
+          {r.receiptOriginalName}
+        </span>
+        {r.period && (
+          <span className="text-[11px] text-gf-text-soft">{r.period}</span>
+        )}
+      </div>
+
+      {/* Badges de estado, método y banderas */}
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge status={r.status} />
+        <MethodBadge method={r.method} />
+        {r.scotiabankExcluded && (
+          <span className="inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+            Excluido Scotiabank
+          </span>
+        )}
+      </div>
+
+      {/* Detalle del candidato + métricas */}
+      <div className="grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-4">
+        <Metric
+          label="RECIBO"
+          value={r.netIncome != null ? fmtCurrency(r.netIncome) : "—"}
+        />
+        <Metric
+          label="DEPÓSITO"
+          value={
+            r.candidate?.amount != null
+              ? fmtCurrency(r.candidate.amount)
+              : "Sin candidato"
+          }
+        />
+        <Metric
+          label="DIF. MONTO"
+          value={
+            r.amountDiffPct != null
+              ? `${r.amountDiffPct.toFixed(1)}%`
+              : "—"
+          }
+          tone={
+            r.amountDiffPct != null && r.amountDiffPct > TOLERANCE_PCT
+              ? "warn"
+              : undefined
+          }
+        />
+        <Metric
+          label="SCORE"
+          value={r.score != null ? r.score.toFixed(1) : "—"}
+        />
+      </div>
+
+      {/* Datos del depósito vinculado */}
+      {r.candidate && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gf-text-soft">
+          <span>
+            Fecha:{" "}
+            <span className="text-gf-text-muted">
+              {r.candidate.date ?? "—"}
+            </span>
+          </span>
+          <span>
+            Pagador RFC:{" "}
+            <span className="text-gf-text-muted">
+              {r.candidate.employerRfc ?? "No detectado"}
+            </span>
+          </span>
+          <span className="truncate max-w-[260px]">
+            Concepto:{" "}
+            <span className="text-gf-text-muted">
+              {r.candidate.concept ?? "—"}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* Alertas por recibo */}
+      {r.alerts.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {r.alerts.map((a, i) => (
+            <span
+              key={`${a.code}-${i}`}
+              className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gf-text-muted"
+            >
+              {a.code}: {a.message}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
+
+// ── Componentes auxiliares ───────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<PreviewStatus, string> = {
+  MATCHED: "bg-green-100 text-green-700",
+  PROVIDER_MIRROR_CONFIRMED: "bg-green-100 text-green-700",
+  DISCREPANCY: "bg-amber-100 text-amber-700",
+  AMBIGUOUS: "bg-amber-100 text-amber-700",
+  MANUAL_REVIEW: "bg-amber-100 text-amber-700",
+  PROVIDER_CANDIDATE: "bg-blue-100 text-blue-700",
+  NOT_MATCHED: "bg-gray-200 text-gray-700",
+  RFC_INCOMPATIBLE: "bg-red-100 text-red-700",
+};
+
+function StatusBadge({ status }: { status: PreviewStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-semibold ${STATUS_STYLES[status]}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function MethodBadge({ method }: { method: PreviewReceiptResult["method"] }) {
+  if (method === "NONE") return null;
+  return (
+    <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gf-text-muted">
+      Método: {METHOD_LABELS[method]}
+    </span>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "warn";
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] font-medium text-gf-text-soft">{label}</span>
+      <span
+        className={`text-[13px] font-semibold ${
+          tone === "warn" ? "text-amber-600" : "text-gf-text"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtCurrency(amount: number): string {
   return new Intl.NumberFormat("es-MX", {
