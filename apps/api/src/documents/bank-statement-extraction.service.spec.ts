@@ -879,6 +879,38 @@ describe('BankStatementExtractionService', () => {
     });
   });
 
+  describe('extract — alert: BANK_NO_TITULAR_RFC', () => {
+    it('fires when accountHolder.rfc is null', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            accountHolder: { fullName: 'MARIA PEREZ', rfc: null, isJointAccount: false },
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'BANK_NO_TITULAR_RFC' }),
+        ]),
+      );
+    });
+
+    it('does NOT fire when rfc is present', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(
+        result.alerts.filter((a) => a.code === 'BANK_NO_TITULAR_RFC'),
+      ).toHaveLength(0);
+    });
+  });
+
   describe('extract — alert: BANK_FEWER_MONTHS_THAN_REQUIRED', () => {
     it('fires when detectedDocumentMonths < requiredBankStatementMonths', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());

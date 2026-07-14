@@ -230,9 +230,12 @@ export default function EstadosStatementCard({
             <h4 className="text-[13px] font-semibold text-gf-text">
               Datos de la cuenta
             </h4>
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-5 gap-6">
               <FieldCell label="Titular">
                 {statement.accountHolder ?? "—"}
+              </FieldCell>
+              <FieldCell label="RFC" mono>
+                {statement.accountHolderRfc ?? "—"}
               </FieldCell>
               <FieldCell label="No. de cuenta" mono>
                 {statement.accountNumber

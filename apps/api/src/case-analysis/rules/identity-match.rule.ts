@@ -55,9 +55,9 @@ const get = (obj: unknown, path: string[]): string | null => {
 
 /**
  * Registry of identity sources. Bank Statement structurally lacks `curp`
- * (and a top-level `rfc` — RFC for bank statements lives only inside deposit
- * records, so it is treated as absent for identity comparison). This mirrors
- * the identity-match-validation spec's source/field capability matrix.
+ * but carries `rfc` via accountHolder (schema v1.1+). The identity-match
+ * rule compares fullName + rfc + curp across all document sources and the
+ * Client record per the identity-match-validation spec.
  */
 const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
