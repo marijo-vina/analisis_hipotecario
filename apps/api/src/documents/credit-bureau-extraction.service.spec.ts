@@ -2699,6 +2699,8 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
         lastPaymentAmount: '',
         paymentDueAmount,
         paymentSource,
+        mopCodes: [],
+        status: 'UNKNOWN' as const,
       };
       return {
         sourceFile: 'buro-report.pdf',
