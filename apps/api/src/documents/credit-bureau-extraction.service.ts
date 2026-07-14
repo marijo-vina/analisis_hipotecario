@@ -804,6 +804,22 @@ export class CreditBureauExtractionService {
   };
 
   /**
+   * Extracts the consultation date from page 1 of the OCR text.
+   * Looks for "FECHA DE CONSULTA" followed by a DD/MM/YYYY date.
+   */
+  private extractConsultationDateFromOcr(ocrText: string): string | null {
+    if (!ocrText) return null;
+    const consultIdx = ocrText.toUpperCase().indexOf('FECHA DE CONSULTA');
+    if (consultIdx === -1) return null;
+    const after = ocrText.slice(consultIdx, consultIdx + 200);
+    const dateMatch = after.match(
+      /(\d{2})[/.\-](\d{2})[/.\-](\d{4})/,
+    );
+    if (!dateMatch) return null;
+    return this.normalizeOcrDate(dateMatch[1]);
+  }
+
+  /**
    * Counts inquiries in the "DETALLE DE CONSULTAS" section that fall within
    * 12 months of the consultation date.
    *
@@ -1002,6 +1018,20 @@ export class CreditBureauExtractionService {
       }
     }
 
+    // ── 6c. Deterministic inquiry count from DETALLE DE CONSULTAS ─────
+    // Runs BEFORE Gemini so it always executes, even when Gemini fails.
+    // Extracts consultation date directly from the OCR text.
+    let deterministicInquiryCount: number | null = null;
+    {
+      const consultDate = this.extractConsultationDateFromOcr(document.ocrText);
+      if (consultDate) {
+        deterministicInquiryCount = this.countInquiriesFromOcr(
+          document.ocrText,
+          consultDate,
+        );
+      }
+    }
+
     // ── 7. Pre-filter OCR ──────────────────────────────────────────────
     // Layer 1: keep borrower + summary + detail (15K cap).
     // Layer 2: keep ONLY "DETALLE DE CRÉDITOS" (~5K) — borrower/report is
@@ -1072,19 +1102,14 @@ export class CreditBureauExtractionService {
       data.borrower = borrower;
       const report = (data.report ?? {}) as Record<string, unknown>;
       report.consultationDate = borrowerFields.consultationDate;
-
-      // ── Deterministic inquiry count from DETALLE DE CONSULTAS ─────────
-      // Gemini's numberOfInquiries is unreliable. We parse consultation
-      // dates from the OCR text and count those within the last 12 months.
-      const inquiryCount = this.countInquiriesFromOcr(
-        document.ocrText,
-        borrowerFields.consultationDate,
-      );
-      if (inquiryCount !== null) {
-        report.numberOfInquiries = inquiryCount;
-      }
-
       data.report = report;
+    }
+
+    // ── Deterministic inquiry count from pre-Gemini extraction ─────────
+    if (deterministicInquiryCount !== null) {
+      const reportData = (data.report ?? {}) as Record<string, unknown>;
+      reportData.numberOfInquiries = deterministicInquiryCount;
+      data.report = reportData;
     }
 
     // ── 9. Disambiguate payment fields using OCR text (Layer 1 only) ──
