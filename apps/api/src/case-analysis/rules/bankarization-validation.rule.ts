@@ -40,7 +40,7 @@ import type {
  * Prioridad:
  *   1. paymentDate explícita extraída → source = EXPLICIT
  *   2. periodEndDate → source = PERIOD_END
- *   3. Inferencia desde periodLabel en el nombre del archivo:
+ *   3. Inferencia desde periodLabel extraído por Gemini (ej. "1A Quincena Mayo 2025"):
  *      - "1A", "1ra", "1Q", "primera", "1a quincena" → día 15 del mes
  *      - "2A", "2da", "2Q", "segunda", "2a quincena" → último día del mes
  *      source = INFERRED_QUINCENA
@@ -50,9 +50,9 @@ import type {
 export function resolvePayrollPaymentDate(
   paymentDate: string | null,
   periodEndDate: string | null,
-  originalName: string | null,
+  periodLabel: string | null,
 ): ResolvedPayrollDate {
-  const label = originalName ?? null;
+  const label = periodLabel ?? null;
 
   // 1. paymentDate explícita
   if (paymentDate) {
@@ -74,7 +74,7 @@ export function resolvePayrollPaymentDate(
     };
   }
 
-  // 3. Inferencia desde nombre del archivo
+  // 3. Inferencia desde periodLabel extraído
   if (label) {
     const inferred = inferDateFromLabel(label);
     if (inferred) {
@@ -235,11 +235,18 @@ export class BankarizationValidationRule implements AnalysisRule {
 
         const explicitPaymentDate = (period.paymentDate as string) ?? null;
         const periodEndDate = (period.periodEndDate as string) ?? null;
+        // periodLabel viene de la extraccion (ej. "1A Quincena Mayo 2025").
+        // Es la fuente autoritativa para inferir la quincena, no el nombre del archivo.
+        const periodLabel =
+          (period.periodLabel as string) ??
+          (period.periodRaw as string) ??
+          originalName ??
+          null;
 
         const resolved = resolvePayrollPaymentDate(
           explicitPaymentDate,
           periodEndDate,
-          originalName,
+          periodLabel,
         );
 
         receipts.push({
