@@ -16,7 +16,6 @@ import { Injectable } from '@nestjs/common';
 import type { AnalysisOutcome } from '../../generated/prisma/client';
 import type {
   AnalysisRule,
-  FieldComparison,
   RuleAlert,
   RuleResult,
   Severity,
@@ -62,17 +61,19 @@ export class BankarizationValidationRule implements AnalysisRule {
     // 4. Fusionar evaluaciones: degradar/mejorar status y propagar flags.
     const merged = this.merge(matchResults, evaluations);
 
-    // 5. Mapear a alertas + outcome + detalle.
+    // 5. Mapear a alertas + outcome. Los resultados por recibo van en los alerts,
+    //    no en detail.fields (que es para la tabla de identidad cross-document).
+    //    La UI de conciliación (estados-conciliacion.tsx) muestra los resultados
+    //    por recibo consumiendo los documentos extraídos, no los FieldComparison.
     const alerts = this.buildAlerts(merged, isJointAccount);
     const outcome = this.computeOutcome(merged);
     const severity = this.computeSeverity(outcome);
-    const fields = this.buildFields(merged);
 
     return {
       ruleId: this.ruleId,
       outcome,
       severity,
-      detail: { sources: ['payroll', 'bank-statement', 'client'], fields },
+      detail: { sources: ['payroll', 'bank-statement', 'client'], fields: [] },
       alerts,
     };
   }
@@ -245,44 +246,4 @@ export class BankarizationValidationRule implements AnalysisRule {
     return 'INFO';
   }
 
-  // ── Construccion de detalle por recibo ──────────────────────────────────────
-  private buildFields(results: PayrollMatchResult[]): FieldComparison[] {
-    return results.map((r) => {
-      const reconciled =
-        r.status === 'MATCHED' || r.status === 'PROVIDER_MIRROR_CONFIRMED';
-      const status: FieldComparison['status'] = reconciled ? 'MATCH' : 'MISMATCH';
-      const severity: Severity =
-        r.status === 'RFC_INCOMPATIBLE'
-          ? 'ERROR'
-          : reconciled
-            ? 'INFO'
-            : 'WARNING';
-
-      const utAlerts: string[] = [];
-      if (r.status === 'DISCREPANCY') utAlerts.push('DISCREPANCY_5PCT');
-      if (r.status === 'RFC_INCOMPATIBLE') utAlerts.push('BANK_PAYROLL_MISMATCH');
-      if (r.status === 'PROVIDER_MIRROR_CONFIRMED')
-        utAlerts.push('PAYROLL_PROVIDER_MIRROR');
-      if (r.scotiabankExcluded) utAlerts.push('PAYROLL_PROVIDER_SCOTIABANK');
-
-      return {
-        fieldName: `bankarization:result:${r.receiptIndex}`,
-        originalValue: {
-          candidateDepositId: r.candidateDepositId,
-          candidateAmount: r.candidateAmount,
-          candidateDate: r.candidateDate,
-        },
-        normalizedValue: {
-          status: r.status,
-          method: r.method,
-          score: r.score,
-          scotiabankExcluded: r.scotiabankExcluded,
-          traceability: r.traceability,
-        },
-        status,
-        severity,
-        alerts: utAlerts,
-      };
-    });
-  }
 }
