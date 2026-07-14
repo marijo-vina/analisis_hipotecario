@@ -53,14 +53,33 @@ export const CONCEPT_CATALOG_KEYWORDS = [
 
 // ── Entradas del matching ───────────────────────────────────────────────────
 
+/** Origen de la fecha de pago resuelta para un recibo. */
+export type PayrollPaymentDateSource =
+  | 'EXPLICIT'
+  | 'PERIOD_END'
+  | 'INFERRED_QUINCENA'
+  | 'MANUAL_OVERRIDE';
+
+/** Fecha de pago resuelta con trazabilidad de origen. */
+export interface ResolvedPayrollDate {
+  resolvedPaymentDate: string | null;
+  source: PayrollPaymentDateSource;
+  estimated: boolean;
+  originalPeriodLabel: string | null;
+}
+
 /** Recibo de nomina minimamente estructurado para el algoritmo de matching. */
 export interface PayrollReceipt {
   index: number;
   netIncome: number | null;
-  /** Fecha de pago ISO `YYYY-MM-DD`. */
+  /** Fecha de pago ISO `YYYY-MM-DD` (campo crudo de la extraccion). */
   paymentDate: string | null;
+  /** Fecha de pago resuelta con trazabilidad (usada por el matching). */
+  resolvedPaymentDate: ResolvedPayrollDate;
   employerRfc: string | null;
   employerName: string | null;
+  /** Nombre original del documento para inferencia de periodo. */
+  originalName: string | null;
 }
 
 /** Deposito bancario (SPEI / transferencia) detectado en estado de cuenta. */
@@ -83,6 +102,13 @@ export interface PayrollMatchInput {
 
 // ── Trazabilidad ─────────────────────────────────────────────────────────────
 
+/** Razon por la que un candidato fue descartado. */
+export interface DiscardReason {
+  depositId: string;
+  reason: 'RFC_MISMATCH' | 'DATE_OUT_OF_RANGE' | 'AMOUNT_EXCEEDS_TOLERANCE' | 'CONCEPT_NOT_COMPATIBLE';
+  detail: string;
+}
+
 /** Regla aplicada para llegar al resultado, con valores comparados. */
 export interface MatchTrace {
   rule: 'RFC_MATCH' | 'FALLBACK_3RULES' | 'NONE';
@@ -90,6 +116,8 @@ export interface MatchTrace {
   dateDiff?: number;
   amountDiffPercent?: number;
   conceptKeyword?: string;
+  /** Candidatos evaluados y descartados antes de llegar al resultado final. */
+  discardReasons: DiscardReason[];
 }
 
 // ── Resultado ───────────────────────────────────────────────────────────────
@@ -106,6 +134,8 @@ export interface PayrollMatchResult {
   score: number | null;
   /** true cuando el deposito de pagadora se excluye para calculos Scotiabank. */
   scotiabankExcluded: boolean;
+  /** Fecha usada para el matching (resuelta con trazabilidad). */
+  usedPaymentDate: string | null;
   traceability: MatchTrace;
 }
 

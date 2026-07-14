@@ -32,6 +32,7 @@ import type {
   MatchTrace,
   PayrollReconciliationStatus,
   PayrollMatchMethod,
+  DiscardReason,
 } from '../types/bankarization.types';
 
 // ── Constantes de tolerancia (deterministicas) ──────────────────────────────
@@ -155,21 +156,22 @@ export class PayrollBankMatchingService {
     used: Set<string>,
   ): PayrollMatchResult {
     const receiptRfc = normalizeRfc(receipt.employerRfc);
+    const paymentDate = receipt.resolvedPaymentDate?.resolvedPaymentDate ?? null;
 
-    // Si el recibo no tiene ingreso ni fecha, no puede matchear.
-    if (receipt.netIncome == null || receipt.paymentDate == null) {
-      return this.notMatched(receipt.index);
+    // Si el recibo no tiene ingreso ni fecha resuelta, no puede matchear.
+    if (receipt.netIncome == null || paymentDate == null) {
+      return this.notMatched(receipt.index, null);
     }
 
     // Pre-filtro: depositos disponibles dentro de ±PREFILTER_DAYS dias.
     const candidates = deposits.filter((d) => {
       if (used.has(d.id)) return false;
-      const dd = dateDiffDays(receipt.paymentDate, d.date);
+      const dd = dateDiffDays(paymentDate, d.date);
       return dd != null && dd <= PREFILTER_DAYS;
     });
 
     if (candidates.length === 0) {
-      return this.notMatched(receipt.index);
+      return this.notMatched(receipt.index, paymentDate);
     }
 
     // ── Paso 2: RFC coincide ──────────────────────────────────────────────
@@ -178,7 +180,7 @@ export class PayrollBankMatchingService {
         (d) => normalizeRfc(d.detectedPayerRfc) === receiptRfc,
       );
       if (sameRfc.length > 0) {
-        return this.matchByRfc(receipt, sameRfc, used, receiptRfc);
+        return this.matchByRfc(receipt, sameRfc, used, receiptRfc, paymentDate, candidates);
       }
 
       // ── Paso 3: RFC presente pero difiere en todos los depositos con RFC ──
@@ -186,18 +188,15 @@ export class PayrollBankMatchingService {
         (d) => normalizeRfc(d.detectedPayerRfc) != null,
       );
       if (diffRfc.length > 0) {
-        // RFC_INCOMPATIBLE: enlazamos el candidato mas proximo (mejor fecha)
-        // para que PagadoraDetectionService lo evalúe. No se hace fallback.
-        return this.rfcIncompatible(receipt, diffRfc, used, receiptRfc);
+        return this.rfcIncompatible(receipt, diffRfc, used, receiptRfc, paymentDate);
       }
 
       // ── Paso 4: receipt tiene RFC pero ningun deposito tiene RFC ──────────
-      // "Falta RFC en el deposito" → fallback.
-      return this.matchByFallback(receipt, candidates, used);
+      return this.matchByFallback(receipt, candidates, used, paymentDate);
     }
 
     // receipt sin RFC → fallback obligatorio.
-    return this.matchByFallback(receipt, candidates, used);
+    return this.matchByFallback(receipt, candidates, used, paymentDate);
   }
 
   // ── Camino RFC (triangular: RFC + fecha ±2d + monto ≤5%) ───────────────────
@@ -206,23 +205,65 @@ export class PayrollBankMatchingService {
     sameRfcDeposits: PayrollDeposit[],
     used: Set<string>,
     receiptRfc: string,
+    paymentDate: string,
+    allCandidates: PayrollDeposit[],
   ): PayrollMatchResult {
+    const discardReasons: DiscardReason[] = [];
+
+    // Descartados por RFC: candidatos con RFC diferente
+    for (const d of allCandidates) {
+      if (!sameRfcDeposits.includes(d)) {
+        const dRfc = normalizeRfc(d.detectedPayerRfc);
+        if (dRfc != null && dRfc !== receiptRfc) {
+          discardReasons.push({
+            depositId: d.id,
+            reason: 'RFC_MISMATCH',
+            detail: `RFC depósito "${dRfc}" ≠ RFC recibo "${receiptRfc}"`,
+          });
+        }
+      }
+    }
+
     // Fecha-compatible (±2d), ordenados por proximidad de monto (menor diff).
     const compatible = sameRfcDeposits
       .map((d) => ({
         d,
-        dd: dateDiffDays(receipt.paymentDate, d.date) ?? Infinity,
+        dd: dateDiffDays(paymentDate, d.date) ?? Infinity,
         ad: amountDiffPercent(receipt.netIncome, d.amount) ?? Infinity,
       }))
       .filter((c) => c.dd <= DATE_TOLERANCE_DAYS)
       .sort((a, b) => a.ad - b.ad);
 
+    // Descartados por fecha entre los same-RFC
+    for (const d of sameRfcDeposits) {
+      const dd = dateDiffDays(paymentDate, d.date) ?? Infinity;
+      if (dd > DATE_TOLERANCE_DAYS) {
+        discardReasons.push({
+          depositId: d.id,
+          reason: 'DATE_OUT_OF_RANGE',
+          detail: `Diferencia fecha ${dd}d > tolerancia ${DATE_TOLERANCE_DAYS}d`,
+        });
+      }
+    }
+
     if (compatible.length === 0) {
-      // RFC coincide pero ningun deposito con fecha compatible → NOT_MATCHED.
-      return this.notMatched(receipt.index, {
-        rule: 'RFC_MATCH',
-        rfcUsed: receiptRfc,
-      });
+      return {
+        receiptIndex: receipt.index,
+        status: 'NOT_MATCHED',
+        method: 'NONE',
+        candidateDepositId: null,
+        candidateAmount: null,
+        candidateDate: null,
+        candidateConcept: null,
+        score: null,
+        scotiabankExcluded: false,
+        usedPaymentDate: paymentDate,
+        traceability: {
+          rule: 'RFC_MATCH',
+          rfcUsed: receiptRfc,
+          discardReasons,
+        },
+      };
     }
 
     const best = compatible[0];
@@ -230,6 +271,14 @@ export class PayrollBankMatchingService {
 
     const status: PayrollReconciliationStatus =
       best.ad <= AMOUNT_TOLERANCE_PCT ? 'MATCHED' : 'DISCREPANCY';
+
+    if (status === 'DISCREPANCY') {
+      discardReasons.push({
+        depositId: best.d.id,
+        reason: 'AMOUNT_EXCEEDS_TOLERANCE',
+        detail: `Diferencia monto ${round2(best.ad)}% > tolerancia ${AMOUNT_TOLERANCE_PCT}%`,
+      });
+    }
 
     return {
       receiptIndex: receipt.index,
@@ -241,11 +290,13 @@ export class PayrollBankMatchingService {
       candidateConcept: best.d.originalConcept,
       score: null,
       scotiabankExcluded: false,
+      usedPaymentDate: paymentDate,
       traceability: {
         rule: 'RFC_MATCH',
         rfcUsed: receiptRfc,
         dateDiff: best.dd,
         amountDiffPercent: round2(best.ad),
+        discardReasons,
       },
     };
   }
@@ -256,15 +307,21 @@ export class PayrollBankMatchingService {
     diffRfcDeposits: PayrollDeposit[],
     used: Set<string>,
     receiptRfc: string,
+    paymentDate: string,
   ): PayrollMatchResult {
-    // Tomamos el dif-RFC mas proximo por fecha para que la pagadora lo evalúe.
     const sorted = [...diffRfcDeposits].sort(
       (a, b) =>
-        (dateDiffDays(receipt.paymentDate, a.date) ?? Infinity) -
-        (dateDiffDays(receipt.paymentDate, b.date) ?? Infinity),
+        (dateDiffDays(paymentDate, a.date) ?? Infinity) -
+        (dateDiffDays(paymentDate, b.date) ?? Infinity),
     );
     const best = sorted[0];
     used.add(best.id);
+
+    const discardReasons: DiscardReason[] = diffRfcDeposits.map((d) => ({
+      depositId: d.id,
+      reason: 'RFC_MISMATCH' as const,
+      detail: `RFC depósito "${normalizeRfc(d.detectedPayerRfc)}" ≠ RFC recibo "${receiptRfc}"`,
+    }));
 
     return {
       receiptIndex: receipt.index,
@@ -276,9 +333,11 @@ export class PayrollBankMatchingService {
       candidateConcept: best.originalConcept,
       score: null,
       scotiabankExcluded: false,
+      usedPaymentDate: paymentDate,
       traceability: {
         rule: 'NONE',
         rfcUsed: receiptRfc,
+        discardReasons,
       },
     };
   }
@@ -288,15 +347,42 @@ export class PayrollBankMatchingService {
     receipt: PayrollReceipt,
     candidates: PayrollDeposit[],
     used: Set<string>,
+    paymentDate: string,
   ): PayrollMatchResult {
+    const discardReasons: DiscardReason[] = [];
+
     // Cada candidato debe pasar las 3 reglas obligatorias.
     const scored = candidates
       .map((d) => {
-        const dd = dateDiffDays(receipt.paymentDate, d.date) ?? Infinity;
+        const dd = dateDiffDays(paymentDate, d.date) ?? Infinity;
         const ad =
           amountDiffPercent(receipt.netIncome, d.amount) ?? Infinity;
         const concept = normalizeConcept(d.originalConcept);
         const keyword = matchConceptKeyword(concept);
+
+        // Registrar descartes
+        if (dd > DATE_TOLERANCE_DAYS) {
+          discardReasons.push({
+            depositId: d.id,
+            reason: 'DATE_OUT_OF_RANGE',
+            detail: `Diferencia fecha ${dd}d > tolerancia ${DATE_TOLERANCE_DAYS}d`,
+          });
+        }
+        if (ad > AMOUNT_TOLERANCE_PCT) {
+          discardReasons.push({
+            depositId: d.id,
+            reason: 'AMOUNT_EXCEEDS_TOLERANCE',
+            detail: `Diferencia monto ${round2(ad)}% > tolerancia ${AMOUNT_TOLERANCE_PCT}%`,
+          });
+        }
+        if (keyword == null && concept !== '') {
+          discardReasons.push({
+            depositId: d.id,
+            reason: 'CONCEPT_NOT_COMPATIBLE',
+            detail: `Concepto "${d.originalConcept ?? '(nulo)'}" no coincide con catálogo`,
+          });
+        }
+
         return { d, dd, ad, keyword };
       })
       .filter(
@@ -309,13 +395,24 @@ export class PayrollBankMatchingService {
         ...c,
         score: this.computeScore(c.ad, c.dd, c.keyword != null),
       }))
-      .sort((a, b) => b.score - a.score); // mayor score primero
+      .sort((a, b) => b.score - a.score);
 
     if (scored.length === 0) {
-      return this.notMatched(receipt.index, { rule: 'NONE' });
+      return {
+        receiptIndex: receipt.index,
+        status: 'NOT_MATCHED',
+        method: 'NONE',
+        candidateDepositId: null,
+        candidateAmount: null,
+        candidateDate: null,
+        candidateConcept: null,
+        score: null,
+        scotiabankExcluded: false,
+        usedPaymentDate: paymentDate,
+        traceability: { rule: 'NONE', discardReasons },
+      };
     }
 
-    // Empate exacto (top 2 con mismo score redondeado) → AMBIGUOUS.
     const top = scored[0];
     const runner = scored[1];
     const isAmbiguous =
@@ -334,11 +431,13 @@ export class PayrollBankMatchingService {
       candidateConcept: top.d.originalConcept,
       score: round2(top.score),
       scotiabankExcluded: false,
+      usedPaymentDate: paymentDate,
       traceability: {
         rule: 'FALLBACK_3RULES',
         dateDiff: top.dd,
         amountDiffPercent: round2(top.ad),
         conceptKeyword: top.keyword ?? undefined,
+        discardReasons,
       },
     };
   }
@@ -370,7 +469,7 @@ export class PayrollBankMatchingService {
   // ── Constructor de resultado NOT_MATCHED ────────────────────────────────────
   private notMatched(
     receiptIndex: number,
-    trace: MatchTrace = { rule: 'NONE' },
+    paymentDate: string | null,
   ): PayrollMatchResult {
     return {
       receiptIndex,
@@ -382,7 +481,11 @@ export class PayrollBankMatchingService {
       candidateConcept: null,
       score: null,
       scotiabankExcluded: false,
-      traceability: trace,
+      usedPaymentDate: paymentDate,
+      traceability: {
+        rule: 'NONE',
+        discardReasons: [],
+      },
     };
   }
 }

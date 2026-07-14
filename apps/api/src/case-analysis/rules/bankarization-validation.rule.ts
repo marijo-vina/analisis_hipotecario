@@ -26,9 +26,141 @@ import { PagadoraDetectionService } from '../services/pagadora-detection.service
 import type {
   PayrollDeposit,
   PayrollMatchResult,
+  PayrollPaymentDateSource,
   PayrollReceipt,
   PayrollReconciliationStatus,
+  ResolvedPayrollDate,
 } from '../types/bankarization.types';
+
+// ── Resolvedor de fecha de pago ────────────────────────────────────────────────
+
+/**
+ * Resuelve la fecha de pago de un recibo de nomina con trazabilidad de origen.
+ *
+ * Prioridad:
+ *   1. paymentDate explícita extraída → source = EXPLICIT
+ *   2. periodEndDate → source = PERIOD_END
+ *   3. Inferencia desde periodLabel en el nombre del archivo:
+ *      - "1A", "1ra", "1Q", "primera", "1a quincena" → día 15 del mes
+ *      - "2A", "2da", "2Q", "segunda", "2a quincena" → último día del mes
+ *      source = INFERRED_QUINCENA
+ *
+ * NUNCA usa la fecha de timbrado/certificación SAT.
+ */
+export function resolvePayrollPaymentDate(
+  paymentDate: string | null,
+  periodEndDate: string | null,
+  originalName: string | null,
+): ResolvedPayrollDate {
+  const label = originalName ?? null;
+
+  // 1. paymentDate explícita
+  if (paymentDate) {
+    return {
+      resolvedPaymentDate: paymentDate,
+      source: 'EXPLICIT',
+      estimated: false,
+      originalPeriodLabel: label,
+    };
+  }
+
+  // 2. periodEndDate
+  if (periodEndDate) {
+    return {
+      resolvedPaymentDate: periodEndDate,
+      source: 'PERIOD_END',
+      estimated: false,
+      originalPeriodLabel: label,
+    };
+  }
+
+  // 3. Inferencia desde nombre del archivo
+  if (label) {
+    const inferred = inferDateFromLabel(label);
+    if (inferred) {
+      return {
+        resolvedPaymentDate: inferred,
+        source: 'INFERRED_QUINCENA',
+        estimated: true,
+        originalPeriodLabel: label,
+      };
+    }
+  }
+
+  return {
+    resolvedPaymentDate: null,
+    source: 'INFERRED_QUINCENA' as PayrollPaymentDateSource,
+    estimated: true,
+    originalPeriodLabel: label,
+  };
+}
+
+/** Infiere fecha desde patrones de quincena en el nombre del archivo. */
+function inferDateFromLabel(label: string): string | null {
+  const n = label.toUpperCase();
+
+  // Extraer mes y año del patron: "MAYO 2025", "MAY-2025", "05-2025", "2025-05"
+  const monthYearPatterns = [
+    /(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s*(\d{4})/i,
+    /(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)[-.\s]*(\d{4})/i,
+    /(\d{1,2})[-.\/](\d{4})/,
+    /(\d{4})[-.\/](\d{1,2})/,
+  ];
+
+  let month: number | null = null;
+  let year: number | null = null;
+
+  for (const pattern of monthYearPatterns) {
+    const m = pattern.exec(n);
+    if (m) {
+      // Detectar formato: mes textual o numerico
+      const g1 = m[1].toUpperCase();
+      const g2 = m[2];
+
+      const monthNames: Record<string, number> = {
+        ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6,
+        JULIO: 7, AGOSTO: 8, SEPTIEMBRE: 9, OCTUBRE: 10, NOVIEMBRE: 11, DICIEMBRE: 12,
+        ENE: 1, FEB: 2, MAR: 3, ABR: 4, MAY: 5, JUN: 6,
+        JUL: 7, AGO: 8, SEP: 9, OCT: 10, NOV: 11, DIC: 12,
+      };
+
+      const parsedMonth = monthNames[g1];
+      if (parsedMonth) {
+        month = parsedMonth;
+        year = parseInt(g2, 10);
+      } else {
+        // Numerico: g1 puede ser mes o año, g2 lo contrario
+        const a = parseInt(g1, 10);
+        const b = parseInt(g2, 10);
+        if (a >= 1 && a <= 12 && b >= 2000) { month = a; year = b; }
+        else if (b >= 1 && b <= 12 && a >= 2000) { month = b; year = a; }
+      }
+      break;
+    }
+  }
+
+  if (!month || !year) return null;
+
+  // Detectar quincena: 1A, 1ra, 1Q, primera → dia 15
+  //                   2A, 2da, 2Q, segunda → ultimo dia del mes
+  const isFirst = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s/i.test(n);
+  const isSecond = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s/i.test(n);
+
+  if (isFirst && !isSecond) {
+    const d = pad(15);
+    return `${year}-${pad(month)}-${d}`;
+  }
+  if (isSecond && !isFirst) {
+    const lastDay = new Date(year, month, 0).getDate(); // month is 1-based, Date uses 0-indexed
+    return `${year}-${pad(month)}-${pad(lastDay)}`;
+  }
+
+  return null;
+}
+
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
 
 /**
  * Regla de bancarizacion. Sin estado: cada ejecucion produce un resultado
@@ -99,17 +231,25 @@ export class BankarizationValidationRule implements AnalysisRule {
         const employer = (ed.employer as Record<string, unknown>) ?? {};
         const income = (ed.income as Record<string, unknown>) ?? {};
         const period = (ed.payrollPeriod as Record<string, unknown>) ?? {};
+        const originalName = (d.originalName as string) ?? null;
+
+        const explicitPaymentDate = (period.paymentDate as string) ?? null;
+        const periodEndDate = (period.periodEndDate as string) ?? null;
+
+        const resolved = resolvePayrollPaymentDate(
+          explicitPaymentDate,
+          periodEndDate,
+          originalName,
+        );
+
         receipts.push({
           index: receiptIndex++,
           netIncome: (income.netIncome as number) ?? null,
-          // paymentDate: Gemini no siempre detecta la fecha de pago explícita.
-          // Fallback a periodEndDate (el pago suele coincidir con el cierre del periodo).
-          paymentDate:
-            (period.paymentDate as string) ??
-            (period.periodEndDate as string) ??
-            null,
+          paymentDate: explicitPaymentDate,
+          resolvedPaymentDate: resolved,
           employerRfc: (employer.rfc as string) ?? null,
           employerName: (employer.legalName as string) ?? null,
+          originalName,
         });
       } else if (code === 'BANK_STATEMENT') {
         const holder = (ed.accountHolder as Record<string, unknown>) ?? {};
