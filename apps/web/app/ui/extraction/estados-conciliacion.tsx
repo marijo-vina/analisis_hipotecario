@@ -59,24 +59,7 @@ export default function EstadosConciliacion({
         <span className="text-base font-semibold text-gf-text">
           Conciliación nómina vs depósitos
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">
-          <span className="h-2 w-2 rounded-full bg-blue-400" />
-          Por recibo — preliminar
-        </span>
       </div>
-
-      <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-4 py-2.5">
-        <p className="text-xs text-blue-700">
-          Conciliación preliminar por recibo. La validación auditable y
-          definitiva la ejecuta la regla <code>bankarization-validation</code>{" "}
-          del backend al correr el análisis.
-        </p>
-      </div>
-
-      <p className="text-[13px] text-gf-text-muted">
-        Comparación individual entre cada recibo de nómina y el mejor depósito
-        bancario detectado (matching RFC → fallback, tolerancia ±2 días y ≤5%).
-      </p>
 
       {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
@@ -125,9 +108,6 @@ export default function EstadosConciliacion({
           <span className="text-sm font-semibold text-gf-text">
             Conciliación por recibo
           </span>
-          <span className="text-xs text-gf-text-muted">
-            (matching determinista: RFC → fallback 3 reglas → pagadora)
-          </span>
         </div>
 
         {results.length === 0 ? (
@@ -150,7 +130,7 @@ export default function EstadosConciliacion({
 
 function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
   return (
-    <div className="rounded-lg bg-gf-bg px-4 py-3 space-y-2.5">
+    <div className="rounded-lg border border-gf-border bg-white px-4 py-3 space-y-2.5">
       {/* Encabezado de la fila */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-gf-text truncate max-w-[280px]">
