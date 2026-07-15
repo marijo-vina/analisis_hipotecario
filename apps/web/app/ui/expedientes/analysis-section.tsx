@@ -17,6 +17,7 @@ import type {
 import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
 import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
+import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -211,11 +212,7 @@ export default function AnalysisSection({
       )}
 
       {activeTab === "motor" && (
-        <Card>
-          <p className="text-sm text-gf-text-muted">
-            Motor financiero — disponible en una fase posterior del Sprint 3.
-          </p>
-        </Card>
+        <LiabilityCalculationSection caseId={caseId} />
       )}
 
       {activeTab === "bancos" && (
