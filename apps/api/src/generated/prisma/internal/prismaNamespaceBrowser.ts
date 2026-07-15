@@ -54,6 +54,7 @@ export const ModelName = {
   User: 'User',
   Client: 'Client',
   MortgageCase: 'MortgageCase',
+  LiabilitySnapshot: 'LiabilitySnapshot',
   Document: 'Document',
   AnalysisRun: 'AnalysisRun',
   AnalysisAlert: 'AnalysisAlert',
@@ -127,6 +128,21 @@ export const MortgageCaseScalarFieldEnum = {
 } as const
 
 export type MortgageCaseScalarFieldEnum = (typeof MortgageCaseScalarFieldEnum)[keyof typeof MortgageCaseScalarFieldEnum]
+
+
+export const LiabilitySnapshotScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  factorUsed: 'factorUsed',
+  rulesVersion: 'rulesVersion',
+  credits: 'credits',
+  globalStatus: 'globalStatus',
+  grossCurrentMonthlyDebt: 'grossCurrentMonthlyDebt',
+  totalCurrentBalance: 'totalCurrentBalance',
+  calculatedAt: 'calculatedAt'
+} as const
+
+export type LiabilitySnapshotScalarFieldEnum = (typeof LiabilitySnapshotScalarFieldEnum)[keyof typeof LiabilitySnapshotScalarFieldEnum]
 
 
 export const DocumentScalarFieldEnum = {
@@ -237,19 +253,19 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
 export const NullableJsonNullValueInput = {
   DbNull: DbNull,
   JsonNull: JsonNull
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
-
-
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

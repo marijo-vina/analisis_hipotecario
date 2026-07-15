@@ -11,6 +11,5 @@ import { IsNumber, IsOptional, IsString } from 'class-validator';
 export class CalculateLiabilityDto {
   @IsOptional()
   @IsNumber()
-  @IsString()
   factorUsed?: number;
 }

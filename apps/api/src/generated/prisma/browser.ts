@@ -33,6 +33,11 @@ export type Client = Prisma.ClientModel
  */
 export type MortgageCase = Prisma.MortgageCaseModel
 /**
+ * Model LiabilitySnapshot
+ * 
+ */
+export type LiabilitySnapshot = Prisma.LiabilitySnapshotModel
+/**
  * Model Document
  * 
  */
