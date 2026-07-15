@@ -338,20 +338,20 @@ describe('LiabilityController', () => {
       );
     });
 
-    it('should return 400 when reason is missing', async () => {
+    it('should accept override without reason (optional field)', async () => {
       const { reason: _reason, ...bodyWithoutReason } = validBody;
 
       await request(app.getHttpServer())
         .patch(`/cases/${caseId}/liability/credits/0`)
         .send(bodyWithoutReason)
-        .expect(400);
+        .expect(200);
     });
 
-    it('should return 400 when reason is too short (under 10 chars)', async () => {
+    it('should accept override with any length reason (no min validation)', async () => {
       await request(app.getHttpServer())
         .patch(`/cases/${caseId}/liability/credits/0`)
         .send({ ...validBody, reason: 'short' })
-        .expect(400);
+        .expect(200);
     });
 
     it('should return 400 when creditNature is not in allowed values', async () => {

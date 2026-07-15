@@ -2,7 +2,6 @@ import {
   IsString,
   IsNumber,
   IsOptional,
-  MinLength,
   IsIn,
 } from 'class-validator';
 
@@ -27,7 +26,7 @@ export class OverrideCreditDto {
   @IsNumber()
   paymentDueAmountEffective?: number;
 
+  @IsOptional()
   @IsString()
-  @MinLength(10)
-  reason: string;
+  reason?: string;
 }

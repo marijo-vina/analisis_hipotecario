@@ -17,9 +17,8 @@ import type { LiabilityCalculationResult } from "@/app/lib/extraction";
  *   PATCH  /cases/:caseId/liability/credits/:creditIndex
  */
 
-/** Body accepted by PATCH override (reason is always required). */
+/** Body accepted by PATCH override. */
 export interface OverrideCreditPayload {
-  reason: string;
   creditNature?: "REVOLVING" | "FIXED";
   currentBalance?: number;
   paymentDueAmountEffective?: number;

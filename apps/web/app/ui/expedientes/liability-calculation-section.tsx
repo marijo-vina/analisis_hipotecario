@@ -123,7 +123,6 @@ export default function LiabilityCalculationSection({
   const handleEditSubmit = async (
     creditIndex: number,
     payload: {
-      reason: string;
       creditNature?: "REVOLVING" | "FIXED";
       currentBalance?: number;
       paymentDueAmountEffective?: number;
