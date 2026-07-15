@@ -4,6 +4,7 @@ import { useState, useEffect, type FormEvent } from "react";
 
 import {
   LiabilityCreditNature,
+  LiabilityStatus,
   type LiabilityCreditResult,
 } from "@/app/lib/extraction";
 
@@ -64,8 +65,14 @@ export default function EditCreditModal({
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
 
-  const balanceEditable = credit.currentBalance === null;
-  const paymentEditable = credit.paymentDueAmountEffective === null;
+  const balanceEditable =
+    credit.currentBalance === null ||
+    (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
+      credit.currentBalance === 0);
+  const paymentEditable =
+    credit.paymentDueAmountEffective === null ||
+    (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
+      credit.paymentDueAmountEffective === 0);
 
   // ── Body scroll lock ──────────────────────────────────────────────────
   useEffect(() => {
