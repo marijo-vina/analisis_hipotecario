@@ -8,20 +8,16 @@ import {
   type LiabilityCreditResult,
 } from "@/app/lib/extraction";
 
-import { NATURE_LABELS } from "./liability-calculation-section";
+import { NATURE_LABELS, formatMXN } from "./liability-calculation-section";
 
 interface EditCreditModalProps {
-  /** The credit being corrected (from the snapshot's credits array) */
   credit: LiabilityCreditResult;
-  /** Index within the snapshot credits array — used for the PATCH path */
   creditIndex: number;
-  /** True while the override request is in flight */
   saving: boolean;
   onClose: () => void;
   onSubmit: (
     creditIndex: number,
     payload: {
-      reason: string;
       creditNature?: "REVOLVING" | "FIXED";
       currentBalance?: number;
       paymentDueAmountEffective?: number;
@@ -29,16 +25,12 @@ interface EditCreditModalProps {
   ) => void;
 }
 
-const MIN_REASON_LENGTH = 10;
-
 /**
  * EditCreditModal — manual correction dialog for credits flagged
  * REQUIRES_REVIEW or INCOMPLETE.
  *
- * Saldo / Monto a pagar inputs are only editable when the bureau value was
- * null (data missing). Naturaleza and reason are always editable. On submit
- * the parent calls PATCH /cases/:id/liability/credits/:index which triggers
- * a server-side recalculation.
+ * Saldo / Monto a pagar inputs show a formatted MXN preview below
+ * to help the advisor avoid digit errors with large amounts.
  */
 export default function EditCreditModal({
   credit,
@@ -47,8 +39,6 @@ export default function EditCreditModal({
   onClose,
   onSubmit,
 }: EditCreditModalProps) {
-  // ── Form state ────────────────────────────────────────────────────────
-  // Nature dropdown only allows REVOLVING / FIXED (never UNKNOWN).
   const initialNature =
     credit.creditNature === LiabilityCreditNature.FIXED
       ? "FIXED"
@@ -62,8 +52,6 @@ export default function EditCreditModal({
       ? String(credit.paymentDueAmountEffective)
       : "",
   );
-  const [reason, setReason] = useState("");
-  const [touched, setTouched] = useState(false);
 
   const balanceEditable =
     credit.currentBalance === null ||
@@ -74,7 +62,7 @@ export default function EditCreditModal({
     (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
       credit.paymentDueAmountEffective === 0);
 
-  // ── Body scroll lock ──────────────────────────────────────────────────
+  // Body scroll lock
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -83,23 +71,16 @@ export default function EditCreditModal({
     };
   }, []);
 
-  // ── Validation ────────────────────────────────────────────────────────
-  const reasonValid = reason.trim().length >= MIN_REASON_LENGTH;
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setTouched(true);
-    if (!reasonValid) return;
 
     const payload: {
-      reason: string;
       creditNature?: "REVOLVING" | "FIXED";
       currentBalance?: number;
       paymentDueAmountEffective?: number;
-    } = { reason: reason.trim() };
+    } = {};
 
-    // Only send nature if it changed from the original,
-    // OR if the original was UNKNOWN (always a correction).
+    // Always send nature when original was UNKNOWN (correction)
     if (nature !== initialNature || credit.creditNature === LiabilityCreditNature.UNKNOWN) {
       payload.creditNature = nature;
     }
@@ -116,7 +97,9 @@ export default function EditCreditModal({
     onSubmit(creditIndex, payload);
   };
 
-  const reasonError = touched && !reasonValid;
+  // Parse raw string to number for preview
+  const balanceNum = balance.trim() !== "" ? Number(balance) : null;
+  const paymentNum = payment.trim() !== "" ? Number(payment) : null;
 
   return (
     <div
@@ -204,17 +187,21 @@ export default function EditCreditModal({
               </label>
               <input
                 id="edit-balance"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={balance}
                 disabled={!balanceEditable}
-                onChange={(e) => setBalance(e.target.value)}
+                onChange={(e) => setBalance(e.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={
                   balanceEditable ? "Capture el saldo" : "—"
                 }
                 className="w-full rounded-md border border-gf-border px-3 py-2 text-sm text-gf-text disabled:cursor-not-allowed disabled:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gf-red/30"
               />
+              {balanceEditable && balanceNum !== null && !Number.isNaN(balanceNum) && (
+                <p className="mt-1 text-xs text-gf-text-soft">
+                  {formatMXN(balanceNum)}
+                </p>
+              )}
             </div>
 
             {/* Monto a pagar */}
@@ -237,46 +224,19 @@ export default function EditCreditModal({
               </label>
               <input
                 id="edit-payment"
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={payment}
                 disabled={!paymentEditable}
-                onChange={(e) => setPayment(e.target.value)}
+                onChange={(e) => setPayment(e.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={
                   paymentEditable ? "Capture el monto a pagar" : "—"
                 }
                 className="w-full rounded-md border border-gf-border px-3 py-2 text-sm text-gf-text disabled:cursor-not-allowed disabled:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gf-red/30"
               />
-            </div>
-
-            {/* Motivo */}
-            <div>
-              <label
-                htmlFor="edit-reason"
-                className="mb-1 block text-sm font-medium text-gf-text"
-              >
-                Motivo del cambio{" "}
-                <span className="text-xs font-normal text-gf-text-muted">
-                  (obligatorio, mínimo {MIN_REASON_LENGTH} caracteres)
-                </span>
-              </label>
-              <textarea
-                id="edit-reason"
-                rows={3}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                onBlur={() => setTouched(true)}
-                placeholder="Ej: Clasificado manualmente como revolvente por revisión del reporte de Buró..."
-                className={`w-full rounded-md border px-3 py-2 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 ${
-                  reasonError
-                    ? "border-red-400"
-                    : "border-gf-border"
-                }`}
-              />
-              {reasonError && (
-                <p className="mt-1 text-xs text-red-600">
-                  El motivo debe tener al menos {MIN_REASON_LENGTH} caracteres.
+              {paymentEditable && paymentNum !== null && !Number.isNaN(paymentNum) && (
+                <p className="mt-1 text-xs text-gf-text-soft">
+                  {formatMXN(paymentNum)}
                 </p>
               )}
             </div>
@@ -294,7 +254,7 @@ export default function EditCreditModal({
             </button>
             <button
               type="submit"
-              disabled={saving || !reasonValid}
+              disabled={saving}
               className="rounded-md bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Calculando..." : "Recalcular y guardar"}
