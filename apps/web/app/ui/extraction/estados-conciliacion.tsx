@@ -53,14 +53,6 @@ export default function EstadosConciliacion({
 
   return (
     <Card className="space-y-5 p-6">
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="h-3.5 w-3.5 rounded-full bg-blue-400" />
-        <span className="text-base font-semibold text-gf-text">
-          Conciliación nómina vs depósitos
-        </span>
-      </div>
-
       {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl bg-gf-bg p-4">
