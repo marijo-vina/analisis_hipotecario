@@ -203,7 +203,7 @@ export class LiabilityCalculationService {
       target.paymentDueAmountEffective = dto.paymentDueAmountEffective;
     }
     target.classificationSource = ClassificationSource.MANUAL;
-    target.classificationReason = dto.reason;
+    target.classificationReason = dto.reason ?? null;
 
     // Recalculate the overridden credit's contribution
     this.recalculateCredit(target, factor);
