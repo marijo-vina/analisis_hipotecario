@@ -18,16 +18,7 @@ interface EstadosConciliacionProps {
 const TOLERANCE_PCT = 5;
 
 /**
- * HU-10 — Conciliación por recibo de nómina vs depósitos.
- *
- * Reemplaza los totales agregados por una vista individual: cada recibo se
- * reconcilia contra el mejor depósito mediante matching determinista
- * (RFC-first, fallback 3 reglas + score, bidireccional 1:1, detección de
- * pagadoras y regla Scotiabank). Muestra estado, método, candidato vinculado
- * y alertas por recibo.
- *
- * Esta comparación es PRELIMINAR e informativa; la validación auditable y
- * definitiva es la regla `bankarization-validation` del backend.
+ * HU-10 — Conciliación por recibo de nómina vs depósitos bancarios.
  */
 export default function EstadosConciliacion({
   allDeposits,
@@ -42,7 +33,6 @@ export default function EstadosConciliacion({
 
   const results = reconcilePreview(payrollReceipts, allDeposits);
 
-  // ── Resumen agregado (informativo) ─────────────────────────────────────
   const totalNetIncome = payrollReceipts.reduce(
     (sum, r) => sum + (r.ingresoNeto ?? 0),
     0,
@@ -52,78 +42,48 @@ export default function EstadosConciliacion({
   ).length;
 
   return (
-    <Card className="space-y-5 p-6">
-      {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl bg-gf-bg p-4">
-          <span className="text-[11px] font-medium text-gf-text-muted">
-            RECIBOS PROCESADOS
-          </span>
-          <p className="mt-1 text-2xl font-bold text-gf-text">
-            {payrollReceipts.length}
-          </p>
-          <span className="text-xs text-gf-text-muted">
-            {conciledCount} conciliado(s)
-          </span>
-        </div>
+    <div className="space-y-4">
+      {/* ── Summary bar (mismo estilo que EstadosSummaryBar) ──────────── */}
+      <Card className="flex flex-wrap items-center gap-6 px-5 py-4">
+        <Stat label="Recibos" value={`${payrollReceipts.length} procesados`} />
+        <Divider />
+        <Stat label="Conciliados" value={`${conciledCount} de ${payrollReceipts.length}`} />
+        <Divider />
+        <Stat
+          label="Depósitos"
+          value={`${allDeposits.length} detectados`}
+        />
+        <Divider />
+        <Stat
+          label="Ingreso neto"
+          value={fmtCurrency(totalNetIncome)}
+        />
+      </Card>
 
-        <div className="rounded-xl bg-gf-bg p-4">
-          <span className="text-[11px] font-medium text-gf-text-muted">
-            DEPÓSITOS DETECTADOS
-          </span>
-          <p className="mt-1 text-2xl font-bold text-gf-text">
-            {allDeposits.length}
-          </p>
-          <span className="text-xs text-gf-text-muted">
-            {allDeposits.length} depósitos de nómina
-          </span>
-        </div>
-
-        <div className="rounded-xl bg-gf-bg p-4">
-          <span className="text-[11px] font-medium text-gf-text-muted">
-            INGRESO NETO (RECIBOS)
-          </span>
-          <p className="mt-1 text-2xl font-bold text-gf-text">
-            {fmtCurrency(totalNetIncome)}
-          </p>
-          <span className="text-xs text-gf-text-muted">
-            tolerancia {TOLERANCE_PCT}%
-          </span>
-        </div>
-      </div>
-
-      {/* ── Vista por recibo ───────────────────────────────────────────── */}
-      <hr className="border-gf-border" />
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gf-text">
+      {/* ── Receipt cards ──────────────────────────────────────────────── */}
+      {results.length > 0 && (
+        <Card className="space-y-4 px-5 py-5">
+          <h4 className="text-[13px] font-semibold text-gf-text">
             Conciliación por recibo
-          </span>
-        </div>
+          </h4>
 
-        {results.length === 0 ? (
-          <p className="text-sm text-gf-text-muted py-2">
-            No hay recibos procesados para conciliar.
-          </p>
-        ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {results.map((r) => (
               <ReceiptRow key={`${r.receiptOriginalName}-${r.receiptIndex}`} r={r} />
             ))}
           </div>
-        )}
-      </div>
-    </Card>
+        </Card>
+      )}
+    </div>
   );
 }
 
-// ── Fila por recibo ──────────────────────────────────────────────────────────
+// ── Receipt row ──────────────────────────────────────────────────────────────
 
 function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
   return (
-    <div className="rounded-lg border border-gf-border bg-white px-4 py-3 space-y-2.5">
-      {/* Encabezado de la fila */}
+    <div className="rounded-lg border border-gf-border bg-white px-4 py-3 space-y-3">
+      {/* Header: filename + period */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-gf-text truncate max-w-[280px]">
           {r.receiptOriginalName}
@@ -133,51 +93,44 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
         )}
       </div>
 
-      {/* Badges de estado, método y banderas */}
+      {/* Status + method badges */}
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={r.status} />
         <MethodBadge method={r.method} />
         {r.scotiabankExcluded && (
-          <span className="inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+          <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600">
             Excluido Scotiabank
           </span>
         )}
       </div>
 
-      {/* Detalle del candidato + métricas */}
-      <div className="grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-4">
-        <Metric
-          label="RECIBO"
-          value={r.netIncome != null ? fmtCurrency(r.netIncome) : "—"}
-        />
-        <Metric
-          label="DEPÓSITO"
-          value={
-            r.candidate?.amount != null
-              ? fmtCurrency(r.candidate.amount)
-              : "Sin candidato"
-          }
-        />
-        <Metric
-          label="DIF. MONTO"
-          value={
-            r.amountDiffPct != null
-              ? `${r.amountDiffPct.toFixed(1)}%`
-              : "—"
-          }
-          tone={
-            r.amountDiffPct != null && r.amountDiffPct > TOLERANCE_PCT
-              ? "warn"
-              : undefined
-          }
-        />
-        <Metric
-          label="SCORE"
-          value={r.score != null ? r.score.toFixed(1) : "—"}
-        />
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <FieldCell label="RECIBO">
+          {r.netIncome != null ? fmtCurrency(r.netIncome) : "—"}
+        </FieldCell>
+        <FieldCell label="DEPÓSITO">
+          {r.candidate?.amount != null
+            ? fmtCurrency(r.candidate.amount)
+            : "Sin candidato"}
+        </FieldCell>
+        <FieldCell label="DIF. MONTO">
+          <span
+            className={
+              r.amountDiffPct != null && r.amountDiffPct > TOLERANCE_PCT
+                ? "text-amber-600"
+                : ""
+            }
+          >
+            {r.amountDiffPct != null ? `${r.amountDiffPct.toFixed(1)}%` : "—"}
+          </span>
+        </FieldCell>
+        <FieldCell label="SCORE">
+          {r.score != null ? r.score.toFixed(1) : "—"}
+        </FieldCell>
       </div>
 
-      {/* Fecha usada con trazabilidad */}
+      {/* Used payment date */}
       <div className="text-[11px] text-gf-text-soft">
         📅 Fecha de pago usada:{" "}
         <span className="text-gf-text-muted">
@@ -198,7 +151,7 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
               : r.paymentDateSource === "PERIOD_END"
                 ? "Cierre periodo"
                 : r.paymentDateSource === "INFERRED_QUINCENA"
-                  ? "Inferida (quincena)"
+                  ? "Inferida"
                   : r.paymentDateSource === "MANUAL_OVERRIDE"
                     ? "Manual"
                     : r.paymentDateSource}
@@ -207,39 +160,39 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
         )}
       </div>
 
-      {/* Datos del depósito vinculado */}
+      {/* Candidate deposit details */}
       {r.candidate && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gf-text-soft">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gf-text-soft">
           <span>
-            Fecha:{" "}
-            <span className="text-gf-text-muted">
+            Fecha depósito:{" "}
+            <span className="font-medium text-gf-text-muted">
               {r.candidate.date ?? "—"}
             </span>
           </span>
           <span>
-            Pagador RFC:{" "}
-            <span className="text-gf-text-muted">
+            RFC pagador:{" "}
+            <span className="font-medium text-gf-text-muted">
               {r.candidate.employerRfc ?? "No detectado"}
             </span>
           </span>
-          <span className="truncate max-w-[260px]">
+          <span className="truncate max-w-[300px]">
             Concepto:{" "}
-            <span className="text-gf-text-muted">
+            <span className="font-medium text-gf-text-muted">
               {r.candidate.concept ?? "—"}
             </span>
           </span>
         </div>
       )}
 
-      {/* Alertas por recibo */}
+      {/* Alerts */}
       {r.alerts.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
+        <div className="flex flex-wrap gap-1.5">
           {r.alerts.map((a, i) => (
             <span
               key={`${a.code}-${i}`}
-              className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gf-text-muted"
+              className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gf-text-muted"
             >
-              {a.code}: {a.message}
+              {a.message}
             </span>
           ))}
         </div>
@@ -248,7 +201,7 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
   );
 }
 
-// ── Componentes auxiliares ───────────────────────────────────────────────────
+// ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<PreviewStatus, string> = {
   MATCHED: "bg-green-100 text-green-700",
@@ -264,7 +217,7 @@ const STATUS_STYLES: Record<PreviewStatus, string> = {
 function StatusBadge({ status }: { status: PreviewStatus }) {
   return (
     <span
-      className={`inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-semibold ${STATUS_STYLES[status]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[status]}`}
     >
       {STATUS_LABELS[status]}
     </span>
@@ -274,33 +227,48 @@ function StatusBadge({ status }: { status: PreviewStatus }) {
 function MethodBadge({ method }: { method: PreviewReceiptResult["method"] }) {
   if (method === "NONE") return null;
   return (
-    <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gf-text-muted">
-      Método: {METHOD_LABELS[method]}
+    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gf-text-muted">
+      {METHOD_LABELS[method]}
     </span>
   );
 }
 
-function Metric({
+// ── Shared helpers (same pattern as estados-statement-card) ──────────────────
+
+function FieldCell({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-gf-text-soft">{label}</span>
+      <span className="text-[13px] font-semibold text-gf-text">{children}</span>
+    </div>
+  );
+}
+
+function Stat({
   label,
   value,
-  tone,
 }: {
   label: string;
   value: string;
-  tone?: "warn";
 }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-[10px] font-medium text-gf-text-soft">{label}</span>
-      <span
-        className={`text-[13px] font-semibold ${
-          tone === "warn" ? "text-amber-600" : "text-gf-text"
-        }`}
-      >
-        {value}
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-medium text-gf-text-soft uppercase tracking-wide">
+        {label}
       </span>
+      <span className="text-lg font-bold text-gf-text">{value}</span>
     </div>
   );
+}
+
+function Divider() {
+  return <div className="h-10 w-px bg-gf-border" />;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
