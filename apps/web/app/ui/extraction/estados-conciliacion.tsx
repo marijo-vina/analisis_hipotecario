@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
@@ -19,6 +20,10 @@ const TOLERANCE_PCT = 5;
 
 /**
  * HU-10 — Conciliación por recibo de nómina vs depósitos bancarios.
+ *
+ * La conciliación se ejecuta bajo demanda (botón "Reconciliar") porque los
+ * documentos se procesan de uno en uno y la asesora puede agregar más después.
+ * Una vez ejecutada, el botón cambia a "Re-ejecutar conciliación".
  */
 export default function EstadosConciliacion({
   allDeposits,
@@ -27,52 +32,72 @@ export default function EstadosConciliacion({
   const payrollParsed = parsePayroll(payrollDocs);
   const payrollReceipts = payrollParsed.receipts.filter((r) => r.hasData);
 
+  const [results, setResults] = useState<PreviewReceiptResult[] | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+
+  const runReconciliation = useCallback(() => {
+    setResults(reconcilePreview(payrollReceipts, allDeposits));
+    setHasRun(true);
+  }, [payrollReceipts, allDeposits]);
+
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
     return null;
   }
-
-  const results = reconcilePreview(payrollReceipts, allDeposits);
 
   const totalNetIncome = payrollReceipts.reduce(
     (sum, r) => sum + (r.ingresoNeto ?? 0),
     0,
   );
-  const conciledCount = results.filter(
-    (r) => r.status === "MATCHED" || r.status === "PROVIDER_MIRROR_CONFIRMED",
-  ).length;
 
   return (
     <div className="space-y-4">
-      {/* ── Summary bar (mismo estilo que EstadosSummaryBar) ──────────── */}
-      <Card className="flex flex-wrap items-center justify-between gap-6 px-5 py-4">
-        <Stat label="Recibos" value={`${payrollReceipts.length} procesados`} />
-        <Divider />
-        <Stat label="Conciliados" value={`${conciledCount} de ${payrollReceipts.length}`} />
-        <Divider />
-        <Stat
-          label="Depósitos"
-          value={`${allDeposits.length} detectados`}
-        />
-        <Divider />
-        <Stat
-          label="Ingreso neto"
-          value={fmtCurrency(totalNetIncome)}
-        />
-      </Card>
+      {/* ── Trigger button ──────────────────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={runReconciliation}
+        disabled={allDeposits.length === 0 || payrollReceipts.length === 0}
+        className="inline-flex items-center gap-2 rounded-lg bg-gf-red px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gf-red-dark disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        {hasRun ? "Re-ejecutar conciliación" : "Reconciliar nómina vs banco"}
+      </button>
 
-      {/* ── Receipt cards ──────────────────────────────────────────────── */}
-      {results.length > 0 && (
-        <Card className="space-y-4 px-5 py-5">
-          <h4 className="text-[13px] font-semibold text-gf-text">
-            Conciliación por recibo
-          </h4>
+      {!results && (
+        <p className="text-sm text-gf-text-muted py-2">
+          Presiona &quot;Reconciliar&quot; para comparar los recibos de nómina contra los depósitos bancarios.
+        </p>
+      )}
 
-          <div className="space-y-3">
-            {results.map((r) => (
-              <ReceiptRow key={`${r.receiptOriginalName}-${r.receiptIndex}`} r={r} />
-            ))}
-          </div>
-        </Card>
+      {results && (
+        <>
+          {/* ── Summary bar ──────────────────────────────────────────── */}
+          <Card className="flex flex-wrap items-center justify-between gap-6 px-5 py-4">
+            <Stat label="Recibos" value={`${payrollReceipts.length} procesados`} />
+            <Divider />
+            <Stat
+              label="Conciliados"
+              value={`${results.filter((r) => r.status === "MATCHED" || r.status === "PROVIDER_MIRROR_CONFIRMED").length} de ${payrollReceipts.length}`}
+            />
+            <Divider />
+            <Stat label="Depósitos" value={`${allDeposits.length} detectados`} />
+            <Divider />
+            <Stat label="Ingreso neto" value={fmtCurrency(totalNetIncome)} />
+          </Card>
+
+          {/* ── Receipt cards ────────────────────────────────────────── */}
+          <Card className="space-y-4 px-5 py-5">
+            <h4 className="text-[13px] font-semibold text-gf-text">
+              Conciliación por recibo
+            </h4>
+            <div className="space-y-3">
+              {results.map((r) => (
+                <ReceiptRow key={`${r.receiptOriginalName}-${r.receiptIndex}`} r={r} />
+              ))}
+            </div>
+          </Card>
+        </>
       )}
     </div>
   );
