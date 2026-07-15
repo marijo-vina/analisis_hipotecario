@@ -82,7 +82,7 @@ export default function EstadosConciliacion({
 
 function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
   return (
-    <div className="rounded-lg border border-gf-border bg-gf-red-soft px-4 py-3 space-y-3">
+    <div className="rounded-lg border border-gf-border bg-gf-bg px-4 py-3 space-y-3">
       {/* Header: filename + status badge + period */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-gf-text truncate max-w-[300px]">
