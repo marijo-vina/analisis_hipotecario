@@ -208,8 +208,8 @@ export default function LiabilityCalculationSection({
                   : "Ver desglose del cálculo"}
               </span>
               <span className="text-gf-text-muted">
-                {snapshot.credits.length} crédito
-                {snapshot.credits.length === 1 ? "" : "s"}
+                {snapshot.credits.filter((c) => !c.isClosed).length} crédito
+                {snapshot.credits.filter((c) => !c.isClosed).length === 1 ? "" : "s"}
               </span>
             </button>
 
@@ -252,6 +252,8 @@ function KpiRow({ snapshot }: { snapshot: LiabilityCalculationResult }) {
       : status === GlobalLiabilityStatus.PARTIAL
         ? "bg-amber-100 text-amber-800"
         : "bg-red-100 text-red-800";
+
+  const openCount = snapshot.credits.filter((c) => !c.isClosed).length;
 
   return (
     <div className="flex flex-row gap-4">
@@ -309,9 +311,9 @@ function KpiRow({ snapshot }: { snapshot: LiabilityCalculationResult }) {
           </span>
         </span>
         <span className="mt-1 text-xs text-gf-text-muted">
-          {snapshot.credits.length} crédito
-          {snapshot.credits.length === 1 ? "" : "s"} evaluado
-          {snapshot.credits.length === 1 ? "" : "s"}
+          {openCount} crédito
+          {openCount === 1 ? "" : "s"} evaluado
+          {openCount === 1 ? "" : "s"}
         </span>
       </div>
     </div>
