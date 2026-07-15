@@ -98,8 +98,9 @@ export default function EditCreditModal({
       paymentDueAmountEffective?: number;
     } = { reason: reason.trim() };
 
-    // Only send nature if it changed from the original.
-    if (nature !== initialNature) {
+    // Only send nature if it changed from the original,
+    // OR if the original was UNKNOWN (always a correction).
+    if (nature !== initialNature || credit.creditNature === LiabilityCreditNature.UNKNOWN) {
       payload.creditNature = nature;
     }
 
