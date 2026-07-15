@@ -91,7 +91,7 @@ export interface OverrideCreditDto {
   creditNature?: CreditNature;
   currentBalance?: number;
   paymentDueAmountEffective?: number;
-  reason: string;
+  reason?: string;
 }
 
 /**
