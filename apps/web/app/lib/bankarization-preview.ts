@@ -90,7 +90,7 @@ export interface PreviewReceiptResult {
 // constantes del backend. Si cambias una tolerancia o peso aca, cambiala alla.
 
 const PREFILTER_DAYS = 7;
-const DATE_TOLERANCE_DAYS = 2;
+const DATE_TOLERANCE_DAYS = 3;
 const AMOUNT_TOLERANCE_PCT = 5;
 const MIN_RECURRENCE = 2;
 

@@ -37,7 +37,7 @@ import type {
 
 // ── Constantes de tolerancia (deterministicas) ──────────────────────────────
 const PREFILTER_DAYS = 7; // ventana de pre-filtro ± dias
-const DATE_TOLERANCE_DAYS = 2; // tolerancia de fecha RFC/fallback
+const DATE_TOLERANCE_DAYS = 3; // tolerancia de fecha RFC/fallback
 const AMOUNT_TOLERANCE_PCT = 5; // tolerancia de monto %
 const AMOUNT_TOLERANCE = AMOUNT_TOLERANCE_PCT / 100; // 0.05
 
