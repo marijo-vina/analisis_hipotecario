@@ -57,18 +57,18 @@ Chain strategy: pending
 
 ## Phase 4: Frontend UI Components
 
-- [ ] 4.1 Create `apps/web/app/ui/expedientes/liability-calculation-section.tsx` orchestrator component: fetches latest snapshot via API, renders KPI cards + accordion + table + modal
-- [ ] 4.2 Implement KPI cards (inline): Saldo actual total (green `#F0FDF4`), Deuda total mensual (blue `#EFF6FF`), Estado del cálculo (amber `#FFFBEB`) with status badge labels
-- [ ] 4.3 Implement accordion: collapsible bar, "Ver/Ocultar desglose del cálculo", default collapsed, full-width clickable
-- [ ] 4.4 Create `apps/web/app/ui/expedientes/liability-table.tsx` with columns: Crédito, Institución, Naturaleza, Saldo actual, Monto a considerar, Monto a pagar, Pasivo calculado, Estado
-- [ ] 4.5 Implement table sorting: REVOLVING → FIXED → UNKNOWN, with 2px `#F3F4F6` separator between groups
-- [ ] 4.6 Implement table badges: naturaleza (Revolvente/Fijo/Pendiente with specified colors), estado (Calculado/Requiere revisión/Incompleto with specified colors)
-- [ ] 4.7 Implement table footer: two total rows with `#F9FAFB` background showing `totalCurrentBalance` and `grossCurrentMonthlyDebt` + global status badge
-- [ ] 4.8 Make rows with REQUIRES_REVIEW or INCOMPLETE status clickable to open edit modal
-- [ ] 4.9 Create `apps/web/app/ui/expedientes/edit-credit-modal.tsx` with fields: naturaleza dropdown, saldo input (conditional), monto a pagar input (conditional), reason textarea (required, min 10 chars)
-- [ ] 4.10 Implement modal impact warning banner (amber `#FFFBEB`) and "Recalcular y guardar" button (red `#DC2626`)
-- [ ] 4.11 Wire modal submit: calls `PATCH /cases/:id/liability/credits/:creditIndex`, then refreshes via `GET /cases/:id/liability/latest`
-- [ ] 4.12 Replace placeholder in `apps/web/app/ui/expedientes/analysis-section.tsx` tab `"motor"` with `<LiabilityCalculationSection caseId={caseId} />`
+- [x] 4.1 Create `apps/web/app/ui/expedientes/liability-calculation-section.tsx` orchestrator component: fetches latest snapshot via API, renders KPI cards + accordion + table + modal
+- [x] 4.2 Implement KPI cards (inline): Saldo actual total (green `#F0FDF4`), Deuda total mensual (blue `#EFF6FF`), Estado del cálculo (amber `#FFFBEB`) with status badge labels
+- [x] 4.3 Implement accordion: collapsible bar, "Ver/Ocultar desglose del cálculo", default collapsed, full-width clickable
+- [x] 4.4 Create `apps/web/app/ui/expedientes/liability-table.tsx` with columns: Crédito, Institución, Naturaleza, Saldo actual, Monto a considerar, Monto a pagar, Pasivo calculado, Estado
+- [x] 4.5 Implement table sorting: REVOLVING → FIXED → UNKNOWN, with 2px `#F3F4F6` separator between groups
+- [x] 4.6 Implement table badges: naturaleza (Revolvente/Fijo/Pendiente with specified colors), estado (Calculado/Requiere revisión/Incompleto with specified colors)
+- [x] 4.7 Implement table footer: two total rows with `#F9FAFB` background showing `totalCurrentBalance` and `grossCurrentMonthlyDebt` + global status badge
+- [x] 4.8 Make rows with REQUIRES_REVIEW or INCOMPLETE status clickable to open edit modal
+- [x] 4.9 Create `apps/web/app/ui/expedientes/edit-credit-modal.tsx` with fields: naturaleza dropdown, saldo input (conditional), monto a pagar input (conditional), reason textarea (required, min 10 chars)
+- [x] 4.10 Implement modal impact warning banner (amber `#FFFBEB`) and "Recalcular y guardar" button (red `#DC2626`)
+- [x] 4.11 Wire modal submit: calls `PATCH /cases/:id/liability/credits/:creditIndex`, then refreshes via `GET /cases/:id/liability/latest`
+- [x] 4.12 Replace placeholder in `apps/web/app/ui/expedientes/analysis-section.tsx` tab `"motor"` with `<LiabilityCalculationSection caseId={caseId} />`
 
 ## Phase 5: Verification
 
