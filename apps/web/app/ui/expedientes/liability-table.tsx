@@ -36,13 +36,16 @@ function sortByNature(credits: LiabilityCreditResult[]): {
   /** indices in the *original* snapshot array, preserved for PATCH calls */
   originalIndices: number[];
 } {
-  const indexed = credits.map((c, i) => ({ c, i }));
-  indexed.sort(
+  // Filter out closed credits — only show active/open credits
+  const open = credits
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !c.isClosed);
+  open.sort(
     (a, b) => NATURE_ORDER[a.c.creditNature] - NATURE_ORDER[b.c.creditNature],
   );
   return {
-    credits: indexed.map((x) => x.c),
-    originalIndices: indexed.map((x) => x.i),
+    credits: open.map((x) => x.c),
+    originalIndices: open.map((x) => x.i),
   };
 }
 
@@ -154,40 +157,45 @@ export default function LiabilityTable({
 
         {/* ── Footer totals ────────────────────────────────────────────── */}
         <tfoot>
-          <tr style={{ backgroundColor: "#F9FAFB" }}>
-            <td
-              colSpan={3}
-              className="px-3 py-2 text-right font-semibold text-gf-text"
-            >
-              Saldo actual total
-            </td>
-            <td className="px-3 py-2 font-bold text-gf-text">
-              {formatMXN(snapshot.totalCurrentBalance)}
-            </td>
-            <td colSpan={4} />
-          </tr>
-          <tr style={{ backgroundColor: "#F9FAFB" }}>
-            <td
-              colSpan={6}
-              className="px-3 py-2 text-right font-semibold text-gf-text"
-            >
-              Deuda total mensual
-            </td>
-            <td className="px-3 py-2 font-bold text-gf-text">
-              {formatMXN(snapshot.grossCurrentMonthlyDebt)}
-            </td>
-            <td className="px-3 py-2">
-              {status !== GlobalLiabilityStatus.CALCULATED && (
-                <span
-                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                  style={{
-                    backgroundColor: globalBadge.bg,
-                    color: globalBadge.text,
-                  }}
-                >
-                  {GLOBAL_STATUS_LABELS[status]}
-                </span>
-              )}
+          <tr>
+            <td colSpan={8} className="p-0">
+              <div className="flex gap-3 px-3 py-3" style={{ backgroundColor: "#F9FAFB" }}>
+                {/* Card: Saldo actual total */}
+                <div className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5">
+                  <span className="text-xs font-semibold text-gf-text-muted">
+                    Saldo actual total
+                  </span>
+                  <span className="text-sm font-bold text-gf-text">
+                    {formatMXN(snapshot.totalCurrentBalance)}
+                  </span>
+                </div>
+
+                {/* Divider pipe */}
+                <div className="w-px bg-gray-200" />
+
+                {/* Card: Deuda total mensual */}
+                <div className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5">
+                  <span className="text-xs font-semibold text-gf-text-muted">
+                    Deuda total mensual
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    {status !== GlobalLiabilityStatus.CALCULATED && (
+                      <span
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          backgroundColor: globalBadge.bg,
+                          color: globalBadge.text,
+                        }}
+                      >
+                        {GLOBAL_STATUS_LABELS[status]}
+                      </span>
+                    )}
+                    <span className="text-sm font-bold text-gf-text">
+                      {formatMXN(snapshot.grossCurrentMonthlyDebt)}
+                    </span>
+                  </span>
+                </div>
+              </div>
             </td>
           </tr>
         </tfoot>
