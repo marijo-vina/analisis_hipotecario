@@ -1452,3 +1452,82 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     hasCritical,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Liability calculation result types — inlined mirror of the API-side types
+// in `apps/api/src/liability/liability.types.ts`. Apps/web is standalone (no
+// cross-app imports), so these are duplicated intentionally.
+// ---------------------------------------------------------------------------
+
+export enum LiabilityCreditNature {
+  REVOLVING = "REVOLVING",
+  FIXED = "FIXED",
+  UNKNOWN = "UNKNOWN",
+}
+
+export enum LiabilityInstitutionCategory {
+  BANK = "BANK",
+  DEPARTMENT_STORE = "DEPARTMENT_STORE",
+  FINTECH = "FINTECH",
+  NON_BANK_SERVICE = "NON_BANK_SERVICE",
+}
+
+export enum LiabilityStatus {
+  CALCULATED = "CALCULATED",
+  REQUIRES_REVIEW = "REQUIRES_REVIEW",
+  INCOMPLETE = "INCOMPLETE",
+}
+
+export enum LiabilityClassificationSource {
+  EXTRACTED = "EXTRACTED",
+  KEYWORD = "KEYWORD",
+  MANUAL = "MANUAL",
+  FALLBACK = "FALLBACK",
+}
+
+export enum GlobalLiabilityStatus {
+  CALCULATED = "CALCULATED",
+  PARTIAL = "PARTIAL",
+  INCOMPLETE = "INCOMPLETE",
+}
+
+export enum LiabilityRuleApplied {
+  REVOLVING_STANDARD = "REVOLVING_STANDARD",
+  FIXED_DIRECT = "FIXED_DIRECT",
+  UNKNOWN_PROVISIONAL = "UNKNOWN_PROVISIONAL",
+  CLOSED_ZERO = "CLOSED_ZERO",
+  INCOMPLETE_DATA = "INCOMPLETE_DATA",
+}
+
+/** Enriched credit result from the liability calculation engine (HU-11). */
+export interface LiabilityCreditResult {
+  creditReference: string;
+  institution: string;
+  creditType: string;
+  productName?: string;
+  classification: string;
+  status: string;
+  currentBalance: number | null;
+  paymentDueAmountEffective: number | null;
+  isClosed: boolean;
+  monthlyDebtContribution: number | null;
+  creditNature: LiabilityCreditNature;
+  institutionCategory: LiabilityInstitutionCategory;
+  ruleApplied: LiabilityRuleApplied;
+  liabilityStatus: LiabilityStatus;
+  classificationSource: LiabilityClassificationSource;
+  classificationReason: string | null;
+}
+
+/** Full liability calculation result returned by the API (HU-11). */
+export interface LiabilityCalculationResult {
+  id: string;
+  caseId: string;
+  calculatedAt: string;
+  factorUsed: number;
+  rulesVersion: string;
+  credits: LiabilityCreditResult[];
+  globalStatus: GlobalLiabilityStatus;
+  grossCurrentMonthlyDebt: number;
+  totalCurrentBalance: number;
+}
