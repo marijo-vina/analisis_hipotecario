@@ -3,6 +3,29 @@
 **Cambio**: hu-10-bankarization-validation
 **Modo**: Standard (Strict TDD: inactivo)
 **Fecha**: 2026-07-14
+**Veredicto final**: PASS ✅
+
+---
+
+## Issues corregidos post-release
+
+| Issue | Fix |
+|-------|-----|
+| BANKARIZATION:RESULT:* en tabla identidad | Regla devuelve `fields: []` (commit 2422aed) |
+| Tipo FieldComparison (TS2322) | Convertir numbers/booleans a strings (commit 9427d38) |
+| paymentDate null en recibos | Fallback a periodEndDate (commit 8e7567e) |
+| Matching no funciona sin RFC en depósitos | Separar no-RFC → fallback, diff-RFC → RFC_INCOMPATIBLE (commit 0f1385b) |
+| Fecha inferida desde filename en vez de periodLabel | Usar payrollPeriod.periodLabel (commit 1e0f839) |
+| Tolerancia fecha ±2d insuficiente | Ampliada a ±3d (commit b64bde1) |
+| UI no mostraba fecha usada | Mostrar fecha + badge de origen (commit 0d1e2d6) |
+| Botón Re-ejecutar no respondía | useCallback → función normal (commit 35ca377) |
+
+## Mejoras UI post-release
+
+- Texto técnico eliminado (commits 8023696, 7032476)
+- Estilo unificado con estados-statement-card (commit 3a945c0)
+- Summary bar justificado, cards bg-gf-bg, badge junto a filename (commits b35aa3a, 66ac3b4)
+- Botón "Reconciliar" bajo demanda con "Re-ejecutar" (commit 38d93b6)
 
 ---
 
