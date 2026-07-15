@@ -48,11 +48,11 @@ Chain strategy: pending
 
 ## Phase 3: Controller + DTOs + Integration
 
-- [ ] 3.1 Create `apps/api/src/liability/dto/calculate-liability.dto.ts` with `factorUsed` (Decimal) and `credits` array of `LiabilityCreditInput`
-- [ ] 3.2 Create `apps/api/src/liability/dto/override-credit.dto.ts` with optional `creditNature`, `currentBalance`, `paymentDueAmountEffective`, and required `reason` (min 10 chars)
-- [ ] 3.3 Create `apps/api/src/liability/liability.controller.ts` with routes: `POST /cases/:id/liability/calculate`, `GET /cases/:id/liability/latest`, `PATCH /cases/:id/liability/credits/:creditIndex`
+- [x] 3.1 Create `apps/api/src/liability/dto/calculate-liability.dto.ts` with `factorUsed` (Decimal) and `credits` array of `LiabilityCreditInput`
+- [x] 3.2 Create `apps/api/src/liability/dto/override-credit.dto.ts` with optional `creditNature`, `currentBalance`, `paymentDueAmountEffective`, and required `reason` (min 10 chars)
+- [x] 3.3 Create `apps/api/src/liability/liability.controller.ts` with routes: `POST /cases/:id/liability/calculate`, `GET /cases/:id/liability/latest`, `PATCH /cases/:id/liability/credits/:creditIndex`
 - [x] 3.4 Write unit tests `apps/api/src/liability/liability.service.spec.ts` covering all 13+ scenarios: REVOLVING (6%>pago, pago>6%, solo saldo, sin datos), FIXED (normal, pago>saldo, saldo+0→INCOMPLETE, sin pago), UNKNOWN (ambos/uno/ninguno), colisión keywords, crédito cerrado, estado global
-- [ ] 3.5 Write integration tests `apps/api/src/liability/liability.controller.spec.ts`: POST→snapshot→GET latest, PATCH override→recalcula→nuevo snapshot, verify `creditReference` preserved through calculation
+- [x] 3.5 Write integration tests `apps/api/src/liability/liability.controller.spec.ts`: POST→snapshot→GET latest, PATCH override→recalcula→nuevo snapshot, verify `creditReference` preserved through calculation
 - [x] 3.6 Write test for exact monetary calculation: 3 credits with 1333.33 + 1333.33 + 1333.34 = exactly 4000.00 (no floating-point error)
 
 ## Phase 4: Frontend UI Components
