@@ -79,8 +79,22 @@ model MortgageCase {
   notes           String?
   documents       Document[]
   analysisRuns    AnalysisRun[]
+  liabilitySnapshots LiabilitySnapshot[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+}
+
+model LiabilitySnapshot {
+  id                      String   @id @default(uuid())
+  mortgageCaseId          String
+  mortgageCase            MortgageCase @relation(fields: [mortgageCaseId], references: [id])
+  factorUsed              Decimal
+  rulesVersion            String
+  credits                 Json
+  globalStatus            String
+  grossCurrentMonthlyDebt Decimal
+  totalCurrentBalance     Decimal
+  calculatedAt            DateTime @default(now())
 }
 
 enum PersonType {
