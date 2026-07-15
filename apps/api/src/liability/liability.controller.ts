@@ -115,7 +115,7 @@ export class LiabilityController {
     @Body() dto: OverrideCreditDto,
   ) {
     const serviceDto: ServiceOverrideDto = {
-      reason: dto.reason,
+      ...(dto.reason !== undefined && { reason: dto.reason }),
       ...(dto.creditNature !== undefined && {
         creditNature: dto.creditNature as ServiceOverrideDto['creditNature'],
       }),
