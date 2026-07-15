@@ -280,7 +280,7 @@ export class LiabilityCalculationService {
       ruleApplied: calc.rule,
       liabilityStatus: calc.status,
       classificationSource: classification.source,
-      classificationReason: classification.reason,
+      classificationReason: calc.reason ?? classification.reason,
     };
   }
 
@@ -309,6 +309,9 @@ export class LiabilityCalculationService {
     credit.monthlyDebtContribution = calc.contribution;
     credit.ruleApplied = calc.rule;
     credit.liabilityStatus = calc.status;
+    if (calc.reason) {
+      credit.classificationReason = calc.reason;
+    }
   }
 
   // ── Classification ───────────────────────────────────────────────────────
@@ -423,6 +426,7 @@ export class LiabilityCalculationService {
     contribution: number | null;
     status: LiabilityStatus;
     rule: RuleApplied;
+    reason?: string | null;
   } {
     switch (nature) {
       case CreditNature.REVOLVING:
@@ -509,16 +513,22 @@ export class LiabilityCalculationService {
     contribution: number | null;
     status: LiabilityStatus;
     rule: RuleApplied;
+    reason?: string | null;
   } {
     const balanceCents = balance !== null ? pesosToCents(balance) : null;
     const paymentCents = payment !== null ? pesosToCents(payment) : null;
 
     if (paymentCents !== null && paymentCents > 0) {
       // Normal: use payment directly
+      const reason =
+        balanceCents !== null && paymentCents > balanceCents
+          ? 'pago > saldo — verificar que el monto a pagar no incluya liquidación anticipada'
+          : null;
       return {
         contribution: centsToPesos(paymentCents),
         status: LiabilityStatus.CALCULATED,
         rule: RuleApplied.FIXED_DIRECT,
+        reason,
       };
     }
 

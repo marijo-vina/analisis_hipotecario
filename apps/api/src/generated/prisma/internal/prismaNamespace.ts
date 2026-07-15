@@ -387,6 +387,7 @@ export const ModelName = {
   User: 'User',
   Client: 'Client',
   MortgageCase: 'MortgageCase',
+  LiabilitySnapshot: 'LiabilitySnapshot',
   Document: 'Document',
   AnalysisRun: 'AnalysisRun',
   AnalysisAlert: 'AnalysisAlert',
@@ -410,7 +411,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "client" | "mortgageCase" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
+    modelProps: "user" | "client" | "mortgageCase" | "liabilitySnapshot" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -633,6 +634,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.MortgageCaseCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.MortgageCaseCountAggregateOutputType> | number
+        }
+      }
+    }
+    LiabilitySnapshot: {
+      payload: Prisma.$LiabilitySnapshotPayload<ExtArgs>
+      fields: Prisma.LiabilitySnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LiabilitySnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LiabilitySnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.LiabilitySnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LiabilitySnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.LiabilitySnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.LiabilitySnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.LiabilitySnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LiabilitySnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.LiabilitySnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        update: {
+          args: Prisma.LiabilitySnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.LiabilitySnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LiabilitySnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LiabilitySnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.LiabilitySnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LiabilitySnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.LiabilitySnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLiabilitySnapshot>
+        }
+        groupBy: {
+          args: Prisma.LiabilitySnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LiabilitySnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LiabilitySnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LiabilitySnapshotCountAggregateOutputType> | number
         }
       }
     }
@@ -1316,6 +1391,21 @@ export const MortgageCaseScalarFieldEnum = {
 export type MortgageCaseScalarFieldEnum = (typeof MortgageCaseScalarFieldEnum)[keyof typeof MortgageCaseScalarFieldEnum]
 
 
+export const LiabilitySnapshotScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  factorUsed: 'factorUsed',
+  rulesVersion: 'rulesVersion',
+  credits: 'credits',
+  globalStatus: 'globalStatus',
+  grossCurrentMonthlyDebt: 'grossCurrentMonthlyDebt',
+  totalCurrentBalance: 'totalCurrentBalance',
+  calculatedAt: 'calculatedAt'
+} as const
+
+export type LiabilitySnapshotScalarFieldEnum = (typeof LiabilitySnapshotScalarFieldEnum)[keyof typeof LiabilitySnapshotScalarFieldEnum]
+
+
 export const DocumentScalarFieldEnum = {
   id: 'id',
   mortgageCaseId: 'mortgageCaseId',
@@ -1424,19 +1514,19 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
 export const NullableJsonNullValueInput = {
   DbNull: DbNull,
   JsonNull: JsonNull
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
-
-
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -1743,6 +1833,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   client?: Prisma.ClientOmit
   mortgageCase?: Prisma.MortgageCaseOmit
+  liabilitySnapshot?: Prisma.LiabilitySnapshotOmit
   document?: Prisma.DocumentOmit
   analysisRun?: Prisma.AnalysisRunOmit
   analysisAlert?: Prisma.AnalysisAlertOmit

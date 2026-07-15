@@ -11,6 +11,7 @@
 export type * from './models/User'
 export type * from './models/Client'
 export type * from './models/MortgageCase'
+export type * from './models/LiabilitySnapshot'
 export type * from './models/Document'
 export type * from './models/AnalysisRun'
 export type * from './models/AnalysisAlert'
