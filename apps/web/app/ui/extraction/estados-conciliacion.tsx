@@ -1,6 +1,6 @@
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
-import { parsePayroll } from "@/app/lib/extraction";
+import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
 import {
   reconcilePreview,
   STATUS_LABELS,
@@ -203,6 +203,36 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
           label="SCORE"
           value={r.score != null ? r.score.toFixed(1) : "—"}
         />
+      </div>
+
+      {/* Fecha usada con trazabilidad */}
+      <div className="text-[11px] text-gf-text-soft">
+        📅 Fecha de pago usada:{" "}
+        <span className="text-gf-text-muted">
+          {r.usedPaymentDate
+            ? formatDateDisplay(r.usedPaymentDate)
+            : "Sin fecha"}
+        </span>
+        {r.paymentDateSource && (
+          <span
+            className={`ml-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+              r.paymentDateEstimated
+                ? "bg-amber-50 text-amber-700"
+                : "bg-green-50 text-green-700"
+            }`}
+          >
+            {r.paymentDateSource === "EXPLICIT"
+              ? "Explícita"
+              : r.paymentDateSource === "PERIOD_END"
+                ? "Cierre periodo"
+                : r.paymentDateSource === "INFERRED_QUINCENA"
+                  ? "Inferida (quincena)"
+                  : r.paymentDateSource === "MANUAL_OVERRIDE"
+                    ? "Manual"
+                    : r.paymentDateSource}
+            {r.paymentDateEstimated && " ⚠️"}
+          </span>
+        )}
       </div>
 
       {/* Datos del depósito vinculado */}

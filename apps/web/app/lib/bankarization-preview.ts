@@ -76,6 +76,12 @@ export interface PreviewReceiptResult {
   amountDiffPct: number | null;
   score: number | null;
   scotiabankExcluded: boolean;
+  /** Fecha usada para el matching (resuelta con trazabilidad). */
+  usedPaymentDate: string | null;
+  /** Origen de la fecha usada: EXPLICIT | PERIOD_END | INFERRED_QUINCENA | MANUAL_OVERRIDE. */
+  paymentDateSource: string | null;
+  /** true si la fecha fue inferida (requiere confirmacion del asesor). */
+  paymentDateEstimated: boolean;
   alerts: { code: string; message: string }[];
 }
 
@@ -198,6 +204,81 @@ function round2(n: number): number {
 
 // ── Algoritmo principal ──────────────────────────────────────────────────────
 
+type PayDateSource = "EXPLICIT" | "PERIOD_END" | "INFERRED_QUINCENA" | "MANUAL_OVERRIDE";
+
+interface ResolvedPayDate {
+  resolvedPaymentDate: string | null;
+  source: PayDateSource;
+  estimated: boolean;
+  originalPeriodLabel: string | null;
+}
+
+/**
+ * Resuelve la fecha de pago con trazabilidad de origen.
+ * @duplicate BankarizationValidationRule.resolvePayrollPaymentDate (backend).
+ */
+function resolvePaymentDate(
+  explicitDate: string | null,
+  periodEndDate: string | null,
+  periodLabel: string | null,
+): ResolvedPayDate {
+  if (explicitDate) {
+    return { resolvedPaymentDate: explicitDate, source: "EXPLICIT", estimated: false, originalPeriodLabel: periodLabel };
+  }
+  if (periodEndDate) {
+    return { resolvedPaymentDate: periodEndDate, source: "PERIOD_END", estimated: false, originalPeriodLabel: periodLabel };
+  }
+  if (periodLabel) {
+    const inferred = inferDateFromLabel(periodLabel);
+    if (inferred) {
+      return { resolvedPaymentDate: inferred, source: "INFERRED_QUINCENA", estimated: true, originalPeriodLabel: periodLabel };
+    }
+  }
+  return { resolvedPaymentDate: null, source: "INFERRED_QUINCENA", estimated: true, originalPeriodLabel: periodLabel };
+}
+
+function inferDateFromLabel(label: string): string | null {
+  const n = label.toUpperCase();
+  const monthYearPatterns = [
+    /(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s*(\d{4})/i,
+    /(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)[-.\s]*(\d{4})/i,
+    /(\d{1,2})[-.\/](\d{4})/,
+    /(\d{4})[-.\/](\d{1,2})/,
+  ];
+  let month: number | null = null;
+  let year: number | null = null;
+  for (const p of monthYearPatterns) {
+    const m = p.exec(n);
+    if (m) {
+      const g1 = m[1].toUpperCase();
+      const g2 = m[2];
+      const names: Record<string, number> = {
+        ENERO:1,FEBRERO:2,MARZO:3,ABRIL:4,MAYO:5,JUNIO:6,
+        JULIO:7,AGOSTO:8,SEPTIEMBRE:9,OCTUBRE:10,NOVIEMBRE:11,DICIEMBRE:12,
+        ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12,
+      };
+      const pm = names[g1];
+      if (pm) { month = pm; year = parseInt(g2,10); }
+      else {
+        const a = parseInt(g1,10), b = parseInt(g2,10);
+        if (a>=1 && a<=12 && b>=2000) { month=a; year=b; }
+        else if (b>=1 && b<=12 && a>=2000) { month=b; year=a; }
+      }
+      break;
+    }
+  }
+  if (!month || !year) return null;
+  const is1 = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s/i.test(n);
+  const is2 = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s/i.test(n);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  if (is1 && !is2) return `${year}-${pad(month)}-15`;
+  if (is2 && !is1) {
+    const last = new Date(year, month, 0).getDate();
+    return `${year}-${pad(month)}-${pad(last)}`;
+  }
+  return null;
+}
+
 interface NormalizedReceipt {
   index: number;
   netIncome: number | null;
@@ -206,6 +287,12 @@ interface NormalizedReceipt {
   employerName: string | null;
   originalName: string;
   period: string | null;
+  resolvedPaymentDate: {
+    resolvedPaymentDate: string | null;
+    source: string;
+    estimated: boolean;
+    originalPeriodLabel: string | null;
+  };
 }
 
 interface NormalizedDeposit {
@@ -225,15 +312,23 @@ export function reconcilePreview(
   receipts: ParsedPayrollReceipt[],
   deposits: ParsedBankStatementDeposit[],
 ): PreviewReceiptResult[] {
-  const normReceipts: NormalizedReceipt[] = receipts.map((r, i) => ({
-    index: i,
-    netIncome: r.ingresoNeto,
-    paymentDate: reverseDate(r.fechaPago),
-    employerRfc: normalizeRfc(r.empleador?.rfc ?? null),
-    employerName: r.empleador?.nombre ?? null,
-    originalName: r.originalName,
-    period: r.periodo,
-  }));
+  const normReceipts: NormalizedReceipt[] = receipts.map((r, i) => {
+    const explicitDate = reverseDate(r.fechaPago);
+    const periodEnd = null; // no disponible en el frontend parseado
+    const periodLabel = r.periodo ?? r.originalName ?? null;
+    const resolved = resolvePaymentDate(explicitDate, periodEnd, periodLabel);
+
+    return {
+      index: i,
+      netIncome: r.ingresoNeto,
+      paymentDate: resolved.resolvedPaymentDate,
+      employerRfc: normalizeRfc(r.empleador?.rfc ?? null),
+      employerName: r.empleador?.nombre ?? null,
+      originalName: r.originalName,
+      period: r.periodo,
+      resolvedPaymentDate: resolved,
+    };
+  });
 
   const normDeposits: NormalizedDeposit[] = deposits.map((d, i) => ({
     id: `dep-${i}`,
@@ -298,9 +393,17 @@ function matchOne(
       return matchByRfc(receipt, sameRfc, used);
     }
 
+    // Separar candidatos con RFC diferente vs sin RFC.
     const diffRfc = candidates.filter((d) => d.payerRfc != null);
+    const noRfc = candidates.filter((d) => d.payerRfc == null);
+
+    // Intentar fallback con depositos SIN RFC primero (comun: el edo de cuenta no muestra RFC).
+    if (noRfc.length > 0) {
+      return matchByFallback(receipt, noRfc, used);
+    }
+
+    // Todos los depositos tienen RFC diferente → RFC_INCOMPATIBLE.
     if (diffRfc.length > 0) {
-      // Enlazar el mas proximo por fecha para pagadora; no fallback.
       const sorted = [...diffRfc].sort(
         (a, b) =>
           (dateDiffDays(receipt.paymentDate, a.date) ?? Infinity) -
@@ -487,6 +590,9 @@ function resolvePagadora(
     amountDiffPct: res.amountDiffPctVal,
     score: res.scoreVal,
     scotiabankExcluded,
+    usedPaymentDate: receipt.resolvedPaymentDate.resolvedPaymentDate,
+    paymentDateSource: receipt.resolvedPaymentDate.source,
+    paymentDateEstimated: receipt.resolvedPaymentDate.estimated,
     alerts: buildAlerts(status, scotiabankExcluded, res.amountDiffPctVal),
   };
 }
