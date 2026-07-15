@@ -44,7 +44,7 @@ export default function EstadosConciliacion({
   return (
     <div className="space-y-4">
       {/* ── Summary bar (mismo estilo que EstadosSummaryBar) ──────────── */}
-      <Card className="flex flex-wrap items-center gap-6 px-5 py-4">
+      <Card className="flex flex-wrap items-center justify-between gap-6 px-5 py-4">
         <Stat label="Recibos" value={`${payrollReceipts.length} procesados`} />
         <Divider />
         <Stat label="Conciliados" value={`${conciledCount} de ${payrollReceipts.length}`} />
@@ -82,20 +82,20 @@ export default function EstadosConciliacion({
 
 function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
   return (
-    <div className="rounded-lg border border-gf-border bg-white px-4 py-3 space-y-3">
-      {/* Header: filename + period */}
+    <div className="rounded-lg border border-gf-border bg-gf-red-soft px-4 py-3 space-y-3">
+      {/* Header: filename + status badge + period */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] font-semibold text-gf-text truncate max-w-[280px]">
+        <span className="text-sm font-semibold text-gf-text truncate max-w-[300px]">
           {r.receiptOriginalName}
         </span>
+        <StatusBadge status={r.status} />
         {r.period && (
           <span className="text-[11px] text-gf-text-soft">{r.period}</span>
         )}
       </div>
 
-      {/* Status + method badges */}
+      {/* Method badge + flags */}
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={r.status} />
         <MethodBadge method={r.method} />
         {r.scotiabankExcluded && (
           <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600">
