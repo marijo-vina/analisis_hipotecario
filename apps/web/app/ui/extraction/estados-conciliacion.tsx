@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
@@ -35,10 +35,10 @@ export default function EstadosConciliacion({
   const [results, setResults] = useState<PreviewReceiptResult[] | null>(null);
   const [hasRun, setHasRun] = useState(false);
 
-  const runReconciliation = useCallback(() => {
+  const runReconciliation = () => {
     setResults(reconcilePreview(payrollReceipts, allDeposits));
     setHasRun(true);
-  }, [payrollReceipts, allDeposits]);
+  };
 
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
     return null;
