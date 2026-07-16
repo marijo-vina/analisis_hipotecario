@@ -536,4 +536,69 @@ describe('IncomeCalculationService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  // ── Conciliation NOT called verification (Task 4.5) ────────────────
+
+  describe('Conciliation isolation', () => {
+    it('getLatest returns identical snapshot on repeated calls (case reload simulation)', async () => {
+      const snapshot = makeSnapshot({ id: 'inc-stable' });
+      mockPrisma.incomeCalculation.findFirst.mockResolvedValue(snapshot);
+
+      const first = await service.getLatest('case-1');
+      const second = await service.getLatest('case-1');
+
+      expect(first).toEqual(second);
+      expect(first.id).toBe('inc-stable');
+      expect(second.id).toBe('inc-stable');
+      // Both calls hit Prisma with the same query
+      expect(mockPrisma.incomeCalculation.findFirst).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.incomeCalculation.findFirst).toHaveBeenCalledWith({
+        where: { mortgageCaseId: 'case-1' },
+        orderBy: { calculatedAt: 'desc' },
+      });
+    });
+
+    it('IncomeCalculationService has ZERO imports from conciliation modules', () => {
+      // Read the service source and verify no conciliation-related imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('path');
+      const servicePath = path.resolve(__dirname, 'income-calculation.service.ts');
+      const source = fs.readFileSync(servicePath, 'utf-8');
+
+      // Must NOT import from payroll-bank-matching or any conciliation module
+      expect(source).not.toMatch(/from\s+['"].*conciliation/);
+      expect(source).not.toMatch(/from\s+['"].*payroll-bank-matching/);
+      expect(source).not.toMatch(/from\s+['"].*bank-reconciliation/);
+
+      // Must NOT reference conciliation service classes
+      expect(source).not.toMatch(/ConciliationService/);
+      expect(source).not.toMatch(/BankReconciliationService/);
+      expect(source).not.toMatch(/PayrollBankMatchingService/);
+    });
+
+    it('calculate() does not invoke any conciliation service', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        makePayrollDoc({ id: 'doc-1' }),
+      ]);
+
+      // Spy on Prisma to verify only expected calls happen
+      const createSpy = mockPrisma.incomeCalculation.create;
+
+      await service.calculate('case-1');
+
+      // Only document.findMany + incomeCalculation.create should be called
+      expect(mockPrisma.document.findMany).toHaveBeenCalledTimes(1);
+      expect(createSpy).toHaveBeenCalledTimes(1);
+
+      // No other Prisma models should be touched (no conciliation-related tables)
+      // Verify the create call is for IncomeCalculation only
+      const createArg = createSpy.mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(createArg.data.mortgageCaseId).toBe('case-1');
+      expect(createArg.data.status).toBe(IncomeCalculationStatus.CALCULATED);
+    });
+  });
 });

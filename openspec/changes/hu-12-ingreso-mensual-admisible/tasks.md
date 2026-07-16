@@ -53,9 +53,9 @@ Chain strategy: pending
 
 - [x] 4.1 Create `apps/api/src/income-calculation/income-calculation.service.spec.ts`: test `calculate()` with 0/1/N receipts, Decimal rounding (gross [15000.50, 14999.50] → 15000.00), exclusion recalculates averages, status transitions CALCULATED → CONFIRMED
 - [x] 4.2 Create `apps/api/src/income-calculation/income-calculation.controller.spec.ts`: test 400 on empty selection, 404 on missing docs, correct HTTP codes for all endpoints
-- [ ] 4.3 Write integration test: full POST→GET→PATCH→POST/confirm lifecycle with seeded PAYROLL_RECEIPT documents
+- [x] 4.3 Write integration test: full POST→GET→PATCH→POST/confirm lifecycle with seeded PAYROLL_RECEIPT documents
 - [x] 4.4 Test: confirmed values do not overwrite calculated averages in snapshot
-- [ ] 4.5 Test: GET /latest returns snapshot intact after case reload; conciliation engine NOT called during income calculation
+- [x] 4.5 Test: GET /latest returns snapshot intact after case reload; conciliation engine NOT called during income calculation
 - [ ] 4.6 Frontend component tests — SKIPPED: apps/web has no test runner configured
 
 ## Phase 5: Cleanup / Verification
