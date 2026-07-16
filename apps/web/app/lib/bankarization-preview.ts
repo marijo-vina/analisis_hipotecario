@@ -83,6 +83,8 @@ export interface PreviewReceiptResult {
   /** true si la fecha fue inferida (requiere confirmacion del asesor). */
   paymentDateEstimated: boolean;
   alerts: { code: string; message: string }[];
+  /** Keyword del catálogo que activó el match de concepto (solo en FALLBACK). */
+  conceptKeyword: string | null;
 }
 
 // ── Constantes (espejo del backend) ──────────────────────────────────────────
@@ -594,6 +596,7 @@ function resolvePagadora(
     paymentDateSource: receipt.resolvedPaymentDate.source,
     paymentDateEstimated: receipt.resolvedPaymentDate.estimated,
     alerts: buildAlerts(status, scotiabankExcluded, res.amountDiffPctVal),
+    conceptKeyword: res.conceptKeyword ?? null,
   };
 }
 
