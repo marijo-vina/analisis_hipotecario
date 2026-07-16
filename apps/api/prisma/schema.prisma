@@ -138,8 +138,9 @@ model Document {
   /// boxes, used by the layout-aware financial extractor. Nullable so the
   /// migration is zero-downtime (existing rows keep NULL).
   ocrLayout        Json?
-  extractedData    Json?
-  processedAt      DateTime?
+  extractedData      Json?
+  processingResults  Json?
+  processedAt        DateTime?
   processingError  String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

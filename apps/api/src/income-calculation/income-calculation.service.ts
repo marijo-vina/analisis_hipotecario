@@ -11,6 +11,7 @@ import {
   type IncomeReceiptResult,
 } from './income-calculation.types';
 import type { ConfirmIncomeDto } from './dto/confirm-income.dto';
+import type { SaveConciliationDto } from './dto/save-conciliation.dto';
 
 // ── Pure helpers ──────────────────────────────────────────────────────────
 
@@ -43,8 +44,8 @@ export function mapDocumentToReceipt(
     employerRfc: employer.rfc ?? data.employerRfc ?? null,
     grossIncome: income.grossIncome ?? data.grossIncome ?? null,
     netIncome: income.netIncome ?? data.netIncome ?? null,
-    conciliationStatus: null,
-    reviewStatus: null,
+    conciliationStatus: ((doc.processingResults as any)?.conciliation?.status as string) ?? null,
+    reviewStatus: ((doc.processingResults as any)?.conciliation?.reviewStatus as string) ?? null,
     included: true,
   };
 }
@@ -237,6 +238,36 @@ export class IncomeCalculationService {
     });
 
     return this.snapshotToResult(snapshot, caseId);
+  }
+
+  // ── Conciliation persistence ─────────────────────────────────────────
+
+  /**
+   * Persist conciliation results into each document's `processingResults`
+   * JSON field. Called after the front-end reconciliation preview runs.
+   */
+  async saveConciliation(
+    caseId: string,
+    dto: SaveConciliationDto,
+  ): Promise<{ saved: number }> {
+    let saved = 0;
+    for (const item of dto.items) {
+      await this.prisma.document.update({
+        where: { id: item.documentId },
+        data: {
+          processingResults: {
+            conciliation: {
+              status: item.status,
+              method: item.method ?? null,
+              reviewStatus: item.reviewStatus ?? 'PENDING',
+              reviewedAt: item.reviewStatus === 'REVIEWED' ? new Date().toISOString() : null,
+            },
+          },
+        },
+      });
+      saved++;
+    }
+    return { saved };
   }
 
   // ── Snapshot conversion ─────────────────────────────────────────────
