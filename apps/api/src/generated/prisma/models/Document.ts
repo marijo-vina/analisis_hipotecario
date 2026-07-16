@@ -715,10 +715,6 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput = {
   deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type DocumentCreateNestedManyWithoutDocumentTypeInput = {
   create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
   connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]

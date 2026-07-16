@@ -388,6 +388,7 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   LiabilitySnapshot: 'LiabilitySnapshot',
+  IncomeCalculation: 'IncomeCalculation',
   Document: 'Document',
   AnalysisRun: 'AnalysisRun',
   AnalysisAlert: 'AnalysisAlert',
@@ -411,7 +412,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "client" | "mortgageCase" | "liabilitySnapshot" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
+    modelProps: "user" | "client" | "mortgageCase" | "liabilitySnapshot" | "incomeCalculation" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -708,6 +709,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.LiabilitySnapshotCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.LiabilitySnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    IncomeCalculation: {
+      payload: Prisma.$IncomeCalculationPayload<ExtArgs>
+      fields: Prisma.IncomeCalculationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.IncomeCalculationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.IncomeCalculationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        findFirst: {
+          args: Prisma.IncomeCalculationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.IncomeCalculationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        findMany: {
+          args: Prisma.IncomeCalculationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>[]
+        }
+        create: {
+          args: Prisma.IncomeCalculationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        createMany: {
+          args: Prisma.IncomeCalculationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.IncomeCalculationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>[]
+        }
+        delete: {
+          args: Prisma.IncomeCalculationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        update: {
+          args: Prisma.IncomeCalculationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        deleteMany: {
+          args: Prisma.IncomeCalculationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.IncomeCalculationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.IncomeCalculationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>[]
+        }
+        upsert: {
+          args: Prisma.IncomeCalculationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IncomeCalculationPayload>
+        }
+        aggregate: {
+          args: Prisma.IncomeCalculationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateIncomeCalculation>
+        }
+        groupBy: {
+          args: Prisma.IncomeCalculationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IncomeCalculationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.IncomeCalculationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IncomeCalculationCountAggregateOutputType> | number
         }
       }
     }
@@ -1406,6 +1481,24 @@ export const LiabilitySnapshotScalarFieldEnum = {
 export type LiabilitySnapshotScalarFieldEnum = (typeof LiabilitySnapshotScalarFieldEnum)[keyof typeof LiabilitySnapshotScalarFieldEnum]
 
 
+export const IncomeCalculationScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  receiptResults: 'receiptResults',
+  averageGrossIncome: 'averageGrossIncome',
+  averageNetIncome: 'averageNetIncome',
+  confirmedGrossIncome: 'confirmedGrossIncome',
+  confirmedNetIncome: 'confirmedNetIncome',
+  status: 'status',
+  confirmedBy: 'confirmedBy',
+  confirmedAt: 'confirmedAt',
+  observations: 'observations',
+  calculatedAt: 'calculatedAt'
+} as const
+
+export type IncomeCalculationScalarFieldEnum = (typeof IncomeCalculationScalarFieldEnum)[keyof typeof IncomeCalculationScalarFieldEnum]
+
+
 export const DocumentScalarFieldEnum = {
   id: 'id',
   mortgageCaseId: 'mortgageCaseId',
@@ -1834,6 +1927,7 @@ export type GlobalOmitConfig = {
   client?: Prisma.ClientOmit
   mortgageCase?: Prisma.MortgageCaseOmit
   liabilitySnapshot?: Prisma.LiabilitySnapshotOmit
+  incomeCalculation?: Prisma.IncomeCalculationOmit
   document?: Prisma.DocumentOmit
   analysisRun?: Prisma.AnalysisRunOmit
   analysisAlert?: Prisma.AnalysisAlertOmit

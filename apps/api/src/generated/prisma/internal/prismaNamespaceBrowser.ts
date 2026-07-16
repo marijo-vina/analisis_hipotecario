@@ -55,6 +55,7 @@ export const ModelName = {
   Client: 'Client',
   MortgageCase: 'MortgageCase',
   LiabilitySnapshot: 'LiabilitySnapshot',
+  IncomeCalculation: 'IncomeCalculation',
   Document: 'Document',
   AnalysisRun: 'AnalysisRun',
   AnalysisAlert: 'AnalysisAlert',
@@ -143,6 +144,24 @@ export const LiabilitySnapshotScalarFieldEnum = {
 } as const
 
 export type LiabilitySnapshotScalarFieldEnum = (typeof LiabilitySnapshotScalarFieldEnum)[keyof typeof LiabilitySnapshotScalarFieldEnum]
+
+
+export const IncomeCalculationScalarFieldEnum = {
+  id: 'id',
+  mortgageCaseId: 'mortgageCaseId',
+  receiptResults: 'receiptResults',
+  averageGrossIncome: 'averageGrossIncome',
+  averageNetIncome: 'averageNetIncome',
+  confirmedGrossIncome: 'confirmedGrossIncome',
+  confirmedNetIncome: 'confirmedNetIncome',
+  status: 'status',
+  confirmedBy: 'confirmedBy',
+  confirmedAt: 'confirmedAt',
+  observations: 'observations',
+  calculatedAt: 'calculatedAt'
+} as const
+
+export type IncomeCalculationScalarFieldEnum = (typeof IncomeCalculationScalarFieldEnum)[keyof typeof IncomeCalculationScalarFieldEnum]
 
 
 export const DocumentScalarFieldEnum = {

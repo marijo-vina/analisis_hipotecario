@@ -38,6 +38,11 @@ export type MortgageCase = Prisma.MortgageCaseModel
  */
 export type LiabilitySnapshot = Prisma.LiabilitySnapshotModel
 /**
+ * Model IncomeCalculation
+ * 
+ */
+export type IncomeCalculation = Prisma.IncomeCalculationModel
+/**
  * Model Document
  * 
  */
