@@ -9,6 +9,7 @@ import { CatalogsModule } from './catalogs/catalogs.module';
 import { MortgageCasesModule } from './mortgage-cases/mortgage-cases.module';
 import { DocumentsModule } from './documents/documents.module';
 import { LiabilityModule } from './liability/liability.module';
+import { IncomeCalculationModule } from './income-calculation/income-calculation.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { LiabilityModule } from './liability/liability.module';
     DocumentsModule,
     CaseAnalysisModule,
     LiabilityModule,
+    IncomeCalculationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
