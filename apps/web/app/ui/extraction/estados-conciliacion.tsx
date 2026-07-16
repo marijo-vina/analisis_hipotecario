@@ -5,7 +5,6 @@ import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
 import {
   reconcilePreview,
   STATUS_LABELS,
-  METHOD_LABELS,
   type PreviewReceiptResult,
   type PreviewStatus,
 } from "@/app/lib/bankarization-preview";
@@ -42,8 +41,14 @@ export default function EstadosConciliacion({
   const [hasRun, setHasRun] = useState(false);
   const [reviewStates, setReviewStates] = useState<Record<string, string>>({});
 
-  // Restore persisted conciliation on mount
+  // Track whether we've already restored from persistence
+  const [restored, setRestored] = useState(false);
+
+  // Restore persisted conciliation once deposits are available
   useEffect(() => {
+    if (restored) return;
+    if (allDeposits.length === 0 && payrollReceipts.length === 0) return;
+
     const persisted: PreviewReceiptResult[] = [];
     let hasAny = false;
 
@@ -57,9 +62,7 @@ export default function EstadosConciliacion({
       }
     }
 
-    if (hasAny) {
-      // We have persisted data — rebuild results from reconcilePreview
-      // but override status/review from persisted processingResults
+    if (hasAny && allDeposits.length > 0) {
       const reconciled = reconcilePreview(payrollReceipts, allDeposits);
       for (const r of reconciled) {
         const doc = payrollDocs[r.receiptIndex];
@@ -86,7 +89,11 @@ export default function EstadosConciliacion({
       setResults(persisted);
       setHasRun(true);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Mark as attempted so we don't loop on re-renders.
+    // Only re-trigger if the data actually changes (length guard).
+    setRestored(true);
+  }, [payrollDocs.length, allDeposits.length]);
 
   const runReconciliation = async () => {
     const newResults = reconcilePreview(payrollReceipts, allDeposits);
@@ -269,21 +276,6 @@ function ReceiptCard({
         )}
       </div>
 
-      {/* Method + explanation */}
-      {r.method !== "NONE" && (
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-gf-text-soft uppercase tracking-wide">
-              Método
-            </span>
-            <MethodBadge method={r.method} />
-          </div>
-          <p className="text-[11px] text-gf-text-muted">
-            {getMethodExplanation(r.method)}
-          </p>
-        </div>
-      )}
-
       {/* Scotiabank exclusion */}
       {r.scotiabankExcluded && (
         <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600">
@@ -440,19 +432,6 @@ function getRuleInfo(status: PreviewStatus): {
   }
 }
 
-function getMethodExplanation(method: PreviewReceiptResult["method"]): string {
-  switch (method) {
-    case "RFC":
-      return "Coincidencia directa por RFC del empleador entre recibo y depósito.";
-    case "FALLBACK":
-      return "Comparación por monto + fecha + concepto cuando el RFC no coincide o no está disponible.";
-    case "PROVIDER_MIRROR":
-      return "Doble espejo confirmado: depósito de empleador y pagadora detectados.";
-    default:
-      return "";
-  }
-}
-
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<PreviewStatus, string> = {
@@ -472,15 +451,6 @@ function StatusBadge({ status }: { status: PreviewStatus }) {
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[status]}`}
     >
       {STATUS_LABELS[status]}
-    </span>
-  );
-}
-
-function MethodBadge({ method }: { method: PreviewReceiptResult["method"] }) {
-  if (method === "NONE") return null;
-  return (
-    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gf-text-muted">
-      {METHOD_LABELS[method]}
     </span>
   );
 }
