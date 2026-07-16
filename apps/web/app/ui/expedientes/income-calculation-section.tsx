@@ -326,7 +326,6 @@ export default function IncomeCalculationSection({
                     <th className="px-4 py-3 text-right">Ingreso bruto</th>
                     <th className="px-4 py-3 text-right">Ingreso neto</th>
                     <th className="px-4 py-3">Conciliación</th>
-                    <th className="px-4 py-3">Revisión</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gf-border">
@@ -370,9 +369,6 @@ export default function IncomeCalculationSection({
                       </td>
                       <td className="px-4 py-3 text-gf-text-muted">
                         {receipt.conciliationStatus ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-gf-text-muted">
-                        {receipt.reviewStatus ?? "—"}
                       </td>
                     </tr>
                   ))}
@@ -451,8 +447,7 @@ export default function IncomeCalculationSection({
               <div className="flex items-center gap-2 text-sm text-green-700">
                 <span className="font-semibold">✓ Ingresos confirmados</span>
                 <span className="text-gf-text-muted">
-                  por {snapshot.confirmedBy ?? "—"} el{" "}
-                  {formatDate(snapshot.confirmedAt)}
+                  el {formatDate(snapshot.confirmedAt)}
                 </span>
               </div>
               {snapshot.observations && (
@@ -504,18 +499,24 @@ function KpiCards({
 
       {/* Promedio ingreso neto */}
       <div
-        className="flex flex-1 flex-col rounded-lg border border-green-200 p-4"
-        style={{ backgroundColor: "#F0FDF4" }}
+        className={`flex flex-1 flex-col rounded-lg border p-4 ${
+          isConfirmed
+            ? "border-violet-200"
+            : "border-green-200"
+        }`}
+        style={{
+          backgroundColor: isConfirmed ? "#F5F3FF" : "#F0FDF4",
+        }}
       >
         <span
           className="text-xs font-medium"
-          style={{ color: "#166534" }}
+          style={{ color: isConfirmed ? "#6D28D9" : "#166534" }}
         >
           Promedio ingreso neto
         </span>
         <span
           className="mt-1 text-lg font-bold"
-          style={{ color: "#166534" }}
+          style={{ color: isConfirmed ? "#6D28D9" : "#166534" }}
         >
           {formatMXN(localNet || snapshot.averageNetIncome)}
         </span>
