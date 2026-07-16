@@ -43,11 +43,11 @@ Chain strategy: pending
 
 ## Phase 3: Frontend Implementation
 
-- [ ] 3.1 Create `apps/web/app/actions/income.ts` with server actions: `calculateIncome(caseId)`, `fetchIncomeLatest(caseId)`, `toggleReceipt(caseId, receiptIndex, included)`, `confirmIncome(caseId, confirmedGross, confirmedNet, observations)`
-- [ ] 3.2 Create `apps/web/app/ui/expedientes/income-calculation-section.tsx` with: 9-column receipt table (checkbox, period, payment date, employer, RFC, gross, net, conciliation, review), KPI cards for calculated averages, confirmation panel with inputs and observations textarea, "Confirmar" button
-- [ ] 3.3 Wire `<IncomeCalculationSection caseId={caseId} />` into `apps/web/app/ui/expedientes/analysis-section.tsx` motor tab, immediately below `<LiabilityCalculationSection />`
-- [ ] 3.4 Handle "No identificada" display for null paymentDate in table; keep receipt eligible for inclusion
-- [ ] 3.5 Implement client-side recalculation of averages when checkboxes toggle (before server round-trip for UX feedback)
+- [x] 3.1 Create `apps/web/app/actions/income.ts` with server actions: `calculateIncome(caseId)`, `fetchIncomeLatest(caseId)`, `toggleReceipt(caseId, receiptIndex, included)`, `confirmIncome(caseId, confirmedGross, confirmedNet, observations)`
+- [x] 3.2 Create `apps/web/app/ui/expedientes/income-calculation-section.tsx` with: 9-column receipt table (checkbox, period, payment date, employer, RFC, gross, net, conciliation, review), KPI cards for calculated averages, confirmation panel with inputs and observations textarea, "Confirmar" button
+- [x] 3.3 Wire `<IncomeCalculationSection caseId={caseId} />` into `apps/web/app/ui/expedientes/analysis-section.tsx` motor tab, immediately below `<LiabilityCalculationSection />`
+- [x] 3.4 Handle "No identificada" display for null paymentDate in table; keep receipt eligible for inclusion
+- [x] 3.5 Implement client-side recalculation of averages when checkboxes toggle (before server round-trip for UX feedback)
 
 ## Phase 4: Testing
 
@@ -56,10 +56,10 @@ Chain strategy: pending
 - [ ] 4.3 Write integration test: full POST→GET→PATCH→POST/confirm lifecycle with seeded PAYROLL_RECEIPT documents
 - [x] 4.4 Test: confirmed values do not overwrite calculated averages in snapshot
 - [ ] 4.5 Test: GET /latest returns snapshot intact after case reload; conciliation engine NOT called during income calculation
-- [ ] 4.6 Frontend test: table renders all 9 columns, checkbox toggle updates KPIs, confirmation panel saves correctly
+- [ ] 4.6 Frontend component tests — SKIPPED: apps/web has no test runner configured
 
 ## Phase 5: Cleanup / Verification
 
-- [ ] 5.1 Verify HU-09, HU-10, HU-11 not affected: run existing test suites for extraction, conciliation, liability modules
-- [ ] 5.2 Run `npx prisma validate` and verify migration is reversible (rollback: drop table, revert schema)
-- [ ] 5.3 Manual verification: open case with PAYROLL_RECEIPT docs, calculate income, toggle receipts, confirm values, reload page — snapshot persists
+- [x] 5.1 Verify HU-09, HU-10, HU-11 not affected: run existing test suites for extraction, conciliation, liability modules
+- [x] 5.2 Run `npx prisma validate` and verify migration is reversible (rollback: drop table, revert schema)
+- [x] 5.3 Manual verification: open case with PAYROLL_RECEIPT docs, calculate income, toggle receipts, confirm values, reload page — snapshot persists

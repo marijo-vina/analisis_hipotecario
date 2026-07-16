@@ -18,6 +18,7 @@ import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
 import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
+import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,11 @@ export default function AnalysisSection({
       )}
 
       {activeTab === "motor" && (
-        <LiabilityCalculationSection caseId={caseId} />
+        <>
+          <LiabilityCalculationSection caseId={caseId} />
+          <div className="mt-6" />
+          <IncomeCalculationSection caseId={caseId} />
+        </>
       )}
 
       {activeTab === "bancos" && (
