@@ -80,6 +80,7 @@ model MortgageCase {
   documents       Document[]
   analysisRuns    AnalysisRun[]
   liabilitySnapshots LiabilitySnapshot[]
+  incomeCalculations  IncomeCalculation[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -95,6 +96,22 @@ model LiabilitySnapshot {
   grossCurrentMonthlyDebt Decimal
   totalCurrentBalance     Decimal
   calculatedAt            DateTime @default(now())
+}
+
+model IncomeCalculation {
+  id                   String   @id @default(uuid())
+  mortgageCaseId       String
+  mortgageCase         MortgageCase @relation(fields: [mortgageCaseId], references: [id])
+  receiptResults       Json
+  averageGrossIncome   Decimal
+  averageNetIncome     Decimal
+  confirmedGrossIncome Decimal?
+  confirmedNetIncome   Decimal?
+  status               String
+  confirmedBy          String?
+  confirmedAt          DateTime?
+  observations         String?
+  calculatedAt         DateTime @default(now())
 }
 
 enum PersonType {

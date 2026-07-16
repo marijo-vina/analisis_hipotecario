@@ -303,6 +303,7 @@ export type MortgageCaseWhereInput = {
   documents?: Prisma.DocumentListRelationFilter
   analysisRuns?: Prisma.AnalysisRunListRelationFilter
   liabilitySnapshots?: Prisma.LiabilitySnapshotListRelationFilter
+  incomeCalculations?: Prisma.IncomeCalculationListRelationFilter
 }
 
 export type MortgageCaseOrderByWithRelationInput = {
@@ -326,6 +327,7 @@ export type MortgageCaseOrderByWithRelationInput = {
   documents?: Prisma.DocumentOrderByRelationAggregateInput
   analysisRuns?: Prisma.AnalysisRunOrderByRelationAggregateInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotOrderByRelationAggregateInput
+  incomeCalculations?: Prisma.IncomeCalculationOrderByRelationAggregateInput
 }
 
 export type MortgageCaseWhereUniqueInput = Prisma.AtLeast<{
@@ -352,6 +354,7 @@ export type MortgageCaseWhereUniqueInput = Prisma.AtLeast<{
   documents?: Prisma.DocumentListRelationFilter
   analysisRuns?: Prisma.AnalysisRunListRelationFilter
   liabilitySnapshots?: Prisma.LiabilitySnapshotListRelationFilter
+  incomeCalculations?: Prisma.IncomeCalculationListRelationFilter
 }, "id">
 
 export type MortgageCaseOrderByWithAggregationInput = {
@@ -411,6 +414,7 @@ export type MortgageCaseCreateInput = {
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateInput = {
@@ -430,6 +434,7 @@ export type MortgageCaseUncheckedCreateInput = {
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUpdateInput = {
@@ -449,6 +454,7 @@ export type MortgageCaseUpdateInput = {
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateInput = {
@@ -468,6 +474,7 @@ export type MortgageCaseUncheckedUpdateInput = {
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseCreateManyInput = {
@@ -719,6 +726,20 @@ export type MortgageCaseUpdateOneRequiredWithoutLiabilitySnapshotsNestedInput = 
   update?: Prisma.XOR<Prisma.XOR<Prisma.MortgageCaseUpdateToOneWithWhereWithoutLiabilitySnapshotsInput, Prisma.MortgageCaseUpdateWithoutLiabilitySnapshotsInput>, Prisma.MortgageCaseUncheckedUpdateWithoutLiabilitySnapshotsInput>
 }
 
+export type MortgageCaseCreateNestedOneWithoutIncomeCalculationsInput = {
+  create?: Prisma.XOR<Prisma.MortgageCaseCreateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput>
+  connectOrCreate?: Prisma.MortgageCaseCreateOrConnectWithoutIncomeCalculationsInput
+  connect?: Prisma.MortgageCaseWhereUniqueInput
+}
+
+export type MortgageCaseUpdateOneRequiredWithoutIncomeCalculationsNestedInput = {
+  create?: Prisma.XOR<Prisma.MortgageCaseCreateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput>
+  connectOrCreate?: Prisma.MortgageCaseCreateOrConnectWithoutIncomeCalculationsInput
+  upsert?: Prisma.MortgageCaseUpsertWithoutIncomeCalculationsInput
+  connect?: Prisma.MortgageCaseWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MortgageCaseUpdateToOneWithWhereWithoutIncomeCalculationsInput, Prisma.MortgageCaseUpdateWithoutIncomeCalculationsInput>, Prisma.MortgageCaseUncheckedUpdateWithoutIncomeCalculationsInput>
+}
+
 export type MortgageCaseCreateNestedOneWithoutDocumentsInput = {
   create?: Prisma.XOR<Prisma.MortgageCaseCreateWithoutDocumentsInput, Prisma.MortgageCaseUncheckedCreateWithoutDocumentsInput>
   connectOrCreate?: Prisma.MortgageCaseCreateOrConnectWithoutDocumentsInput
@@ -847,6 +868,7 @@ export type MortgageCaseCreateWithoutAdvisorInput = {
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutAdvisorInput = {
@@ -865,6 +887,7 @@ export type MortgageCaseUncheckedCreateWithoutAdvisorInput = {
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutAdvisorInput = {
@@ -928,6 +951,7 @@ export type MortgageCaseCreateWithoutClientInput = {
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutClientInput = {
@@ -946,6 +970,7 @@ export type MortgageCaseUncheckedCreateWithoutClientInput = {
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutClientInput = {
@@ -990,6 +1015,7 @@ export type MortgageCaseCreateWithoutLiabilitySnapshotsInput = {
   status: Prisma.CaseStatusCreateNestedOneWithoutCasesInput
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutLiabilitySnapshotsInput = {
@@ -1008,6 +1034,7 @@ export type MortgageCaseUncheckedCreateWithoutLiabilitySnapshotsInput = {
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutLiabilitySnapshotsInput = {
@@ -1042,6 +1069,7 @@ export type MortgageCaseUpdateWithoutLiabilitySnapshotsInput = {
   status?: Prisma.CaseStatusUpdateOneRequiredWithoutCasesNestedInput
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutLiabilitySnapshotsInput = {
@@ -1060,6 +1088,99 @@ export type MortgageCaseUncheckedUpdateWithoutLiabilitySnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
+}
+
+export type MortgageCaseCreateWithoutIncomeCalculationsInput = {
+  id?: string
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  notes?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  client: Prisma.ClientCreateNestedOneWithoutCasesInput
+  advisor: Prisma.UserCreateNestedOneWithoutCasesInput
+  creditType: Prisma.CreditTypeCreateNestedOneWithoutCasesInput
+  status: Prisma.CaseStatusCreateNestedOneWithoutCasesInput
+  documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
+  analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
+  liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+}
+
+export type MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput = {
+  id?: string
+  clientId: string
+  advisorId: string
+  creditTypeId: number
+  statusId: number
+  personType?: $Enums.PersonType
+  propertyLocation?: string | null
+  estimatedTermMonths?: number | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  notes?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
+  analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
+  liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+}
+
+export type MortgageCaseCreateOrConnectWithoutIncomeCalculationsInput = {
+  where: Prisma.MortgageCaseWhereUniqueInput
+  create: Prisma.XOR<Prisma.MortgageCaseCreateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput>
+}
+
+export type MortgageCaseUpsertWithoutIncomeCalculationsInput = {
+  update: Prisma.XOR<Prisma.MortgageCaseUpdateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedUpdateWithoutIncomeCalculationsInput>
+  create: Prisma.XOR<Prisma.MortgageCaseCreateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput>
+  where?: Prisma.MortgageCaseWhereInput
+}
+
+export type MortgageCaseUpdateToOneWithWhereWithoutIncomeCalculationsInput = {
+  where?: Prisma.MortgageCaseWhereInput
+  data: Prisma.XOR<Prisma.MortgageCaseUpdateWithoutIncomeCalculationsInput, Prisma.MortgageCaseUncheckedUpdateWithoutIncomeCalculationsInput>
+}
+
+export type MortgageCaseUpdateWithoutIncomeCalculationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
+  advisor?: Prisma.UserUpdateOneRequiredWithoutCasesNestedInput
+  creditType?: Prisma.CreditTypeUpdateOneRequiredWithoutCasesNestedInput
+  status?: Prisma.CaseStatusUpdateOneRequiredWithoutCasesNestedInput
+  documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
+  analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
+  liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+}
+
+export type MortgageCaseUncheckedUpdateWithoutIncomeCalculationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clientId?: Prisma.StringFieldUpdateOperationsInput | string
+  advisorId?: Prisma.StringFieldUpdateOperationsInput | string
+  creditTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  statusId?: Prisma.IntFieldUpdateOperationsInput | number
+  personType?: Prisma.EnumPersonTypeFieldUpdateOperationsInput | $Enums.PersonType
+  propertyLocation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  estimatedTermMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  propertyValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseCreateWithoutDocumentsInput = {
@@ -1078,6 +1199,7 @@ export type MortgageCaseCreateWithoutDocumentsInput = {
   status: Prisma.CaseStatusCreateNestedOneWithoutCasesInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutDocumentsInput = {
@@ -1096,6 +1218,7 @@ export type MortgageCaseUncheckedCreateWithoutDocumentsInput = {
   updatedAt?: Date | string
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutDocumentsInput = {
@@ -1130,6 +1253,7 @@ export type MortgageCaseUpdateWithoutDocumentsInput = {
   status?: Prisma.CaseStatusUpdateOneRequiredWithoutCasesNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutDocumentsInput = {
@@ -1148,6 +1272,7 @@ export type MortgageCaseUncheckedUpdateWithoutDocumentsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseCreateWithoutAnalysisRunsInput = {
@@ -1166,6 +1291,7 @@ export type MortgageCaseCreateWithoutAnalysisRunsInput = {
   status: Prisma.CaseStatusCreateNestedOneWithoutCasesInput
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutAnalysisRunsInput = {
@@ -1184,6 +1310,7 @@ export type MortgageCaseUncheckedCreateWithoutAnalysisRunsInput = {
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutAnalysisRunsInput = {
@@ -1218,6 +1345,7 @@ export type MortgageCaseUpdateWithoutAnalysisRunsInput = {
   status?: Prisma.CaseStatusUpdateOneRequiredWithoutCasesNestedInput
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutAnalysisRunsInput = {
@@ -1236,6 +1364,7 @@ export type MortgageCaseUncheckedUpdateWithoutAnalysisRunsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseCreateWithoutCreditTypeInput = {
@@ -1254,6 +1383,7 @@ export type MortgageCaseCreateWithoutCreditTypeInput = {
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutCreditTypeInput = {
@@ -1272,6 +1402,7 @@ export type MortgageCaseUncheckedCreateWithoutCreditTypeInput = {
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutCreditTypeInput = {
@@ -1316,6 +1447,7 @@ export type MortgageCaseCreateWithoutStatusInput = {
   documents?: Prisma.DocumentCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseUncheckedCreateWithoutStatusInput = {
@@ -1334,6 +1466,7 @@ export type MortgageCaseUncheckedCreateWithoutStatusInput = {
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedCreateNestedManyWithoutMortgageCaseInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedCreateNestedManyWithoutMortgageCaseInput
 }
 
 export type MortgageCaseCreateOrConnectWithoutStatusInput = {
@@ -1393,6 +1526,7 @@ export type MortgageCaseUpdateWithoutAdvisorInput = {
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutAdvisorInput = {
@@ -1411,6 +1545,7 @@ export type MortgageCaseUncheckedUpdateWithoutAdvisorInput = {
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateManyWithoutAdvisorInput = {
@@ -1459,6 +1594,7 @@ export type MortgageCaseUpdateWithoutClientInput = {
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutClientInput = {
@@ -1477,6 +1613,7 @@ export type MortgageCaseUncheckedUpdateWithoutClientInput = {
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateManyWithoutClientInput = {
@@ -1525,6 +1662,7 @@ export type MortgageCaseUpdateWithoutCreditTypeInput = {
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutCreditTypeInput = {
@@ -1543,6 +1681,7 @@ export type MortgageCaseUncheckedUpdateWithoutCreditTypeInput = {
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateManyWithoutCreditTypeInput = {
@@ -1591,6 +1730,7 @@ export type MortgageCaseUpdateWithoutStatusInput = {
   documents?: Prisma.DocumentUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateWithoutStatusInput = {
@@ -1609,6 +1749,7 @@ export type MortgageCaseUncheckedUpdateWithoutStatusInput = {
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
   liabilitySnapshots?: Prisma.LiabilitySnapshotUncheckedUpdateManyWithoutMortgageCaseNestedInput
+  incomeCalculations?: Prisma.IncomeCalculationUncheckedUpdateManyWithoutMortgageCaseNestedInput
 }
 
 export type MortgageCaseUncheckedUpdateManyWithoutStatusInput = {
@@ -1635,12 +1776,14 @@ export type MortgageCaseCountOutputType = {
   documents: number
   analysisRuns: number
   liabilitySnapshots: number
+  incomeCalculations: number
 }
 
 export type MortgageCaseCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   documents?: boolean | MortgageCaseCountOutputTypeCountDocumentsArgs
   analysisRuns?: boolean | MortgageCaseCountOutputTypeCountAnalysisRunsArgs
   liabilitySnapshots?: boolean | MortgageCaseCountOutputTypeCountLiabilitySnapshotsArgs
+  incomeCalculations?: boolean | MortgageCaseCountOutputTypeCountIncomeCalculationsArgs
 }
 
 /**
@@ -1674,6 +1817,13 @@ export type MortgageCaseCountOutputTypeCountLiabilitySnapshotsArgs<ExtArgs exten
   where?: Prisma.LiabilitySnapshotWhereInput
 }
 
+/**
+ * MortgageCaseCountOutputType without action
+ */
+export type MortgageCaseCountOutputTypeCountIncomeCalculationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.IncomeCalculationWhereInput
+}
+
 
 export type MortgageCaseSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1696,6 +1846,7 @@ export type MortgageCaseSelect<ExtArgs extends runtime.Types.Extensions.Internal
   documents?: boolean | Prisma.MortgageCase$documentsArgs<ExtArgs>
   analysisRuns?: boolean | Prisma.MortgageCase$analysisRunsArgs<ExtArgs>
   liabilitySnapshots?: boolean | Prisma.MortgageCase$liabilitySnapshotsArgs<ExtArgs>
+  incomeCalculations?: boolean | Prisma.MortgageCase$incomeCalculationsArgs<ExtArgs>
   _count?: boolean | Prisma.MortgageCaseCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["mortgageCase"]>
 
@@ -1764,6 +1915,7 @@ export type MortgageCaseInclude<ExtArgs extends runtime.Types.Extensions.Interna
   documents?: boolean | Prisma.MortgageCase$documentsArgs<ExtArgs>
   analysisRuns?: boolean | Prisma.MortgageCase$analysisRunsArgs<ExtArgs>
   liabilitySnapshots?: boolean | Prisma.MortgageCase$liabilitySnapshotsArgs<ExtArgs>
+  incomeCalculations?: boolean | Prisma.MortgageCase$incomeCalculationsArgs<ExtArgs>
   _count?: boolean | Prisma.MortgageCaseCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MortgageCaseIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1789,6 +1941,7 @@ export type $MortgageCasePayload<ExtArgs extends runtime.Types.Extensions.Intern
     documents: Prisma.$DocumentPayload<ExtArgs>[]
     analysisRuns: Prisma.$AnalysisRunPayload<ExtArgs>[]
     liabilitySnapshots: Prisma.$LiabilitySnapshotPayload<ExtArgs>[]
+    incomeCalculations: Prisma.$IncomeCalculationPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2205,6 +2358,7 @@ export interface Prisma__MortgageCaseClient<T, Null = never, ExtArgs extends run
   documents<T extends Prisma.MortgageCase$documentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MortgageCase$documentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   analysisRuns<T extends Prisma.MortgageCase$analysisRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MortgageCase$analysisRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AnalysisRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   liabilitySnapshots<T extends Prisma.MortgageCase$liabilitySnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MortgageCase$liabilitySnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LiabilitySnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  incomeCalculations<T extends Prisma.MortgageCase$incomeCalculationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MortgageCase$incomeCalculationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$IncomeCalculationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2717,6 +2871,30 @@ export type MortgageCase$liabilitySnapshotsArgs<ExtArgs extends runtime.Types.Ex
   take?: number
   skip?: number
   distinct?: Prisma.LiabilitySnapshotScalarFieldEnum | Prisma.LiabilitySnapshotScalarFieldEnum[]
+}
+
+/**
+ * MortgageCase.incomeCalculations
+ */
+export type MortgageCase$incomeCalculationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the IncomeCalculation
+   */
+  select?: Prisma.IncomeCalculationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the IncomeCalculation
+   */
+  omit?: Prisma.IncomeCalculationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.IncomeCalculationInclude<ExtArgs> | null
+  where?: Prisma.IncomeCalculationWhereInput
+  orderBy?: Prisma.IncomeCalculationOrderByWithRelationInput | Prisma.IncomeCalculationOrderByWithRelationInput[]
+  cursor?: Prisma.IncomeCalculationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.IncomeCalculationScalarFieldEnum | Prisma.IncomeCalculationScalarFieldEnum[]
 }
 
 /**
