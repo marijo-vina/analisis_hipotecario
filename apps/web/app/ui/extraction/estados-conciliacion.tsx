@@ -356,13 +356,15 @@ function CriteriaBreakdown({ r }: { r: PreviewReceiptResult }) {
           </tr>
           <tr>
             <td className="px-3 py-2 font-medium text-gf-text">Concepto</td>
-            <td className="px-3 py-2 text-gf-text-muted truncate max-w-[150px]">—</td>
+            <td className="px-3 py-2 text-gray-400">—</td>
             <td className="px-3 py-2 text-gf-text-muted truncate max-w-[150px]">{r.candidate.concept ?? "—"}</td>
             <td className="px-3 py-2">
-              {r.method === "FALLBACK" ? (
+              {r.conceptKeyword ? (
+                <span className="text-green-600">✓ Contiene <span className="font-semibold">&ldquo;{r.conceptKeyword}&rdquo;</span></span>
+              ) : r.method === "FALLBACK" ? (
                 <span className="text-green-600">✓ Concepto compatible</span>
               ) : (
-                <span className="text-gray-400">⚠ No evaluado</span>
+                <span className="text-gray-400">—</span>
               )}
             </td>
           </tr>
