@@ -53,6 +53,49 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+// ── Currency input helper ────────────────────────────────────────────────────
+
+/**
+ * Formats a raw numeric string with thousand-separator commas for display
+ * while the user types. "1500000" → "1,500,000", "15000.50" → "15,000.50".
+ */
+function formatCurrencyRaw(raw: string): string {
+  if (!raw) return "";
+  const parts = raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+}
+
+/** Controlled text input that displays MXN-formatted numbers as the user types. */
+function CurrencyInput({
+  value,
+  onChange,
+  className,
+  placeholder,
+  id,
+}: {
+  value: string;
+  onChange: (raw: string) => void;
+  className?: string;
+  placeholder?: string;
+  id?: string;
+}) {
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={formatCurrencyRaw(value)}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/,/g, "");
+        onChange(raw);
+      }}
+      className={className}
+    />
+  );
+}
+
 // ── Status helpers ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -359,11 +402,10 @@ export default function IncomeCalculationSection({
                   <label className="mb-1 block text-xs font-medium text-gf-text-muted">
                     Ingreso bruto mensual confirmado
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
                     value={confirmGross}
-                    onChange={(e) => setConfirmGross(e.target.value)}
+                    onChange={setConfirmGross}
+                    placeholder="0.00"
                     className="w-full rounded-md border border-gf-border bg-gf-surface px-3 py-2 text-sm text-gf-text focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
                   />
                 </div>
@@ -371,11 +413,10 @@ export default function IncomeCalculationSection({
                   <label className="mb-1 block text-xs font-medium text-gf-text-muted">
                     Ingreso neto mensual confirmado
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
                     value={confirmNet}
-                    onChange={(e) => setConfirmNet(e.target.value)}
+                    onChange={setConfirmNet}
+                    placeholder="0.00"
                     className="w-full rounded-md border border-gf-border bg-gf-surface px-3 py-2 text-sm text-gf-text focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
                   />
                 </div>
