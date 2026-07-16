@@ -325,7 +325,6 @@ export default function IncomeCalculationSection({
                     <th className="px-4 py-3">RFC</th>
                     <th className="px-4 py-3 text-right">Ingreso bruto</th>
                     <th className="px-4 py-3 text-right">Ingreso neto</th>
-                    <th className="px-4 py-3">Conciliación</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gf-border">
@@ -366,9 +365,6 @@ export default function IncomeCalculationSection({
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-gf-text">
                         {formatMXN(receipt.netIncome)}
-                      </td>
-                      <td className="px-4 py-3 text-gf-text-muted">
-                        {receipt.conciliationStatus ?? "—"}
                       </td>
                     </tr>
                   ))}
