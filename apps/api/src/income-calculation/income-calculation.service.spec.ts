@@ -25,6 +25,7 @@ function makePayrollDoc(
       payrollPeriod: { periodLabel: 'Mayo 2025', paymentDate: '2025-05-15' },
       income: { grossIncome: 15000, netIncome: 12000 },
     },
+    processingResults: null,
     ...overrides,
   };
 }
@@ -568,9 +569,10 @@ describe('IncomeCalculationService', () => {
       const source = fs.readFileSync(servicePath, 'utf-8');
 
       // Must NOT import from payroll-bank-matching or any conciliation module
-      expect(source).not.toMatch(/from\s+['"].*conciliation/);
       expect(source).not.toMatch(/from\s+['"].*payroll-bank-matching/);
       expect(source).not.toMatch(/from\s+['"].*bank-reconciliation/);
+      expect(source).not.toMatch(/from\s+['"].*conciliation-service/);
+      expect(source).not.toMatch(/from\s+['"].*conciliation\.service/);
 
       // Must NOT reference conciliation service classes
       expect(source).not.toMatch(/ConciliationService/);

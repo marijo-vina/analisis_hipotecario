@@ -13,6 +13,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IncomeCalculationService } from './income-calculation.service';
 import { ConfirmIncomeDto } from './dto/confirm-income.dto';
+import { SaveConciliationDto } from './dto/save-conciliation.dto';
 
 /**
  * Optional body shape for `POST /cases/:caseId/income/calculate`.
@@ -126,5 +127,21 @@ export class IncomeCalculationController {
     @Req() req: { user: { id: string } },
   ) {
     return this.incomeService.confirm(caseId, dto, req.user.id);
+  }
+
+  /**
+   * POST /cases/:caseId/income/conciliation
+   *
+   * Persists conciliation results (status, method, reviewStatus) into
+   * each document's `processingResults` JSON field. Called after the
+   * front-end reconciliation preview runs.
+   */
+  @Post('conciliation')
+  @HttpCode(200)
+  async saveConciliation(
+    @Param('caseId') caseId: string,
+    @Body() dto: SaveConciliationDto,
+  ) {
+    return this.incomeService.saveConciliation(caseId, dto);
   }
 }
