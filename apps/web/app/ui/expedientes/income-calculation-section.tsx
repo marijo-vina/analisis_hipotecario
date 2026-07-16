@@ -119,6 +119,38 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function ConciliationBadge({ status }: { status: string }) {
+  const styleMap: Record<string, string> = {
+    MATCHED: "bg-green-100 text-green-700",
+    PROVIDER_MIRROR_CONFIRMED: "bg-green-100 text-green-700",
+    DISCREPANCY: "bg-amber-100 text-amber-700",
+    AMBIGUOUS: "bg-amber-100 text-amber-700",
+    NOT_MATCHED: "bg-gray-200 text-gray-600",
+    RFC_INCOMPATIBLE: "bg-red-100 text-red-700",
+    PROVIDER_CANDIDATE: "bg-blue-100 text-blue-700",
+    MANUAL_REVIEW: "bg-amber-100 text-amber-700",
+  };
+  const labelMap: Record<string, string> = {
+    MATCHED: "Conciliado",
+    PROVIDER_MIRROR_CONFIRMED: "Espejo",
+    DISCREPANCY: "Discrepancia",
+    AMBIGUOUS: "Ambiguo",
+    NOT_MATCHED: "Sin conciliar",
+    RFC_INCOMPATIBLE: "RFC incompatible",
+    PROVIDER_CANDIDATE: "Pagadora",
+    MANUAL_REVIEW: "Revisión",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+        styleMap[status] ?? "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {labelMap[status] ?? status}
+    </span>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 /**
@@ -325,6 +357,7 @@ export default function IncomeCalculationSection({
                     <th className="px-4 py-3">RFC</th>
                     <th className="px-4 py-3 text-right">Ingreso bruto</th>
                     <th className="px-4 py-3 text-right">Ingreso neto</th>
+                    <th className="px-4 py-3">Conciliación</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gf-border">
@@ -365,6 +398,13 @@ export default function IncomeCalculationSection({
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-gf-text">
                         {formatMXN(receipt.netIncome)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {receipt.conciliationStatus ? (
+                          <ConciliationBadge status={receipt.conciliationStatus} />
+                        ) : (
+                          <span className="text-gf-text-soft">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

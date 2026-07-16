@@ -201,6 +201,7 @@ export default function AnalysisSection({
       {/* ── Contenido del tab ───────────────────────────────────────────── */}
       {activeTab === "validaciones" && (
         <ValidacionesTab
+          caseId={caseId}
           state={state}
           operationalStatus={operationalStatus}
           onAnalyze={handleAnalyze}
@@ -234,6 +235,7 @@ export default function AnalysisSection({
 // ── Tab Validaciones ──────────────────────────────────────────────────────────
 
 function ValidacionesTab({
+  caseId,
   state,
   operationalStatus,
   onAnalyze,
@@ -243,6 +245,7 @@ function ValidacionesTab({
   allDeposits,
   payrollDocs,
 }: {
+  caseId: string;
   state: UiState;
   operationalStatus: string;
   onAnalyze: () => Promise<void>;
@@ -279,6 +282,7 @@ function ValidacionesTab({
         </h3>
         {allDeposits.length > 0 && payrollDocs.length > 0 ? (
           <EstadosConciliacion
+            caseId={caseId}
             allDeposits={allDeposits}
             payrollDocs={payrollDocs}
           />
