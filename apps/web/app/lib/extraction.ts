@@ -876,6 +876,9 @@ export function parseBankStatements(
       (a) => a.severity === "CRITICAL",
     );
     for (const a of alerts) {
+      // Skip per-statement month-count warnings — they're misleading
+      // at the aggregate level because each statement only sees itself.
+      if (a.code === "BANK_FEWER_MONTHS_THAN_REQUIRED") continue;
       if (a.severity === "CRITICAL") totalCriticalAlerts++;
       else totalWarningAlerts++;
     }

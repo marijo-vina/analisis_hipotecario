@@ -235,9 +235,9 @@ function EditableInquiriesKpi({
           >
             ✕
           </button>
-        </div>
       </div>
-    );
+    </div>
+  );
   }
 
   return (
@@ -266,6 +266,13 @@ function EditableInquiriesKpi({
       </div>
     </div>
   );
+}
+
+/** Formats a numeric string with thousand-separator commas (e.g. "1450000" → "1,450,000"). */
+function formatWithCommas(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits === "") return "";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function KpiRow({
@@ -366,8 +373,7 @@ function DiagnosisCard({ parsed }: { parsed: ParsedCreditBureau }) {
         <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-[10px] font-semibold ${chipColor}`}>
           Riesgo {riskLevel.toLowerCase()}
         </span>
-      </div>
-      <p className="text-[12px] text-gf-text-muted">{riskMessage}</p>
+        </div>
     </div>
   );
 }
@@ -439,12 +445,14 @@ function RiskChips({ parsed }: { parsed: ParsedCreditBureau }) {
 function CreditRow({
   credit,
   creditNumber,
+  displayNumber,
   caseId,
   documentId,
   onPaymentDueUpdate,
 }: {
   credit: ParsedCreditBureauCredit;
-  creditNumber: number;
+  creditNumber: number;  // original flat index in parsed.credits[]
+  displayNumber: number; // 1-based row number shown to the user
   caseId: string;
   documentId: string;
   onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
@@ -452,6 +460,7 @@ function CreditRow({
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [mopExpanded, setMopExpanded] = useState(false);
 
   const isRisky =
@@ -489,14 +498,19 @@ function CreditRow({
     credit.paymentDueAmountEffective ?? credit.paymentDueAmount ?? null;
 
   async function handleSave() {
-    const parsed = parseFloat(editValue);
+    // Strip thousand separators before parsing
+    const parsed = parseFloat(editValue.replace(/,/g, ""));
     if (isNaN(parsed)) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await updatePaymentDueManual(caseId, documentId, creditNumber, parsed);
       onPaymentDueUpdate(creditNumber, parsed);
       setEditing(false);
-    } catch {
+    } catch (e) {
+      setSaveError(
+        e instanceof Error ? e.message : "Error al guardar el monto",
+      );
     } finally {
       setSaving(false);
     }
@@ -508,7 +522,8 @@ function CreditRow({
   }
 
   function handleStartEdit() {
-    setEditValue(effectiveForDisplay != null ? String(effectiveForDisplay) : "");
+    const raw = effectiveForDisplay != null ? String(effectiveForDisplay) : "";
+    setEditValue(formatWithCommas(raw));
     setEditing(true);
   }
 
@@ -576,7 +591,7 @@ function CreditRow({
       {/* # */}
       <td className="py-2.5 pl-4 pr-1 w-8">
         <span className="text-[13px] font-semibold text-gf-text-muted">
-          {creditNumber}.
+          {displayNumber}.
         </span>
       </td>
 
@@ -613,16 +628,16 @@ function CreditRow({
         ) : editing ? (
           <span className="inline-flex items-center gap-1">
             <input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="numeric"
               value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
+              onChange={(e) => setEditValue(formatWithCommas(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSave();
                 if (e.key === "Escape") handleCancel();
               }}
               autoFocus
-              className="w-20 rounded border border-gf-border px-1.5 py-0.5 text-right font-mono text-[13px] text-gf-text focus:border-blue-400 focus:outline-none"
+              className="w-28 rounded border border-gf-border px-1.5 py-0.5 text-right font-mono text-[13px] text-gf-text focus:border-blue-400 focus:outline-none"
             />
             <button type="button" onClick={handleSave} disabled={saving} className="inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700 disabled:opacity-50">
               {saving ? "··" : "✓"}
@@ -630,6 +645,9 @@ function CreditRow({
             <button type="button" onClick={handleCancel} disabled={saving} className="inline-flex items-center rounded bg-gf-bg px-1.5 py-0.5 text-[10px] font-medium text-gf-text-muted hover:bg-gf-border/50 disabled:opacity-50">
               ✕
             </button>
+            {saveError && (
+              <span className="text-[10px] text-red-600 ml-1">{saveError}</span>
+            )}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 justify-end">
@@ -735,15 +753,13 @@ function CreditTableSection({
   accent,
   caseId,
   documentId,
-  globalStartIndex,
   onPaymentDueUpdate,
 }: {
   title: string;
-  credits: ParsedCreditBureauCredit[];
+  credits: { credit: ParsedCreditBureauCredit; idx: number }[];
   accent: "red" | "purple";
   caseId: string;
   documentId: string;
-  globalStartIndex: number;
   onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
 }) {
   if (credits.length === 0) return null;
@@ -769,14 +785,15 @@ function CreditTableSection({
               </tr>
             </thead>
             <tbody>
-              {credits.map((credit, i) => (
+              {credits.map(({ credit, idx }, i) => (
                 <CreditRow
-                  key={i}
+                  key={idx}
                   credit={credit}
-                  creditNumber={globalStartIndex + i + 1}
+                  creditNumber={idx}
+                  displayNumber={i + 1}
                   caseId={caseId}
                   documentId={documentId}
-                  onPaymentDueUpdate={(ci, mv) => onPaymentDueUpdate(globalStartIndex + ci, mv)}
+                  onPaymentDueUpdate={onPaymentDueUpdate}
                 />
               ))}
             </tbody>
@@ -798,8 +815,12 @@ function CreditsTable({
 }) {
   if (parsed.credits.length === 0) return null;
 
-  const bankingCredits = parsed.credits.filter(isBankingCredit);
-  const nonBankingCredits = parsed.credits.filter((c) => !isBankingCredit(c));
+  // Tag each credit with its original flat index so the callback
+  // always uses the correct position in parsed.credits[], regardless
+  // of how the banking / non-banking split reorders them.
+  const indexed = parsed.credits.map((credit, idx) => ({ credit, idx }));
+  const bankingCredits = indexed.filter(({ credit }) => isBankingCredit(credit));
+  const nonBankingCredits = indexed.filter(({ credit }) => !isBankingCredit(credit));
 
   return (
     <div className="flex flex-col gap-5">
@@ -809,7 +830,6 @@ function CreditsTable({
         accent="red"
         caseId={caseId}
         documentId={parsed.documentId}
-        globalStartIndex={0}
         onPaymentDueUpdate={onPaymentDueUpdate}
       />
       <CreditTableSection
@@ -818,8 +838,7 @@ function CreditsTable({
         accent="purple"
         caseId={caseId}
         documentId={parsed.documentId}
-        globalStartIndex={0}
-        onPaymentDueUpdate={(ci, mv) => onPaymentDueUpdate(bankingCredits.length + ci, mv)}
+        onPaymentDueUpdate={onPaymentDueUpdate}
       />
     </div>
   );

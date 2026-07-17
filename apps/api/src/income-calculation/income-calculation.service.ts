@@ -263,7 +263,7 @@ export class IncomeCalculationService {
               reviewedAt: item.reviewStatus === 'REVIEWED' ? new Date().toISOString() : null,
             },
           },
-        },
+        } as any,
       });
       saved++;
     }

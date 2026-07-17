@@ -88,6 +88,7 @@ export type DocumentCountAggregateOutputType = {
   ocrText: number
   ocrLayout: number
   extractedData: number
+  processingResults: number
   processedAt: number
   processingError: number
   createdAt: number
@@ -158,6 +159,7 @@ export type DocumentCountAggregateInputType = {
   ocrText?: true
   ocrLayout?: true
   extractedData?: true
+  processingResults?: true
   processedAt?: true
   processingError?: true
   createdAt?: true
@@ -265,6 +267,7 @@ export type DocumentGroupByOutputType = {
   ocrText: string | null
   ocrLayout: runtime.JsonValue | null
   extractedData: runtime.JsonValue | null
+  processingResults: runtime.JsonValue | null
   processedAt: Date | null
   processingError: string | null
   createdAt: Date
@@ -308,6 +311,7 @@ export type DocumentWhereInput = {
   ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
   ocrLayout?: Prisma.JsonNullableFilter<"Document">
   extractedData?: Prisma.JsonNullableFilter<"Document">
+  processingResults?: Prisma.JsonNullableFilter<"Document">
   processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
   processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -332,6 +336,7 @@ export type DocumentOrderByWithRelationInput = {
   ocrText?: Prisma.SortOrderInput | Prisma.SortOrder
   ocrLayout?: Prisma.SortOrderInput | Prisma.SortOrder
   extractedData?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingResults?: Prisma.SortOrderInput | Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   processingError?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -359,6 +364,7 @@ export type DocumentWhereUniqueInput = Prisma.AtLeast<{
   ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
   ocrLayout?: Prisma.JsonNullableFilter<"Document">
   extractedData?: Prisma.JsonNullableFilter<"Document">
+  processingResults?: Prisma.JsonNullableFilter<"Document">
   processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
   processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -383,6 +389,7 @@ export type DocumentOrderByWithAggregationInput = {
   ocrText?: Prisma.SortOrderInput | Prisma.SortOrder
   ocrLayout?: Prisma.SortOrderInput | Prisma.SortOrder
   extractedData?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingResults?: Prisma.SortOrderInput | Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   processingError?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -411,6 +418,7 @@ export type DocumentScalarWhereWithAggregatesInput = {
   ocrText?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   ocrLayout?: Prisma.JsonNullableWithAggregatesFilter<"Document">
   extractedData?: Prisma.JsonNullableWithAggregatesFilter<"Document">
+  processingResults?: Prisma.JsonNullableWithAggregatesFilter<"Document">
   processedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Document"> | Date | string | null
   processingError?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Document"> | Date | string
@@ -427,6 +435,7 @@ export type DocumentCreateInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -451,6 +460,7 @@ export type DocumentUncheckedCreateInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -467,6 +477,7 @@ export type DocumentUpdateInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -491,6 +502,7 @@ export type DocumentUncheckedUpdateInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -511,6 +523,7 @@ export type DocumentCreateManyInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -527,6 +540,7 @@ export type DocumentUpdateManyMutationInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -547,6 +561,7 @@ export type DocumentUncheckedUpdateManyInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -577,6 +592,7 @@ export type DocumentCountOrderByAggregateInput = {
   ocrText?: Prisma.SortOrder
   ocrLayout?: Prisma.SortOrder
   extractedData?: Prisma.SortOrder
+  processingResults?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   processingError?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -809,6 +825,7 @@ export type DocumentCreateWithoutUploadedByInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -831,6 +848,7 @@ export type DocumentUncheckedCreateWithoutUploadedByInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -880,6 +898,7 @@ export type DocumentScalarWhereInput = {
   ocrText?: Prisma.StringNullableFilter<"Document"> | string | null
   ocrLayout?: Prisma.JsonNullableFilter<"Document">
   extractedData?: Prisma.JsonNullableFilter<"Document">
+  processingResults?: Prisma.JsonNullableFilter<"Document">
   processedAt?: Prisma.DateTimeNullableFilter<"Document"> | Date | string | null
   processingError?: Prisma.StringNullableFilter<"Document"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Document"> | Date | string
@@ -896,6 +915,7 @@ export type DocumentCreateWithoutMortgageCaseInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -918,6 +938,7 @@ export type DocumentUncheckedCreateWithoutMortgageCaseInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -960,6 +981,7 @@ export type DocumentCreateWithoutDocumentTypeInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -982,6 +1004,7 @@ export type DocumentUncheckedCreateWithoutDocumentTypeInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1024,6 +1047,7 @@ export type DocumentCreateWithoutDocumentStatusInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1046,6 +1070,7 @@ export type DocumentUncheckedCreateWithoutDocumentStatusInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1091,6 +1116,7 @@ export type DocumentCreateManyUploadedByInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1107,6 +1133,7 @@ export type DocumentUpdateWithoutUploadedByInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1129,6 +1156,7 @@ export type DocumentUncheckedUpdateWithoutUploadedByInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1148,6 +1176,7 @@ export type DocumentUncheckedUpdateManyWithoutUploadedByInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1167,6 +1196,7 @@ export type DocumentCreateManyMortgageCaseInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1183,6 +1213,7 @@ export type DocumentUpdateWithoutMortgageCaseInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1205,6 +1236,7 @@ export type DocumentUncheckedUpdateWithoutMortgageCaseInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1224,6 +1256,7 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1243,6 +1276,7 @@ export type DocumentCreateManyDocumentTypeInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1259,6 +1293,7 @@ export type DocumentUpdateWithoutDocumentTypeInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1281,6 +1316,7 @@ export type DocumentUncheckedUpdateWithoutDocumentTypeInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1300,6 +1336,7 @@ export type DocumentUncheckedUpdateManyWithoutDocumentTypeInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1319,6 +1356,7 @@ export type DocumentCreateManyDocumentStatusInput = {
   ocrText?: string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Date | string | null
   processingError?: string | null
   createdAt?: Date | string
@@ -1335,6 +1373,7 @@ export type DocumentUpdateWithoutDocumentStatusInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1357,6 +1396,7 @@ export type DocumentUncheckedUpdateWithoutDocumentStatusInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1376,6 +1416,7 @@ export type DocumentUncheckedUpdateManyWithoutDocumentStatusInput = {
   ocrText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ocrLayout?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   extractedData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  processingResults?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   processingError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1398,6 +1439,7 @@ export type DocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   ocrText?: boolean
   ocrLayout?: boolean
   extractedData?: boolean
+  processingResults?: boolean
   processedAt?: boolean
   processingError?: boolean
   createdAt?: boolean
@@ -1422,6 +1464,7 @@ export type DocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   ocrText?: boolean
   ocrLayout?: boolean
   extractedData?: boolean
+  processingResults?: boolean
   processedAt?: boolean
   processingError?: boolean
   createdAt?: boolean
@@ -1446,6 +1489,7 @@ export type DocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   ocrText?: boolean
   ocrLayout?: boolean
   extractedData?: boolean
+  processingResults?: boolean
   processedAt?: boolean
   processingError?: boolean
   createdAt?: boolean
@@ -1470,13 +1514,14 @@ export type DocumentSelectScalar = {
   ocrText?: boolean
   ocrLayout?: boolean
   extractedData?: boolean
+  processingResults?: boolean
   processedAt?: boolean
   processingError?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "ocrText" | "ocrLayout" | "extractedData" | "processedAt" | "processingError" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
+export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "ocrText" | "ocrLayout" | "extractedData" | "processingResults" | "processedAt" | "processingError" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
 export type DocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
   documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
@@ -1523,6 +1568,7 @@ export type $DocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
      */
     ocrLayout: runtime.JsonValue | null
     extractedData: runtime.JsonValue | null
+    processingResults: runtime.JsonValue | null
     processedAt: Date | null
     processingError: string | null
     createdAt: Date
@@ -1967,6 +2013,7 @@ export interface DocumentFieldRefs {
   readonly ocrText: Prisma.FieldRef<"Document", 'String'>
   readonly ocrLayout: Prisma.FieldRef<"Document", 'Json'>
   readonly extractedData: Prisma.FieldRef<"Document", 'Json'>
+  readonly processingResults: Prisma.FieldRef<"Document", 'Json'>
   readonly processedAt: Prisma.FieldRef<"Document", 'DateTime'>
   readonly processingError: Prisma.FieldRef<"Document", 'String'>
   readonly createdAt: Prisma.FieldRef<"Document", 'DateTime'>

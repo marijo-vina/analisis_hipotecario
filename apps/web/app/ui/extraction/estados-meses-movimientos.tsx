@@ -28,8 +28,6 @@ export default function EstadosMesesMovimientos({
   context,
   statements,
 }: EstadosMesesMovimientosProps) {
-  const allMovements = statements.flatMap((s) => s.otherMovements);
-
   // Statements with actual extracted data
   const dataStatements = statements.filter((s) => s.hasData);
 
@@ -150,54 +148,6 @@ export default function EstadosMesesMovimientos({
           </p>
         )}
       </Card>
-
-      {/* ── Other movements ──────────────────────────────────────────── */}
-      {allMovements.length > 0 && (
-        <Card className="w-[360px] shrink-0 space-y-3 p-5">
-          <span className="text-sm font-semibold text-gf-text">
-            Otros movimientos
-          </span>
-
-          <div className="space-y-2">
-            {allMovements.slice(0, 6).map((mov, i) => {
-              const isOutflow = mov.amount != null && mov.amount < 0;
-              return (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 rounded-lg bg-gf-bg px-3 py-2"
-                >
-                  <span className="w-[68px] shrink-0 text-xs font-semibold text-gf-text">
-                    {mov.date ? fmtShort(mov.date) : "—"}
-                  </span>
-                  <span
-                    className={`w-24 shrink-0 text-right text-[13px] font-semibold ${
-                      isOutflow ? "text-red-600" : "text-green-600"
-                    }`}
-                  >
-                    {mov.amount != null ? fmtCurrency(mov.amount) : "—"}
-                  </span>
-                  <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-gf-text truncate">
-                      {mov.movementType ?? mov.description ?? "—"}
-                    </span>
-                    {mov.description && mov.movementType && (
-                      <span className="text-[10px] text-gf-text-soft truncate">
-                        {mov.description}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {allMovements.length > 6 && (
-            <p className="text-[11px] text-gf-text-muted">
-              y {allMovements.length - 6} movimientos más...
-            </p>
-          )}
-        </Card>
-      )}
     </div>
   );
 }
@@ -242,20 +192,3 @@ function getBankForMonth(
   return "—";
 }
 
-function fmtShort(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (m) return `${m[3]} ${fmtMonthAbbr(m[2])}`;
-  return iso;
-}
-
-function fmtMonthAbbr(mm: string): string {
-  return MONTH_LABELS[mm] ?? mm;
-}
-
-function fmtCurrency(amount: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
