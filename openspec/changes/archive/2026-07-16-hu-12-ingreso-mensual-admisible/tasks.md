@@ -58,6 +58,11 @@ Chain strategy: pending
 - [x] 4.5 Test: GET /latest returns snapshot intact after case reload; conciliation engine NOT called during income calculation
 - [ ] 4.6 Frontend component tests — SKIPPED: apps/web has no test runner configured
 
+> **Archive note (2026-07-16)**: Task 4.6 intentionally skipped with explicit orchestrator approval.
+> Reason: `apps/web` has no test runner configured (no Vitest/Jest/RTL install). Backend coverage is complete
+> (49/49 income tests + 51/51 liability regression). Frontend test infrastructure is a separate
+> follow-up concern, not a blocker for this change. sdd-verify: **PASS WITH WARNINGS** (no CRITICAL issues).
+
 ## Phase 5: Cleanup / Verification
 
 - [x] 5.1 Verify HU-09, HU-10, HU-11 not affected: run existing test suites for extraction, conciliation, liability modules
