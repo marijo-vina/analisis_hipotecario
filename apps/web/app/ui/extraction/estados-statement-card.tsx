@@ -20,11 +20,20 @@ interface EstadosStatementCardProps {
 export default function EstadosStatementCard({
   statement,
 }: EstadosStatementCardProps) {
-  const [expanded, setExpanded] = useState(statement.hasCritical);
+  // Filter out per-statement month-count warnings; they're misleading
+  // because each statement sees only itself, not the aggregate.
+  const visibleAlerts = statement.alerts.filter(
+    (a) => a.code !== "BANK_FEWER_MONTHS_THAN_REQUIRED",
+  );
+  const visibleHasCritical = visibleAlerts.some(
+    (a) => a.severity === "CRITICAL",
+  );
 
-  const borderClass = statement.hasCritical
+  const [expanded, setExpanded] = useState(visibleHasCritical);
+
+  const borderClass = visibleHasCritical
     ? "border-l-4 border-l-red-500"
-    : statement.alerts.length > 0
+    : visibleAlerts.length > 0
       ? "border-l-4 border-l-amber-500"
       : "";
 
@@ -133,14 +142,14 @@ export default function EstadosStatementCard({
         <div className="flex flex-1 flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-[15px] font-semibold text-gf-text">
-              {statement.bankName ?? "Banco desconocido"}
+              {statement.originalName ?? statement.bankName ?? "Desconocido"}
             </span>
-            {statement.hasCritical && (
+            {visibleHasCritical && (
               <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
                 ● CRÍTICA
               </span>
             )}
-            {!statement.hasCritical && statement.alerts.length > 0 && (
+            {!visibleHasCritical && visibleAlerts.length > 0 && (
               <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
                 ● ADVERTENCIA
               </span>
@@ -210,16 +219,16 @@ export default function EstadosStatementCard({
             />
             <MetricCell
               label="Alertas"
-              value={String(statement.alerts.length)}
+              value={String(visibleAlerts.length)}
               sub={
-                statement.hasCritical
+                visibleHasCritical
                   ? "críticas"
-                  : statement.alerts.length > 0
+                  : visibleAlerts.length > 0
                     ? "advertencias"
                     : "sin alertas"
               }
-              danger={statement.hasCritical}
-              warning={!statement.hasCritical && statement.alerts.length > 0}
+              danger={visibleHasCritical}
+              warning={!visibleHasCritical && visibleAlerts.length > 0}
             />
           </div>
 
@@ -363,8 +372,8 @@ export default function EstadosStatementCard({
             </>
           )}
 
-          {/* ── Alerts ─────────────────────────────────────────────────── */}
-          {statement.alerts.length > 0 && (
+          {/* ── Alerts (excluding month-count warnings) ────────────────── */}
+          {visibleAlerts.length > 0 && (
             <>
               <div className="border-t border-gf-border" />
               <div className="space-y-2.5 px-5 py-5">
@@ -374,44 +383,44 @@ export default function EstadosStatementCard({
                   </h4>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      statement.hasCritical
+                      visibleHasCritical
                         ? "bg-red-50 text-red-600"
                         : "bg-amber-50 text-amber-600"
                     }`}
                   >
-                    {statement.alerts.length}{" "}
-                    {statement.hasCritical ? "críticas" : "advertencias"}
+                    {visibleAlerts.length}{" "}
+                    {visibleHasCritical ? "críticas" : "advertencias"}
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {statement.alerts.map((alert) => {
-                    const isCrit = alert.severity === "CRITICAL";
-                    return (
-                      <div
-                        key={alert.code}
-                        className={`flex items-start gap-3 rounded-lg px-4 py-3 ${
-                          isCrit ? "bg-red-50" : "bg-amber-50"
-                        }`}
-                      >
-                        <span
-                          className={`mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                            isCrit ? "bg-red-500" : "bg-amber-500"
+                  {visibleAlerts.map((alert) => {
+                      const isCrit = alert.severity === "CRITICAL";
+                      return (
+                        <div
+                          key={alert.code}
+                          className={`flex items-start gap-3 rounded-lg px-4 py-3 ${
+                            isCrit ? "bg-red-50" : "bg-amber-50"
                           }`}
                         >
-                          !
-                        </span>
-                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                           <span
-                            className={`text-[13px] font-semibold ${
-                              isCrit ? "text-red-800" : "text-amber-800"
+                            className={`mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                              isCrit ? "bg-red-500" : "bg-amber-500"
                             }`}
                           >
-                            {alert.message}
+                            !
                           </span>
+                          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                            <span
+                              className={`text-[13px] font-semibold ${
+                                isCrit ? "text-red-800" : "text-amber-800"
+                              }`}
+                            >
+                              {alert.message}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               </div>
             </>

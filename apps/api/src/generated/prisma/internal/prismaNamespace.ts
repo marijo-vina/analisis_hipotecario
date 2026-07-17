@@ -1513,6 +1513,7 @@ export const DocumentScalarFieldEnum = {
   ocrText: 'ocrText',
   ocrLayout: 'ocrLayout',
   extractedData: 'extractedData',
+  processingResults: 'processingResults',
   processedAt: 'processedAt',
   processingError: 'processingError',
   createdAt: 'createdAt',

@@ -2599,7 +2599,8 @@ export class CreditBureauExtractionService {
       throw new Error('Document not found or has no extracted data');
     }
 
-    const data = doc.extractedData as Record<string, unknown>;
+    // Deep-clone so Prisma detects the mutation in the Json field.
+    const data = JSON.parse(JSON.stringify(doc.extractedData)) as Record<string, unknown>;
     const credits = data.credits as Record<string, unknown>[] | undefined;
     if (!credits || creditIndex < 0 || creditIndex >= credits.length) {
       throw new Error(`Credit index ${creditIndex} out of bounds (0-${(credits?.length ?? 0) - 1})`);
@@ -2670,7 +2671,8 @@ export class CreditBureauExtractionService {
       throw new Error('Document not found or has no extracted data');
     }
 
-    const data = doc.extractedData as Record<string, unknown>;
+    // Deep-clone so Prisma detects the mutation in the Json field.
+    const data = JSON.parse(JSON.stringify(doc.extractedData)) as Record<string, unknown>;
 
     if (body.inquiries24mManual !== undefined) {
       data.inquiries24mManual = body.inquiries24mManual;
