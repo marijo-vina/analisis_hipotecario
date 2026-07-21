@@ -21,13 +21,23 @@ describe('PayrollBankMatchingService', () => {
       employerRfc: string | null;
       employerName: string | null;
     }> = {},
-  ) => ({
-    index: over.index ?? 0,
-    netIncome: over.netIncome ?? 10000,
-    paymentDate: over.paymentDate ?? '2026-07-01',
-    employerRfc: over.employerRfc ?? null,
-    employerName: over.employerName ?? null,
-  });
+  ) => {
+    const paymentDate = over.paymentDate ?? '2026-07-01';
+    return {
+      index: over.index ?? 0,
+      netIncome: over.netIncome ?? 10000,
+      paymentDate,
+      resolvedPaymentDate: {
+        resolvedPaymentDate: paymentDate,
+        source: 'MANUAL_OVERRIDE' as const,
+        estimated: false,
+        originalPeriodLabel: null,
+      },
+      employerRfc: over.employerRfc ?? null,
+      employerName: over.employerName ?? null,
+      originalName: null,
+    };
+  };
 
   const deposit = (
     over: Partial<{
