@@ -166,6 +166,8 @@ function normalizeRfc(rfc: string | null | undefined): string | null {
 
 /**
  * Normaliza concepto a minusculas (NFD + strip acentos + colapsar espacios).
+ * Ademas reemplaza caracteres griegos visualmente identicos (OCR artifacts)
+ * por sus equivalentes latinos.
  * @duplicate PayrollBankMatchingService.normalizeConcept (backend) — misma logica.
  */
 function normalizeConceptLower(concept: string | null | undefined): string {
@@ -174,6 +176,15 @@ function normalizeConceptLower(concept: string | null | undefined): string {
     .toUpperCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7]/g, (ch) => {
+      // Greek capital lookalikes → Latin
+      const map: Record<string, string> = {
+        '\u0391':'A','\u0392':'B','\u0395':'E','\u0396':'Z','\u0397':'H',
+        '\u0399':'I','\u039A':'K','\u039C':'M','\u039D':'N','\u039F':'O',
+        '\u03A1':'P','\u03A4':'T','\u03A5':'Y','\u03A7':'X',
+      };
+      return map[ch] ?? ch;
+    })
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
@@ -181,6 +192,8 @@ function normalizeConceptLower(concept: string | null | undefined): string {
 
 /**
  * Normaliza concepto a mayusculas (NFD + strip acentos + colapsar espacios).
+ * Ademas reemplaza caracteres griegos visualmente identicos (OCR artifacts)
+ * por sus equivalentes latinos.
  * @duplicate PagadoraDetectionService.normalizeConceptUpper (backend) — misma logica.
  */
 function normalizeConceptUpper(concept: string | null | undefined): string {
@@ -189,6 +202,14 @@ function normalizeConceptUpper(concept: string | null | undefined): string {
     .toUpperCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7]/g, (ch) => {
+      const map: Record<string, string> = {
+        '\u0391':'A','\u0392':'B','\u0395':'E','\u0396':'Z','\u0397':'H',
+        '\u0399':'I','\u039A':'K','\u039C':'M','\u039D':'N','\u039F':'O',
+        '\u03A1':'P','\u03A4':'T','\u03A5':'Y','\u03A7':'X',
+      };
+      return map[ch] ?? ch;
+    })
     .replace(/\s+/g, " ")
     .trim();
 }

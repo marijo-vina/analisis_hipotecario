@@ -33,10 +33,20 @@ const AMOUNT_TOLERANCE_PCT = 5;
 /**
  * Normaliza un concepto a MAYUSCULAS sin acentos para la regla Scotiabank
  * (la regla busca la palabra "NOMINA" en mayusculas).
+ * Ademas reemplaza caracteres griegos visualmente identicos (OCR artifacts).
  */
 function normalizeConceptUpper(concept: string | null): string {
   if (concept == null) return '';
-  return normalizeText(concept).toUpperCase();
+  return normalizeText(concept)
+    .replace(/[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7]/g, (ch) => {
+      const map: Record<string, string> = {
+        '\u0391':'A','\u0392':'B','\u0395':'E','\u0396':'Z','\u0397':'H',
+        '\u0399':'I','\u039A':'K','\u039C':'M','\u039D':'N','\u039F':'O',
+        '\u03A1':'P','\u03A4':'T','\u03A5':'Y','\u03A7':'X',
+      };
+      return map[ch] ?? ch;
+    })
+    .toUpperCase();
 }
 
 /** true cuando el concepto normalizado contiene la palabra "NOMINA". */
