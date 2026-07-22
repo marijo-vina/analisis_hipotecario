@@ -201,11 +201,22 @@ export class BankarizationValidationRule implements AnalysisRule {
     const outcome = this.computeOutcome(merged);
     const severity = this.computeSeverity(outcome);
 
+    // 6. Compute case-level bankarization flags for Phase C (bank-viability).
+    const hasPagadoraIncome = merged.some(
+      (r) => (r as Record<string, unknown>).hasPagadoraIncome === true,
+    );
+    const scotiabankExcluded = merged.some((r) => r.scotiabankExcluded);
+
     return {
       ruleId: this.ruleId,
       outcome,
       severity,
-      detail: { sources: ['payroll', 'bank-statement', 'client'], fields: [] },
+      detail: {
+        sources: ['payroll', 'bank-statement', 'client'],
+        fields: [],
+        hasPagadoraIncome,
+        scotiabankExcluded,
+      },
       alerts,
     };
   }
@@ -300,6 +311,7 @@ export class BankarizationValidationRule implements AnalysisRule {
         ...r,
         status,
         scotiabankExcluded: ev.scotiabankExcluded || r.scotiabankExcluded,
+        hasPagadoraIncome: ev.isProviderCandidate || ev.isMirrorConfirmed,
       };
     });
   }
