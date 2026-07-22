@@ -229,6 +229,18 @@ export interface ProductMatchCalculation {
 }
 
 export interface ProductPolicySnapshot {
+  /**
+   * Optional bank display name. The backend `policySnapshot` is currently
+   * typed as `Record<string, unknown>` and does NOT include `bankName` yet;
+   * the UI falls back to `bankCode` when this is absent.
+   */
+  bankName?: string;
+  /**
+   * Optional product display name. The backend `policySnapshot` is currently
+   * typed as `Record<string, unknown>` and does NOT include `productName` yet;
+   * the UI falls back to `productCode` when this is absent.
+   */
+  productName?: string;
   incomeCriterion: string;
   debtCommitmentFactor: string;
   minimumEmploymentTenureMonths: number | null;
@@ -283,4 +295,5 @@ export const REASON_LABELS: Record<string, string> = {
   MISSING_LIABILITY_SNAPSHOT: "Sin snapshot de pasivos",
   UNSUPPORTED_DESTINATION: "Destino no soportado",
   MISSING_BIRTH_DATE: "Fecha de nacimiento no disponible",
+  MISSING_EMPLOYMENT_DATA: "Datos de empleo no disponibles",
 };

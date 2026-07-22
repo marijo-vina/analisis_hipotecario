@@ -406,6 +406,9 @@ export class BankViabilityRule implements AnalysisRule {
           maximumMonths: product.maximumMaturityAgeMonths,
         };
       }
+    } else if (product.maximumMaturityAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.maturityAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.maturityAge = { status: 'NOT_APPLICABLE' };
     }
@@ -426,6 +429,9 @@ export class BankViabilityRule implements AnalysisRule {
           requiredMonths: product.minimumApplicantAgeMonths,
         };
       }
+    } else if (product.minimumApplicantAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.minimumApplicantAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.minimumApplicantAge = { status: 'NOT_APPLICABLE' };
     }
@@ -446,6 +452,9 @@ export class BankViabilityRule implements AnalysisRule {
           maximumMonths: product.maximumApplicationAgeMonths,
         };
       }
+    } else if (product.maximumApplicationAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.maximumApplicationAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.maximumApplicationAge = { status: 'NOT_APPLICABLE' };
     }
@@ -467,6 +476,10 @@ export class BankViabilityRule implements AnalysisRule {
           requiredMonths: product.minimumEmploymentTenureMonths,
         };
       }
+    } else if (product.minimumEmploymentTenureMonths !== null) {
+      // Policy exists but employment data missing
+      checks.employmentTenure = { status: 'REQUIRES_REVIEW', reason: 'MISSING_EMPLOYMENT_DATA' };
+      reasons.push('MISSING_EMPLOYMENT_DATA');
     } else {
       checks.employmentTenure = { status: 'NOT_APPLICABLE' };
     }

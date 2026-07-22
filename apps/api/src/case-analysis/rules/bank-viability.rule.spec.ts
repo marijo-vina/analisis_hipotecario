@@ -392,6 +392,15 @@ describe('BankViabilityRule', () => {
         requestedAmount: { toString: () => '1900000.00' },
         propertyValue: { toString: () => '2000000.00' },
       });
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employee: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ maximumLtv: { toString: () => '0.90' } }),
       ]);
@@ -562,6 +571,15 @@ describe('BankViabilityRule', () => {
         ...defaultCase(),
         estimatedTermMonths: 600,
       });
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employee: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ maximumMaturityAgeMonths: 960 }),
       ]);
@@ -710,6 +728,30 @@ describe('BankViabilityRule', () => {
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
+
+    it('defaults to { false, false } when deriveScotiabankFlags receives undefined (no bankarizationFlags in context)', async () => {
+      // Exercises the `deriveScotiabankFlags(undefined)` branch of
+      // BankViabilityRule.deriveScotiabankFlags(): when the orchestrator does
+      // not pass `bankarizationFlags` in the Phase C context, the rule MUST
+      // treat both Scotiabank flags as false rather than crashing or
+      // reading stale data from the DB.
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.bankProductPolicy.findMany.mockResolvedValue([
+        makeProduct({ bank: makeBank({ code: 'SCOTIABANK' }) }),
+      ]);
+
+      // defaultContext() with no args yields a context that does NOT
+      // include `bankarizationFlags` — exactly the undefined-flags case.
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+
+      const inputs = getBv(result).inputs;
+      expect(inputs.hasPagadoraIncome).toBe(false);
+      expect(inputs.scotiabankExcluded).toBe(false);
+      // Scotiabank without pagadora → must not be flagged for exclusion
+      expect(getBv(result).productMatches[0].reasons).not.toContain(
+        'SCOTIABANK_PAGADORA_EXCLUSION',
+      );
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────
@@ -764,7 +806,16 @@ describe('BankViabilityRule', () => {
   // ─────────────────────────────────────────────────────────────────────
   describe('aggregate outcome', () => {
     it('returns PASS when at least one product is PRELIMINARY_VIABLE', async () => {
-      const { rule } = makeRuleAndMock();
+      const { rule, prisma } = makeRuleAndMock();
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW prevents PRELIMINARY_VIABLE)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employee: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(result.outcome).toBe('PASS');
     });

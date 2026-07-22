@@ -58,14 +58,14 @@ function formatCurrency(value: string | null): string {
   if (value == null) return "—";
   const num = Number(String(value).replace(/[^0-9.-]/g, ""));
   if (Number.isNaN(num)) return value;
-  return `$${num.toLocaleString("es-MX")}`;
+  return `$${num.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatPercent(value: string | null): string {
   if (value == null) return "—";
   const num = Number(String(value).replace(/[^0-9.-]/g, ""));
   if (Number.isNaN(num)) return value;
-  return `${num}%`;
+  return `${(num * 100).toFixed(0)}%`;
 }
 
 function isInsufficientReasons(reasons: string[]): boolean {
@@ -317,20 +317,16 @@ function ProductTable({
         const isExpanded = expandedIndex === rows.indexOf(m);
         return (
           <span className="inline-flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle(rows.indexOf(m));
-              }}
-              className="text-gf-text-muted hover:text-gf-text transition-transform text-[10px]"
-              style={{
-                transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-              }}
+            <span
+              className="text-gf-text-muted text-sm"
+              style={{ minWidth: "16px", textAlign: "center" }}
             >
-              ▸
-            </button>
+              {isExpanded ? "▲" : "▼"}
+            </span>
             <span className="text-xs font-medium text-gf-text">{name}</span>
+            <span className="text-[10px] text-gf-text-muted">
+              {isExpanded ? "Ocultar detalle" : "Ver detalle"}
+            </span>
           </span>
         );
       },
@@ -393,34 +389,54 @@ function ProductTable({
       key: "aforo",
       header: "Aforo",
       render: (m) => {
+        const requested = formatPercent(m.calculation.requestedLtv);
+        const maxLtv = formatPercent(m.policySnapshot.maximumLtv);
         const hasLtvExceeded = m.reasons.includes("LTV_EXCEEDED");
-        if (hasLtvExceeded) {
-          const requested = formatPercent(m.calculation.requestedLtv);
-          const maxLtv = formatPercent(m.policySnapshot.maximumLtv);
+
+        if (requested === "—" && maxLtv === "—") {
+          return <span className="text-xs text-gf-text">—</span>;
+        }
+
+        if (maxLtv !== "—") {
+          const text = requested !== "—" ? `${requested} / máx. ${maxLtv}` : `máx. ${maxLtv}`;
           return (
-            <span className="text-xs text-gf-text">
-              {requested} / máx. {maxLtv}
+            <span
+              className="text-xs"
+              style={{ color: hasLtvExceeded ? "#92400E" : undefined }}
+            >
+              {text}
             </span>
           );
         }
-        return (
-          <span className="text-xs text-gf-text">
-            {formatPercent(m.calculation.requestedLtv)}
-          </span>
-        );
+
+        return <span className="text-xs text-gf-text">{requested}</span>;
       },
     },
     {
       key: "status",
       header: "Estado",
-      render: (m) => (
-        <span
-          className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap"
-          style={{ backgroundColor: STATUS_BADGE_COLORS[m.status] ?? "#6B7280" }}
-        >
-          {STATUS_LABELS[m.status] ?? m.status}
-        </span>
-      ),
+      render: (m) => {
+        const firstReason =
+          m.reasons.length > 0 ? REASON_LABELS[m.reasons[0]] ?? m.reasons[0] : null;
+        const showReason =
+          (m.status === "REQUIRES_REVIEW" || m.status === "NOT_COMPATIBLE") &&
+          firstReason;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span
+              className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap"
+              style={{ backgroundColor: STATUS_BADGE_COLORS[m.status] ?? "#6B7280" }}
+            >
+              {STATUS_LABELS[m.status] ?? m.status}
+            </span>
+            {showReason && (
+              <span className="text-[10px] text-gf-text-muted leading-tight">
+                {firstReason}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -430,6 +446,7 @@ function ProductTable({
         columns={columns}
         rows={rows}
         emptyMessage="Sin productos evaluados"
+        onRowClick={(_, i) => onToggle(i)}
       />
       {/* Expanded detail panels — rendered below the table */}
       {expandedIndex != null && expandedIndex < rows.length && (
@@ -449,50 +466,89 @@ function ProductDetail({ match }: { match: ProductMatch }) {
   const isNet = String(criterion).toUpperCase().includes("NET");
   const incomeLabel = isNet ? "Neto" : "Bruto";
 
+  // Helper to get policy text for each control
+  function getPolicyText(checkKey: string): string {
+    const snap = match.policySnapshot;
+    switch (checkKey) {
+      case "capacity":
+        return "Debe ser mayor que $0.00";
+      case "ltv":
+        return snap.maximumLtv ? `Máx. ${formatPercent(snap.maximumLtv)}` : "—";
+      case "maturityAge":
+        return snap.maximumMaturityAgeMonths
+          ? `Máx. ${formatAge(snap.maximumMaturityAgeMonths)}`
+          : "—";
+      case "minimumApplicantAge":
+        return snap.minimumApplicantAgeMonths
+          ? `Mín. ${formatAge(snap.minimumApplicantAgeMonths)}`
+          : "—";
+      case "maximumApplicationAge":
+        return snap.maximumApplicationAgeMonths
+          ? `Máx. ${formatAge(snap.maximumApplicationAgeMonths)}`
+          : "—";
+      case "employmentTenure":
+        return snap.minimumEmploymentTenureMonths
+          ? `Mín. ${formatAge(snap.minimumEmploymentTenureMonths)}`
+          : "—";
+      default:
+        return "—";
+    }
+  }
+
+  // Helper to get expediente value for each control
+  function getExpedienteValue(checkKey: string): string {
+    switch (checkKey) {
+      case "capacity":
+        return formatCurrency(calculation.availableCapacity);
+      case "ltv":
+        return formatPercent(calculation.requestedLtv);
+      case "maturityAge":
+        return formatAge(calculation.ageAtMaturityMonths);
+      case "minimumApplicantAge":
+        return formatAge(calculation.currentAgeMonths);
+      case "maximumApplicationAge":
+        return formatAge(calculation.currentAgeMonths);
+      case "employmentTenure":
+        return formatAge(calculation.employmentTenureMonths);
+      default:
+        return "—";
+    }
+  }
+
   // 6 control rows (BankViabilityRule produces exactly 6 checks)
-  const controlRows: {
-    label: string;
-    expediente: string;
-    politica: string;
-    status: string;
-  }[] = [
-    {
-      label: "Capacidad de pago",
-      expediente: formatCurrency(calculation.availableCapacity),
-      politica: formatCurrency(calculation.maximumDebt),
-      status: checks.capacity?.status ?? "NOT_APPLICABLE",
-    },
-    {
-      label: "Aforo",
-      expediente: formatPercent(calculation.requestedLtv),
-      politica: formatPercent(match.policySnapshot.maximumLtv),
-      status: checks.ltv?.status ?? "NOT_APPLICABLE",
-    },
-    {
-      label: "Edad mínima solicitante",
-      expediente: formatAge(calculation.currentAgeMonths),
-      politica: formatAge(match.policySnapshot.minimumApplicantAgeMonths),
-      status: checks.minimumApplicantAge?.status ?? "NOT_APPLICABLE",
-    },
-    {
-      label: "Edad máxima de solicitud",
-      expediente: formatAge(calculation.currentAgeMonths),
-      politica: formatAge(match.policySnapshot.maximumApplicationAgeMonths),
-      status: checks.maximumApplicationAge?.status ?? "NOT_APPLICABLE",
-    },
-    {
-      label: "Edad al vencimiento",
-      expediente: formatAge(calculation.ageAtMaturityMonths),
-      politica: formatAge(match.policySnapshot.maximumMaturityAgeMonths),
-      status: checks.maturityAge?.status ?? "NOT_APPLICABLE",
-    },
-    {
-      label: "Antigüedad laboral",
-      expediente: formatAge(calculation.employmentTenureMonths),
-      politica: formatAge(match.policySnapshot.minimumEmploymentTenureMonths),
-      status: checks.employmentTenure?.status ?? "NOT_APPLICABLE",
-    },
-  ];
+  const controlKeys = [
+    "capacity",
+    "ltv",
+    "minimumApplicantAge",
+    "maximumApplicationAge",
+    "maturityAge",
+    "employmentTenure",
+  ] as const;
+
+  const controlLabels: Record<string, string> = {
+    capacity: "Capacidad de pago",
+    ltv: "Aforo",
+    minimumApplicantAge: "Edad mínima solicitante",
+    maximumApplicationAge: "Edad máxima de solicitud",
+    maturityAge: "Edad al vencimiento",
+    employmentTenure: "Antigüedad laboral",
+  };
+
+  const controlRows = controlKeys.map((key) => {
+    const check = checks[key];
+    const status = check?.status ?? "NOT_APPLICABLE";
+
+    // For REQUIRES_REVIEW (missing data): show "—" as expediente
+    const expediente =
+      status === "REQUIRES_REVIEW" ? "—" : getExpedienteValue(key);
+
+    return {
+      label: controlLabels[key],
+      expediente,
+      politica: getPolicyText(key),
+      status,
+    };
+  });
 
   const resultBadgeColor: Record<string, string> = {
     PASS: "#166534",
