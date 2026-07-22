@@ -18,6 +18,12 @@ describe('CatalogsService', () => {
     documentStatus: {
       findMany: jest.fn(),
     },
+    bank: {
+      findMany: jest.fn(),
+    },
+    bankProductPolicy: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -126,6 +132,84 @@ describe('CatalogsService', () => {
       mockPrismaService.documentStatus.findMany.mockResolvedValue([]);
 
       const result = await service.getDocumentStatuses();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getBanks', () => {
+    it('should return active banks ordered by code asc', async () => {
+      const banks = [
+        { id: '1', code: 'BANORTE', name: 'Banorte', isActive: true },
+        { id: '2', code: 'HSBC', name: 'HSBC', isActive: true },
+      ];
+
+      mockPrismaService.bank.findMany.mockResolvedValue(banks);
+
+      const result = await service.getBanks();
+
+      expect(result).toEqual(banks);
+      expect(mockPrismaService.bank.findMany).toHaveBeenCalledWith({
+        where: { isActive: true },
+        orderBy: { code: 'asc' },
+      });
+    });
+
+    it('should return empty array when no active banks', async () => {
+      mockPrismaService.bank.findMany.mockResolvedValue([]);
+
+      const result = await service.getBanks();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getBankProducts', () => {
+    it('should return active bank products with bank included', async () => {
+      const products = [
+        { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
+      ];
+
+      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue(products);
+
+      const result = await service.getBankProducts();
+
+      expect(result).toEqual(products);
+      expect(mockPrismaService.bankProductPolicy.findMany).toHaveBeenCalledWith({
+        where: {
+          isActive: true,
+          bank: { isActive: true },
+        },
+        include: { bank: true },
+        orderBy: { code: 'asc' },
+      });
+    });
+
+    it('should filter by destination when provided', async () => {
+      const products = [
+        { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
+      ];
+
+      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue(products);
+
+      const result = await service.getBankProducts('ACQUISITION');
+
+      expect(result).toEqual(products);
+      expect(mockPrismaService.bankProductPolicy.findMany).toHaveBeenCalledWith({
+        where: {
+          isActive: true,
+          destination: 'ACQUISITION',
+          bank: { isActive: true },
+        },
+        include: { bank: true },
+        orderBy: { code: 'asc' },
+      });
+    });
+
+    it('should return empty array when no products match', async () => {
+      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue([]);
+
+      const result = await service.getBankProducts('LIQUIDITY');
 
       expect(result).toEqual([]);
     });

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CatalogsService } from './catalogs.service';
 
@@ -31,6 +31,20 @@ export class CatalogsController {
   @Get('document-statuses')
   async findDocumentStatuses() {
     const data = await this.catalogsService.getDocumentStatuses();
+
+    return { data };
+  }
+
+  @Get('banks')
+  async findBanks() {
+    const data = await this.catalogsService.getBanks();
+
+    return { data };
+  }
+
+  @Get('bank-products')
+  async findBankProducts(@Query('destination') destination?: string) {
+    const data = await this.catalogsService.getBankProducts(destination);
 
     return { data };
   }

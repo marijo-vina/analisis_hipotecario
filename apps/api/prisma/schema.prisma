@@ -196,11 +196,12 @@ model DocumentStatus {
 }
 
 model CreditType {
-  id       Int            @id @default(autoincrement())
-  code     String         @unique
-  name     String
-  isActive Boolean        @default(true)
-  cases    MortgageCase[]
+  id          Int                @id @default(autoincrement())
+  code        String             @unique
+  name        String
+  isActive    Boolean            @default(true)
+  destination ProductDestination?
+  cases       MortgageCase[]
 }
 
 model CaseStatus {
@@ -209,4 +210,51 @@ model CaseStatus {
   name  String
   order Int            @default(0)
   cases MortgageCase[]
+}
+
+enum IncomeCriterion {
+  GROSS
+  NET
+}
+
+enum ProductDestination {
+  ACQUISITION
+  LIQUIDITY
+  MORTGAGE_REPLACEMENT
+}
+
+model Bank {
+  id                   String              @id @default(uuid())
+  code                 String              @unique
+  name                 String
+  debtCommitmentFactor Decimal             @db.Decimal(5, 4)
+  incomeCriterion      IncomeCriterion
+  isActive             Boolean             @default(true)
+  sourceVersion        String
+  products             BankProductPolicy[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model BankProductPolicy {
+  id                            String             @id @default(uuid())
+  bankId                        String
+  code                          String             @unique
+  name                          String
+  destination                   ProductDestination
+  personType                    PersonType
+  minimumEmploymentTenureMonths Int?
+  minimumApplicantAgeMonths     Int?
+  maximumApplicationAgeMonths   Int?
+  maximumMaturityAgeMonths      Int?
+  maximumLtv                    Decimal?           @db.Decimal(5, 4)
+  isActive                      Boolean            @default(true)
+  sourceVersion                 String
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+
+  bank Bank @relation(fields: [bankId], references: [id])
+
+  @@index([destination, personType, isActive])
+  @@index([bankId])
 }

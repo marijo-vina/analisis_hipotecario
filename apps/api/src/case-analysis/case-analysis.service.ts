@@ -6,6 +6,7 @@ import type {
 } from './analysis-rule.interface';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { BankViabilityRule } from './rules/bank-viability.rule';
 import { ReviewDecisionDto } from './dto/review-decision.dto';
 
 /** Loaded mortgage case shape used by the orchestrator. */
@@ -54,11 +55,12 @@ export class CaseAnalysisService {
     private readonly prisma: PrismaService,
     identityMatchRule: IdentityMatchRule,
     bankarizationValidationRule: BankarizationValidationRule,
+    bankViabilityRule: BankViabilityRule,
   ) {
     // Rule registry. HU-10 adds bankarization-validation (nomina vs depositos)
-    // despues del identity-match. Future Sprint 3/4 rules (income, liability,
-    // bank viability) register here without touching the controller.
-    this.rules = [identityMatchRule, bankarizationValidationRule];
+    // despues del identity-match. HU-13 adds bank-viability. Future Sprint 3/4
+    // rules (income, liability) register here without touching the controller.
+    this.rules = [identityMatchRule, bankarizationValidationRule, bankViabilityRule];
   }
 
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
@@ -74,14 +76,24 @@ export class CaseAnalysisService {
     // Execute all registered rules sequentially and aggregate results.
     const ruleResults: RuleResult[] = [];
     for (const rule of this.rules) {
+      const context = {
+        ...mortgageCase.client,
+        caseId,
+      } as Record<string, unknown>;
       const result = await rule.execute(
-        mortgageCase.client,
+        context,
         mortgageCase.documents as unknown as Record<string, unknown>[],
       );
       ruleResults.push(result);
     }
 
     const aggregate = this.aggregate(ruleResults);
+
+    // Merge bankViability snapshot from the bank-viability rule into detail.
+    const bankViabilityResult = ruleResults.find((r) => r.ruleId === 'bank-viability');
+    const bankViability = bankViabilityResult
+      ? (bankViabilityResult.detail as Record<string, unknown>).bankViability
+      : undefined;
 
     // Persist the immutable AnalysisRun + its AnalysisAlert records.
     const createdRun = await this.prisma.analysisRun.create({
@@ -93,6 +105,7 @@ export class CaseAnalysisService {
           ruleResults,
           sources: aggregate.sources,
           fields: aggregate.fields,
+          ...(bankViability ? { bankViability } : {}),
         } as never,
         triggeredBy,
         alerts: {
