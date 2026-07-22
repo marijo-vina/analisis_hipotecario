@@ -306,11 +306,19 @@ function IdentityValidationSection({
         fields={run.detail.fields}
       />
 
-      {actionError && (
-        <Card className="bg-red-50 border-red-200">
-          <p className="text-xs text-gf-red">{actionError}</p>
-        </Card>
-      )}
+      {/* ── Re-analysis trigger ──────────────────────────────────────── */}
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onAnalyze}
+          className="text-xs text-gf-text-muted hover:text-gf-red underline transition-colors"
+        >
+          Re-ejecutar análisis
+        </button>
+        {actionError && (
+          <span className="text-xs text-gf-red">{actionError}</span>
+        )}
+      </div>
     </div>
   );
 }
