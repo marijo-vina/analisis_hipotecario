@@ -229,6 +229,18 @@ export interface ProductMatchCalculation {
 }
 
 export interface ProductPolicySnapshot {
+  /**
+   * Optional bank display name. The backend `policySnapshot` is currently
+   * typed as `Record<string, unknown>` and does NOT include `bankName` yet;
+   * the UI falls back to `bankCode` when this is absent.
+   */
+  bankName?: string;
+  /**
+   * Optional product display name. The backend `policySnapshot` is currently
+   * typed as `Record<string, unknown>` and does NOT include `productName` yet;
+   * the UI falls back to `productCode` when this is absent.
+   */
+  productName?: string;
   incomeCriterion: string;
   debtCommitmentFactor: string;
   minimumEmploymentTenureMonths: number | null;
