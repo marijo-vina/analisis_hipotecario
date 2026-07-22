@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type {
   BankViabilitySnapshot,
   BankViabilityInputs,
+  BankarizationFlags,
   ProductMatch,
   ProductMatchCalculation,
   ProductMatchStatus,
@@ -125,9 +126,10 @@ export class BankViabilityRule implements AnalysisRule {
     const { employmentStartDate, conflictingDates } =
       await this.deriveEmploymentStartDate(caseId, incomeCalc);
 
-    // ── Derive Scotiabank flags from bankarization run ───────────────
+    // ── Derive Scotiabank flags from Phase A context ────────────────────
+    const bankarizationFlags = (ctx as Record<string, unknown>).bankarizationFlags as BankarizationFlags | undefined;
     const { hasPagadoraIncome, scotiabankExcluded } =
-      await this.deriveScotiabankFlags(caseId);
+      this.deriveScotiabankFlags(bankarizationFlags);
 
     // ── Build inputs ─────────────────────────────────────────────────
     const inputs: BankViabilityInputs = {
@@ -282,29 +284,12 @@ export class BankViabilityRule implements AnalysisRule {
 
   // ── Scotiabank Flags Derivation ────────────────────────────────────
 
-  private async deriveScotiabankFlags(
-    caseId: string,
-  ): Promise<{ hasPagadoraIncome: boolean; scotiabankExcluded: boolean }> {
-    const latestRun = await this.prisma.analysisRun.findFirst({
-      where: { mortgageCaseId: caseId },
-      orderBy: { createdAt: 'desc' },
-      select: { detail: true },
-    });
-
-    if (!latestRun) return { hasPagadoraIncome: false, scotiabankExcluded: false };
-
-    const detail = latestRun.detail as Record<string, unknown> | null;
-    const ruleResults = (detail?.ruleResults ?? []) as Record<string, unknown>[];
-    const bankarizationResult = ruleResults.find(
-      (r) => r.ruleId === 'bankarization-validation',
-    );
-
-    if (!bankarizationResult) return { hasPagadoraIncome: false, scotiabankExcluded: false };
-
-    const bankDetail = bankarizationResult.detail as Record<string, unknown> | undefined;
+  private deriveScotiabankFlags(
+    flags?: BankarizationFlags,
+  ): { hasPagadoraIncome: boolean; scotiabankExcluded: boolean } {
     return {
-      hasPagadoraIncome: (bankDetail?.hasPagadoraIncome as boolean) ?? false,
-      scotiabankExcluded: (bankDetail?.scotiabankExcluded as boolean) ?? false,
+      hasPagadoraIncome: flags?.hasPagadoraIncome ?? false,
+      scotiabankExcluded: flags?.scotiabankExcluded ?? false,
     };
   }
 

@@ -21,7 +21,6 @@ function makePrismaMock() {
     liabilitySnapshot: { findFirst: jest.fn() },
     creditType: { findUnique: jest.fn() },
     bankProductPolicy: { findMany: jest.fn() },
-    analysisRun: { findFirst: jest.fn() },
     document: { findMany: jest.fn() },
   };
 }
@@ -101,11 +100,12 @@ function makeProduct(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function defaultContext(): CaseAnalysisContext {
+function defaultContext(flags?: { hasPagadoraIncome?: boolean; scotiabankExcluded?: boolean }): CaseAnalysisContext {
   return {
     client: { id: 'client-1', fullName: 'JOSE PEREZ' },
     caseId: 'case-1',
-  };
+    ...(flags ? { bankarizationFlags: { hasPagadoraIncome: flags.hasPagadoraIncome ?? false, scotiabankExcluded: flags.scotiabankExcluded ?? false } } : {}),
+  } as CaseAnalysisContext;
 }
 
 function defaultDocuments() {
@@ -128,7 +128,6 @@ function makeRuleAndMock() {
   prisma.liabilitySnapshot.findFirst.mockResolvedValue(defaultLiabilitySnapshot());
   prisma.creditType.findUnique.mockResolvedValue(defaultCreditType());
   prisma.bankProductPolicy.findMany.mockResolvedValue([makeProduct()]);
-  prisma.analysisRun.findFirst.mockResolvedValue(null);
   prisma.document.findMany.mockResolvedValue([]);
 
   return { rule, prisma };
@@ -246,28 +245,16 @@ describe('BankViabilityRule', () => {
       expect(getBv(result).reasons).toContain('CONFLICTING_EMPLOYMENT_DATES');
     });
 
-    it('reads hasPagadoraIncome and scotiabankExcluded from bankarization-validation detail', async () => {
+    it('reads hasPagadoraIncome and scotiabankExcluded from bankarizationFlags context', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      prisma.analysisRun.findFirst.mockResolvedValue({
-        detail: {
-          ruleResults: [
-            {
-              ruleId: 'bankarization-validation',
-              detail: {
-                sources: [],
-                fields: [],
-                hasPagadoraIncome: true,
-                scotiabankExcluded: true,
-              },
-            },
-          ],
-        },
-      });
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ bank: makeBank({ code: 'SCOTIABANK' }) }),
       ]);
 
-      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const result = await rule.execute(
+        defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: true }),
+        defaultDocuments(),
+      );
       // Scotiabank + pagadora → REQUIRES_REVIEW
       expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
       expect(getBv(result).productMatches[0].reasons).toContain(
@@ -679,26 +666,14 @@ describe('BankViabilityRule', () => {
   describe('Scotiabank pagadora rule', () => {
     it('returns REQUIRES_REVIEW for Scotiabank when hasPagadoraIncome and scotiabankExcluded are true', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      prisma.analysisRun.findFirst.mockResolvedValue({
-        detail: {
-          ruleResults: [
-            {
-              ruleId: 'bankarization-validation',
-              detail: {
-                sources: [],
-                fields: [],
-                hasPagadoraIncome: true,
-                scotiabankExcluded: true,
-              },
-            },
-          ],
-        },
-      });
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
       ]);
 
-      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const result = await rule.execute(
+        defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: true }),
+        defaultDocuments(),
+      );
       expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
       expect(getBv(result).productMatches[0].reasons).toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
@@ -707,26 +682,14 @@ describe('BankViabilityRule', () => {
 
     it('does not flag Scotiabank when scotiabankExcluded is false', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      prisma.analysisRun.findFirst.mockResolvedValue({
-        detail: {
-          ruleResults: [
-            {
-              ruleId: 'bankarization-validation',
-              detail: {
-                sources: [],
-                fields: [],
-                hasPagadoraIncome: true,
-                scotiabankExcluded: false,
-              },
-            },
-          ],
-        },
-      });
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
       ]);
 
-      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const result = await rule.execute(
+        defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: false }),
+        defaultDocuments(),
+      );
       // Not REQUIRES_REVIEW due to Scotiabank (may be PRELIMINARY_VIABLE or other)
       expect(getBv(result).productMatches[0].reasons).not.toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
@@ -735,26 +698,14 @@ describe('BankViabilityRule', () => {
 
     it('does not affect non-Scotiabank products when flags are true', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      prisma.analysisRun.findFirst.mockResolvedValue({
-        detail: {
-          ruleResults: [
-            {
-              ruleId: 'bankarization-validation',
-              detail: {
-                sources: [],
-                fields: [],
-                hasPagadoraIncome: true,
-                scotiabankExcluded: true,
-              },
-            },
-          ],
-        },
-      });
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ bank: makeBank({ code: 'BANORTE' }) }),
       ]);
 
-      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const result = await rule.execute(
+        defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: true }),
+        defaultDocuments(),
+      );
       expect(getBv(result).productMatches[0].reasons).not.toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
