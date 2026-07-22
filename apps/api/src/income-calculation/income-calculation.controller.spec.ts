@@ -59,7 +59,6 @@ describe('IncomeCalculationController', () => {
     calculate: jest.Mock;
     getLatest: jest.Mock;
     toggleReceipt: jest.Mock;
-    confirm: jest.Mock;
   };
 
   const caseId = 'case-uuid-1';
@@ -71,7 +70,6 @@ describe('IncomeCalculationController', () => {
       calculate: jest.fn(),
       getLatest: jest.fn(),
       toggleReceipt: jest.fn(),
-      confirm: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -263,108 +261,6 @@ describe('IncomeCalculationController', () => {
         .patch(`/cases/${caseId}/income/receipts/0`)
         .send({ included: false })
         .expect(400);
-    });
-  });
-
-  // ── POST /cases/:caseId/income/confirm ───────────────────────────────
-
-  describe('POST /cases/:caseId/income/confirm', () => {
-    it('should return 200 with the confirmed snapshot', async () => {
-      const result = makeResult({
-        id: 'inc-3',
-        status: IncomeCalculationStatus.CONFIRMED,
-        confirmedGrossIncome: 20000,
-        confirmedNetIncome: 16000,
-        confirmedBy: 'advisor-1',
-        observations: 'Ajuste manual',
-      });
-      mockService.confirm.mockResolvedValue(result);
-
-      const response = await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 20000,
-          confirmedNetIncome: 16000,
-          observations: 'Ajuste manual',
-        })
-        .expect(200);
-
-      expect(response.body).toMatchObject({
-        id: 'inc-3',
-        status: 'CONFIRMED',
-        confirmedGrossIncome: 20000,
-        confirmedBy: 'advisor-1',
-      });
-      expect(mockService.confirm).toHaveBeenCalledTimes(1);
-      // Confirm the service received the DTO + confirmedBy from req.user
-      const [passedCaseId, dto, passedBy] = mockService.confirm.mock.calls[0];
-      expect(passedCaseId).toBe(caseId);
-      expect(dto.confirmedGrossIncome).toBe(20000);
-      expect(dto.confirmedNetIncome).toBe(16000);
-      expect(dto.observations).toBe('Ajuste manual');
-      expect(passedBy).toBe('advisor-1');
-    });
-
-    it('should return 400 when confirmedGrossIncome is missing', async () => {
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({ confirmedNetIncome: 16000 })
-        .expect(400);
-    });
-
-    it('should return 400 when confirmedNetIncome is missing', async () => {
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({ confirmedGrossIncome: 20000 })
-        .expect(400);
-    });
-
-    it('should return 400 with empty body', async () => {
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({})
-        .expect(400);
-    });
-
-    it('should return 400 when confirmedGrossIncome is not a number', async () => {
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 'abc',
-          confirmedNetIncome: 16000,
-        })
-        .expect(400);
-    });
-
-    it('should accept observations as optional', async () => {
-      mockService.confirm.mockResolvedValue(
-        makeResult({
-          status: IncomeCalculationStatus.CONFIRMED,
-          observations: null,
-        }),
-      );
-
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 20000,
-          confirmedNetIncome: 16000,
-        })
-        .expect(200);
-    });
-
-    it('should return 404 when no snapshot exists to confirm', async () => {
-      mockService.confirm.mockRejectedValue(
-        new NotFoundException('No income calculation found for this case'),
-      );
-
-      await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 20000,
-          confirmedNetIncome: 16000,
-        })
-        .expect(404);
     });
   });
 });

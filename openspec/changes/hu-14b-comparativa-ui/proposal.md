@@ -1,4 +1,4 @@
-# Proposal: HU-14 — Visualizar Comparativa Bancaria Preliminar
+# Proposal: HU-14B — Visualizar Comparativa Bancaria Preliminar
 
 ## Intent
 

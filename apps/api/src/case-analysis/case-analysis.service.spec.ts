@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
+import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
+import { LiabilityCalculationService } from '../liability/liability.service';
 import { CaseAnalysisService } from './case-analysis.service';
 import type { RuleResult } from './analysis-rule.interface';
 
@@ -30,9 +32,6 @@ describe('CaseAnalysisService', () => {
       create: jest.fn(),
       findFirst: jest.fn(),
     },
-    reviewDecision: {
-      create: jest.fn(),
-    },
   };
 
   const mockIdentityMatchRule = {
@@ -48,6 +47,14 @@ describe('CaseAnalysisService', () => {
   const mockBankViabilityRule = {
     ruleId: 'bank-viability',
     execute: jest.fn(),
+  };
+
+  const mockIncomeCalcService = {
+    calculate: jest.fn(),
+  };
+
+  const mockLiabilityCalcService = {
+    calculate: jest.fn(),
   };
 
   const mockBankarizationPassResult: RuleResult = {
@@ -107,6 +114,8 @@ describe('CaseAnalysisService', () => {
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
+        { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
+        { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
       ],
     }).compile();
     service = module.get<CaseAnalysisService>(CaseAnalysisService);
@@ -126,6 +135,8 @@ describe('CaseAnalysisService', () => {
     it('loads the case with client, documents, and documentType', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
 
       await service.run('case-1', 'advisor-1');
@@ -140,12 +151,14 @@ describe('CaseAnalysisService', () => {
       const mortgageCase = buildCase();
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
 
       await service.run('case-1', 'advisor-1');
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalledWith(
-        mortgageCase.client,
+        expect.objectContaining({ id: mortgageCase.client.id }),
         mortgageCase.documents,
       );
     });
@@ -153,6 +166,8 @@ describe('CaseAnalysisService', () => {
     it('persists an AnalysisRun with COMPLETED status and aggregate detail', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
 
       await service.run('case-1', 'advisor-1');
@@ -172,6 +187,8 @@ describe('CaseAnalysisService', () => {
     it('returns AnalysisResult with runId, executionStatus, outcome, summary, detail, executionMetadata', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
 
       const result = await service.run('case-1', 'advisor-1');
@@ -191,7 +208,56 @@ describe('CaseAnalysisService', () => {
       );
     });
 
-    it('transitions case to REQUIRES_REVIEW when outcome is FAIL', async () => {
+    it('executes Phase A rules, Phase B calculations, then Phase C bankViability in order', async () => {
+      const callOrder: string[] = [];
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
+      mockIdentityMatchRule.execute.mockImplementation(async () => {
+        callOrder.push('identity-match');
+        return mockPassRuleResult;
+      });
+      mockBankarizationRule.execute.mockImplementation(async () => {
+        callOrder.push('bankarization-validation');
+        return mockBankarizationPassResult;
+      });
+      mockIncomeCalcService.calculate.mockImplementation(async () => {
+        callOrder.push('income-calculation');
+        return {};
+      });
+      mockLiabilityCalcService.calculate.mockImplementation(async () => {
+        callOrder.push('liability-calculation');
+        return {};
+      });
+      mockBankViabilityRule.execute.mockImplementation(async () => {
+        callOrder.push('bank-viability');
+        return mockBankViabilityPassResult;
+      });
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(callOrder).toEqual([
+        'identity-match',
+        'bankarization-validation',
+        'income-calculation',
+        'liability-calculation',
+        'bank-viability',
+      ]);
+    });
+
+    it('continues to Phase C even when Phase B income calculation fails', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockRejectedValue(new Error('No payroll docs'));
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(result.executionStatus).toBe('COMPLETED');
+      expect(mockBankViabilityRule.execute).toHaveBeenCalled();
+    });
+
+    it('does NOT update case status on FAIL (transitionToRequiresReview removed)', async () => {
       const failResult: RuleResult = {
         ruleId: 'identity-match',
         outcome: 'FAIL',
@@ -201,25 +267,21 @@ describe('CaseAnalysisService', () => {
       };
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
       mockIdentityMatchRule.execute.mockResolvedValue(failResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
-      mockPrismaService.caseStatus.findUnique.mockResolvedValue({ id: 9, code: 'REQUIRES_REVIEW' });
 
       await service.run('case-1', 'advisor-1');
 
-      expect(mockPrismaService.caseStatus.findUnique).toHaveBeenCalledWith({
-        where: { code: 'REQUIRES_REVIEW' },
-      });
-      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'case-1' },
-          data: { statusId: 9 },
-        }),
-      );
+      expect(mockPrismaService.caseStatus.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.mortgageCase.update).not.toHaveBeenCalled();
     });
 
     it('does NOT update case status when outcome is PASS', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
 
       await service.run('case-1', 'advisor-1');
@@ -250,59 +312,6 @@ describe('CaseAnalysisService', () => {
       const result = await service.getLatest('case-1');
 
       expect(result).toBeNull();
-    });
-  });
-
-  describe('recordReviewDecision', () => {
-    it('validates that the AnalysisRun belongs to the case before storing a decision', async () => {
-      mockPrismaService.analysisRun.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.recordReviewDecision('case-1', 'run-1', {
-          action: 'CONFIRM_ISSUE',
-        } as never),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('persists a ReviewDecision with action and decidedBy', async () => {
-      mockPrismaService.analysisRun.findFirst.mockResolvedValue({ id: 'run-1', mortgageCaseId: 'case-1' });
-      mockPrismaService.reviewDecision.create.mockResolvedValue({ id: 'dec-1', action: 'CONFIRM_ISSUE' });
-
-      const result = await service.recordReviewDecision('case-1', 'run-1', {
-        action: 'CONFIRM_ISSUE',
-      } as never);
-
-      expect(mockPrismaService.reviewDecision.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            runId: 'run-1',
-            action: 'CONFIRM_ISSUE',
-            decidedBy: '',
-          }),
-        }),
-      );
-      expect(result).toEqual({ id: 'dec-1', action: 'CONFIRM_ISSUE' });
-    });
-
-    it('persists a ReviewDecision with justification for MARK_FALSE_POSITIVE', async () => {
-      mockPrismaService.analysisRun.findFirst.mockResolvedValue({ id: 'run-1', mortgageCaseId: 'case-1' });
-      mockPrismaService.reviewDecision.create.mockResolvedValue({ id: 'dec-2' });
-
-      await service.recordReviewDecision('case-1', 'run-1', {
-        action: 'MARK_FALSE_POSITIVE',
-        justification: 'OCR misread the field',
-      } as never, 'advisor-1');
-
-      expect(mockPrismaService.reviewDecision.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            runId: 'run-1',
-            action: 'MARK_FALSE_POSITIVE',
-            justification: 'OCR misread the field',
-            decidedBy: 'advisor-1',
-          }),
-        }),
-      );
     });
   });
 });

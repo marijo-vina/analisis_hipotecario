@@ -21,7 +21,6 @@ describe('MortgageCasesController — analysis endpoints (integration)', () => {
   const mockCaseAnalysisService = {
     run: jest.fn(),
     getLatest: jest.fn(),
-    recordReviewDecision: jest.fn(),
   };
 
   const mockPrismaService = {};
@@ -148,74 +147,6 @@ describe('MortgageCasesController — analysis endpoints (integration)', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.message).toBe('No analysis runs found');
-    });
-  });
-
-  describe('POST /mortgage-cases/:caseId/analysis/:runId/review-decision', () => {
-    it('returns 200 with the recorded decision when justification is provided for MARK_FALSE_POSITIVE', async () => {
-      const decision = { id: 'dec-1', action: 'MARK_FALSE_POSITIVE', justification: 'OCR misread field' };
-      mockCaseAnalysisService.recordReviewDecision.mockResolvedValue(decision);
-
-      const response = await request(app.getHttpServer())
-        .post('/mortgage-cases/case-1/analysis/run-1/review-decision')
-        .set('Authorization', 'Bearer fake')
-        .send({ action: 'MARK_FALSE_POSITIVE', justification: 'OCR misread field' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.action).toBe('MARK_FALSE_POSITIVE');
-      expect(mockCaseAnalysisService.recordReviewDecision).toHaveBeenCalledWith(
-        'case-1',
-        'run-1',
-        expect.objectContaining({ action: 'MARK_FALSE_POSITIVE', justification: 'OCR misread field' }),
-        expect.any(String),
-      );
-    });
-
-    it('returns 400 when MARK_FALSE_POSITIVE is submitted without justification', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/mortgage-cases/case-1/analysis/run-1/review-decision')
-        .set('Authorization', 'Bearer fake')
-        .send({ action: 'MARK_FALSE_POSITIVE' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe('Justification required for false positive');
-      expect(mockCaseAnalysisService.recordReviewDecision).not.toHaveBeenCalled();
-    });
-
-    it('returns 400 when MARK_FALSE_POSITIVE justification is empty/whitespace', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/mortgage-cases/case-1/analysis/run-1/review-decision')
-        .set('Authorization', 'Bearer fake')
-        .send({ action: 'MARK_FALSE_POSITIVE', justification: '   ' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe('Justification required for false positive');
-    });
-
-    it('returns 200 for CONFIRM_ISSUE without justification', async () => {
-      mockCaseAnalysisService.recordReviewDecision.mockResolvedValue({ id: 'dec-2', action: 'CONFIRM_ISSUE' });
-
-      const response = await request(app.getHttpServer())
-        .post('/mortgage-cases/case-1/analysis/run-1/review-decision')
-        .set('Authorization', 'Bearer fake')
-        .send({ action: 'CONFIRM_ISSUE' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.action).toBe('CONFIRM_ISSUE');
-    });
-
-    it('returns 404 for a non-existent run', async () => {
-      mockCaseAnalysisService.recordReviewDecision.mockRejectedValue(
-        new NotFoundException('Analysis run not found for this case'),
-      );
-
-      const response = await request(app.getHttpServer())
-        .post('/mortgage-cases/case-1/analysis/missing-run/review-decision')
-        .set('Authorization', 'Bearer fake')
-        .send({ action: 'CONFIRM_ISSUE' });
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe('Analysis run not found for this case');
     });
   });
 });

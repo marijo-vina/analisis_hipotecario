@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Calculation of admissible monthly income for salaried persons from structured payroll receipts, with receipt selection, gross/net averages, manual confirmation, immutable snapshots, and simple states.
+Calculation of admissible monthly income for salaried persons from structured payroll receipts, with receipt selection, gross/net averages, and immutable snapshots that remain in CALCULATED state (no manual confirmation required).
 
 ## Requirements
 
@@ -65,32 +65,17 @@ The system MUST calculate averageGrossIncome = sum(gross of included) / included
 - WHEN the system calculates
 - THEN averageNetIncome SHALL be 12,000.00
 
-### Requirement: Manual Confirmation
-
-The system MUST allow the advisor to capture confirmedGrossIncome, confirmedNetIncome, and observations. Confirmation MUST NOT overwrite averageGrossIncome or averageNetIncome. On confirm, the system MUST save: calculated averages, confirmed values, included receipts, excluded receipts, confirming user, confirmation date, and observations.
-
-#### Scenario: Manual adjustment does not modify automatic averages
-
-- GIVEN calculated averages of 18,000 gross and 15,000 net
-- WHEN the advisor confirms with gross = 20,000 and net = 16,000
-- THEN averageGrossIncome SHALL remain 18,000
-- AND confirmedGrossIncome SHALL be 20,000
-
-#### Scenario: Confirmation saves metadata
-
-- GIVEN a calculated snapshot with included receipts [0,1] and excluded [2]
-- WHEN the advisor confirms with observations "Ajuste por comisiones"
-- THEN the snapshot SHALL store confirmedBy, confirmedAt, observations, included and excluded receipt indices
-
 ### Requirement: Snapshot Persistence and Retrieval
 
-The system MUST persist immutable snapshots. POST /cases/:caseId/income/calculate creates a new snapshot. GET /cases/:caseId/income/latest returns the most recent. Reopening the case MUST retrieve the latest snapshot correctly. The system MUST NOT re-execute conciliation rules during income calculation.
+The system MUST persist immutable snapshots. POST /cases/:caseId/income/calculate creates a new snapshot. GET /cases/:caseId/income/latest returns the most recent. Reopening the case MUST retrieve the latest snapshot correctly. The system MUST NOT re-execute conciliation rules during income calculation. Snapshots SHALL remain in CALCULATED state; no CONFIRMED transition occurs.
+
+(Previously: Snapshots transitioned from CALCULATED to CONFIRMED upon manual confirmation.)
 
 #### Scenario: Result retrieved when reopening case
 
-- GIVEN a confirmed snapshot exists for a case
+- GIVEN a calculated snapshot exists for a case
 - WHEN the case detail page reloads
-- THEN GET /cases/:caseId/income/latest SHALL return the snapshot with calculated and confirmed values intact
+- THEN GET /cases/:caseId/income/latest SHALL return the snapshot with calculated averages intact
 
 #### Scenario: Conciliation rules not re-executed
 
@@ -98,18 +83,6 @@ The system MUST persist immutable snapshots. POST /cases/:caseId/income/calculat
 - WHEN income calculation triggers
 - THEN the system SHALL NOT call the conciliation engine
 - AND existing conciliation statuses SHALL remain unchanged
-
-### Requirement: Simple States
-
-The system MUST maintain three states: CALCULATED (snapshot created), CONFIRMED (advisor confirmed values), REQUIRES_REVIEW (when calculated data is suspicious or incomplete; future use).
-
-#### Scenario: State transitions
-
-- GIVEN a fresh calculation
-- WHEN the snapshot is created
-- THEN status SHALL be CALCULATED
-- WHEN the advisor confirms
-- THEN status SHALL transition to CONFIRMED
 
 ### Requirement: UI Placement
 

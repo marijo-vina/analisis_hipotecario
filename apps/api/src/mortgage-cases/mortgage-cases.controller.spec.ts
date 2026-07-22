@@ -1,10 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
-import { ReviewDecisionDto } from '../case-analysis/dto/review-decision.dto';
 import { UpdateMortgageCaseDto } from './dto/update-mortgage-case.dto';
 import { UpdateMortgageCaseStatusDto } from './dto/update-mortgage-case-status.dto';
 import { MortgageCasesController } from './mortgage-cases.controller';
@@ -24,7 +23,6 @@ describe('MortgageCasesController', () => {
   const mockCaseAnalysisService = {
     run: jest.fn(),
     getLatest: jest.fn(),
-    recordReviewDecision: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -157,72 +155,6 @@ describe('MortgageCasesController', () => {
       mockCaseAnalysisService.getLatest.mockResolvedValue(null);
 
       await expect(controller.getLatestAnalysis('case-1')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('submitReviewDecision', () => {
-    it('stores a CONFIRM_ISSUE decision via CaseAnalysisService', async () => {
-      const req = { user: { id: 'advisor-1' } };
-      const dto: ReviewDecisionDto = { action: 'CONFIRM_ISSUE' };
-      const decision = { id: 'dec-1', action: 'CONFIRM_ISSUE' };
-      mockCaseAnalysisService.recordReviewDecision.mockResolvedValue(decision);
-
-      const result = await controller.submitReviewDecision('case-1', 'run-1', dto, req);
-
-      expect(mockCaseAnalysisService.recordReviewDecision).toHaveBeenCalledWith(
-        'case-1',
-        'run-1',
-        dto,
-        'advisor-1',
-      );
-      expect(result).toEqual(decision);
-    });
-
-    it('stores a MARK_FALSE_POSITIVE decision when justification is provided', async () => {
-      const req = { user: { id: 'advisor-1' } };
-      const dto: ReviewDecisionDto = {
-        action: 'MARK_FALSE_POSITIVE',
-        justification: 'OCR misread the field',
-      };
-      mockCaseAnalysisService.recordReviewDecision.mockResolvedValue({ id: 'dec-2' });
-
-      await controller.submitReviewDecision('case-1', 'run-1', dto, req);
-
-      expect(mockCaseAnalysisService.recordReviewDecision).toHaveBeenCalledWith(
-        'case-1',
-        'run-1',
-        dto,
-        'advisor-1',
-      );
-    });
-
-    it('throws BadRequestException when MARK_FALSE_POSITIVE has no justification', async () => {
-      const req = { user: { id: 'advisor-1' } };
-      const dto = { action: 'MARK_FALSE_POSITIVE' } as ReviewDecisionDto;
-
-      await expect(
-        controller.submitReviewDecision('case-1', 'run-1', dto, req),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockCaseAnalysisService.recordReviewDecision).not.toHaveBeenCalled();
-    });
-
-    it('throws BadRequestException when MARK_FALSE_POSITIVE justification is empty', async () => {
-      const req = { user: { id: 'advisor-1' } };
-      const dto = { action: 'MARK_FALSE_POSITIVE', justification: '   ' } as ReviewDecisionDto;
-
-      await expect(
-        controller.submitReviewDecision('case-1', 'run-1', dto, req),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws NotFoundException when the run does not belong to the case', async () => {
-      const req = { user: { id: 'advisor-1' } };
-      const dto: ReviewDecisionDto = { action: 'CONFIRM_ISSUE' };
-      mockCaseAnalysisService.recordReviewDecision.mockRejectedValue(new NotFoundException());
-
-      await expect(
-        controller.submitReviewDecision('case-1', 'missing-run', dto, req),
-      ).rejects.toThrow(NotFoundException);
     });
   });
 });

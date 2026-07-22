@@ -39,7 +39,6 @@ export default function EstadosConciliacion({
 
   const [results, setResults] = useState<PreviewReceiptResult[] | null>(null);
   const [hasRun, setHasRun] = useState(false);
-  const [reviewStates, setReviewStates] = useState<Record<string, string>>({});
 
   // Track whether we've already restored from persistence
   const [restored, setRestored] = useState(false);
@@ -77,12 +76,6 @@ export default function EstadosConciliacion({
               r.method = conc.method as PreviewReceiptResult["method"];
             }
           }
-          if (conc?.reviewStatus) {
-            setReviewStates((prev) => ({
-              ...prev,
-              [r.receiptOriginalName]: conc.reviewStatus as string,
-            }));
-          }
         }
         persisted.push(r);
       }
@@ -109,37 +102,16 @@ export default function EstadosConciliacion({
           documentId: doc.id,
           status: r.status,
           method: r.method !== "NONE" ? r.method : undefined,
-          reviewStatus: reviewStates[r.receiptOriginalName] ?? "PENDING",
         };
       })
       .filter(Boolean) as Array<{
       documentId: string;
       status: string;
       method?: string;
-      reviewStatus?: string;
     }>;
 
     if (items.length > 0) {
       await saveConciliation(caseId, items);
-    }
-  };
-
-  const toggleReview = async (receiptName: string, documentId: string) => {
-    const current = reviewStates[receiptName] ?? "PENDING";
-    const next = current === "REVIEWED" ? "PENDING" : "REVIEWED";
-    setReviewStates((prev) => ({ ...prev, [receiptName]: next }));
-
-    // Persist the review state change
-    const result = results?.find((r) => r.receiptOriginalName === receiptName);
-    if (result) {
-      await saveConciliation(caseId, [
-        {
-          documentId,
-          status: result.status,
-          method: result.method !== "NONE" ? result.method : undefined,
-          reviewStatus: next,
-        },
-      ]);
     }
   };
 
@@ -192,15 +164,10 @@ export default function EstadosConciliacion({
           {/* ── Receipt cards ────────────────────────────────────────── */}
           <div className="space-y-4">
             {results.map((r) => {
-              const doc = payrollDocs[r.receiptIndex];
-              const docId = doc?.id ?? "";
               return (
                 <ReceiptCard
                   key={`${r.receiptOriginalName}-${r.receiptIndex}`}
                   r={r}
-                  documentId={docId}
-                  reviewState={reviewStates[r.receiptOriginalName] ?? "PENDING"}
-                  onToggleReview={toggleReview}
                 />
               );
             })}
@@ -215,14 +182,8 @@ export default function EstadosConciliacion({
 
 function ReceiptCard({
   r,
-  documentId,
-  reviewState,
-  onToggleReview,
 }: {
   r: PreviewReceiptResult;
-  documentId: string;
-  reviewState: string;
-  onToggleReview: (name: string, docId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(() => {
     // Expanded by default if matched or has result; collapsed if NOT_MATCHED
@@ -251,19 +212,6 @@ function ReceiptCard({
       >
         <span className="text-sm">{ruleInfo.icon}</span>
         <span className="text-[13px] font-semibold">{ruleInfo.message}</span>
-        {r.status !== "NOT_MATCHED" && (
-          <button
-            type="button"
-            onClick={() => onToggleReview(r.receiptOriginalName, documentId)}
-            className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
-              reviewState === "REVIEWED"
-                ? "border-green-300 text-green-700 bg-green-50"
-                : "border-gray-300 text-gray-500 bg-white hover:border-gray-400"
-            }`}
-          >
-            {reviewState === "REVIEWED" ? "✓ REVISADO" : "○ PENDIENTE"}
-          </button>
-        )}
         {hasCriteria && (
           <button
             type="button"

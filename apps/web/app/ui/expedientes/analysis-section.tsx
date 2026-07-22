@@ -5,13 +5,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   triggerAnalysis,
   fetchLatestAnalysis,
-  submitReviewDecision,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
 import type {
   AnalysisRun,
   FieldComparison,
-  ReviewDecision,
   Document,
 } from "@/app/lib/definitions";
 import Card from "@/app/ui/common/card";
@@ -74,14 +72,6 @@ const FIELD_STATUS_BADGE: Record<
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function isResultState(
-  state: UiState,
-): state is { phase: "result"; run: AnalysisRun } {
-  return state.phase === "result";
-}
-
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function AnalysisSection({
@@ -92,8 +82,6 @@ export default function AnalysisSection({
   const [activeTab, setActiveTab] = useState<TabId>("validaciones");
   const [state, setState] = useState<UiState>({ phase: "loading" });
   const [actionError, setActionError] = useState<string | null>(null);
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [operationalStatus, setOperationalStatus] = useState(statusCode);
 
   // Cargar último análisis al montar
   const loadLatest = useCallback(async () => {
@@ -105,20 +93,10 @@ export default function AnalysisSection({
     }
     if (res.data) {
       setState({ phase: "result", run: res.data });
-      const hasConfirmedReview = res.data.reviewDecisions?.some(
-        (d) => d.action === "CONFIRM_ISSUE",
-      );
-      setOperationalStatus(
-        res.data.outcome === "FAIL" && !hasConfirmedReview
-          ? "REQUIRES_REVIEW"
-          : hasConfirmedReview
-            ? "REVIEWED"
-            : statusCode,
-      );
     } else {
       setState({ phase: "idle" });
     }
-  }, [caseId, statusCode]);
+  }, [caseId]);
 
   useEffect(() => {
     loadLatest();
@@ -132,31 +110,6 @@ export default function AnalysisSection({
     if (!res.success || !res.data) {
       setState({ phase: "error", message: res.error ?? "Error" });
       return;
-    }
-    await loadLatest();
-  };
-
-  // Decisión de revisión
-  const handleReviewDecision = async (
-    action: ReviewDecision["action"],
-    justification?: string,
-  ) => {
-    if (!isResultState(state)) return;
-    setReviewSubmitting(true);
-    setActionError(null);
-    const res = await submitReviewDecision(
-      caseId,
-      state.run.id,
-      action,
-      justification,
-    );
-    setReviewSubmitting(false);
-    if (!res.success) {
-      setActionError(res.error ?? "Error");
-      return;
-    }
-    if (action === "CONFIRM_ISSUE") {
-      setOperationalStatus("REVIEWED");
     }
     await loadLatest();
   };
@@ -203,10 +156,7 @@ export default function AnalysisSection({
         <ValidacionesTab
           caseId={caseId}
           state={state}
-          operationalStatus={operationalStatus}
           onAnalyze={handleAnalyze}
-          onReviewDecision={handleReviewDecision}
-          isReviewSubmitting={reviewSubmitting}
           actionError={actionError}
           allDeposits={bankParsed.allDeposits}
           payrollDocs={payrollDocs}
@@ -237,23 +187,14 @@ export default function AnalysisSection({
 function ValidacionesTab({
   caseId,
   state,
-  operationalStatus,
   onAnalyze,
-  onReviewDecision,
-  isReviewSubmitting,
   actionError,
   allDeposits,
   payrollDocs,
 }: {
   caseId: string;
   state: UiState;
-  operationalStatus: string;
   onAnalyze: () => Promise<void>;
-  onReviewDecision: (
-    action: ReviewDecision["action"],
-    justification?: string,
-  ) => Promise<void>;
-  isReviewSubmitting: boolean;
   actionError: string | null;
   allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
   payrollDocs: Document[];
@@ -267,10 +208,7 @@ function ValidacionesTab({
         </h3>
         <IdentityValidationSection
           state={state}
-          operationalStatus={operationalStatus}
           onAnalyze={onAnalyze}
-          onReviewDecision={onReviewDecision}
-          isReviewSubmitting={isReviewSubmitting}
           actionError={actionError}
         />
       </section>
@@ -303,20 +241,11 @@ function ValidacionesTab({
 
 function IdentityValidationSection({
   state,
-  operationalStatus,
   onAnalyze,
-  onReviewDecision,
-  isReviewSubmitting,
   actionError,
 }: {
   state: UiState;
-  operationalStatus: string;
   onAnalyze: () => Promise<void>;
-  onReviewDecision: (
-    action: ReviewDecision["action"],
-    justification?: string,
-  ) => Promise<void>;
-  isReviewSubmitting: boolean;
   actionError: string | null;
 }) {
   if (state.phase === "loading") {
@@ -355,7 +284,7 @@ function IdentityValidationSection({
         >
           {state.phase === "analyzing"
             ? "Analizando..."
-            : "Validar expediente"}
+            : "Analizar expediente"}
         </Button>
       </Card>
     );
@@ -365,9 +294,6 @@ function IdentityValidationSection({
 
   return (
     <div className="space-y-4">
-      {/* ── Estado operativo ────────────────────────────────────────── */}
-      <OperationalStatusBadge status={operationalStatus} />
-
       {/* ── Resumen de identidad (discrepancias) ────────────────────────── */}
       <IdentitySummaryCard
         fields={run.detail.fields}
@@ -380,43 +306,17 @@ function IdentityValidationSection({
         fields={run.detail.fields}
       />
 
-      {/* ── Acciones ──────────────────────────────────────────────────── */}
-      <ActionsGroup
-        onReviewDecision={onReviewDecision}
-        onReprocess={onAnalyze}
-        isSubmitting={isReviewSubmitting}
-        error={actionError}
-        hasExistingDecision={(run.reviewDecisions?.length ?? 0) > 0}
-      />
-    </div>
-  );
-}
-
-// ── Badge de estado operativo ─────────────────────────────────────────────────
-
-function OperationalStatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; className: string }> = {
-    REQUIRES_REVIEW: {
-      label: "Requiere revisión",
-      className: "bg-yellow-50 border-yellow-200 text-yellow-800",
-    },
-    REVIEWED: {
-      label: "Revisado",
-      className: "bg-green-50 border-green-200 text-green-800",
-    },
-  };
-
-  const cfg = config[status] ?? {
-    label: status,
-    className: "bg-gray-50 border-gray-200 text-gray-600",
-  };
-
-  return (
-    <div
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm ${cfg.className}`}
-    >
-      <span className="text-xs text-current/60">Estado operativo</span>
-      <span className="font-semibold">{cfg.label}</span>
+      {/* ── Reprocess button ──────────────────────────────────────────── */}
+      <Card className="bg-gf-bg-secondary">
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={onAnalyze}
+        >
+          🔄 Reprocesar análisis
+        </Button>
+        {actionError && <p className="text-xs text-gf-red mt-2">{actionError}</p>}
+      </Card>
     </div>
   );
 }
@@ -683,76 +583,6 @@ function IdentitySummaryCard({
           Todos los campos comparables coinciden entre documentos.
         </p>
       )}
-    </Card>
-  );
-}
-
-// ── ActionsGroup ──────────────────────────────────────────────────────────────
-
-function ActionsGroup({
-  onReviewDecision,
-  onReprocess,
-  isSubmitting,
-  error,
-  hasExistingDecision,
-}: {
-  onReviewDecision: (
-    action: ReviewDecision["action"],
-    justification?: string,
-  ) => Promise<void>;
-  onReprocess: () => Promise<void>;
-  isSubmitting: boolean;
-  error: string | null;
-  hasExistingDecision: boolean;
-}) {
-  if (hasExistingDecision) {
-    return (
-      <Card className="bg-gf-bg-secondary">
-        <p className="text-sm text-gf-text-muted">
-          Ya se registró una decisión para este análisis.
-        </p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="bg-gf-bg-secondary">
-      <p className="text-xs text-gf-text-muted mb-3">¿Qué deseas hacer?</p>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button
-          variant="secondary"
-          type="button"
-          disabled={isSubmitting}
-          onClick={() =>
-            document
-              .getElementById("documentos")
-              ?.scrollIntoView({ behavior: "smooth" })
-          }
-        >
-          📄 Revisar documentos
-        </Button>
-
-        <Button
-          variant="secondary"
-          type="button"
-          disabled={isSubmitting}
-          onClick={onReprocess}
-        >
-          {isSubmitting ? "..." : "🔄 Reprocesar análisis"}
-        </Button>
-
-        <Button
-          variant="secondary"
-          type="button"
-          disabled={isSubmitting}
-          onClick={() => onReviewDecision("CONFIRM_ISSUE")}
-        >
-          {isSubmitting ? "..." : "✅ Confirmar revisión"}
-        </Button>
-      </div>
-
-      {error && <p className="text-xs text-gf-red mt-2">{error}</p>}
     </Card>
   );
 }

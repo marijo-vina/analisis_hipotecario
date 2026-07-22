@@ -47,6 +47,8 @@ function defaultIncomeCalculation() {
     id: 'inc-1',
     confirmedGrossIncome: { toString: () => '83427.21' },
     confirmedNetIncome: { toString: () => '56976.33' },
+    averageGrossIncome: { toString: () => '80000.00' },
+    averageNetIncome: { toString: () => '55000.00' },
     receiptResults: JSON.stringify([
       { documentId: 'doc-payroll-1' },
     ]),
@@ -305,6 +307,7 @@ describe('BankViabilityRule', () => {
       prisma.incomeCalculation.findFirst.mockResolvedValue({
         ...defaultIncomeCalculation(),
         confirmedNetIncome: null,
+        averageNetIncome: null,
       });
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ bank: makeBank({ incomeCriterion: 'NET' }) }),
@@ -313,6 +316,44 @@ describe('BankViabilityRule', () => {
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
       expect(getBv(result).productMatches[0].reasons).toContain('UNCONFIRMED_INCOME');
+    });
+
+    it('falls back to averageNetIncome when confirmedNetIncome is null', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.incomeCalculation.findFirst.mockResolvedValue({
+        ...defaultIncomeCalculation(),
+        confirmedGrossIncome: null,
+        confirmedNetIncome: null,
+        averageGrossIncome: { toString: () => '75000.00' },
+        averageNetIncome: { toString: () => '50000.00' },
+      });
+      prisma.bankProductPolicy.findMany.mockResolvedValue([
+        makeProduct({ bank: makeBank({ incomeCriterion: 'NET', debtCommitmentFactor: { toString: () => '0.60' } }) }),
+      ]);
+
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const calc = getBv(result).productMatches[0].calculation;
+      // Should use averageNetIncome = 50000.00 as fallback
+      expect(calc.incomeUsed).toBe('50000.00');
+    });
+
+    it('falls back to averageGrossIncome when confirmedGrossIncome is null', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.incomeCalculation.findFirst.mockResolvedValue({
+        ...defaultIncomeCalculation(),
+        confirmedGrossIncome: null,
+        confirmedNetIncome: null,
+        averageGrossIncome: { toString: () => '75000.00' },
+        averageNetIncome: { toString: () => '50000.00' },
+      });
+      prisma.bankProductPolicy.findMany.mockResolvedValue([
+        makeProduct({ bank: makeBank({ incomeCriterion: 'GROSS', debtCommitmentFactor: { toString: () => '0.55' } }) }),
+      ]);
+
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const calc = getBv(result).productMatches[0].calculation;
+      // Should use averageGrossIncome = 75000.00 as fallback
+      expect(calc.incomeUsed).toBe('75000.00');
     });
   });
 
@@ -747,10 +788,11 @@ describe('BankViabilityRule', () => {
 
     it('REQUIRES_REVIEW takes precedence over CONDITIONED', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      // Null net income → REQUIRES_REVIEW, AND LTV exceeded → CONDITIONED
+      // Null net income AND null average → REQUIRES_REVIEW, AND LTV exceeded → CONDITIONED
       prisma.incomeCalculation.findFirst.mockResolvedValue({
         ...defaultIncomeCalculation(),
         confirmedNetIncome: null,
+        averageNetIncome: null,
       });
       prisma.mortgageCase.findUnique.mockResolvedValue({
         ...defaultCase(),
