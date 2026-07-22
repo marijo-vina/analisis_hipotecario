@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
@@ -39,8 +39,8 @@ export default function EstadosConciliacion({
 
   // Track whether we've already restored from persistence
   const [restored, setRestored] = useState(false);
-  // Track whether we've already attempted auto-run
-  const [autoRan, setAutoRan] = useState(false);
+  // Data signature of the last auto-run — prevents re-executing with same data
+  const lastSignatureRef = useRef<string | null>(null);
 
   // Restore persisted conciliation once deposits are available
   useEffect(() => {
@@ -114,17 +114,21 @@ export default function EstadosConciliacion({
     }
   }, [payrollReceipts, allDeposits, caseId, payrollDocs]);
 
-  // Auto-run conciliation on mount when data is available.
-  // Always runs fresh reconciliation, even if persisted results exist —
-  // persisted status may be stale and miss candidate data.
+  // Auto-run conciliation when data is available. Uses a data signature
+  // (deposit count × receipt count × receipts with netIncome) so it re-runs
+  // when extractedData actually becomes available, not just on first mount.
   useEffect(() => {
-    if (autoRan) return;
     if (!restored) return;
     if (allDeposits.length === 0 || payrollReceipts.length === 0) return;
 
-    setAutoRan(true);
+    // Build a fingerprint that changes when usable data arrives
+    const receiptsWithIncome = payrollReceipts.filter((r) => r.ingresoNeto != null).length;
+    const sig = `d${allDeposits.length}-r${payrollReceipts.length}-i${receiptsWithIncome}`;
+    if (sig === lastSignatureRef.current) return;
+
+    lastSignatureRef.current = sig;
     runReconciliation();
-  }, [restored, allDeposits.length, payrollReceipts.length, autoRan, runReconciliation]);
+  }, [restored, allDeposits.length, payrollReceipts.length, runReconciliation]);
 
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
     return null;
