@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
@@ -22,12 +22,9 @@ const TOLERANCE_PCT = 5;
 /**
  * HU-10 — Conciliación por recibo de nómina vs depósitos bancarios.
  *
- * La conciliación se ejecuta bajo demanda (botón "Reconciliar") porque los
- * documentos se procesan de uno en uno y la asesora puede agregar más después.
- * Una vez ejecutada, el botón cambia a "Re-ejecutar conciliación".
- *
- * HU-12: Los resultados se persisten en Document.processingResults y se
- * restauran al montar el componente si existen.
+ * La conciliación se ejecuta automáticamente al cargar los datos
+ * (integrada en el flujo unificado de análisis — HU-14A).
+ * Los resultados se persisten y se restauran en montajes posteriores.
  */
 export default function EstadosConciliacion({
   caseId,
@@ -42,6 +39,8 @@ export default function EstadosConciliacion({
 
   // Track whether we've already restored from persistence
   const [restored, setRestored] = useState(false);
+  // Track whether we've already attempted auto-run
+  const [autoRan, setAutoRan] = useState(false);
 
   // Restore persisted conciliation once deposits are available
   useEffect(() => {
@@ -88,7 +87,7 @@ export default function EstadosConciliacion({
     setRestored(true);
   }, [payrollDocs.length, allDeposits.length]);
 
-  const runReconciliation = async () => {
+  const runReconciliation = useCallback(async () => {
     const newResults = reconcilePreview(payrollReceipts, allDeposits);
     setResults(newResults);
     setHasRun(true);
@@ -113,7 +112,18 @@ export default function EstadosConciliacion({
     if (items.length > 0) {
       await saveConciliation(caseId, items);
     }
-  };
+  }, [payrollReceipts, allDeposits, caseId, payrollDocs]);
+
+  // Auto-run conciliation on mount when data is available and no persisted results exist
+  useEffect(() => {
+    if (autoRan) return;
+    if (!restored) return;
+    if (allDeposits.length === 0 || payrollReceipts.length === 0) return;
+    if (results !== null) return; // Already have results from restore
+
+    setAutoRan(true);
+    runReconciliation();
+  }, [restored, allDeposits.length, payrollReceipts.length, results, autoRan, runReconciliation]);
 
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
     return null;
@@ -126,22 +136,9 @@ export default function EstadosConciliacion({
 
   return (
     <div className="space-y-4">
-      {/* ── Trigger button ──────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={runReconciliation}
-        disabled={allDeposits.length === 0 || payrollReceipts.length === 0}
-        className="inline-flex items-center gap-2 rounded-lg bg-gf-red px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gf-red-dark disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        {hasRun ? "Re-ejecutar conciliación" : "Reconciliar nómina vs banco"}
-      </button>
-
       {!results && (
-        <p className="text-sm text-gf-text-muted py-2">
-          Presiona &quot;Reconciliar&quot; para comparar los recibos de nómina contra los depósitos bancarios.
+        <p className="text-sm text-gf-text-muted py-2 animate-pulse">
+          Conciliando nómina vs banco...
         </p>
       )}
 

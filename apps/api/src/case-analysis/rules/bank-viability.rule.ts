@@ -6,7 +6,7 @@ import type {
   RuleResult,
   Severity,
 } from '../analysis-rule.interface';
-import type { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import type {
   BankViabilitySnapshot,
   BankViabilityInputs,
