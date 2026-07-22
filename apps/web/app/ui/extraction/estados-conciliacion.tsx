@@ -114,16 +114,17 @@ export default function EstadosConciliacion({
     }
   }, [payrollReceipts, allDeposits, caseId, payrollDocs]);
 
-  // Auto-run conciliation on mount when data is available and no persisted results exist
+  // Auto-run conciliation on mount when data is available.
+  // Always runs fresh reconciliation, even if persisted results exist —
+  // persisted status may be stale and miss candidate data.
   useEffect(() => {
     if (autoRan) return;
     if (!restored) return;
     if (allDeposits.length === 0 || payrollReceipts.length === 0) return;
-    if (results !== null) return; // Already have results from restore
 
     setAutoRan(true);
     runReconciliation();
-  }, [restored, allDeposits.length, payrollReceipts.length, results, autoRan, runReconciliation]);
+  }, [restored, allDeposits.length, payrollReceipts.length, autoRan, runReconciliation]);
 
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
     return null;
