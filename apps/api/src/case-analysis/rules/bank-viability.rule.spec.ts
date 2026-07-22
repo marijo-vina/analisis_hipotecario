@@ -710,6 +710,30 @@ describe('BankViabilityRule', () => {
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
+
+    it('defaults to { false, false } when deriveScotiabankFlags receives undefined (no bankarizationFlags in context)', async () => {
+      // Exercises the `deriveScotiabankFlags(undefined)` branch of
+      // BankViabilityRule.deriveScotiabankFlags(): when the orchestrator does
+      // not pass `bankarizationFlags` in the Phase C context, the rule MUST
+      // treat both Scotiabank flags as false rather than crashing or
+      // reading stale data from the DB.
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.bankProductPolicy.findMany.mockResolvedValue([
+        makeProduct({ bank: makeBank({ code: 'SCOTIABANK' }) }),
+      ]);
+
+      // defaultContext() with no args yields a context that does NOT
+      // include `bankarizationFlags` — exactly the undefined-flags case.
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+
+      const inputs = getBv(result).inputs;
+      expect(inputs.hasPagadoraIncome).toBe(false);
+      expect(inputs.scotiabankExcluded).toBe(false);
+      // Scotiabank without pagadora → must not be flagged for exclusion
+      expect(getBv(result).productMatches[0].reasons).not.toContain(
+        'SCOTIABANK_PAGADORA_EXCLUSION',
+      );
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────
