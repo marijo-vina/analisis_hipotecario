@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { BankViabilityRule } from './rules/bank-viability.rule';
 import { CaseAnalysisService } from './case-analysis.service';
 import type { RuleResult } from './analysis-rule.interface';
 
@@ -44,11 +45,24 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockBankViabilityRule = {
+    ruleId: 'bank-viability',
+    execute: jest.fn(),
+  };
+
   const mockBankarizationPassResult: RuleResult = {
     ruleId: 'bankarization-validation',
     outcome: 'PASS',
     severity: 'INFO',
     detail: { sources: ['payroll', 'bank-statement', 'client'], fields: [] },
+    alerts: [],
+  };
+
+  const mockBankViabilityPassResult: RuleResult = {
+    ruleId: 'bank-viability',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'bank-catalog'], fields: [], bankViability: { sourceVersion: 'ANAQUEL_MAYO_2026', productMatches: [] } },
     alerts: [],
   };
 
@@ -85,12 +99,14 @@ describe('CaseAnalysisService', () => {
     // La bancarizacion (HU-10) tambien se ejecuta; default PASS para que el
     // agregado reciba un RuleResult valido sin que cada test lo configure.
     mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
+    mockBankViabilityRule.execute.mockResolvedValue(mockBankViabilityPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CaseAnalysisService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
+        { provide: BankViabilityRule, useValue: mockBankViabilityRule },
       ],
     }).compile();
     service = module.get<CaseAnalysisService>(CaseAnalysisService);
