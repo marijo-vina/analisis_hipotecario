@@ -140,6 +140,7 @@ export interface FieldComparison {
 export interface AnalysisDetail {
   sources: string[];
   fields: FieldComparison[];
+  bankViability?: BankViabilitySnapshot;
 }
 
 export interface AnalysisAlert {
@@ -180,3 +181,106 @@ export interface AnalysisResult {
     triggeredBy: string;
   };
 }
+
+// ---- Bank Viability (HU-14B) -----------------------------------------------
+
+export type ProductMatchStatus =
+  | "PRELIMINARY_VIABLE"
+  | "CONDITIONED"
+  | "NOT_COMPATIBLE"
+  | "REQUIRES_REVIEW";
+
+export type CheckStatus =
+  | "PASS"
+  | "FAIL"
+  | "REQUIRES_REVIEW"
+  | "NOT_APPLICABLE";
+
+export interface CheckResult {
+  status: CheckStatus;
+  [key: string]: unknown;
+}
+
+export interface BankViabilityInputs {
+  confirmedGrossIncome: string | null;
+  confirmedNetIncome: string | null;
+  totalMonthlyLiabilities: string | null;
+  requestedAmount: string | null;
+  propertyValue: string | null;
+  estimatedTermMonths: number | null;
+  birthDate: string | null;
+  employmentStartDate: string | null;
+  hasPagadoraIncome: boolean;
+  scotiabankExcluded: boolean;
+}
+
+export interface ProductMatchCalculation {
+  incomeUsed: string | null;
+  maximumDebt: string | null;
+  totalMonthlyLiabilities: string | null;
+  availableCapacity: string | null;
+  requestedLtv: string | null;
+  maximumAmountByLtv: string | null;
+  requiredReduction: string | null;
+  currentAgeMonths: number | null;
+  ageAtMaturityMonths: number | null;
+  employmentTenureMonths: number | null;
+  maximumTheoreticalTermMonths: number | null;
+}
+
+export interface ProductPolicySnapshot {
+  incomeCriterion: string;
+  debtCommitmentFactor: string;
+  minimumEmploymentTenureMonths: number | null;
+  minimumApplicantAgeMonths: number | null;
+  maximumApplicationAgeMonths: number | null;
+  maximumMaturityAgeMonths: number | null;
+  maximumLtv: string | null;
+}
+
+export interface ProductMatch {
+  bankCode: string;
+  productCode: string;
+  status: ProductMatchStatus;
+  reasons: string[];
+  policySnapshot: ProductPolicySnapshot;
+  calculation: ProductMatchCalculation;
+  checks: Record<string, CheckResult>;
+}
+
+export interface BankViabilitySnapshot {
+  sourceVersion: string;
+  creditTypeCode: string;
+  destination: string | null;
+  calculatedAt: string;
+  warningLegend: string;
+  reasons: string[];
+  inputs: BankViabilityInputs;
+  productMatches: ProductMatch[];
+}
+
+export const STATUS_LABELS: Record<string, string> = {
+  PRELIMINARY_VIABLE: "Viable preliminarmente",
+  CONDITIONED: "Condicionado",
+  REQUIRES_REVIEW: "Requiere revisión",
+  NOT_COMPATIBLE: "No compatible",
+};
+
+export const REASON_LABELS: Record<string, string> = {
+  NEGATIVE_CAPACITY: "Capacidad negativa",
+  LTV_EXCEEDED: "Aforo excede el máximo permitido",
+  MATURITY_AGE_EXCEEDED: "Edad al vencimiento excede el máximo",
+  NO_VALID_TERM_AVAILABLE: "Sin plazo válido disponible",
+  MINIMUM_AGE_NOT_MET: "Edad mínima no alcanzada",
+  MAXIMUM_APPLICATION_AGE_EXCEEDED: "Edad máxima de solicitud excedida",
+  INSUFFICIENT_EMPLOYMENT_TENURE: "Antigüedad laboral insuficiente",
+  UNCONFIRMED_INCOME: "Ingreso no confirmado",
+  SCOTIABANK_PAGADORA_EXCLUSION: "Exclusión Scotiabank por nómina Pagadora",
+  INVALID_REQUESTED_AMOUNT: "Monto solicitado inválido",
+  INVALID_PROPERTY_VALUE: "Valor del inmueble inválido",
+  CONFLICTING_EMPLOYMENT_DATES: "Fechas de empleo inconsistentes",
+  MISSING_INCOME_CALCULATION: "Sin cálculo de ingresos",
+  MISSING_LIABILITY_SNAPSHOT: "Sin snapshot de pasivos",
+  UNSUPPORTED_DESTINATION: "Destino no soportado",
+  MISSING_BIRTH_DATE: "Fecha de nacimiento no disponible",
+};
