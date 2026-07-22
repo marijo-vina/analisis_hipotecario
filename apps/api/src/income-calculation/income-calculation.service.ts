@@ -10,7 +10,6 @@ import {
   type IncomeCalculationResult,
   type IncomeReceiptResult,
 } from './income-calculation.types';
-import type { ConfirmIncomeDto } from './dto/confirm-income.dto';
 import type { SaveConciliationDto } from './dto/save-conciliation.dto';
 
 // ── Pure helpers ──────────────────────────────────────────────────────────
@@ -200,40 +199,6 @@ export class IncomeCalculationService {
         averageGrossIncome: gross.toFixed(2),
         averageNetIncome: net.toFixed(2),
         status: IncomeCalculationStatus.CALCULATED,
-      },
-    });
-
-    return this.snapshotToResult(snapshot, caseId);
-  }
-
-  /**
-   * Confirm the calculated snapshot with manually-captured
-   * `confirmedGrossIncome`/`confirmedNetIncome` plus optional
-   * observations. Persists a NEW snapshot with `status = CONFIRMED`
-   * that preserves the original calculated averages — confirmed
-   * values are stored side-by-side, never overwriting the computed
-   * `averageGrossIncome` / `averageNetIncome`.
-   */
-  async confirm(
-    caseId: string,
-    dto: ConfirmIncomeDto,
-    confirmedBy: string,
-  ): Promise<IncomeCalculationResult> {
-    const latest = await this.getLatest(caseId);
-
-    const snapshot = await this.prisma.incomeCalculation.create({
-      data: {
-        mortgageCaseId: caseId,
-        receiptResults: latest.receiptResults as unknown as never,
-        // Preserve the calculated averages — do NOT overwrite
-        averageGrossIncome: latest.averageGrossIncome,
-        averageNetIncome: latest.averageNetIncome,
-        confirmedGrossIncome: dto.confirmedGrossIncome,
-        confirmedNetIncome: dto.confirmedNetIncome,
-        observations: dto.observations ?? null,
-        confirmedBy,
-        confirmedAt: new Date(),
-        status: IncomeCalculationStatus.CONFIRMED,
       },
     });
 

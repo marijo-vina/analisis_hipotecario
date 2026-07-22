@@ -88,7 +88,6 @@ describe('IncomeCalculationController — full lifecycle (integration)', () => {
     calculate: jest.Mock;
     getLatest: jest.Mock;
     toggleReceipt: jest.Mock;
-    confirm: jest.Mock;
   };
 
   const caseId = 'case-integration-1';
@@ -100,7 +99,6 @@ describe('IncomeCalculationController — full lifecycle (integration)', () => {
       calculate: jest.fn(),
       getLatest: jest.fn(),
       toggleReceipt: jest.fn(),
-      confirm: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -199,119 +197,6 @@ describe('IncomeCalculationController — full lifecycle (integration)', () => {
       expect(response.body.receiptResults[1].included).toBe(true);
       expect(response.body.receiptResults[2].included).toBe(true);
       expect(mockService.toggleReceipt).toHaveBeenCalledWith(caseId, 0, false);
-    });
-
-    it('step 4: POST /confirm → 200, CONFIRMED, confirmed values stored, averages unchanged', async () => {
-      // After toggle, averages are 25k/20k; confirm with 25k/20k
-      const receipts = makeSeededReceipts();
-      receipts[0] = { ...receipts[0], included: false };
-
-      const confirmed: IncomeCalculationResult = {
-        ...makeCalculatedResult(),
-        id: 'inc-3',
-        receiptResults: receipts,
-        averageGrossIncome: 25000,
-        averageNetIncome: 20000,
-        includedCount: 2,
-        status: IncomeCalculationStatus.CONFIRMED,
-        confirmedGrossIncome: 25000,
-        confirmedNetIncome: 20000,
-        confirmedBy: 'advisor-1',
-        confirmedAt: '2026-07-16T12:00:00.000Z',
-        observations: 'OK',
-      };
-      mockService.confirm.mockResolvedValue(confirmed);
-
-      const response = await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 25000,
-          confirmedNetIncome: 20000,
-          observations: 'OK',
-        })
-        .expect(200);
-
-      expect(response.body.status).toBe('CONFIRMED');
-      expect(response.body.confirmedGrossIncome).toBe(25000);
-      expect(response.body.confirmedNetIncome).toBe(20000);
-      expect(response.body.confirmedBy).toBe('advisor-1');
-      expect(response.body.observations).toBe('OK');
-      // Averages must remain the calculated values (25k/20k), not overwritten
-      expect(response.body.averageGrossIncome).toBe(25000);
-      expect(response.body.averageNetIncome).toBe(20000);
-      expect(mockService.confirm).toHaveBeenCalledWith(
-        caseId,
-        expect.objectContaining({
-          confirmedGrossIncome: 25000,
-          confirmedNetIncome: 20000,
-          observations: 'OK',
-        }),
-        'advisor-1',
-      );
-    });
-
-    it('full chain: POST → GET → PATCH → POST/confirm in sequence', async () => {
-      // Step 1: calculate
-      const calculated = makeCalculatedResult();
-      mockService.calculate.mockResolvedValue(calculated);
-
-      const calcRes = await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/calculate`)
-        .expect(201);
-      expect(calcRes.body.status).toBe('CALCULATED');
-
-      // Step 2: get latest (returns same snapshot)
-      mockService.getLatest.mockResolvedValue(calculated);
-
-      const latestRes = await request(app.getHttpServer())
-        .get(`/cases/${caseId}/income/latest`)
-        .expect(200);
-      expect(latestRes.body.id).toBe(calcRes.body.id);
-
-      // Step 3: toggle receipt 0 → exclude
-      const receipts = makeSeededReceipts();
-      receipts[0] = { ...receipts[0], included: false };
-      const toggled = makeCalculatedResult({
-        id: 'inc-2',
-        receiptResults: receipts,
-        averageGrossIncome: 25000,
-        averageNetIncome: 20000,
-        includedCount: 2,
-      });
-      mockService.toggleReceipt.mockResolvedValue(toggled);
-
-      const toggleRes = await request(app.getHttpServer())
-        .patch(`/cases/${caseId}/income/receipts/0`)
-        .send({ included: false })
-        .expect(200);
-      expect(toggleRes.body.includedCount).toBe(2);
-
-      // Step 4: confirm
-      const confirmed = makeCalculatedResult({
-        id: 'inc-3',
-        receiptResults: receipts,
-        averageGrossIncome: 25000,
-        averageNetIncome: 20000,
-        includedCount: 2,
-        status: IncomeCalculationStatus.CONFIRMED,
-        confirmedGrossIncome: 25000,
-        confirmedNetIncome: 20000,
-        confirmedBy: 'advisor-1',
-        confirmedAt: '2026-07-16T12:00:00.000Z',
-        observations: 'OK',
-      });
-      mockService.confirm.mockResolvedValue(confirmed);
-
-      const confirmRes = await request(app.getHttpServer())
-        .post(`/cases/${caseId}/income/confirm`)
-        .send({
-          confirmedGrossIncome: 25000,
-          confirmedNetIncome: 20000,
-          observations: 'OK',
-        })
-        .expect(200);
-      expect(confirmRes.body.status).toBe('CONFIRMED');
-      expect(confirmRes.body.confirmedGrossIncome).toBe(25000);
     });
   });
 });

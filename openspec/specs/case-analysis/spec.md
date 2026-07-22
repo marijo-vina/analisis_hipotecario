@@ -8,14 +8,15 @@ Module-level spec for the `case-analysis` domain: `AnalysisRun` lifecycle, `Anal
 
 ### Requirement: AnalysisRun Lifecycle
 
-The system SHALL maintain an `AnalysisRun` record per execution with split status fields: `executionStatus` (PENDING | RUNNING | COMPLETED | ERROR) and `outcome` (PASS | PARTIAL | FAIL). Each invocation of the analysis endpoint SHALL create a new immutable `AnalysisRun` record. The raw result SHALL NOT be mutated after creation.
+The system SHALL maintain an `AnalysisRun` record per execution with split status fields: `executionStatus` (PENDING | RUNNING | COMPLETED | ERROR) and `outcome` (PASS | PARTIAL | FAIL). Each invocation of the analysis endpoint SHALL create a new immutable `AnalysisRun` record. The raw result SHALL NOT be mutated after creation. The `run()` method SHALL orchestrate income and liability calculation services as part of Phase B execution.
+
+(Previously: AnalysisRun tracked review decisions separately and did not orchestrate income/liability calculations.)
 
 | Field | Type | Values |
 |-------|------|--------|
 | executionStatus | enum | PENDING, RUNNING, COMPLETED, ERROR |
 | outcome | enum | PASS, PARTIAL, FAIL |
 | detail | JSONB | Rule-specific structured output |
-| reviewDecision | separate model | MARK_FALSE_POSITIVE, CONFIRM_ISSUE, CANCEL_CASE |
 
 #### Scenario: Synchronous analysis creates completed run
 
@@ -29,15 +30,11 @@ The system SHALL maintain an `AnalysisRun` record per execution with split statu
 - WHEN the asesora triggers analysis again
 - THEN a second `AnalysisRun` is created; the first record remains unchanged
 
-#### Scenario: Review decision does not mutate raw result
-
-- GIVEN an `AnalysisRun` with `outcome: FAIL`
-- WHEN the asesora submits a review decision (MARK_FALSE_POSITIVE)
-- THEN the `reviewDecision` is stored separately; the `AnalysisRun` outcome remains `FAIL`
-
 ### Requirement: AnalysisRule Interface
 
-The system SHALL define an `AnalysisRule` interface that each rule implements. The orchestrator SHALL execute all registered rules sequentially and aggregate their results into a single `AnalysisResult`.
+The system SHALL define an `AnalysisRule` interface that each rule implements. The orchestrator SHALL execute all registered rules sequentially and aggregate their results into a single `AnalysisResult`. Rules SHALL NOT transition the case to `REQUIRES_REVIEW` status on FAIL — analysis produces results but does not gate case progression.
+
+(Previously: Rules could transition case to REQUIRES_REVIEW status on FAIL.)
 
 | Property | Description |
 |----------|-------------|
@@ -58,6 +55,32 @@ The system SHALL define an `AnalysisRule` interface that each rule implements. T
 - WHEN the orchestrator runs analysis
 - THEN both rules execute and results are aggregated into a single `AnalysisResult`
 
+### Requirement: Phased Orchestration
+
+The system SHALL execute `CaseAnalysisService.run()` in three phases: (A) document-level rules (identity match, bankarization validation), (B) financial calculations (income + liability via injected services), (C) bank viability rule. Phase B SHALL inject `IncomeCalculationService` and `LiabilityCalculationService`. Phase C SHALL execute after Phase B completes so that income and liability snapshots are available.
+
+#### Scenario: Three-phase execution completes in order
+
+- GIVEN a mortgage case with documents
+- WHEN `run()` is invoked
+- THEN Phase A executes document rules, Phase B calculates income and liability, Phase C evaluates bank viability
+
+#### Scenario: Phase B injects calculation services
+
+- GIVEN `CaseAnalysisService` is instantiated
+- WHEN `IncomeCalculationService` and `LiabilityCalculationService` are injected
+- THEN `run()` calls both services during Phase B before executing bank viability
+
+### Requirement: Income Fallback in Bank Viability
+
+The system SHALL use `averageGrossIncome` and `averageNetIncome` as fallback values when `confirmedGrossIncome` and `confirmedNetIncome` are null during bank viability evaluation.
+
+#### Scenario: Fallback to calculated averages
+
+- GIVEN `confirmedGrossIncome` is null and `averageGrossIncome` is 18,000
+- WHEN `BankViabilityRule` resolves income
+- THEN it uses 18,000 as the gross income input
+
 ### Requirement: AnalysisResult Contract
 
 The system SHALL return an `AnalysisResult` containing: `runId`, `executionStatus`, `outcome`, `summary`, `detail` (stable structure), and `executionMetadata` (timestamp, triggeredBy).
@@ -77,18 +100,4 @@ The system SHALL return an `AnalysisResult` containing: `runId`, `executionStatu
 - WHEN the result is returned
 - THEN it contains runId, executionStatus, outcome, summary, detail, and executionMetadata
 
-### Requirement: Review Decision Actions
 
-The system SHALL accept three review decision actions from the asesora: `MARK_FALSE_POSITIVE` (requires justification), `CONFIRM_ISSUE`, `CANCEL_CASE`. Each decision SHALL be stored in a separate model without altering the original `AnalysisRun`.
-
-#### Scenario: False positive requires justification
-
-- GIVEN an AnalysisRun with outcome FAIL
-- WHEN the asesora submits MARK_FALSE_POSITIVE without justification
-- THEN the system returns 400 with "Justification required for false positive"
-
-#### Scenario: Cancel case action
-
-- GIVEN an AnalysisRun with outcome FAIL
-- WHEN the asesora submits CANCEL_CASE
-- THEN the case status transitions to CANCELLED and the decision is recorded

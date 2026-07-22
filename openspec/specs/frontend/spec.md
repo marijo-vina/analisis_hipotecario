@@ -179,3 +179,40 @@ Frontend web UI mínima para que la asesora gestione clientes y expedientes hipo
 | **409** | Conflicto (unique constraint) | Mensaje inline específico: "RFC ya registrado" o "Email ya registrado" |
 | **500** | Error interno servidor | Banner/toast genérico: "Error inesperado. Intente nuevamente." |
 | **Network** | Fetch falla (sin respuesta) | Mensaje: "No se pudo conectar con el servidor" |
+
+---
+
+## 6. Unified Analysis Flow (HU-14A)
+
+### Requirement: Single Analysis Button
+
+The system SHALL display a single "Analizar expediente" button in the Validaciones tab that calls `POST /mortgage-cases/:caseId/analyze`. This button SHALL replace all individual phase trigger buttons (no separate "Validar expediente", "Calcular", "Calcular ingresos" buttons).
+
+#### Scenario: Single button triggers full analysis
+
+- GIVEN the advisor is viewing a case's Validaciones tab
+- WHEN they click "Analizar expediente"
+- THEN the system calls `POST /mortgage-cases/:caseId/analyze` and displays progress/results
+
+### Requirement: Auto-Refresh on Completion
+
+The system SHALL refresh all tabs (validations, motor financiero, comparativa) upon analysis completion so that income, liability, and bank viability results are visible without manual navigation.
+
+#### Scenario: All tabs update after analysis
+
+- GIVEN analysis completes successfully
+- WHEN the advisor switches to Motor Financiero tab
+- THEN income and liability results are already populated
+
+### Removed UI (HU-14A cleanup)
+
+The following UI elements were eliminated as part of HU-14A's MVP simplification and are no longer present in the frontend:
+
+- "Validar expediente" button (replaced by single "Analizar expediente" button)
+- "Calcular" button for liability (replaced by single button)
+- "Calcular ingresos" button (replaced by single button)
+- "Confirmar revisión" button + `ActionsGroup` component + `OperationalStatusBadge` (manual review gating removed)
+- Per-receipt "PENDIENTE / REVISADO" toggle in `estados-conciliacion` (manual receipt review removed)
+- "Confirmar ingresos" card with confirmed KPI cards and CONFIRMADO badge (manual income confirmation removed)
+- `submitReviewDecision` server action in `apps/web/app/actions/analysis.ts` (removed)
+- `confirmIncome` server action in `apps/web/app/actions/income.ts` (removed)

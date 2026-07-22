@@ -6,7 +6,6 @@ import {
   fetchIncomeLatest,
   calculateIncome,
   toggleIncomeReceipt,
-  confirmIncome,
   type IncomeCalculationResult,
   type IncomeReceiptResult,
 } from "@/app/actions/income";
@@ -99,21 +98,12 @@ function CurrencyInput({
 // ── Status helpers ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const isConfirmed = status === "CONFIRMED";
-  const label = isConfirmed ? "CONFIRMADO" : "CALCULADO";
+  const label = status === "CALCULATED" ? "CALCULADO" : status;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        isConfirmed
-          ? "bg-green-100 text-green-800"
-          : "bg-blue-100 text-blue-800"
-      }`}
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800"
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          isConfirmed ? "bg-green-600" : "bg-blue-600"
-        }`}
-      />
+      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
       {label}
     </span>
   );
@@ -176,12 +166,6 @@ export default function IncomeCalculationSection({
     [],
   );
 
-  // Confirmation form state
-  const [confirmGross, setConfirmGross] = useState("");
-  const [confirmNet, setConfirmNet] = useState("");
-  const [observations, setObservations] = useState("");
-  const [confirming, setConfirming] = useState(false);
-
   // ── Load latest snapshot ───────────────────────────────────────────────
   const loadLatest = useCallback(async () => {
     setLoading(true);
@@ -195,8 +179,6 @@ export default function IncomeCalculationSection({
     if (res.data) {
       setSnapshot(res.data);
       setLocalReceipts(res.data.receiptResults);
-      setConfirmGross(res.data.averageGrossIncome.toFixed(2));
-      setConfirmNet(res.data.averageNetIncome.toFixed(2));
     }
   }, [caseId]);
 
@@ -232,8 +214,6 @@ export default function IncomeCalculationSection({
     }
     setSnapshot(res.data);
     setLocalReceipts(res.data.receiptResults);
-    setConfirmGross(res.data.averageGrossIncome.toFixed(2));
-    setConfirmNet(res.data.averageNetIncome.toFixed(2));
   };
 
   // ── Toggle receipt inclusion ───────────────────────────────────────────
@@ -256,29 +236,6 @@ export default function IncomeCalculationSection({
       return;
     }
     // Sync with server response
-    setSnapshot(res.data);
-    setLocalReceipts(res.data.receiptResults);
-    setConfirmGross(res.data.averageGrossIncome.toFixed(2));
-    setConfirmNet(res.data.averageNetIncome.toFixed(2));
-  };
-
-  // ── Confirm income ─────────────────────────────────────────────────────
-  const handleConfirm = async () => {
-    const gross = parseFloat(confirmGross);
-    const net = parseFloat(confirmNet);
-    if (isNaN(gross) || isNaN(net)) {
-      setError("Ingresa valores numéricos válidos para la confirmación");
-      return;
-    }
-
-    setConfirming(true);
-    setError(null);
-    const res = await confirmIncome(caseId, gross, net, observations);
-    setConfirming(false);
-    if (!res.success || !res.data) {
-      setError(res.error ?? "Error al confirmar el cálculo");
-      return;
-    }
     setSnapshot(res.data);
     setLocalReceipts(res.data.receiptResults);
   };
@@ -419,80 +376,6 @@ export default function IncomeCalculationSection({
             )}
           </Card>
 
-          {/* ── Confirmation panel ─────────────────────────────────────────── */}
-          {snapshot.status !== "CONFIRMED" && (
-            <Card>
-              <h4 className="mb-3 text-sm font-semibold text-gf-text">
-                Confirmar ingresos
-              </h4>
-              <p className="mb-4 text-xs text-gf-text-muted">
-                Ajusta los valores calculados si es necesario y confirma los
-                ingresos admisibles del solicitante.
-              </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gf-text-muted">
-                    Ingreso bruto mensual confirmado
-                  </label>
-                  <CurrencyInput
-                    value={confirmGross}
-                    onChange={setConfirmGross}
-                    placeholder="0.00"
-                    className="w-full rounded-md border border-gf-border bg-gf-surface px-3 py-2 text-sm text-gf-text focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gf-text-muted">
-                    Ingreso neto mensual confirmado
-                  </label>
-                  <CurrencyInput
-                    value={confirmNet}
-                    onChange={setConfirmNet}
-                    placeholder="0.00"
-                    className="w-full rounded-md border border-gf-border bg-gf-surface px-3 py-2 text-sm text-gf-text focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gf-text-muted">
-                    Observaciones
-                  </label>
-                  <textarea
-                    value={observations}
-                    onChange={(e) => setObservations(e.target.value)}
-                    rows={2}
-                    placeholder="Opcional"
-                    className="w-full rounded-md border border-gf-border bg-gf-surface px-3 py-2 text-sm text-gf-text focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button
-                  variant="primary"
-                  onClick={handleConfirm}
-                  loading={confirming}
-                >
-                  {confirming ? "Confirmando..." : "Confirmar ingresos"}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {/* ── Confirmed info ─────────────────────────────────────────────── */}
-          {snapshot.status === "CONFIRMED" && (
-            <Card>
-              <div className="flex items-center gap-2 text-sm text-green-700">
-                <span className="font-semibold">✓ Ingresos confirmados</span>
-                <span className="text-gf-text-muted">
-                  el {formatDate(snapshot.confirmedAt)}
-                </span>
-              </div>
-              {snapshot.observations && (
-                <p className="mt-2 text-xs text-gf-text-muted">
-                  Observaciones: {snapshot.observations}
-                </p>
-              )}
-            </Card>
-          )}
         </>
       )}
     </section>
@@ -512,8 +395,6 @@ function KpiCards({
   localNet: number;
   localCount: number;
 }) {
-  const isConfirmed = snapshot.status === "CONFIRMED";
-
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {/* Promedio ingreso bruto */}
@@ -535,24 +416,18 @@ function KpiCards({
 
       {/* Promedio ingreso neto */}
       <div
-        className={`flex flex-1 flex-col rounded-lg border p-4 ${
-          isConfirmed
-            ? "border-violet-200"
-            : "border-green-200"
-        }`}
-        style={{
-          backgroundColor: isConfirmed ? "#F5F3FF" : "#F0FDF4",
-        }}
+        className="flex flex-1 flex-col rounded-lg border border-green-200 p-4"
+        style={{ backgroundColor: "#F0FDF4" }}
       >
         <span
           className="text-xs font-medium"
-          style={{ color: isConfirmed ? "#6D28D9" : "#166534" }}
+          style={{ color: "#166534" }}
         >
           Promedio ingreso neto
         </span>
         <span
           className="mt-1 text-lg font-bold"
-          style={{ color: isConfirmed ? "#6D28D9" : "#166534" }}
+          style={{ color: "#166534" }}
         >
           {formatMXN(localNet || snapshot.averageNetIncome)}
         </span>
@@ -561,71 +436,21 @@ function KpiCards({
         </span>
       </div>
 
-      {/* Confirmed gross (if confirmed) */}
-      {isConfirmed && (
-        <div
-          className="flex flex-1 flex-col rounded-lg border border-emerald-200 p-4"
-          style={{ backgroundColor: "#ECFDF5" }}
-        >
-          <span
-            className="text-xs font-medium"
-            style={{ color: "#065F46" }}
-          >
-            Bruto confirmado
-          </span>
-          <span
-            className="mt-1 text-lg font-bold"
-            style={{ color: "#065F46" }}
-          >
-            {formatMXN(snapshot.confirmedGrossIncome)}
-          </span>
-          <span className="mt-1 text-xs text-gf-text-muted">
-            Valor verificado por analista
-          </span>
-        </div>
-      )}
-
-      {/* Confirmed net (if confirmed) */}
-      {isConfirmed && (
-        <div
-          className="flex flex-1 flex-col rounded-lg border border-emerald-200 p-4"
-          style={{ backgroundColor: "#ECFDF5" }}
-        >
-          <span
-            className="text-xs font-medium"
-            style={{ color: "#065F46" }}
-          >
-            Neto confirmado
-          </span>
-          <span
-            className="mt-1 text-lg font-bold"
-            style={{ color: "#065F46" }}
-          >
-            {formatMXN(snapshot.confirmedNetIncome)}
-          </span>
-          <span className="mt-1 text-xs text-gf-text-muted">
-            Valor verificado por analista
-          </span>
-        </div>
-      )}
-
-      {/* Estado (if not confirmed — takes the slot) */}
-      {!isConfirmed && (
-        <div
-          className="flex flex-1 flex-col rounded-lg border border-amber-200 p-4"
-          style={{ backgroundColor: "#FFFBEB" }}
-        >
-          <span className="text-xs font-medium" style={{ color: "#92400E" }}>
-            Estado
-          </span>
-          <span className="mt-1">
-            <StatusBadge status={snapshot.status} />
-          </span>
-          <span className="mt-1 text-xs text-gf-text-muted">
-            Pendiente de confirmación
-          </span>
-        </div>
-      )}
+      {/* Estado */}
+      <div
+        className="flex flex-1 flex-col rounded-lg border border-amber-200 p-4"
+        style={{ backgroundColor: "#FFFBEB" }}
+      >
+        <span className="text-xs font-medium" style={{ color: "#92400E" }}>
+          Estado
+        </span>
+        <span className="mt-1">
+          <StatusBadge status={snapshot.status} />
+        </span>
+        <span className="mt-1 text-xs text-gf-text-muted">
+          Cálculo completado
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,7 +13,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
-import { ReviewDecisionDto } from '../case-analysis/dto/review-decision.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
 import { QueryMortgageCaseDto } from './dto/query-mortgage-case.dto';
@@ -82,29 +80,5 @@ export class MortgageCasesController {
       throw new NotFoundException('No analysis runs found');
     }
     return run;
-  }
-
-  /** Records a review decision on a completed AnalysisRun. */
-  @HttpCode(200)
-  @Post(':caseId/analysis/:runId/review-decision')
-  async submitReviewDecision(
-    @Param('caseId') caseId: string,
-    @Param('runId') runId: string,
-    @Body() dto: ReviewDecisionDto,
-    @Req() req: { user: { id: string } },
-  ) {
-    // Enforce justification for the false-positive action (spec requirement).
-    if (dto.action === 'MARK_FALSE_POSITIVE') {
-      if (!dto.justification || dto.justification.trim() === '') {
-        throw new BadRequestException('Justification required for false positive');
-      }
-    }
-
-    return this.caseAnalysisService.recordReviewDecision(
-      caseId,
-      runId,
-      dto,
-      req.user.id,
-    );
   }
 }

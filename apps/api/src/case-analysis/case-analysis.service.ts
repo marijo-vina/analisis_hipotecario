@@ -7,7 +7,8 @@ import type {
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
-import { ReviewDecisionDto } from './dto/review-decision.dto';
+import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
+import { LiabilityCalculationService } from '../liability/liability.service';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
@@ -38,29 +39,27 @@ export interface AnalysisResultPayload {
 /**
  * Orchestrates cross-document analysis for a mortgage case.
  *
- *  1. Loads the MortgageCase with its Client and Documents (documentType +
- *     extractedData).
- *  2. Executes every registered `AnalysisRule` sequentially.
- *  3. Aggregates their results into a single `AnalysisRun` record and
- *     creates `AnalysisAlert` rows for every rule-emitted alert.
- *  4. When the aggregate outcome is `FAIL`, transitions the case status to
- *     `REQUIRES_REVIEW` (gates automatic financial-engine advance only).
- *  5. Returns an immutable `AnalysisResult` snapshot.
+ * 3-phase execution:
+ *  Phase A: identity-match + bankarization-validation rules
+ *  Phase B: income calculation + liability calculation (services)
+ *  Phase C: bank-viability rule (reads income/liability from DB)
+ *
+ * Phase failure produces a warning but does not block subsequent phases.
  */
 @Injectable()
 export class CaseAnalysisService {
-  private readonly rules: AnalysisRule[];
+  private readonly phaseARules: AnalysisRule[];
 
   constructor(
     private readonly prisma: PrismaService,
     identityMatchRule: IdentityMatchRule,
     bankarizationValidationRule: BankarizationValidationRule,
-    bankViabilityRule: BankViabilityRule,
+    private readonly bankViabilityRule: BankViabilityRule,
+    private readonly incomeCalcService: IncomeCalculationService,
+    private readonly liabilityCalcService: LiabilityCalculationService,
   ) {
-    // Rule registry. HU-10 adds bankarization-validation (nomina vs depositos)
-    // despues del identity-match. HU-13 adds bank-viability. Future Sprint 3/4
-    // rules (income, liability) register here without touching the controller.
-    this.rules = [identityMatchRule, bankarizationValidationRule, bankViabilityRule];
+    // Phase A rules — pure evaluation, no side-effect-producing services.
+    this.phaseARules = [identityMatchRule, bankarizationValidationRule];
   }
 
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
@@ -73,24 +72,46 @@ export class CaseAnalysisService {
       throw new NotFoundException('Mortgage case not found');
     }
 
-    // Execute all registered rules sequentially and aggregate results.
+    const context = {
+      ...mortgageCase.client,
+      caseId,
+    } as Record<string, unknown>;
+    const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+
+    // ── Phase A: Document validation rules ──────────────────────────────
     const ruleResults: RuleResult[] = [];
-    for (const rule of this.rules) {
-      const context = {
-        ...mortgageCase.client,
-        caseId,
-      } as Record<string, unknown>;
-      const result = await rule.execute(
-        context,
-        mortgageCase.documents as unknown as Record<string, unknown>[],
-      );
+    for (const rule of this.phaseARules) {
+      const result = await rule.execute(context, docs);
       ruleResults.push(result);
     }
+
+    // ── Phase B: Income + Liability calculations ────────────────────────
+    try {
+      await this.incomeCalcService.calculate(caseId, []);
+    } catch (err) {
+      console.warn(`[CaseAnalysis] Phase B income calculation warning for case ${caseId}:`, (err as Error).message);
+    }
+
+    try {
+      // Extract credits from bureau document for liability calculation
+      const bureauDoc = mortgageCase.documents.find(
+        (d) => d.documentType.code === 'CREDIT_BUREAU',
+      );
+      const credits = bureauDoc
+        ? ((bureauDoc.extractedData as Record<string, unknown>)?.credits as import('../liability/liability.types').LiabilityCreditInput[] ?? [])
+        : [];
+      await this.liabilityCalcService.calculate(caseId, credits);
+    } catch (err) {
+      console.warn(`[CaseAnalysis] Phase B liability calculation warning for case ${caseId}:`, (err as Error).message);
+    }
+
+    // ── Phase C: Bank viability rule (reads fresh income/liability) ─────
+    const bankViabilityResult = await this.bankViabilityRule.execute(context, docs);
+    ruleResults.push(bankViabilityResult);
 
     const aggregate = this.aggregate(ruleResults);
 
     // Merge bankViability snapshot from the bank-viability rule into detail.
-    const bankViabilityResult = ruleResults.find((r) => r.ruleId === 'bank-viability');
     const bankViability = bankViabilityResult
       ? (bankViabilityResult.detail as Record<string, unknown>).bankViability
       : undefined;
@@ -114,11 +135,6 @@ export class CaseAnalysisService {
       },
     });
 
-    // FAIL outcome gates automatic financial-engine advance.
-    if (aggregate.outcome === 'FAIL') {
-      await this.transitionToRequiresReview(caseId);
-    }
-
     return {
       runId: createdRun.id,
       executionStatus: 'COMPLETED',
@@ -137,35 +153,7 @@ export class CaseAnalysisService {
     return this.prisma.analysisRun.findFirst({
       where: { mortgageCaseId: caseId },
       orderBy: { createdAt: 'desc' },
-      include: { alerts: true, reviewDecisions: true },
-    });
-  }
-
-  /**
-   * Stores a ReviewDecision against an AnalysisRun, validating that the run
-   * belongs to the provided case. `MARK_FALSE_POSITIVE` justification is
-   * enforced by the controller's ValidationPipe before reaching the service.
-   */
-  async recordReviewDecision(
-    caseId: string,
-    runId: string,
-    dto: ReviewDecisionDto,
-    decidedBy?: string,
-  ) {
-    const run = await this.prisma.analysisRun.findFirst({
-      where: { id: runId, mortgageCaseId: caseId },
-    });
-    if (!run) {
-      throw new NotFoundException('Analysis run not found for this case');
-    }
-
-    return this.prisma.reviewDecision.create({
-      data: {
-        runId,
-        action: dto.action,
-        justification: dto.justification,
-        decidedBy: decidedBy ?? '',
-      },
+      include: { alerts: true },
     });
   }
 
@@ -202,25 +190,11 @@ export class CaseAnalysisService {
 
   private buildSummary(outcome: 'PASS' | 'PARTIAL' | 'FAIL', alertCount: number): string {
     if (outcome === 'FAIL') {
-      return `Análisis completado con resultado: FAIL (${alertCount} alerta(s)). Caso enviado a REQUIRES_REVIEW.`;
+      return `Análisis completado con resultado: FAIL (${alertCount} alerta(s)).`;
     }
     if (outcome === 'PARTIAL') {
       return `Análisis completado con resultado: PARTIAL (${alertCount} alerta(s)). Revisión manual recomendada.`;
     }
     return 'Análisis completado con resultado: PASS. Sin alertas.';
-  }
-
-  private async transitionToRequiresReview(caseId: string) {
-    const status = await this.prisma.caseStatus.findUnique({
-      where: { code: 'REQUIRES_REVIEW' },
-    });
-    if (!status) {
-      // REQUIRES_REVIEW status must exist (seeded in PR 1).
-      throw new NotFoundException('Case status REQUIRES_REVIEW not found');
-    }
-    await this.prisma.mortgageCase.update({
-      where: { id: caseId },
-      data: { statusId: status.id },
-    });
   }
 }

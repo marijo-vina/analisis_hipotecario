@@ -7,12 +7,10 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IncomeCalculationService } from './income-calculation.service';
-import { ConfirmIncomeDto } from './dto/confirm-income.dto';
 import { SaveConciliationDto } from './dto/save-conciliation.dto';
 
 /**
@@ -109,24 +107,6 @@ export class IncomeCalculationController {
       receiptIndex,
       body.included,
     );
-  }
-
-  /**
-   * POST /cases/:caseId/income/confirm
-   *
-   * Capture manually-confirmed gross/net income and optional
-   * observations on the latest snapshot. Persists a NEW snapshot
-   * with `status = CONFIRMED` that preserves the calculated
-   * averages (confirmed values are stored side-by-side).
-   */
-  @Post('confirm')
-  @HttpCode(200)
-  async confirm(
-    @Param('caseId') caseId: string,
-    @Body() dto: ConfirmIncomeDto,
-    @Req() req: { user: { id: string } },
-  ) {
-    return this.incomeService.confirm(caseId, dto, req.user.id);
   }
 
   /**

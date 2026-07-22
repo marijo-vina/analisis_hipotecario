@@ -19,9 +19,7 @@ import { revalidatePath } from "next/cache";
 // ── Types (mirror backend income-calculation.types.ts) ─────────────────────
 
 export type IncomeCalculationStatus =
-  | "CALCULATED"
-  | "CONFIRMED"
-  | "REQUIRES_REVIEW";
+  | "CALCULATED";
 
 export interface IncomeReceiptResult {
   documentId: string;
@@ -150,43 +148,5 @@ export async function toggleIncomeReceipt(
     success: false,
     error:
       result.errors?._form ?? "No se pudo actualizar el recibo",
-  };
-}
-
-/**
- * Confirms the income calculation with analyst-verified values.
- * Transitions status to CONFIRMED without overwriting calculated averages.
- */
-export async function confirmIncome(
-  caseId: string,
-  confirmedGrossIncome: number,
-  confirmedNetIncome: number,
-  observations?: string,
-): Promise<{
-  success: boolean;
-  data?: IncomeCalculationResult;
-  error?: string;
-}> {
-  const result = await apiFetch<IncomeCalculationResult>(
-    `/cases/${caseId}/income/confirm`,
-    {
-      method: "POST",
-      body: {
-        confirmedGrossIncome,
-        confirmedNetIncome,
-        ...(observations ? { observations } : {}),
-      },
-    },
-  );
-
-  if (result.ok) {
-    revalidatePath(`/dashboard/expedientes/${caseId}`);
-    return { success: true, data: result.data };
-  }
-
-  return {
-    success: false,
-    error:
-      result.errors?._form ?? "No se pudo confirmar el cálculo de ingresos",
   };
 }

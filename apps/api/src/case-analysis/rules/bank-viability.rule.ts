@@ -87,6 +87,14 @@ export class BankViabilityRule implements AnalysisRule {
       this.prisma.incomeCalculation.findFirst({
         where: { mortgageCaseId: caseId },
         orderBy: { calculatedAt: 'desc' },
+        select: {
+          confirmedGrossIncome: true,
+          confirmedNetIncome: true,
+          averageGrossIncome: true,
+          averageNetIncome: true,
+          receiptResults: true,
+          calculatedAt: true,
+        },
       }),
       this.prisma.liabilitySnapshot.findFirst({
         where: { mortgageCaseId: caseId },
@@ -105,8 +113,9 @@ export class BankViabilityRule implements AnalysisRule {
     const estimatedTermMonths = mortgageCase?.estimatedTermMonths ?? null;
     const personType = (mortgageCase?.personType as string) ?? 'SALARIED';
 
-    const confirmedGrossIncome = incomeCalc?.confirmedGrossIncome ?? null;
-    const confirmedNetIncome = incomeCalc?.confirmedNetIncome ?? null;
+    // Income fallback: confirmed → average → null
+    const confirmedGrossIncome = incomeCalc?.confirmedGrossIncome ?? incomeCalc?.averageGrossIncome ?? null;
+    const confirmedNetIncome = incomeCalc?.confirmedNetIncome ?? incomeCalc?.averageNetIncome ?? null;
     const totalMonthlyLiabilities = liabilitySnap?.grossCurrentMonthlyDebt ?? null;
 
     // ── Derive birthDate from INE extraction (documents array) ─────────
