@@ -443,6 +443,57 @@ export type BoolWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedBoolFilter<$PrismaModel>
 }
 
+export type EnumProductDestinationNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel> | $Enums.ProductDestination | null
+}
+
+export type EnumProductDestinationNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumProductDestinationNullableWithAggregatesFilter<$PrismaModel> | $Enums.ProductDestination | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel>
+}
+
+export type EnumIncomeCriterionFilter<$PrismaModel = never> = {
+  equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
+  in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel> | $Enums.IncomeCriterion
+}
+
+export type EnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
+  in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIncomeCriterionWithAggregatesFilter<$PrismaModel> | $Enums.IncomeCriterion
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+}
+
+export type EnumProductDestinationFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel>
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel> | $Enums.ProductDestination
+}
+
+export type EnumProductDestinationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel>
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProductDestinationWithAggregatesFilter<$PrismaModel> | $Enums.ProductDestination
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -829,6 +880,57 @@ export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedBoolFilter<$PrismaModel>
   _max?: Prisma.NestedBoolFilter<$PrismaModel>
+}
+
+export type NestedEnumProductDestinationNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel> | $Enums.ProductDestination | null
+}
+
+export type NestedEnumProductDestinationNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumProductDestinationNullableWithAggregatesFilter<$PrismaModel> | $Enums.ProductDestination | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProductDestinationNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumIncomeCriterionFilter<$PrismaModel = never> = {
+  equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
+  in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel> | $Enums.IncomeCriterion
+}
+
+export type NestedEnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
+  in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIncomeCriterionWithAggregatesFilter<$PrismaModel> | $Enums.IncomeCriterion
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+}
+
+export type NestedEnumProductDestinationFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel>
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel> | $Enums.ProductDestination
+}
+
+export type NestedEnumProductDestinationWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ProductDestination | Prisma.EnumProductDestinationFieldRefInput<$PrismaModel>
+  in?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ProductDestination[] | Prisma.ListEnumProductDestinationFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumProductDestinationWithAggregatesFilter<$PrismaModel> | $Enums.ProductDestination
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumProductDestinationFilter<$PrismaModel>
 }
 
 

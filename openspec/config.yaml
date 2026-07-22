@@ -1,0 +1,6 @@
+version: "1.0"
+project: analisis_hipotecario
+base_path: openspec
+changes_dir: changes
+specs_dir: specs
+archive_dir: changes/archive

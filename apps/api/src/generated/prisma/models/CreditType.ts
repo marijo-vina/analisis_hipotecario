@@ -39,6 +39,7 @@ export type CreditTypeMinAggregateOutputType = {
   code: string | null
   name: string | null
   isActive: boolean | null
+  destination: $Enums.ProductDestination | null
 }
 
 export type CreditTypeMaxAggregateOutputType = {
@@ -46,6 +47,7 @@ export type CreditTypeMaxAggregateOutputType = {
   code: string | null
   name: string | null
   isActive: boolean | null
+  destination: $Enums.ProductDestination | null
 }
 
 export type CreditTypeCountAggregateOutputType = {
@@ -53,6 +55,7 @@ export type CreditTypeCountAggregateOutputType = {
   code: number
   name: number
   isActive: number
+  destination: number
   _all: number
 }
 
@@ -70,6 +73,7 @@ export type CreditTypeMinAggregateInputType = {
   code?: true
   name?: true
   isActive?: true
+  destination?: true
 }
 
 export type CreditTypeMaxAggregateInputType = {
@@ -77,6 +81,7 @@ export type CreditTypeMaxAggregateInputType = {
   code?: true
   name?: true
   isActive?: true
+  destination?: true
 }
 
 export type CreditTypeCountAggregateInputType = {
@@ -84,6 +89,7 @@ export type CreditTypeCountAggregateInputType = {
   code?: true
   name?: true
   isActive?: true
+  destination?: true
   _all?: true
 }
 
@@ -178,6 +184,7 @@ export type CreditTypeGroupByOutputType = {
   code: string
   name: string
   isActive: boolean
+  destination: $Enums.ProductDestination | null
   _count: CreditTypeCountAggregateOutputType | null
   _avg: CreditTypeAvgAggregateOutputType | null
   _sum: CreditTypeSumAggregateOutputType | null
@@ -208,6 +215,7 @@ export type CreditTypeWhereInput = {
   code?: Prisma.StringFilter<"CreditType"> | string
   name?: Prisma.StringFilter<"CreditType"> | string
   isActive?: Prisma.BoolFilter<"CreditType"> | boolean
+  destination?: Prisma.EnumProductDestinationNullableFilter<"CreditType"> | $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseListRelationFilter
 }
 
@@ -216,6 +224,7 @@ export type CreditTypeOrderByWithRelationInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  destination?: Prisma.SortOrderInput | Prisma.SortOrder
   cases?: Prisma.MortgageCaseOrderByRelationAggregateInput
 }
 
@@ -227,6 +236,7 @@ export type CreditTypeWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.CreditTypeWhereInput | Prisma.CreditTypeWhereInput[]
   name?: Prisma.StringFilter<"CreditType"> | string
   isActive?: Prisma.BoolFilter<"CreditType"> | boolean
+  destination?: Prisma.EnumProductDestinationNullableFilter<"CreditType"> | $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseListRelationFilter
 }, "id" | "code">
 
@@ -235,6 +245,7 @@ export type CreditTypeOrderByWithAggregationInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  destination?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.CreditTypeCountOrderByAggregateInput
   _avg?: Prisma.CreditTypeAvgOrderByAggregateInput
   _max?: Prisma.CreditTypeMaxOrderByAggregateInput
@@ -250,12 +261,14 @@ export type CreditTypeScalarWhereWithAggregatesInput = {
   code?: Prisma.StringWithAggregatesFilter<"CreditType"> | string
   name?: Prisma.StringWithAggregatesFilter<"CreditType"> | string
   isActive?: Prisma.BoolWithAggregatesFilter<"CreditType"> | boolean
+  destination?: Prisma.EnumProductDestinationNullableWithAggregatesFilter<"CreditType"> | $Enums.ProductDestination | null
 }
 
 export type CreditTypeCreateInput = {
   code: string
   name: string
   isActive?: boolean
+  destination?: $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseCreateNestedManyWithoutCreditTypeInput
 }
 
@@ -264,6 +277,7 @@ export type CreditTypeUncheckedCreateInput = {
   code: string
   name: string
   isActive?: boolean
+  destination?: $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseUncheckedCreateNestedManyWithoutCreditTypeInput
 }
 
@@ -271,6 +285,7 @@ export type CreditTypeUpdateInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseUpdateManyWithoutCreditTypeNestedInput
 }
 
@@ -279,6 +294,7 @@ export type CreditTypeUncheckedUpdateInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
   cases?: Prisma.MortgageCaseUncheckedUpdateManyWithoutCreditTypeNestedInput
 }
 
@@ -287,12 +303,14 @@ export type CreditTypeCreateManyInput = {
   code: string
   name: string
   isActive?: boolean
+  destination?: $Enums.ProductDestination | null
 }
 
 export type CreditTypeUpdateManyMutationInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
 }
 
 export type CreditTypeUncheckedUpdateManyInput = {
@@ -300,6 +318,7 @@ export type CreditTypeUncheckedUpdateManyInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
 }
 
 export type CreditTypeScalarRelationFilter = {
@@ -312,6 +331,7 @@ export type CreditTypeCountOrderByAggregateInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  destination?: Prisma.SortOrder
 }
 
 export type CreditTypeAvgOrderByAggregateInput = {
@@ -323,6 +343,7 @@ export type CreditTypeMaxOrderByAggregateInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  destination?: Prisma.SortOrder
 }
 
 export type CreditTypeMinOrderByAggregateInput = {
@@ -330,6 +351,7 @@ export type CreditTypeMinOrderByAggregateInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  destination?: Prisma.SortOrder
 }
 
 export type CreditTypeSumOrderByAggregateInput = {
@@ -350,10 +372,15 @@ export type CreditTypeUpdateOneRequiredWithoutCasesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CreditTypeUpdateToOneWithWhereWithoutCasesInput, Prisma.CreditTypeUpdateWithoutCasesInput>, Prisma.CreditTypeUncheckedUpdateWithoutCasesInput>
 }
 
+export type NullableEnumProductDestinationFieldUpdateOperationsInput = {
+  set?: $Enums.ProductDestination | null
+}
+
 export type CreditTypeCreateWithoutCasesInput = {
   code: string
   name: string
   isActive?: boolean
+  destination?: $Enums.ProductDestination | null
 }
 
 export type CreditTypeUncheckedCreateWithoutCasesInput = {
@@ -361,6 +388,7 @@ export type CreditTypeUncheckedCreateWithoutCasesInput = {
   code: string
   name: string
   isActive?: boolean
+  destination?: $Enums.ProductDestination | null
 }
 
 export type CreditTypeCreateOrConnectWithoutCasesInput = {
@@ -383,6 +411,7 @@ export type CreditTypeUpdateWithoutCasesInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
 }
 
 export type CreditTypeUncheckedUpdateWithoutCasesInput = {
@@ -390,6 +419,7 @@ export type CreditTypeUncheckedUpdateWithoutCasesInput = {
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  destination?: Prisma.NullableEnumProductDestinationFieldUpdateOperationsInput | $Enums.ProductDestination | null
 }
 
 
@@ -428,6 +458,7 @@ export type CreditTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   code?: boolean
   name?: boolean
   isActive?: boolean
+  destination?: boolean
   cases?: boolean | Prisma.CreditType$casesArgs<ExtArgs>
   _count?: boolean | Prisma.CreditTypeCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["creditType"]>
@@ -437,6 +468,7 @@ export type CreditTypeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   code?: boolean
   name?: boolean
   isActive?: boolean
+  destination?: boolean
 }, ExtArgs["result"]["creditType"]>
 
 export type CreditTypeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -444,6 +476,7 @@ export type CreditTypeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   code?: boolean
   name?: boolean
   isActive?: boolean
+  destination?: boolean
 }, ExtArgs["result"]["creditType"]>
 
 export type CreditTypeSelectScalar = {
@@ -451,9 +484,10 @@ export type CreditTypeSelectScalar = {
   code?: boolean
   name?: boolean
   isActive?: boolean
+  destination?: boolean
 }
 
-export type CreditTypeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "code" | "name" | "isActive", ExtArgs["result"]["creditType"]>
+export type CreditTypeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "code" | "name" | "isActive" | "destination", ExtArgs["result"]["creditType"]>
 export type CreditTypeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   cases?: boolean | Prisma.CreditType$casesArgs<ExtArgs>
   _count?: boolean | Prisma.CreditTypeCountOutputTypeDefaultArgs<ExtArgs>
@@ -471,6 +505,7 @@ export type $CreditTypePayload<ExtArgs extends runtime.Types.Extensions.Internal
     code: string
     name: string
     isActive: boolean
+    destination: $Enums.ProductDestination | null
   }, ExtArgs["result"]["creditType"]>
   composites: {}
 }
@@ -899,6 +934,7 @@ export interface CreditTypeFieldRefs {
   readonly code: Prisma.FieldRef<"CreditType", 'String'>
   readonly name: Prisma.FieldRef<"CreditType", 'String'>
   readonly isActive: Prisma.FieldRef<"CreditType", 'Boolean'>
+  readonly destination: Prisma.FieldRef<"CreditType", 'ProductDestination'>
 }
     
 

@@ -30,4 +30,23 @@ export class CatalogsService {
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
     });
   }
+
+  getBanks() {
+    return this.prisma.bank.findMany({
+      where: { isActive: true },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  getBankProducts(destination?: string) {
+    return this.prisma.bankProductPolicy.findMany({
+      where: {
+        isActive: true,
+        ...(destination ? { destination: destination as any } : {}),
+        bank: { isActive: true },
+      },
+      include: { bank: true },
+      orderBy: { code: 'asc' },
+    });
+  }
 }
