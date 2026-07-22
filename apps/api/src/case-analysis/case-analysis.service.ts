@@ -95,7 +95,7 @@ export class CaseAnalysisService {
     try {
       // Extract credits from bureau document for liability calculation
       const bureauDoc = mortgageCase.documents.find(
-        (d) => d.documentType.code === 'CREDIT_BUREAU',
+        (d) => d.documentType.code === 'CREDIT_BUREAU_REPORT',
       );
       const credits = bureauDoc
         ? ((bureauDoc.extractedData as Record<string, unknown>)?.credits as import('../liability/liability.types').LiabilityCreditInput[] ?? [])
