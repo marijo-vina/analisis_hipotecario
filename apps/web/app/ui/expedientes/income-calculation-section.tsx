@@ -4,14 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 
 import {
   fetchIncomeLatest,
-  calculateIncome,
   toggleIncomeReceipt,
   type IncomeCalculationResult,
   type IncomeReceiptResult,
 } from "@/app/actions/income";
 
 import Card from "@/app/ui/common/card";
-import Button from "@/app/ui/common/button";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -95,52 +93,6 @@ function CurrencyInput({
   );
 }
 
-// ── Status helpers ───────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const label = status === "CALCULATED" ? "CALCULADO" : status;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-      {label}
-    </span>
-  );
-}
-
-function ConciliationBadge({ status }: { status: string }) {
-  const styleMap: Record<string, string> = {
-    MATCHED: "bg-green-100 text-green-700",
-    PROVIDER_MIRROR_CONFIRMED: "bg-green-100 text-green-700",
-    DISCREPANCY: "bg-amber-100 text-amber-700",
-    AMBIGUOUS: "bg-amber-100 text-amber-700",
-    NOT_MATCHED: "bg-gray-200 text-gray-600",
-    RFC_INCOMPATIBLE: "bg-red-100 text-red-700",
-    PROVIDER_CANDIDATE: "bg-blue-100 text-blue-700",
-    MANUAL_REVIEW: "bg-amber-100 text-amber-700",
-  };
-  const labelMap: Record<string, string> = {
-    MATCHED: "Conciliado",
-    PROVIDER_MIRROR_CONFIRMED: "Espejo",
-    DISCREPANCY: "Discrepancia",
-    AMBIGUOUS: "Ambiguo",
-    NOT_MATCHED: "Sin conciliar",
-    RFC_INCOMPATIBLE: "RFC incompatible",
-    PROVIDER_CANDIDATE: "Pagadora",
-    MANUAL_REVIEW: "Revisión",
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-        styleMap[status] ?? "bg-gray-100 text-gray-600"
-      }`}
-    >
-      {labelMap[status] ?? status}
-    </span>
-  );
-}
-
 // ── Component ────────────────────────────────────────────────────────────────
 
 /**
@@ -159,7 +111,6 @@ export default function IncomeCalculationSection({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [calculating, setCalculating] = useState(false);
 
   // Local receipt state for optimistic updates
   const [localReceipts, setLocalReceipts] = useState<IncomeReceiptResult[]>(
@@ -201,20 +152,6 @@ export default function IncomeCalculationSection({
       included.length;
     return { gross, net, count: included.length };
   }, [localReceipts]);
-
-  // ── Calculate ──────────────────────────────────────────────────────────
-  const handleCalculate = async () => {
-    setCalculating(true);
-    setError(null);
-    const res = await calculateIncome(caseId);
-    setCalculating(false);
-    if (!res.success || !res.data) {
-      setError(res.error ?? "Error al calcular ingresos");
-      return;
-    }
-    setSnapshot(res.data);
-    setLocalReceipts(res.data.receiptResults);
-  };
 
   // ── Toggle receipt inclusion ───────────────────────────────────────────
   const handleToggleReceipt = async (
@@ -263,7 +200,6 @@ export default function IncomeCalculationSection({
         <h3 className="text-base font-semibold text-gf-text">
           Cálculo de ingreso mensual admisible
         </h3>
-        {snapshot && <StatusBadge status={snapshot.status} />}
       </div>
 
       {error && (
@@ -276,18 +212,9 @@ export default function IncomeCalculationSection({
       {!snapshot && !error && (
         <Card className="text-center">
           <p className="text-sm text-gf-text-muted">
-            Sin cálculo — ejecuta el motor de ingresos para ver el desglose de
-            recibos de nómina.
+            Sin cálculo — ejecuta &quot;Analizar expediente&quot; en la pestaña
+            Validaciones para calcular automáticamente los ingresos.
           </p>
-          <div className="mt-4">
-            <Button
-              variant="primary"
-              onClick={handleCalculate}
-              loading={calculating}
-            >
-              {calculating ? "Calculando..." : "Calcular ingresos"}
-            </Button>
-          </div>
         </Card>
       )}
 
@@ -358,7 +285,7 @@ export default function IncomeCalculationSection({
                       </td>
                       <td className="px-4 py-3">
                         {receipt.conciliationStatus ? (
-                          <ConciliationBadge status={receipt.conciliationStatus} />
+                          <span className="text-xs text-gf-text-muted">{receipt.conciliationStatus}</span>
                         ) : (
                           <span className="text-gf-text-soft">—</span>
                         )}
@@ -396,7 +323,7 @@ function KpiCards({
   localCount: number;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
       {/* Promedio ingreso bruto */}
       <div
         className="flex flex-1 flex-col rounded-lg border border-blue-200 p-4"
@@ -436,21 +363,6 @@ function KpiCards({
         </span>
       </div>
 
-      {/* Estado */}
-      <div
-        className="flex flex-1 flex-col rounded-lg border border-amber-200 p-4"
-        style={{ backgroundColor: "#FFFBEB" }}
-      >
-        <span className="text-xs font-medium" style={{ color: "#92400E" }}>
-          Estado
-        </span>
-        <span className="mt-1">
-          <StatusBadge status={snapshot.status} />
-        </span>
-        <span className="mt-1 text-xs text-gf-text-muted">
-          Cálculo completado
-        </span>
-      </div>
     </div>
   );
 }

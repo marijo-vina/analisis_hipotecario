@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 
 import {
   fetchLiabilityLatest,
-  calculateLiability,
   overrideLiabilityCredit,
 } from "@/app/actions/liability";
 import {
@@ -78,7 +77,6 @@ export default function LiabilityCalculationSection({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [calculating, setCalculating] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   // Edit modal state
@@ -104,20 +102,6 @@ export default function LiabilityCalculationSection({
   useEffect(() => {
     loadLatest();
   }, [loadLatest]);
-
-  // ── Calculate ──────────────────────────────────────────────────────────
-  const handleCalculate = async () => {
-    setCalculating(true);
-    setError(null);
-    const res = await calculateLiability(caseId);
-    setCalculating(false);
-    if (!res.success || !res.data) {
-      setError(res.error ?? "Error al calcular pasivos");
-      return;
-    }
-    setSnapshot(res.data);
-    setExpanded(true);
-  };
 
   // ── Edit credit submit ──────────────────────────────────────────────────
   const handleEditSubmit = async (
@@ -174,16 +158,9 @@ export default function LiabilityCalculationSection({
       {!snapshot && !error && (
         <div className="rounded-lg border border-gf-border bg-gf-surface p-8 text-center">
           <p className="text-sm text-gf-text-muted">
-            Sin cálculo — ejecuta el motor de pasivos para ver el desglose.
+            Sin cálculo — ejecuta &quot;Analizar expediente&quot; en la pestaña
+            Validaciones para calcular automáticamente los pasivos.
           </p>
-          <button
-            type="button"
-            onClick={handleCalculate}
-            disabled={calculating}
-            className="mt-4 inline-flex items-center justify-center rounded-md bg-gf-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gf-red-dark disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {calculating ? "Calculando..." : "Calcular"}
-          </button>
         </div>
       )}
 
