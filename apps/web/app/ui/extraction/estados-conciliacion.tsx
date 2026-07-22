@@ -88,7 +88,24 @@ export default function EstadosConciliacion({
   }, [payrollDocs.length, allDeposits.length]);
 
   const runReconciliation = useCallback(async () => {
+    // DEBUG: log input data to diagnose NOT_MATCHED issue
+    console.group("[conciliation] runReconciliation");
+    console.log("payrollReceipts count:", payrollReceipts.length);
+    payrollReceipts.forEach((r, i) => {
+      console.log(`  [${i}] netIncome=${r.ingresoNeto} paymentDate=${r.fechaPago} employerRfc=${r.empleador?.rfc ?? "null"} hasData=${r.hasData}`);
+    });
+    console.log("allDeposits count:", allDeposits.length);
+    allDeposits.forEach((d, i) => {
+      console.log(`  [${i}] amount=${d.amount} date=${d.date} concept=${d.originalConcept?.substring(0, 30)} employerRfc=${d.employerRfc}`);
+    });
+
     const newResults = reconcilePreview(payrollReceipts, allDeposits);
+    
+    console.log("Results:");
+    newResults.forEach((r, i) => {
+      console.log(`  [${i}] ${r.receiptOriginalName}: status=${r.status} method=${r.method} candidate=${r.candidate ? "yes" : "null"} amountDiff=${r.amountDiffPct} dateDiff=${r.dateDiffVal ?? "null"}`);
+    });
+    console.groupEnd();
     setResults(newResults);
     setHasRun(true);
 
@@ -121,11 +138,11 @@ export default function EstadosConciliacion({
     if (!restored) return;
     if (allDeposits.length === 0 || payrollReceipts.length === 0) return;
 
-    // Build a fingerprint that changes when usable data arrives
     const receiptsWithIncome = payrollReceipts.filter((r) => r.ingresoNeto != null).length;
     const sig = `d${allDeposits.length}-r${payrollReceipts.length}-i${receiptsWithIncome}`;
     if (sig === lastSignatureRef.current) return;
 
+    console.log(`[conciliation] auto-run firing, sig=${sig} (previous=${lastSignatureRef.current})`);
     lastSignatureRef.current = sig;
     runReconciliation();
   }, [restored, allDeposits.length, payrollReceipts.length, runReconciliation]);
