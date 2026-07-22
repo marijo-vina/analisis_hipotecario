@@ -1,3 +1,12 @@
+/**
+ * Flags carried from Phase A (bankarization-validation) to Phase C
+ * (bank-viability) without querying the database.
+ */
+export interface BankarizationFlags {
+  hasPagadoraIncome: boolean;
+  scotiabankExcluded: boolean;
+}
+
 export type CheckStatus = 'PASS' | 'FAIL' | 'REQUIRES_REVIEW' | 'NOT_APPLICABLE';
 
 export type ProductMatchStatus =
