@@ -49,6 +49,14 @@ const SCORE_WEIGHT_CONCEPT = 30;
 // Epsilon para considerar empate de score (AMBIGUOUS).
 const SCORE_TIE_EPSILON = 0.01;
 
+// Mapeo de caracteres griegos visualmente identicos a latinos (OCR artifacts).
+const GREEK_TO_LATIN: Record<string, string> = {
+  '\u0391':'A','\u0392':'B','\u0395':'E','\u0396':'Z','\u0397':'H',
+  '\u0399':'I','\u039A':'K','\u039C':'M','\u039D':'N','\u039F':'O',
+  '\u03A1':'P','\u03A4':'T','\u03A5':'Y','\u03A7':'X',
+};
+const GREEK_LOOKALIKE_RE = /[\u0391\u0392\u0395\u0396\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7]/g;
+
 // ── Helpers puros (exportados para reutilizacion/testeo) ─────────────────────
 
 /** Normaliza un RFC: trim + mayusculas, eliminando guiones/slashes/puntos. */
@@ -97,6 +105,7 @@ export function amountDiffPercent(
 export function normalizeConcept(concept: string | null | undefined): string {
   if (concept == null) return '';
   return normalizeText(concept)
+    .replace(GREEK_LOOKALIKE_RE, (ch) => GREEK_TO_LATIN[ch] ?? ch)
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
