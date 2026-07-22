@@ -143,8 +143,8 @@ function inferDateFromLabel(label: string): string | null {
 
   // Detectar quincena: 1A, 1ra, 1Q, primera → dia 15
   //                   2A, 2da, 2Q, segunda → ultimo dia del mes
-  const isFirst = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s/i.test(n);
-  const isSecond = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s/i.test(n);
+  const isFirst = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s|\.1\./i.test(n);
+  const isSecond = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s|\.2\./i.test(n);
 
   if (isFirst && !isSecond) {
     const d = pad(15);

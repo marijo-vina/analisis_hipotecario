@@ -270,8 +270,8 @@ function inferDateFromLabel(label: string): string | null {
     }
   }
   if (!month || !year) return null;
-  const is1 = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s/i.test(n);
-  const is2 = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s/i.test(n);
+  const is1 = /1[AaRrQq]|1ra|1er|primera|1a\s|1er\s|\.1\./i.test(n);
+  const is2 = /2[AaRrQq]|2da|2do|segunda|2a\s|2do\s|\.2\./i.test(n);
   const pad = (x: number) => String(x).padStart(2, "0");
   if (is1 && !is2) return `${year}-${pad(month)}-15`;
   if (is2 && !is1) {
