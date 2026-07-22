@@ -28,6 +28,7 @@ export interface RuleAlert {
 export interface RuleDetail {
   sources: string[];
   fields: FieldComparison[];
+  [key: string]: unknown;
 }
 
 /** Aggregate result of a single rule execution. */

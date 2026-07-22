@@ -50,3 +50,20 @@ export const PersonType = {
 } as const
 
 export type PersonType = (typeof PersonType)[keyof typeof PersonType]
+
+
+export const IncomeCriterion = {
+  GROSS: 'GROSS',
+  NET: 'NET'
+} as const
+
+export type IncomeCriterion = (typeof IncomeCriterion)[keyof typeof IncomeCriterion]
+
+
+export const ProductDestination = {
+  ACQUISITION: 'ACQUISITION',
+  LIQUIDITY: 'LIQUIDITY',
+  MORTGAGE_REPLACEMENT: 'MORTGAGE_REPLACEMENT'
+} as const
+
+export type ProductDestination = (typeof ProductDestination)[keyof typeof ProductDestination]

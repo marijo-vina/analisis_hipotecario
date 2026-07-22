@@ -82,3 +82,13 @@ export type CreditType = Prisma.CreditTypeModel
  * 
  */
 export type CaseStatus = Prisma.CaseStatusModel
+/**
+ * Model Bank
+ * 
+ */
+export type Bank = Prisma.BankModel
+/**
+ * Model BankProductPolicy
+ * 
+ */
+export type BankProductPolicy = Prisma.BankProductPolicyModel

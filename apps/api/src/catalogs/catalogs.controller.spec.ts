@@ -12,6 +12,8 @@ describe('CatalogsController', () => {
     getCaseStatuses: jest.fn(),
     getDocumentTypes: jest.fn(),
     getDocumentStatuses: jest.fn(),
+    getBanks: jest.fn(),
+    getBankProducts: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -137,6 +139,68 @@ describe('CatalogsController', () => {
 
       expect(result).toEqual({ data: [] });
       expect(mockCatalogsService.getDocumentStatuses).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findBanks', () => {
+    it('should return banks from service', async () => {
+      const banks = [
+        { id: '1', code: 'BANORTE', name: 'Banorte', isActive: true },
+        { id: '2', code: 'HSBC', name: 'HSBC', isActive: true },
+      ];
+
+      mockCatalogsService.getBanks.mockResolvedValue(banks);
+
+      const result = await controller.findBanks();
+
+      expect(result).toEqual({ data: banks });
+      expect(mockCatalogsService.getBanks).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array wrapped in data key', async () => {
+      mockCatalogsService.getBanks.mockResolvedValue([]);
+
+      const result = await controller.findBanks();
+
+      expect(result).toEqual({ data: [] });
+      expect(mockCatalogsService.getBanks).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findBankProducts', () => {
+    it('should return bank products from service', async () => {
+      const products = [
+        { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
+      ];
+
+      mockCatalogsService.getBankProducts.mockResolvedValue(products);
+
+      const result = await controller.findBankProducts();
+
+      expect(result).toEqual({ data: products });
+      expect(mockCatalogsService.getBankProducts).toHaveBeenCalledWith(undefined);
+    });
+
+    it('should pass destination query to service', async () => {
+      const products = [
+        { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
+      ];
+
+      mockCatalogsService.getBankProducts.mockResolvedValue(products);
+
+      const result = await controller.findBankProducts('ACQUISITION');
+
+      expect(result).toEqual({ data: products });
+      expect(mockCatalogsService.getBankProducts).toHaveBeenCalledWith('ACQUISITION');
+    });
+
+    it('should return empty array wrapped in data key', async () => {
+      mockCatalogsService.getBankProducts.mockResolvedValue([]);
+
+      const result = await controller.findBankProducts('LIQUIDITY');
+
+      expect(result).toEqual({ data: [] });
+      expect(mockCatalogsService.getBankProducts).toHaveBeenCalledWith('LIQUIDITY');
     });
   });
 });
