@@ -9,6 +9,7 @@ import { BankarizationValidationRule } from './rules/bankarization-validation.ru
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
+import type { BankarizationFlags } from './types/bank-viability.types';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
@@ -85,6 +86,17 @@ export class CaseAnalysisService {
       ruleResults.push(result);
     }
 
+    // Extract bankarization flags from Phase A for Phase C (bank-viability).
+    const bankarizationResult = ruleResults.find(
+      (r) => r.ruleId === 'bankarization-validation',
+    );
+    const bankarizationFlags: BankarizationFlags = {
+      hasPagadoraIncome:
+        (bankarizationResult?.detail.hasPagadoraIncome as boolean) ?? false,
+      scotiabankExcluded:
+        (bankarizationResult?.detail.scotiabankExcluded as boolean) ?? false,
+    };
+
     // ── Phase B: Income + Liability calculations ────────────────────────
     try {
       await this.incomeCalcService.calculate(caseId, []);
@@ -106,7 +118,8 @@ export class CaseAnalysisService {
     }
 
     // ── Phase C: Bank viability rule (reads fresh income/liability) ─────
-    const bankViabilityResult = await this.bankViabilityRule.execute(context, docs);
+    const phaseCContext = { ...context, bankarizationFlags };
+    const bankViabilityResult = await this.bankViabilityRule.execute(phaseCContext, docs);
     ruleResults.push(bankViabilityResult);
 
     const aggregate = this.aggregate(ruleResults);
@@ -140,7 +153,11 @@ export class CaseAnalysisService {
       executionStatus: 'COMPLETED',
       outcome: aggregate.outcome,
       summary: aggregate.summary,
-      detail: { sources: aggregate.sources, fields: aggregate.fields },
+      detail: {
+        sources: aggregate.sources,
+        fields: aggregate.fields,
+        ...(bankViability ? { bankViability } : {}),
+      },
       executionMetadata: {
         timestamp: new Date().toISOString(),
         triggeredBy,
