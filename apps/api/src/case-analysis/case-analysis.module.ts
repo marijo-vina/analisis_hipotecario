@@ -6,9 +6,11 @@ import { BankarizationValidationRule } from './rules/bankarization-validation.ru
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { PayrollBankMatchingService } from './services/payroll-bank-matching.service';
 import { PagadoraDetectionService } from './services/pagadora-detection.service';
+import { IncomeCalculationModule } from '../income-calculation/income-calculation.module';
+import { LiabilityModule } from '../liability/liability.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, IncomeCalculationModule, LiabilityModule],
   providers: [
     CaseAnalysisService,
     IdentityMatchRule,

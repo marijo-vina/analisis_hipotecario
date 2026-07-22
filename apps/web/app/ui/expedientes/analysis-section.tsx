@@ -306,17 +306,11 @@ function IdentityValidationSection({
         fields={run.detail.fields}
       />
 
-      {/* ── Reprocess button ──────────────────────────────────────────── */}
-      <Card className="bg-gf-bg-secondary">
-        <Button
-          variant="secondary"
-          type="button"
-          onClick={onAnalyze}
-        >
-          🔄 Reprocesar análisis
-        </Button>
-        {actionError && <p className="text-xs text-gf-red mt-2">{actionError}</p>}
-      </Card>
+      {actionError && (
+        <Card className="bg-red-50 border-red-200">
+          <p className="text-xs text-gf-red">{actionError}</p>
+        </Card>
+      )}
     </div>
   );
 }
@@ -382,7 +376,9 @@ function ValidationTable({
               </tr>
             </thead>
             <tbody>
-              {sources.map((source) => (
+              {sources
+                .filter((s) => s in SOURCE_LABELS)
+                .map((source) => (
                 <tr
                   key={source}
                   className="border-b border-gf-border/60 hover:bg-gf-bg-hover transition-colors"
