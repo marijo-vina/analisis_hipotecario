@@ -11,6 +11,7 @@ interface DataTableProps<T> {
   rows: T[];
   emptyMessage: string;
   onRowClick?: (row: T, index: number) => void;
+  selectedIndex?: number | null;
 }
 
 /**
@@ -30,6 +31,7 @@ export default function DataTable<T>({
   rows,
   emptyMessage,
   onRowClick,
+  selectedIndex,
 }: DataTableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-[var(--radius-md)] border border-gf-border">
@@ -58,21 +60,24 @@ export default function DataTable<T>({
               </td>
             </tr>
           ) : (
-            rows.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className={`border-b border-gf-border last:border-b-0 hover:bg-gf-red-soft/30 transition-colors duration-150${onRowClick ? " cursor-pointer" : ""}`}
-                onClick={onRowClick ? () => onRowClick(row, rowIndex) : undefined}
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3 whitespace-nowrap">
-                    {col.render
-                      ? col.render(row)
-                      : String((row as Record<string, unknown>)[col.key] ?? '')}
-                  </td>
-                ))}
-              </tr>
-            ))
+            rows.map((row, rowIndex) => {
+              const isSelected = selectedIndex === rowIndex;
+              return (
+                <tr
+                  key={rowIndex}
+                  className={`border-b border-gf-border transition-colors duration-150${onRowClick ? " cursor-pointer" : ""}${isSelected ? " bg-gf-red-soft/20" : " hover:bg-gf-red-soft/30 last:border-b-0"}`}
+                  onClick={onRowClick ? () => onRowClick(row, rowIndex) : undefined}
+                >
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3 whitespace-nowrap">
+                      {col.render
+                        ? col.render(row)
+                        : String((row as Record<string, unknown>)[col.key] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
