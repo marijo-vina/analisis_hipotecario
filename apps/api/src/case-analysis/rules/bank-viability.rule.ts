@@ -271,8 +271,10 @@ export class BankViabilityRule implements AnalysisRule {
 
     for (const receipt of receipts) {
       const ed = receipt.extractedData as Record<string, unknown> | null;
+      // Payroll extraction normalizes to employment.hireDate; also check raw employee path
+      const employment = ed?.employment as Record<string, unknown> | undefined;
       const employee = ed?.employee as Record<string, unknown> | undefined;
-      const hireDate = employee?.hireDate as string | undefined;
+      const hireDate = (employment?.hireDate ?? employee?.hireDate) as string | undefined;
       if (hireDate) hireDates.add(hireDate);
     }
 
@@ -406,6 +408,9 @@ export class BankViabilityRule implements AnalysisRule {
           maximumMonths: product.maximumMaturityAgeMonths,
         };
       }
+    } else if (product.maximumMaturityAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.maturityAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.maturityAge = { status: 'NOT_APPLICABLE' };
     }
@@ -426,6 +431,9 @@ export class BankViabilityRule implements AnalysisRule {
           requiredMonths: product.minimumApplicantAgeMonths,
         };
       }
+    } else if (product.minimumApplicantAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.minimumApplicantAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.minimumApplicantAge = { status: 'NOT_APPLICABLE' };
     }
@@ -446,6 +454,9 @@ export class BankViabilityRule implements AnalysisRule {
           maximumMonths: product.maximumApplicationAgeMonths,
         };
       }
+    } else if (product.maximumApplicationAgeMonths !== null) {
+      // Policy exists but birth date data missing
+      checks.maximumApplicationAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
       checks.maximumApplicationAge = { status: 'NOT_APPLICABLE' };
     }
@@ -467,6 +478,10 @@ export class BankViabilityRule implements AnalysisRule {
           requiredMonths: product.minimumEmploymentTenureMonths,
         };
       }
+    } else if (product.minimumEmploymentTenureMonths !== null) {
+      // Policy exists but employment data missing
+      checks.employmentTenure = { status: 'REQUIRES_REVIEW', reason: 'MISSING_EMPLOYMENT_DATA' };
+      reasons.push('MISSING_EMPLOYMENT_DATA');
     } else {
       checks.employmentTenure = { status: 'NOT_APPLICABLE' };
     }
@@ -499,6 +514,8 @@ export class BankViabilityRule implements AnalysisRule {
 
     // ── Policy Snapshot ──────────────────────────────────────────────
     const policySnapshot = {
+      bankName: product.bank.name,
+      productName: product.name,
       incomeCriterion: product.bank.incomeCriterion,
       debtCommitmentFactor: d2(new Prisma.Decimal(product.bank.debtCommitmentFactor.toString())),
       minimumEmploymentTenureMonths: product.minimumEmploymentTenureMonths,

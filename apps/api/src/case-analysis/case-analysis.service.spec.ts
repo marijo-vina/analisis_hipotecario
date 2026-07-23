@@ -221,9 +221,10 @@ describe('CaseAnalysisService', () => {
       const result = await service.run('case-1', 'advisor-1');
 
       // The response must include `bankViability` on detail (HU-14B requirement).
-      expect(result.detail).toHaveProperty('bankViability');
+      const detail = result.detail as Record<string, unknown>;
+      expect(detail).toHaveProperty('bankViability');
       // The propagated snapshot must match what the bank-viability rule produced.
-      expect(result.detail.bankViability).toEqual(
+      expect(detail.bankViability).toEqual(
         (mockBankViabilityPassResult.detail as Record<string, unknown>).bankViability,
       );
       // And the persisted AnalysisRun must persist the same snapshot so
