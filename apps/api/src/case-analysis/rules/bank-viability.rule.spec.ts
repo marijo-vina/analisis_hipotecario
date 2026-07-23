@@ -204,7 +204,7 @@ describe('BankViabilityRule', () => {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
           extractedData: {
-            employee: { hireDate: '2024-01-15' },
+            employment: { hireDate: '2024-01-15' },
           },
           processingResults: null,
         },
@@ -229,13 +229,13 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
         {
           id: 'doc-payroll-2',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2023-06-01' } },
+          extractedData: { employment: { hireDate: '2023-06-01' } },
           processingResults: null,
         },
       ]);
@@ -392,6 +392,15 @@ describe('BankViabilityRule', () => {
         requestedAmount: { toString: () => '1900000.00' },
         propertyValue: { toString: () => '2000000.00' },
       });
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ maximumLtv: { toString: () => '0.90' } }),
       ]);
@@ -562,6 +571,15 @@ describe('BankViabilityRule', () => {
         ...defaultCase(),
         estimatedTermMonths: 600,
       });
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       prisma.bankProductPolicy.findMany.mockResolvedValue([
         makeProduct({ maximumMaturityAgeMonths: 960 }),
       ]);
@@ -611,7 +629,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
       ]);
@@ -632,7 +650,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2026-06-01' } },
+          extractedData: { employment: { hireDate: '2026-06-01' } },
           processingResults: null,
         },
       ]);
@@ -788,7 +806,16 @@ describe('BankViabilityRule', () => {
   // ─────────────────────────────────────────────────────────────────────
   describe('aggregate outcome', () => {
     it('returns PASS when at least one product is PRELIMINARY_VIABLE', async () => {
-      const { rule } = makeRuleAndMock();
+      const { rule, prisma } = makeRuleAndMock();
+      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW prevents PRELIMINARY_VIABLE)
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-payroll-1',
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
+          processingResults: null,
+        },
+      ]);
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(result.outcome).toBe('PASS');
     });

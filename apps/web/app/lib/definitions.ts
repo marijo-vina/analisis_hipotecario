@@ -295,4 +295,14 @@ export const REASON_LABELS: Record<string, string> = {
   MISSING_LIABILITY_SNAPSHOT: "Sin snapshot de pasivos",
   UNSUPPORTED_DESTINATION: "Destino no soportado",
   MISSING_BIRTH_DATE: "Fecha de nacimiento no disponible",
+  MISSING_EMPLOYMENT_DATA: "Datos de empleo no disponibles",
+};
+
+export const DESTINATION_LABELS: Record<string, string> = {
+  ACQUISITION: "Adquisición de vivienda",
+  CONSTRUCTION: "Construcción",
+  REMODELING: "Remodelación",
+  REFINANCING: "Refinanciamiento",
+  LAND_PURCHASE: "Compra de terreno",
+  COMMERCIAL: "Comercial",
 };
