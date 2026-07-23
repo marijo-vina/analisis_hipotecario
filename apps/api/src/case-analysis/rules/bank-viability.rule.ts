@@ -271,8 +271,10 @@ export class BankViabilityRule implements AnalysisRule {
 
     for (const receipt of receipts) {
       const ed = receipt.extractedData as Record<string, unknown> | null;
+      // Payroll extraction normalizes to employment.hireDate; also check raw employee path
+      const employment = ed?.employment as Record<string, unknown> | undefined;
       const employee = ed?.employee as Record<string, unknown> | undefined;
-      const hireDate = employee?.hireDate as string | undefined;
+      const hireDate = (employment?.hireDate ?? employee?.hireDate) as string | undefined;
       if (hireDate) hireDates.add(hireDate);
     }
 
@@ -512,6 +514,8 @@ export class BankViabilityRule implements AnalysisRule {
 
     // ── Policy Snapshot ──────────────────────────────────────────────
     const policySnapshot = {
+      bankName: product.bank.name,
+      productName: product.name,
       incomeCriterion: product.bank.incomeCriterion,
       debtCommitmentFactor: d2(new Prisma.Decimal(product.bank.debtCommitmentFactor.toString())),
       minimumEmploymentTenureMonths: product.minimumEmploymentTenureMonths,

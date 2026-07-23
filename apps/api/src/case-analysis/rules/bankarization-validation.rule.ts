@@ -203,7 +203,7 @@ export class BankarizationValidationRule implements AnalysisRule {
 
     // 6. Compute case-level bankarization flags for Phase C (bank-viability).
     const hasPagadoraIncome = merged.some(
-      (r) => (r as Record<string, unknown>).hasPagadoraIncome === true,
+      (r) => (r as unknown as Record<string, unknown>).hasPagadoraIncome === true,
     );
     const scotiabankExcluded = merged.some((r) => r.scotiabankExcluded);
 
