@@ -34,6 +34,7 @@ type UiState =
   | { phase: "idle" }
   | { phase: "analyzing" }
   | { phase: "result"; run: AnalysisRun }
+  | { phase: "observations"; run: AnalysisRun }
   | { phase: "error"; message: string };
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -81,7 +82,16 @@ export default function AnalysisSection({
 }: AnalysisSectionProps) {
   const [activeTab, setActiveTab] = useState<TabId>("validaciones");
   const [state, setState] = useState<UiState>({ phase: "loading" });
-  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Determinar si el resultado tiene observaciones
+  const isObservations = useCallback((run: AnalysisRun): boolean => {
+    const bv = run.detail.bankViability;
+    if (!bv) return false;
+    if (run.outcome === "PARTIAL") return true;
+    return bv.productMatches.some(
+      (m) => m.status === "CONDITIONED" || m.status === "REQUIRES_REVIEW",
+    );
+  }, []);
 
   // Cargar último análisis al montar
   const loadLatest = useCallback(async () => {
@@ -92,11 +102,15 @@ export default function AnalysisSection({
       return;
     }
     if (res.data) {
-      setState({ phase: "result", run: res.data });
+      setState(
+        isObservations(res.data)
+          ? { phase: "observations", run: res.data }
+          : { phase: "result", run: res.data },
+      );
     } else {
       setState({ phase: "idle" });
     }
-  }, [caseId]);
+  }, [caseId, isObservations]);
 
   useEffect(() => {
     loadLatest();
@@ -105,7 +119,6 @@ export default function AnalysisSection({
   // Disparar análisis
   const handleAnalyze = async () => {
     setState({ phase: "analyzing" });
-    setActionError(null);
     const res = await triggerAnalysis(caseId);
     if (!res.success || !res.data) {
       setState({ phase: "error", message: res.error ?? "Error" });
@@ -123,27 +136,83 @@ export default function AnalysisSection({
   );
   const bankParsed = parseBankStatements(bankStatementDocs);
 
+  // ── Button label/variant based on phase ─────────────────────────────────
+  const headerButton = (() => {
+    switch (state.phase) {
+      case "idle":
+        return (
+          <Button variant="primary" type="button" onClick={handleAnalyze}>
+            Analizar expediente
+          </Button>
+        );
+      case "result":
+      case "observations":
+        return (
+          <Button variant="primary" type="button" onClick={handleAnalyze}>
+            Re-ejecutar análisis
+          </Button>
+        );
+      case "analyzing":
+        return (
+          <Button variant="primary" type="button" disabled>
+            Analizando...
+          </Button>
+        );
+      case "error":
+        return (
+          <Button variant="primary" type="button" onClick={handleAnalyze}>
+            Reintentar análisis
+          </Button>
+        );
+      default:
+        return null;
+    }
+  })();
+
+  const isAnalyzing = state.phase === "analyzing";
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div className="mb-4 mt-8">
-      {/* ── Título ──────────────────────────────────────────────────────── */}
-      <h2 className="text-base font-semibold text-gf-text mb-3">
-        Análisis del expediente
-      </h2>
+      {/* ── Header row: título + botón ──────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-semibold text-gf-text">
+          Análisis del expediente
+        </h2>
+        {headerButton}
+      </div>
+
+      {/* ── Stepper — visible during analyzing or error ─────────────────── */}
+      {(state.phase === "analyzing" || state.phase === "error") && (
+        <AnalysisStepper
+          phase={state.phase}
+          failedPhase={state.phase === "error" ? "validaciones" : undefined}
+        />
+      )}
+
+      {/* ── Compact status bar — visible after completion ───────────────── */}
+      {(state.phase === "result" || state.phase === "observations") && (
+        <CompactStatusBar
+          phase={state.phase}
+          timestamp={state.run.createdAt}
+        />
+      )}
 
       {/* ── Tabs ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center border-b border-gf-border mb-4">
+      <div className="flex items-center border-b border-gf-border mb-4 mt-4">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              if (!isAnalyzing) setActiveTab(tab.id);
+            }}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
                 ? "border-gf-red text-gf-red"
                 : "border-transparent text-gf-text-muted hover:text-gf-text"
-            }`}
+            } ${isAnalyzing ? "pointer-events-none opacity-50" : ""}`}
           >
             {tab.label}
           </button>
@@ -152,31 +221,37 @@ export default function AnalysisSection({
       </div>
 
       {/* ── Contenido del tab ───────────────────────────────────────────── */}
-      {activeTab === "validaciones" && (
-        <ValidacionesTab
-          caseId={caseId}
-          state={state}
-          onAnalyze={handleAnalyze}
-          actionError={actionError}
-          allDeposits={bankParsed.allDeposits}
-          payrollDocs={payrollDocs}
-        />
-      )}
-
-      {activeTab === "motor" && (
+      {isAnalyzing ? (
+        <p className="text-sm text-gf-text-muted py-8 text-center">
+          Los resultados se publicarán al finalizar las tres fases.
+        </p>
+      ) : (
         <>
-          <LiabilityCalculationSection caseId={caseId} />
-          <div className="mt-6" />
-          <IncomeCalculationSection caseId={caseId} />
-        </>
-      )}
+          {activeTab === "validaciones" && (
+            <ValidacionesTab
+              caseId={caseId}
+              state={state}
+              allDeposits={bankParsed.allDeposits}
+              payrollDocs={payrollDocs}
+            />
+          )}
 
-      {activeTab === "bancos" && (
-        <Card>
-          <p className="text-sm text-gf-text-muted">
-            Bancos / Viabilidad — disponible en una fase posterior del Sprint 3.
-          </p>
-        </Card>
+          {activeTab === "motor" && (
+            <>
+              <LiabilityCalculationSection caseId={caseId} />
+              <div className="mt-6" />
+              <IncomeCalculationSection caseId={caseId} />
+            </>
+          )}
+
+          {activeTab === "bancos" && (
+            <Card>
+              <p className="text-sm text-gf-text-muted">
+                Bancos / Viabilidad — disponible en una fase posterior del Sprint 3.
+              </p>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );
@@ -187,15 +262,11 @@ export default function AnalysisSection({
 function ValidacionesTab({
   caseId,
   state,
-  onAnalyze,
-  actionError,
   allDeposits,
   payrollDocs,
 }: {
   caseId: string;
   state: UiState;
-  onAnalyze: () => Promise<void>;
-  actionError: string | null;
   allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
   payrollDocs: Document[];
 }) {
@@ -208,8 +279,6 @@ function ValidacionesTab({
         </h3>
         <IdentityValidationSection
           state={state}
-          onAnalyze={onAnalyze}
-          actionError={actionError}
         />
       </section>
 
@@ -241,12 +310,8 @@ function ValidacionesTab({
 
 function IdentityValidationSection({
   state,
-  onAnalyze,
-  actionError,
 }: {
   state: UiState;
-  onAnalyze: () => Promise<void>;
-  actionError: string | null;
 }) {
   if (state.phase === "loading") {
     return (
@@ -262,9 +327,6 @@ function IdentityValidationSection({
     return (
       <Card className="border-red-200 bg-red-50">
         <p className="text-sm text-red-700">{state.message}</p>
-        <Button variant="secondary" type="button" onClick={onAnalyze}>
-          Reintentar
-        </Button>
       </Card>
     );
   }
@@ -272,25 +334,15 @@ function IdentityValidationSection({
   if (state.phase === "idle" || state.phase === "analyzing") {
     return (
       <Card>
-        <p className="text-sm text-gf-text-muted mb-3">
+        <p className="text-sm text-gf-text-muted">
           Sin analizar — ejecuta las validaciones para comparar identidad entre
           documentos.
         </p>
-        <Button
-          variant="primary"
-          type="button"
-          disabled={state.phase === "analyzing"}
-          onClick={onAnalyze}
-        >
-          {state.phase === "analyzing"
-            ? "Analizando..."
-            : "Analizar expediente"}
-        </Button>
       </Card>
     );
   }
 
-  const { run } = state as { phase: "result"; run: AnalysisRun };
+  const { run } = state as { phase: "result" | "observations"; run: AnalysisRun };
 
   return (
     <div className="space-y-4">
@@ -305,20 +357,6 @@ function IdentityValidationSection({
         sources={run.detail.sources}
         fields={run.detail.fields}
       />
-
-      {/* ── Re-analysis trigger ──────────────────────────────────────── */}
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onAnalyze}
-          className="text-xs text-gf-text-muted hover:text-gf-red underline transition-colors"
-        >
-          Re-ejecutar análisis
-        </button>
-        {actionError && (
-          <span className="text-xs text-gf-red">{actionError}</span>
-        )}
-      </div>
     </div>
   );
 }
@@ -588,5 +626,91 @@ function IdentitySummaryCard({
         </p>
       )}
     </Card>
+  );
+}
+
+// ── AnalysisStepper ─────────────────────────────────────────────────────────
+
+function AnalysisStepper({
+  phase,
+  failedPhase,
+}: {
+  phase: "analyzing" | "error";
+  failedPhase?: string;
+}) {
+  const steps = [
+    { key: "validaciones", label: "Validaciones" },
+    { key: "motor", label: "Motor financiero" },
+    { key: "comparativa", label: "Comparativa bancaria" },
+  ];
+
+  return (
+    <div className="flex items-center justify-center gap-0 py-4">
+      {steps.map((step, i) => {
+        const isError = phase === "error" && failedPhase === step.key;
+
+        const circleColor = isError
+          ? "bg-red-500 text-white"
+          : "bg-gray-200 text-gray-400";
+        const labelColor = isError ? "text-red-600" : "text-gf-text-muted";
+        const lineColor = "bg-gray-200";
+
+        return (
+          <div key={step.key} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${circleColor}`}
+              >
+                {isError ? "✕" : i + 1}
+              </div>
+              <span className={`text-[11px] mt-1 whitespace-nowrap ${labelColor}`}>
+                {step.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`w-14 h-[3px] mx-1 mb-5 ${lineColor}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── CompactStatusBar ─────────────────────────────────────────────────────────
+
+function CompactStatusBar({
+  phase,
+  timestamp,
+}: {
+  phase: "result" | "observations";
+  timestamp: string;
+}) {
+  const date = new Date(timestamp).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  if (phase === "observations") {
+    return (
+      <div
+        className="flex items-center h-8 px-4 rounded text-xs font-medium text-amber-800"
+        style={{ backgroundColor: "#FFFBEB" }}
+      >
+        ⚠ Análisis completado con observaciones — {date}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center h-8 px-4 rounded text-xs font-medium text-green-800"
+      style={{ backgroundColor: "#ECFDF5" }}
+    >
+      ✓ Análisis completado el {date} · 3 fases exitosas
+    </div>
   );
 }
