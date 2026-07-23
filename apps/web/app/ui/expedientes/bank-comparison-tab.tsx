@@ -6,7 +6,7 @@ import type {
   ProductMatch,
   ProductMatchStatus,
 } from "@/app/lib/definitions";
-import { STATUS_LABELS, REASON_LABELS } from "@/app/lib/definitions";
+import { STATUS_LABELS, REASON_LABELS, DESTINATION_LABELS } from "@/app/lib/definitions";
 import DataTable, { type Column } from "@/app/ui/common/data-table";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ function StatusHeader({
 
   const hasViable = counts.PRELIMINARY_VIABLE > 0;
   const total = productMatches.length;
-  const destLabel = destination ?? "—";
+  const destLabel = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
 
   return (
     <div
@@ -267,7 +267,7 @@ function FinancialSummary({
     { label: "Monto solicitado", value: formatCurrency(inputs.requestedAmount) },
     { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
     { label: "Plazo", value: termYears ?? "—" },
-    { label: "Destino", value: destination ?? "—" },
+    { label: "Destino", value: DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—" },
   ];
 
   return (

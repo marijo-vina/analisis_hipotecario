@@ -204,7 +204,7 @@ describe('BankViabilityRule', () => {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
           extractedData: {
-            employee: { hireDate: '2024-01-15' },
+            employment: { hireDate: '2024-01-15' },
           },
           processingResults: null,
         },
@@ -229,13 +229,13 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
         {
           id: 'doc-payroll-2',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2023-06-01' } },
+          extractedData: { employment: { hireDate: '2023-06-01' } },
           processingResults: null,
         },
       ]);
@@ -397,7 +397,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
       ]);
@@ -576,7 +576,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
       ]);
@@ -629,7 +629,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
       ]);
@@ -650,7 +650,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2026-06-01' } },
+          extractedData: { employment: { hireDate: '2026-06-01' } },
           processingResults: null,
         },
       ]);
@@ -812,7 +812,7 @@ describe('BankViabilityRule', () => {
         {
           id: 'doc-payroll-1',
           documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employee: { hireDate: '2024-01-15' } },
+          extractedData: { employment: { hireDate: '2024-01-15' } },
           processingResults: null,
         },
       ]);

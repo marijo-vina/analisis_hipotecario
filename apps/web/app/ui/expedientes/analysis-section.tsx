@@ -17,6 +17,7 @@ import Button from "@/app/ui/common/button";
 import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
+import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ type UiState =
 const TABS: { id: TabId; label: string }[] = [
   { id: "validaciones", label: "Validaciones" },
   { id: "motor", label: "Motor financiero" },
-  { id: "bancos", label: "Bancos / Viabilidad" },
+  { id: "bancos", label: "Comparativa bancaria" },
 ];
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -245,11 +246,13 @@ export default function AnalysisSection({
           )}
 
           {activeTab === "bancos" && (
-            <Card>
-              <p className="text-sm text-gf-text-muted">
-                Bancos / Viabilidad — disponible en una fase posterior del Sprint 3.
-              </p>
-            </Card>
+            <BankComparisonTab
+              bankViability={
+                state.phase === "result" || state.phase === "observations"
+                  ? state.run.detail?.bankViability
+                  : undefined
+              }
+            />
           )}
         </>
       )}

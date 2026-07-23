@@ -208,6 +208,35 @@ describe('CaseAnalysisService', () => {
       );
     });
 
+    it('POST response includes detail.bankViability with the same shape as the rule produced', async () => {
+      // HU-14B fix: POST /analyze must expose `detail.bankViability` so the
+      // frontend renders the Comparativa bancaria tab on the first response
+      // without needing a follow-up GET /analysis/latest.
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      // The response must include `bankViability` on detail (HU-14B requirement).
+      const detail = result.detail as Record<string, unknown>;
+      expect(detail).toHaveProperty('bankViability');
+      // The propagated snapshot must match what the bank-viability rule produced.
+      expect(detail.bankViability).toEqual(
+        (mockBankViabilityPassResult.detail as Record<string, unknown>).bankViability,
+      );
+      // And the persisted AnalysisRun must persist the same snapshot so
+      // GET /analysis/latest exposes an identical shape.
+      const persistedDetail = mockPrismaService.analysisRun.create.mock
+        .calls[0][0].data.detail as Record<string, unknown>;
+      expect(persistedDetail).toHaveProperty('bankViability');
+      expect(persistedDetail.bankViability).toEqual(
+        (mockBankViabilityPassResult.detail as Record<string, unknown>).bankViability,
+      );
+    });
+
     it('executes Phase A rules, Phase B calculations, then Phase C bankViability in order', async () => {
       const callOrder: string[] = [];
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildCase());
