@@ -311,21 +311,17 @@ function ProductTable({
       key: "bankCode",
       header: "Banco",
       render: (m) => {
-        // Fallback: check if policySnapshot has bankName (not in typed interface)
         const snap = m.policySnapshot as unknown as Record<string, unknown>;
         const name = (snap.bankName as string) || m.bankCode;
         const isExpanded = expandedIndex === rows.indexOf(m);
         return (
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="text-gf-text-muted text-sm"
-              style={{ minWidth: "16px", textAlign: "center" }}
-            >
+          <span className="inline-flex items-center gap-2">
+            <span className="text-sm text-gf-text-muted" style={{ minWidth: "14px" }}>
               {isExpanded ? "▲" : "▼"}
             </span>
             <span className="text-xs font-medium text-gf-text">{name}</span>
             <span className="text-[10px] text-gf-text-muted">
-              {isExpanded ? "Ocultar detalle" : "Ver detalle"}
+              {isExpanded ? "Ocultar" : "Ver"}
             </span>
           </span>
         );
@@ -447,6 +443,7 @@ function ProductTable({
         rows={rows}
         emptyMessage="Sin productos evaluados"
         onRowClick={(_, i) => onToggle(i)}
+        selectedIndex={expandedIndex}
       />
       {/* Expanded detail panels — rendered below the table */}
       {expandedIndex != null && expandedIndex < rows.length && (
@@ -459,227 +456,123 @@ function ProductTable({
 // ── Product Detail (expandable) ──────────────────────────────────────────────
 
 function ProductDetail({ match }: { match: ProductMatch }) {
-  const { calculation, checks, reasons } = match;
+  const { calculation, checks, reasons, policySnapshot } = match;
+  const snap = policySnapshot as unknown as Record<string, unknown>;
+  const bankName = (snap.bankName as string) || match.bankCode;
+  const productName = (snap.productName as string) || match.productCode;
 
-  // Determine income type label
-  const criterion = match.policySnapshot.incomeCriterion;
+  const criterion = policySnapshot.incomeCriterion;
   const isNet = String(criterion).toUpperCase().includes("NET");
   const incomeLabel = isNet ? "Neto" : "Bruto";
+  const statusLabel = STATUS_LABELS[match.status] ?? match.status;
+  const mainReason =
+    reasons.length > 0 ? REASON_LABELS[reasons[0]] ?? reasons[0] : "Sin restricciones detectadas";
 
-  // Helper to get policy text for each control
-  function getPolicyText(checkKey: string): string {
-    const snap = match.policySnapshot;
-    switch (checkKey) {
-      case "capacity":
-        return "Debe ser mayor que $0.00";
-      case "ltv":
-        return snap.maximumLtv ? `Máx. ${formatPercent(snap.maximumLtv)}` : "—";
-      case "maturityAge":
-        return snap.maximumMaturityAgeMonths
-          ? `Máx. ${formatAge(snap.maximumMaturityAgeMonths)}`
-          : "—";
-      case "minimumApplicantAge":
-        return snap.minimumApplicantAgeMonths
-          ? `Mín. ${formatAge(snap.minimumApplicantAgeMonths)}`
-          : "—";
-      case "maximumApplicationAge":
-        return snap.maximumApplicationAgeMonths
-          ? `Máx. ${formatAge(snap.maximumApplicationAgeMonths)}`
-          : "—";
-      case "employmentTenure":
-        return snap.minimumEmploymentTenureMonths
-          ? `Mín. ${formatAge(snap.minimumEmploymentTenureMonths)}`
-          : "—";
-      default:
-        return "—";
+  const controlKeys = ["capacity","ltv","minimumApplicantAge","maximumApplicationAge","maturityAge","employmentTenure"] as const;
+  const controlLabels: Record<string, string> = { capacity: "Capacidad de pago", ltv: "Aforo", minimumApplicantAge: "Edad mínima solicitante", maximumApplicationAge: "Edad máxima de solicitud", maturityAge: "Edad al vencimiento", employmentTenure: "Antigüedad laboral" };
+  const resultBadge: Record<string, { color: string; label: string }> = { PASS: { color: "#166534", label: "Cumple" }, FAIL: { color: "#991B1B", label: "No cumple" }, NOT_APPLICABLE: { color: "#6B7280", label: "No aplica" }, REQUIRES_REVIEW: { color: "#1D4ED8", label: "Requiere revisión" } };
+
+  function getPolicyText(key: string): string {
+    const maxLtv = snap.maximumLtv as string | null | undefined;
+    const maxMaturity = snap.maximumMaturityAgeMonths as number | null | undefined;
+    const minAge = snap.minimumApplicantAgeMonths as number | null | undefined;
+    const maxAge = snap.maximumApplicationAgeMonths as number | null | undefined;
+    const minTenure = snap.minimumEmploymentTenureMonths as number | null | undefined;
+    switch (key) {
+      case "capacity": return "Debe ser mayor que $0.00";
+      case "ltv": return maxLtv ? `Máx. ${formatPercent(maxLtv)}` : "—";
+      case "maturityAge": return maxMaturity ? `Máx. ${formatAge(maxMaturity)}` : "—";
+      case "minimumApplicantAge": return minAge ? `Mín. ${formatAge(minAge)}` : "—";
+      case "maximumApplicationAge": return maxAge ? `Máx. ${formatAge(maxAge)}` : "—";
+      case "employmentTenure": return minTenure ? `Mín. ${formatAge(minTenure)}` : "—";
+      default: return "—";
     }
   }
 
-  // Helper to get expediente value for each control
-  function getExpedienteValue(checkKey: string): string {
-    switch (checkKey) {
-      case "capacity":
-        return formatCurrency(calculation.availableCapacity);
-      case "ltv":
-        return formatPercent(calculation.requestedLtv);
-      case "maturityAge":
-        return formatAge(calculation.ageAtMaturityMonths);
-      case "minimumApplicantAge":
-        return formatAge(calculation.currentAgeMonths);
-      case "maximumApplicationAge":
-        return formatAge(calculation.currentAgeMonths);
-      case "employmentTenure":
-        return formatAge(calculation.employmentTenureMonths);
-      default:
-        return "—";
+  function getExpedienteValue(key: string): string {
+    switch (key) {
+      case "capacity": return formatCurrency(calculation.availableCapacity);
+      case "ltv": return formatPercent(calculation.requestedLtv);
+      case "maturityAge": return formatAge(calculation.ageAtMaturityMonths);
+      case "minimumApplicantAge": return formatAge(calculation.currentAgeMonths);
+      case "maximumApplicationAge": return formatAge(calculation.currentAgeMonths);
+      case "employmentTenure": return formatAge(calculation.employmentTenureMonths);
+      default: return "—";
     }
   }
-
-  // 6 control rows (BankViabilityRule produces exactly 6 checks)
-  const controlKeys = [
-    "capacity",
-    "ltv",
-    "minimumApplicantAge",
-    "maximumApplicationAge",
-    "maturityAge",
-    "employmentTenure",
-  ] as const;
-
-  const controlLabels: Record<string, string> = {
-    capacity: "Capacidad de pago",
-    ltv: "Aforo",
-    minimumApplicantAge: "Edad mínima solicitante",
-    maximumApplicationAge: "Edad máxima de solicitud",
-    maturityAge: "Edad al vencimiento",
-    employmentTenure: "Antigüedad laboral",
-  };
-
-  const controlRows = controlKeys.map((key) => {
-    const check = checks[key];
-    const status = check?.status ?? "NOT_APPLICABLE";
-
-    // For REQUIRES_REVIEW (missing data): show "—" as expediente
-    const expediente =
-      status === "REQUIRES_REVIEW" ? "—" : getExpedienteValue(key);
-
-    return {
-      label: controlLabels[key],
-      expediente,
-      politica: getPolicyText(key),
-      status,
-    };
-  });
-
-  const resultBadgeColor: Record<string, string> = {
-    PASS: "#166534",
-    FAIL: "#991B1B",
-    NOT_APPLICABLE: "#6B7280",
-    REQUIRES_REVIEW: "#1D4ED8",
-  };
-
-  const resultBadgeLabel: Record<string, string> = {
-    PASS: "Cumple",
-    FAIL: "No cumple",
-    NOT_APPLICABLE: "No aplica",
-    REQUIRES_REVIEW: "Requiere revisión",
-  };
 
   return (
-    <div
-      className="border border-gf-border/50 rounded-b-lg -mt-px"
-      style={{ backgroundColor: "#FAFAFA" }}
-    >
-      <div className="p-5 space-y-5">
-        {/* 1. Cálculo financiero */}
-        <section>
-          <h4 className="text-xs font-semibold text-gf-text mb-2">
-            Cálculo financiero
-          </h4>
-          <table className="w-full text-sm border-collapse max-w-md">
+    <div className="border-t-0 rounded-b-lg" style={{ backgroundColor: "#F8F9FA", borderLeft: "3px solid #DC2626" }}>
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-gf-text truncate">{bankName} · {productName}</span>
+          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap" style={{ backgroundColor: STATUS_BADGE_COLORS[match.status] ?? "#6B7280" }}>{statusLabel}</span>
+        </div>
+        <span className="text-[11px] text-gf-text-muted">{mainReason}</span>
+      </div>
+
+      {/* Body — 2 cols: left (calc + controls), right (reasons) */}
+      <div className="px-5 pb-4 space-y-4">
+        {/* Top row: compact financial calc cards */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {[
+            ["Criterio", incomeLabel],
+            ["Ingreso usado", formatCurrency(calculation.incomeUsed)],
+            ["Factor CE", formatPercent(policySnapshot.debtCommitmentFactor)],
+            ["Máx. deuda", formatCurrency(calculation.maximumDebt)],
+            ["Pasivo mensual", formatCurrency(calculation.totalMonthlyLiabilities)],
+            ["Cap. disponible", formatCurrency(calculation.availableCapacity)],
+          ].map(([label, value]) => (
+            <div key={label} className="bg-white rounded-md border border-gf-border/30 px-2.5 py-2">
+              <div className="text-[9px] text-gf-text-muted uppercase leading-tight">{label}</div>
+              <div className="text-xs font-semibold text-gf-text leading-tight mt-0.5">{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Controls table */}
+        <div className="overflow-x-auto rounded border border-gf-border/30">
+          <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="border-b border-gf-border/40">
-                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">
-                  Concepto
-                </th>
-                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">
-                  Valor
-                </th>
+              <tr className="bg-gf-bg/40 border-b border-gf-border/20">
+                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">Control</th>
+                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">Expediente</th>
+                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">Política</th>
+                <th className="text-left px-3 py-1.5 text-[10px] font-medium text-gf-text-muted uppercase">Resultado</th>
               </tr>
             </thead>
             <tbody>
-              {[
-                ["Criterio de ingreso", incomeLabel],
-                ["Ingreso utilizado", formatCurrency(calculation.incomeUsed)],
-                ["Factor CE", formatPercent(match.policySnapshot.debtCommitmentFactor)],
-                ["Máximo de endeudamiento", formatCurrency(calculation.maximumDebt)],
-                ["Pasivo mensual", formatCurrency(calculation.totalMonthlyLiabilities)],
-                ["Capacidad disponible", formatCurrency(calculation.availableCapacity)],
-              ].map(([label, value]) => (
-                <tr key={label} className="border-b border-gf-border/20">
-                  <td className="px-3 py-1.5 text-xs text-gf-text-muted">{label}</td>
-                  <td className="px-3 py-1.5 text-xs font-medium text-gf-text">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        {/* 2. Evaluación de controles */}
-        <section>
-          <h4 className="text-xs font-semibold text-gf-text mb-2">
-            Evaluación de controles
-          </h4>
-          <div className="overflow-x-auto rounded border border-gf-border/40">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gf-bg/50 border-b border-gf-border/40">
-                  <th className="text-left px-3 py-2 text-[10px] font-medium text-gf-text-muted uppercase">
-                    Control
-                  </th>
-                  <th className="text-left px-3 py-2 text-[10px] font-medium text-gf-text-muted uppercase">
-                    Expediente
-                  </th>
-                  <th className="text-left px-3 py-2 text-[10px] font-medium text-gf-text-muted uppercase">
-                    Política
-                  </th>
-                  <th className="text-left px-3 py-2 text-[10px] font-medium text-gf-text-muted uppercase">
-                    Resultado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {controlRows.map((row) => (
-                  <tr
-                    key={row.label}
-                    className="border-b border-gf-border/20 last:border-b-0"
-                  >
-                    <td className="px-3 py-2 text-xs text-gf-text">
-                      {row.label}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gf-text">
-                      {row.expediente}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-gf-text-muted">
-                      {row.politica}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white"
-                        style={{
-                          backgroundColor:
-                            resultBadgeColor[row.status] ?? "#6B7280",
-                        }}
-                      >
-                        {resultBadgeLabel[row.status] ?? row.status}
-                      </span>
+              {controlKeys.map((key) => {
+                const check = checks[key];
+                const status = check?.status ?? "NOT_APPLICABLE";
+                const expediente = status === "REQUIRES_REVIEW" ? "—" : getExpedienteValue(key);
+                const badge = resultBadge[status] ?? { color: "#6B7280", label: status };
+                return (
+                  <tr key={key} className="border-b border-gf-border/10 last:border-b-0">
+                    <td className="px-3 py-1.5 text-xs text-gf-text">{controlLabels[key]}</td>
+                    <td className="px-3 py-1.5 text-xs text-gf-text">{expediente}</td>
+                    <td className="px-3 py-1.5 text-xs text-gf-text-muted">{getPolicyText(key)}</td>
+                    <td className="px-3 py-1.5">
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white" style={{ backgroundColor: badge.color }}>{badge.label}</span>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-        {/* 3. Razones */}
-        {reasons.length > 0 && (
-          <section>
-            <h4 className="text-xs font-semibold text-gf-text mb-2">
-              Razones
-            </h4>
-            <ul className="list-disc list-inside space-y-0.5">
-              {reasons.map((r) => (
-                <li key={r} className="text-xs text-gf-text-muted">
-                  {REASON_LABELS[r] ?? r}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {/* Reasons — always shown */}
+        <div className="text-xs text-gf-text-muted">
+          <span className="font-medium text-gf-text">Razones: </span>
+          {reasons.length === 0
+            ? "Sin observaciones adicionales."
+            : reasons.map((r) => REASON_LABELS[r] ?? r).join(" · ")}
+        </div>
 
-        {/* 4. Ajustes sugeridos (CONDITIONED only) */}
-        {match.status === "CONDITIONED" && (
-          <SuggestedAdjustments match={match} />
-        )}
+        {/* Suggested adjustments (CONDITIONED only) */}
+        {match.status === "CONDITIONED" && <SuggestedAdjustments match={match} />}
       </div>
     </div>
   );
