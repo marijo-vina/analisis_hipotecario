@@ -22,6 +22,7 @@ const FIXED_KEYWORDS = [
   'NOMINA',
   'NÓMINA',
   'SERVICIO',
+  'SIMPLE',
 ];
 
 // ── Institution name → category mapping ──────────────────────────────────

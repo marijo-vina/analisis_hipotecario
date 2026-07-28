@@ -16,43 +16,8 @@ import { LiabilityCalculationService } from './liability.service';
 // Local DTO interface (service-level) — distinct from the HTTP DTO
 import type { OverrideCreditDto as ServiceOverrideDto } from './liability.service';
 import { OverrideCreditDto } from './dto/override-credit.dto';
+import { mapBureauCreditToInput } from './credit-mapper';
 import type { LiabilityCreditInput } from './liability.types';
-
-/**
- * Maps a raw bureau-extracted credit record to the LiabilityCreditInput
- * shape expected by the calculation service.
- *
- * Bureau `extractedData.credits[].` fields → LiabilityCreditInput:
- *   accountNumber       → creditReference
- *   institution         → institution
- *   creditType          → creditType
- *   classification      → classification (Gemini's call)
- *   status              → status
- *   currentBalance      → currentBalance (nullable)
- *   paymentDueAmount    → paymentDueAmountEffective (nullable)
- *   isClosed            → isClosed
- */
-function mapBureauCreditToInput(
-  raw: Record<string, unknown>,
-): LiabilityCreditInput {
-  return {
-    creditReference: String(raw.accountNumber ?? raw.creditReference ?? ''),
-    institution: String(raw.institution ?? ''),
-    creditType: String(raw.creditType ?? ''),
-    productName: raw.productName ? String(raw.productName) : undefined,
-    classification: String(raw.classification ?? 'UNKNOWN'),
-    status: String(raw.status ?? ''),
-    currentBalance:
-      raw.currentBalance !== null && raw.currentBalance !== undefined
-        ? Number(raw.currentBalance)
-        : null,
-    paymentDueAmountEffective:
-      raw.paymentDueAmount !== null && raw.paymentDueAmount !== undefined
-        ? Number(raw.paymentDueAmount)
-        : null,
-    isClosed: Boolean(raw.isClosed ?? false),
-  };
-}
 
 @UseGuards(JwtAuthGuard)
 @Controller('cases/:caseId/liability')
