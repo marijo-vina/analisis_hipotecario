@@ -553,6 +553,21 @@ describe('LiabilityCalculationService', () => {
       expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
     });
 
+    it('resolves to FIXED via "SIMPLE" keyword for crédito simple', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'CRÉDITO SIMPLE',
+          classification: 'UNKNOWN',
+          currentBalance: 50000,
+          paymentDueAmountEffective: 2500,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+      expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
+    });
+
     it('falls back to UNKNOWN when no keywords match', async () => {
       const result = await service.calculate('case-1', [
         makeCredit({

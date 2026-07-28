@@ -9,6 +9,7 @@ import { BankarizationValidationRule } from './rules/bankarization-validation.ru
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
+import { mapBureauCreditToInput } from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
 
 /** Loaded mortgage case shape used by the orchestrator. */
@@ -109,9 +110,8 @@ export class CaseAnalysisService {
       const bureauDoc = mortgageCase.documents.find(
         (d) => d.documentType.code === 'CREDIT_BUREAU_REPORT',
       );
-      const credits = bureauDoc
-        ? ((bureauDoc.extractedData as Record<string, unknown>)?.credits as import('../liability/liability.types').LiabilityCreditInput[] ?? [])
-        : [];
+      const rawCredits = (bureauDoc?.extractedData as Record<string, unknown>)?.credits as Record<string, unknown>[] | undefined;
+      const credits = (rawCredits ?? []).map(mapBureauCreditToInput);
       await this.liabilityCalcService.calculate(caseId, credits);
     } catch (err) {
       console.warn(`[CaseAnalysis] Phase B liability calculation warning for case ${caseId}:`, (err as Error).message);
