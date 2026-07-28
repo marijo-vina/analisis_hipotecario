@@ -55,9 +55,21 @@ export default function EditCreditModal({
 
   const balanceEditable =
     credit.currentBalance === null ||
+    credit.liabilityStatus === LiabilityStatus.REQUIRES_REVIEW ||
     (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
       credit.currentBalance === 0);
   const paymentEditable =
+    credit.paymentDueAmountEffective === null ||
+    credit.liabilityStatus === LiabilityStatus.REQUIRES_REVIEW ||
+    (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
+      credit.paymentDueAmountEffective === 0);
+
+  // Distinguish "missing data" from "REQUIRES_REVIEW with data" for labels
+  const balanceIsMissing =
+    credit.currentBalance === null ||
+    (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
+      credit.currentBalance === 0);
+  const paymentIsMissing =
     credit.paymentDueAmountEffective === null ||
     (credit.liabilityStatus === LiabilityStatus.INCOMPLETE &&
       credit.paymentDueAmountEffective === 0);
@@ -179,9 +191,14 @@ export default function EditCreditModal({
                     (reportado en Buró)
                   </span>
                 )}
-                {balanceEditable && (
+                {balanceEditable && balanceIsMissing && (
                   <span className="ml-1 text-xs font-medium text-red-600">
                     dato faltante en Buró
+                  </span>
+                )}
+                {balanceEditable && !balanceIsMissing && (
+                  <span className="ml-1 text-xs font-medium text-amber-700">
+                    editable — reportado en Buró
                   </span>
                 )}
               </label>
@@ -216,9 +233,14 @@ export default function EditCreditModal({
                     (reportado en Buró)
                   </span>
                 )}
-                {paymentEditable && (
+                {paymentEditable && paymentIsMissing && (
                   <span className="ml-1 text-xs font-medium text-red-600">
                     dato faltante en Buró
+                  </span>
+                )}
+                {paymentEditable && !paymentIsMissing && (
+                  <span className="ml-1 text-xs font-medium text-amber-700">
+                    editable — reportado en Buró
                   </span>
                 )}
               </label>
