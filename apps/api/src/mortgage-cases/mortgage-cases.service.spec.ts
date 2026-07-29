@@ -85,6 +85,14 @@ describe('MortgageCasesService', () => {
           advisor: true,
           creditType: true,
           status: true,
+          documents: {
+            select: {
+              id: true,
+              documentStatus: true,
+              documentType: true,
+              processingError: true,
+            },
+          },
         },
       });
       expect(result).toEqual(
@@ -175,6 +183,14 @@ describe('MortgageCasesService', () => {
           advisor: true,
           creditType: true,
           status: true,
+          documents: {
+            select: {
+              id: true,
+              documentStatus: true,
+              documentType: true,
+              processingError: true,
+            },
+          },
         },
       });
       expect(result).toEqual({
@@ -202,6 +218,14 @@ describe('MortgageCasesService', () => {
           advisor: true,
           creditType: true,
           status: true,
+          documents: {
+            select: {
+              id: true,
+              documentStatus: true,
+              documentType: true,
+              processingError: true,
+            },
+          },
         },
       });
       expect(result).toEqual(row);
@@ -246,6 +270,14 @@ describe('MortgageCasesService', () => {
           advisor: true,
           creditType: true,
           status: true,
+          documents: {
+            select: {
+              id: true,
+              documentStatus: true,
+              documentType: true,
+              processingError: true,
+            },
+          },
         },
       });
       expect(result).toEqual(updatedCase);
