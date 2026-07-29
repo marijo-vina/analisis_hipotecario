@@ -9,6 +9,14 @@ const MORTGAGE_CASE_INCLUDE = {
   advisor: true,
   creditType: true,
   status: true,
+  documents: {
+    select: {
+      id: true,
+      documentStatus: true,
+      documentType: true,
+      processingError: true,
+    },
+  },
 };
 
 @Injectable()

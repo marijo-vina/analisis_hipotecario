@@ -59,6 +59,12 @@ export interface MortgageCase {
   propertyValue?: number;
   estimatedTermMonths?: number;
   notes?: string;
+  documents?: Array<{
+    id: string;
+    documentStatus: { id: number; code: string; name: string };
+    documentType: { id: number; code: string; name: string };
+    processingError?: string | null;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
