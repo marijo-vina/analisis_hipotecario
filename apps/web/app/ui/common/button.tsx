@@ -10,6 +10,7 @@ interface ButtonProps {
   type?: 'button' | 'submit';
   onClick?: () => void;
   href?: string;
+  className?: string;
   children: ReactNode;
 }
 
@@ -18,15 +19,15 @@ const VARIANT_CLASSES: Record<
   { base: string; hover: string }
 > = {
   primary: {
-    base: 'bg-gf-red text-white',
+    base: 'bg-gf-red text-white shadow-sm',
     hover: 'hover:bg-gf-red-dark',
   },
   secondary: {
-    base: 'bg-white text-gf-text border border-gf-border',
-    hover: 'hover:bg-gray-50',
+    base: 'bg-white text-gf-text border border-gf-border shadow-sm',
+    hover: 'hover:bg-gf-surface-dim',
   },
   destructive: {
-    base: 'bg-red-600 text-white',
+    base: 'bg-gf-danger text-white shadow-sm',
     hover: 'hover:bg-red-700',
   },
 };
@@ -38,18 +39,20 @@ export default function Button({
   type = 'button',
   onClick,
   href,
+  className = '',
   children,
 }: ButtonProps) {
   const { base, hover } = VARIANT_CLASSES[variant];
 
-  const className = [
+  const combinedClassName = [
     base,
     hover,
-    'rounded-[var(--radius-sm)]',
-    'font-semibold',
+    'w-full',
+    'h-[48px]',
+    'rounded-[10px]',
+    'font-medium',
     'px-5',
-    'py-2.5',
-    'text-sm',
+    'text-base',
     'inline-flex',
     'items-center',
     'justify-center',
@@ -57,6 +60,7 @@ export default function Button({
     'transition-colors',
     'duration-150',
     disabled || loading ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
+    className,
   ]
     .filter(Boolean)
     .join(' ');
@@ -64,7 +68,7 @@ export default function Button({
   const content = loading ? (
     <>
       <svg
-        className="animate-spin h-4 w-4"
+        className="animate-spin h-5 w-5 text-current"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
@@ -92,7 +96,7 @@ export default function Button({
 
   if (href && !disabled) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} className={combinedClassName}>
         {content}
       </Link>
     );
@@ -103,7 +107,7 @@ export default function Button({
       type={type}
       disabled={disabled || loading}
       onClick={onClick}
-      className={className}
+      className={combinedClassName}
     >
       {content}
     </button>
