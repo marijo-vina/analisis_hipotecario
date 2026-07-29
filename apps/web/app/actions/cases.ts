@@ -51,7 +51,8 @@ export async function createCase(
 
   const num = (v: FormDataEntryValue | null) => {
     if (!v || typeof v !== "string" || v.trim() === "") return undefined;
-    const n = Number(v);
+    const clean = v.replace(/[^0-9.]/g, "");
+    const n = Number(clean);
     return Number.isNaN(n) ? undefined : n;
   };
 

@@ -1,14 +1,12 @@
 import { apiFetch } from "@/app/lib/api";
 import type { Client, CreditType, PaginatedResponse } from "@/app/lib/definitions";
-import PageHeader from "@/app/ui/common/page-header";
 import CaseForm from "@/app/ui/case-form";
 
 /**
  * New mortgage case page — server component wrapper.
  *
- * Fetches available credit types and the client list from the backend
- * to populate the select dropdowns. Filters credit types to only active.
- * Passes both lists as props to the client-side CaseForm.
+ * Fetches available credit types and the client list from the backend.
+ * Passes both lists as props to the redesigned CaseForm.
  */
 export default async function NuevoExpedientePage() {
   let creditTypes: CreditType[] = [];
@@ -34,17 +32,5 @@ export default async function NuevoExpedientePage() {
     );
   }
 
-  return (
-    <div>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Expedientes", href: "/dashboard/expedientes" },
-          { label: "Nuevo expediente" },
-        ]}
-        title="Nuevo expediente"
-      />
-      <CaseForm creditTypes={creditTypes} clients={clients} />
-    </div>
-  );
+  return <CaseForm creditTypes={creditTypes} clients={clients} />;
 }

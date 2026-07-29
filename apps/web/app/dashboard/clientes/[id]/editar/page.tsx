@@ -9,13 +9,6 @@ interface ClientEditPageProps {
   params: Promise<{ id: string }>;
 }
 
-/**
- * Client edit page — server component.
- *
- * Fetches client data and renders a pre-populated edit form wrapped
- * in a PageHeader with breadcrumbs. Handles 404 and generic error
- * states (same pattern as detail page).
- */
 export default async function ClientEditPage({ params }: ClientEditPageProps) {
   const { id } = await params;
 
@@ -34,7 +27,7 @@ export default async function ClientEditPage({ params }: ClientEditPageProps) {
           title="Cliente no encontrado"
         />
         <p className="text-slate-600 mb-4">
-          No se encontr&oacute; un cliente con el ID especificado.
+          No se encontró un cliente con el ID especificado.
         </p>
         <Link
           href="/dashboard/clientes"
@@ -74,19 +67,5 @@ export default async function ClientEditPage({ params }: ClientEditPageProps) {
   // ---- Success ------------------------------------------------------------
   const client = result.data;
 
-  return (
-    <div>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Clientes", href: "/dashboard/clientes" },
-          { label: client.fullName, href: `/dashboard/clientes/${id}` },
-          { label: "Editar cliente" },
-        ]}
-        title={`Editar cliente: ${client.fullName}`}
-      />
-
-      <ClientEditForm client={client} />
-    </div>
-  );
+  return <ClientEditForm client={client} />;
 }
