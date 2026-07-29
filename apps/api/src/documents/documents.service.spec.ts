@@ -7,6 +7,7 @@ import { DocumentAiService } from './document-ai.service';
 import { DocumentsService } from './documents.service';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
+import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 
 describe('DocumentsService', () => {
   let service: DocumentsService;
@@ -87,6 +88,10 @@ describe('DocumentsService', () => {
     buildPath: jest.fn(),
   };
 
+  const mockCaseStatusCalculatorService = {
+    recalculate: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -108,6 +113,10 @@ describe('DocumentsService', () => {
         {
           provide: StoragePathService,
           useValue: mockStoragePathService,
+        },
+        {
+          provide: CaseStatusCalculatorService,
+          useValue: mockCaseStatusCalculatorService,
         },
       ],
     }).compile();

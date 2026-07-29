@@ -268,48 +268,4 @@ describe('MortgageCasesService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
-
-  describe('updateStatus', () => {
-    it('should update status and return mortgage case with includes when valid statusCode is provided', async () => {
-      const caseId = 'case-uuid';
-      const statusCode = 'IN_REVIEW';
-      const mockStatus = { id: 5, code: 'IN_REVIEW', name: 'En revisión', order: 5 };
-      const mockCase = { id: caseId, statusId: 1 };
-      const mockUpdatedCase = { ...mockCase, statusId: 5, status: mockStatus, updatedAt: new Date() };
-
-      mockPrismaService.caseStatus.findUnique.mockResolvedValue(mockStatus);
-      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mockCase);
-      mockPrismaService.mortgageCase.update.mockResolvedValue(mockUpdatedCase);
-
-      const result = await service.updateStatus(caseId, statusCode);
-
-      expect(mockPrismaService.caseStatus.findUnique).toHaveBeenCalledWith({ where: { code: statusCode } });
-      expect(mockPrismaService.mortgageCase.findUnique).toHaveBeenCalledWith({ where: { id: caseId } });
-      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: caseId },
-          data: { statusId: mockStatus.id },
-        }),
-      );
-      expect(result).toEqual(mockUpdatedCase);
-    });
-
-    it('should throw NotFoundException when mortgage case does not exist', async () => {
-      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(null);
-
-      await expect(service.updateStatus('nonexistent-uuid', 'IN_REVIEW')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('should throw BadRequestException when status code is not found in CaseStatus table', async () => {
-      const mockCase = { id: 'case-uuid', statusId: 1 };
-      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mockCase);
-      mockPrismaService.caseStatus.findUnique.mockResolvedValue(null);
-
-      await expect(service.updateStatus('case-uuid', 'DELETED_CODE')).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-  });
 });

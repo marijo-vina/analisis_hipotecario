@@ -258,4 +258,39 @@ describe('Mortgage Cases + Catalogs (e2e)', () => {
         .expect(404);
     });
   });
+
+  describe('PATCH /mortgage-cases/:id (removed)', () => {
+    it('should return 404 because the PATCH route has been removed', async () => {
+      const created = await createMortgageCase(authToken, { clientId, creditTypeId });
+
+      await request(app.getHttpServer())
+        .patch(`/mortgage-cases/${created.body.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ statusCode: 'DOCUMENTS_UPLOADED' })
+        .expect(404);
+    });
+  });
+
+  describe('GET /case-statuses returns new 4 status codes', () => {
+    it('should return exactly the 4 simplified statuses', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/case-statuses')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      const codes = response.body.data.map((s: { code: string }) => s.code);
+      expect(codes).toEqual(
+        expect.arrayContaining([
+          'PENDING_DOCUMENTS',
+          'DOCUMENTS_UPLOADED',
+          'DOCUMENTS_PROCESSED',
+          'PRELIMINARY_RESULT',
+        ]),
+      );
+      // Old status codes should NOT be present
+      expect(codes).not.toContain('PROCESSING');
+      expect(codes).not.toContain('IN_REVIEW');
+      expect(codes).not.toContain('CLOSED');
+    });
+  });
 });

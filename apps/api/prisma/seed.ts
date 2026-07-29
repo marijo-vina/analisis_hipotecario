@@ -34,14 +34,10 @@ const DOCUMENT_STATUSES = [
 ];
 
 const CASE_STATUSES = [
-  { code: 'PENDING_DOCUMENTS',  name: 'Pendiente de documentos', order: 1 },
-  { code: 'DOCUMENTS_UPLOADED', name: 'Documentos cargados',     order: 2 },
-  { code: 'PROCESSING',         name: 'En procesamiento',        order: 3 },
-  { code: 'DATA_EXTRACTED',     name: 'Datos extraídos',         order: 4 },
-  { code: 'IN_REVIEW',          name: 'En revisión',             order: 5 },
-  { code: 'REPORT_GENERATED',   name: 'Reporte generado',        order: 6 },
-  { code: 'OBSERVED',           name: 'Observado',               order: 7 },
-  { code: 'CLOSED',             name: 'Cerrado',                 order: 8 },
+  { code: 'PENDING_DOCUMENTS',   name: 'Pendiente de documentos',  order: 1 },
+  { code: 'DOCUMENTS_UPLOADED',  name: 'Documentación completa',   order: 2 },
+  { code: 'DOCUMENTS_PROCESSED', name: 'Documentos procesados',    order: 3 },
+  { code: 'PRELIMINARY_RESULT',  name: 'Resultado preliminar',     order: 4 },
 ];
 
 const SOURCE_VERSION = 'ANAQUEL_MAYO_2026';
