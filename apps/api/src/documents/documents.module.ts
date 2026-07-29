@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { CaseStatusCalculatorModule } from '../case-status-calculator/case-status-calculator.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentAiService } from './document-ai.service';
@@ -15,7 +16,7 @@ import { LayoutFinancialExtractorService } from './layout-financial-extractor.se
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, CaseStatusCalculatorModule],
   controllers: [DocumentsController],
   providers: [
     DocumentsService,

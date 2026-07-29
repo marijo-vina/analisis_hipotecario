@@ -8,6 +8,7 @@ import { IncomeCalculationService } from '../income-calculation/income-calculati
 import { LiabilityCalculationService } from '../liability/liability.service';
 import { CaseAnalysisService } from './case-analysis.service';
 import type { RuleResult } from './analysis-rule.interface';
+import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 
 describe('CaseAnalysisService', () => {
   let service: CaseAnalysisService;
@@ -55,6 +56,10 @@ describe('CaseAnalysisService', () => {
 
   const mockLiabilityCalcService = {
     calculate: jest.fn(),
+  };
+
+  const mockCaseStatusCalculatorService = {
+    recalculate: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockBankarizationPassResult: RuleResult = {
@@ -116,6 +121,7 @@ describe('CaseAnalysisService', () => {
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
         { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
+        { provide: CaseStatusCalculatorService, useValue: mockCaseStatusCalculatorService },
       ],
     }).compile();
     service = module.get<CaseAnalysisService>(CaseAnalysisService);

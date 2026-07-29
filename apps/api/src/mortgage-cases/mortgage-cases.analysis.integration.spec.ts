@@ -15,7 +15,6 @@ describe('MortgageCasesController — analysis endpoints (integration)', () => {
     findAll: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
-    updateStatus: jest.fn(),
   };
 
   const mockCaseAnalysisService = {

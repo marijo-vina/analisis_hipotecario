@@ -60,17 +60,13 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
 
   const c = result.data;
 
-  const [statusesResult, clientResult, docTypesResult, docsResult] =
+  const [clientResult, docTypesResult, docsResult] =
     await Promise.all([
-      apiFetch<{
-        data: { code: string; name: string; order: number }[];
-      }>("/case-statuses"),
       apiFetch<Client>(`/clients/${c.clientId}`),
       apiFetch<{ data: DocumentType[] }>("/document-types"),
       apiFetch<{ data: Document[] }>(`/mortgage-cases/${id}/documents`),
     ]);
 
-  const statuses = statusesResult.ok ? statusesResult.data.data : [];
   const client = clientResult.ok ? clientResult.data : null;
   const documentTypes: DocumentType[] = docTypesResult.ok
     ? docTypesResult.data.data
@@ -82,7 +78,6 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
       caseId={c.id}
       statusCode={c.status.code}
       statusName={c.status.name}
-      statuses={statuses}
       client={client}
       caseData={{
         id: c.id,

@@ -3,68 +3,44 @@ import { getSession } from "@/app/lib/session";
 import { apiFetch } from "@/app/lib/api";
 import type { MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 import PageHeader from "@/app/ui/common/page-header";
-import Card from "@/app/ui/common/card";
-import DataTable from "@/app/ui/common/data-table";
-import EmptyState from "@/app/ui/common/empty-state";
-import Button from "@/app/ui/common/button";
 import StatusBadge from "@/app/ui/common/badge";
 
-// ── Status codes used for metric aggregation ─────────────────────
-const STATUS = {
-  PENDING_DOCUMENTS: "PENDING_DOCUMENTS",
-  IN_REVIEW: "IN_REVIEW",
-  CLOSED: "CLOSED",
-  REJECTED: "REJECTED",
-  OBSERVED: "OBSERVED",
-} as const;
-
-// ── Column configuration shared between recent cases and pending tasks ──
-const caseColumns = [
+// ── Kanban columns — one per case status ─────────────────────────
+const KANBAN_COLUMNS = [
   {
-    key: "client",
-    header: "Cliente",
-    render: (item: MortgageCase) => item.client.fullName,
+    code: "PENDING_DOCUMENTS",
+    title: "Pendiente de documentos",
+    accent: "border-amber-400",
+    bgAccent: "bg-amber-50",
   },
   {
-    key: "status",
-    header: "Estatus",
-    render: (item: MortgageCase) => (
-      <StatusBadge code={item.status.code} name={item.status.name} />
-    ),
+    code: "DOCUMENTS_UPLOADED",
+    title: "Documentación completa",
+    accent: "border-sky-400",
+    bgAccent: "bg-sky-50",
   },
   {
-    key: "updatedAt",
-    header: "Última actualización",
-    render: (item: MortgageCase) =>
-      new Date(item.updatedAt).toLocaleDateString("es-MX"),
+    code: "DOCUMENTS_PROCESSED",
+    title: "Documentos procesados",
+    accent: "border-green-400",
+    bgAccent: "bg-green-50",
   },
   {
-    key: "actions",
-    header: "Acciones",
-    render: (item: MortgageCase) => (
-      <Link
-        href={`/dashboard/expedientes/${item.id}`}
-        className="text-gf-red hover:underline font-medium"
-      >
-        Ver
-      </Link>
-    ),
+    code: "PRELIMINARY_RESULT",
+    title: "Resultado preliminar",
+    accent: "border-blue-400",
+    bgAccent: "bg-blue-50",
   },
-];
+] as const;
 
 /**
  * Decode the JWT payload (base64url-encoded JSON) to extract user claims.
  * Server-only — no external dependencies required.
- *
- * JWT payloads use URL-safe base64 without padding. We convert to standard
- * base64 and pad before decoding.
  */
 function decodeJwtPayload(token: string): Record<string, unknown> {
   try {
     const base64Url = token.split(".")[1];
-    // URL-safe → standard base64
     let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    // Pad to multiple of 4
     while (base64.length % 4 !== 0) base64 += "=";
     const json = Buffer.from(base64, "base64").toString("utf8");
     return JSON.parse(json);
@@ -74,12 +50,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
 }
 
 /**
- * Dashboard home page — redesigned with greeting, metric cards,
- * recent cases table, and pending tasks section.
+ * Dashboard home page — 4-column Kanban layout.
  *
- * Server Component rendered inside the dashboard layout.
- * All data fetching uses the existing apiFetch pattern against
- * the NestJS backend (no backend changes).
+ * Each column represents one case status. Cases are distributed
+ * into columns by their current status code.
  */
 export default async function DashboardPage() {
   // ── 1. User identity from JWT ────────────────────────────────────
@@ -90,64 +64,24 @@ export default async function DashboardPage() {
     (claims.email as string) ||
     "Asesora";
 
-  // ── 2. Fetch all cases for metrics and tables ────────────────────
+  // ── 2. Fetch all cases ──────────────────────────────────────────
   const result = await apiFetch<PaginatedResponse<MortgageCase>>(
     "/mortgage-cases?page=1&limit=1000",
   );
 
   const cases: MortgageCase[] = result.ok ? result.data.data : [];
 
-  // ── 3. Compute metric counts ─────────────────────────────────────
-  const activeCases = cases.filter(
-    (c) => c.status.code !== STATUS.CLOSED && c.status.code !== STATUS.REJECTED,
-  );
-  const pendingDocuments = cases.filter(
-    (c) => c.status.code === STATUS.PENDING_DOCUMENTS,
-  );
-  const inReview = cases.filter(
-    (c) => c.status.code === STATUS.IN_REVIEW,
-  );
-  const closedCases = cases.filter(
-    (c) => c.status.code === STATUS.CLOSED,
-  );
+  // ── 3. Group cases by status code ──────────────────────────────
+  const casesByStatus = new Map<string, MortgageCase[]>();
+  for (const col of KANBAN_COLUMNS) {
+    casesByStatus.set(col.code, []);
+  }
+  for (const c of cases) {
+    const list = casesByStatus.get(c.status.code);
+    if (list) list.push(c);
+  }
 
-  const metricCards = [
-    {
-      label: "Expedientes activos",
-      value: activeCases.length,
-      accent: "bg-gf-success",
-    },
-    {
-      label: "Pendientes de documentos",
-      value: pendingDocuments.length,
-      accent: "bg-gf-warning",
-    },
-    {
-      label: "En revisión",
-      value: inReview.length,
-      accent: "bg-gf-info",
-    },
-    {
-      label: "Cerrados",
-      value: closedCases.length,
-      accent: "bg-gf-neutral",
-    },
-  ];
-
-  // ── 4. Recent cases (last 5, newest first) ──────────────────────
-  const recentCases = [...cases]
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-    .slice(0, 5);
-
-  // ── 5. Pending tasks — OBSERVED cases needing advisor attention ──
-  const pendingTasks = cases.filter(
-    (c) => c.status.code === STATUS.OBSERVED,
-  );
-
-  // ── Render ───────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────
   return (
     <div>
       <PageHeader
@@ -155,57 +89,55 @@ export default async function DashboardPage() {
         subtitle="Resumen de operaciones hipotecarias"
       />
 
-      {/* ── Metric cards grid ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {metricCards.map((card) => (
-          <Card key={card.label}>
-            <div className="flex flex-col">
-              <p className="text-gf-text-muted text-sm mb-1">{card.label}</p>
-              <p className="text-3xl font-bold text-gf-text">{card.value}</p>
-              <div
-                className={`w-8 h-1 rounded-full mt-3 ${card.accent}`}
-                aria-hidden="true"
-              />
+      {/* ── Kanban board ────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {KANBAN_COLUMNS.map((col) => {
+          const columnCases = casesByStatus.get(col.code) ?? [];
+          return (
+            <div
+              key={col.code}
+              className={`rounded-lg border-t-4 ${col.accent} ${col.bgAccent} p-3`}
+            >
+              {/* Column header */}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gf-text">
+                  {col.title}
+                </h2>
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white text-xs font-bold text-gf-text-muted shadow-sm">
+                  {columnCases.length}
+                </span>
+              </div>
+
+              {/* Case cards */}
+              <div className="flex flex-col gap-2">
+                {columnCases.length === 0 ? (
+                  <p className="text-xs text-gf-text-muted italic text-center py-4">
+                    Sin expedientes
+                  </p>
+                ) : (
+                  columnCases.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/dashboard/expedientes/${c.id}`}
+                      className="block bg-white rounded-md border border-gf-border p-3 hover:shadow-md transition-shadow focus-visible:ring-2 focus-visible:ring-gf-red/40 focus-visible:outline-none"
+                    >
+                      <p className="text-sm font-medium text-gf-text truncate">
+                        {c.client.fullName}
+                      </p>
+                      <p className="text-xs text-gf-text-muted mt-0.5">
+                        EXP-{c.id.slice(0, 8).toUpperCase()}
+                      </p>
+                      <div className="mt-2">
+                        <StatusBadge code={c.status.code} name={c.status.name} />
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
             </div>
-          </Card>
-        ))}
+          );
+        })}
       </div>
-
-      {/* ── Recent cases section ───────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gf-text mb-4">
-          Expedientes recientes
-        </h2>
-        {recentCases.length > 0 ? (
-          <DataTable<MortgageCase>
-            columns={caseColumns}
-            rows={recentCases}
-            emptyMessage="No hay expedientes recientes"
-          />
-        ) : (
-          <EmptyState
-            message="No hay expedientes recientes"
-            ctaLabel="Crear primer expediente"
-            ctaHref="/dashboard/expedientes/nuevo"
-          />
-        )}
-      </section>
-
-      {/* ── Pending tasks section ──────────────────────────────── */}
-      <section>
-        <h2 className="text-lg font-semibold text-gf-text mb-4">
-          Tareas pendientes
-        </h2>
-        {pendingTasks.length > 0 ? (
-          <DataTable<MortgageCase>
-            columns={caseColumns}
-            rows={pendingTasks}
-            emptyMessage="No hay tareas pendientes"
-          />
-        ) : (
-          <EmptyState message="No hay tareas pendientes" />
-        )}
-      </section>
     </div>
   );
 }

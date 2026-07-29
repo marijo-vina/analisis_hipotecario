@@ -5,7 +5,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
 import { UpdateMortgageCaseDto } from './dto/update-mortgage-case.dto';
-import { UpdateMortgageCaseStatusDto } from './dto/update-mortgage-case-status.dto';
 import { MortgageCasesController } from './mortgage-cases.controller';
 import { MortgageCasesService } from './mortgage-cases.service';
 
@@ -17,7 +16,6 @@ describe('MortgageCasesController', () => {
     findAll: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
-    updateStatus: jest.fn(),
   };
 
   const mockCaseAnalysisService = {
@@ -110,19 +108,6 @@ describe('MortgageCasesController', () => {
       const result = await controller.update('mc-1', dto);
 
       expect(mockMortgageCasesService.update).toHaveBeenCalledWith('mc-1', dto);
-      expect(result).toEqual(mockResult);
-    });
-  });
-
-  describe('updateStatus', () => {
-    it('should call service.updateStatus with id and dto', async () => {
-      const dto: UpdateMortgageCaseStatusDto = { statusCode: 'IN_REVIEW' };
-      const mockResult = { id: 'case-uuid', status: { code: 'IN_REVIEW' } };
-      mockMortgageCasesService.updateStatus.mockResolvedValue(mockResult);
-
-      const result = await controller.updateStatus('case-uuid', dto);
-
-      expect(mockMortgageCasesService.updateStatus).toHaveBeenCalledWith('case-uuid', 'IN_REVIEW');
       expect(result).toEqual(mockResult);
     });
   });

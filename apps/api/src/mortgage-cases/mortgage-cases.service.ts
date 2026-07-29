@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMortgageCaseDto } from './dto/create-mortgage-case.dto';
 import { QueryMortgageCaseDto } from './dto/query-mortgage-case.dto';
@@ -97,27 +97,6 @@ export class MortgageCasesService {
     return this.prisma.mortgageCase.update({
       where: { id },
       data: { ...dto },
-      include: MORTGAGE_CASE_INCLUDE,
-    });
-  }
-
-  async updateStatus(id: string, statusCode: string) {
-    // 1. Validate case exists FIRST
-    const mortgageCase = await this.prisma.mortgageCase.findUnique({ where: { id } });
-    if (!mortgageCase) {
-      throw new NotFoundException('Mortgage case not found');
-    }
-
-    // 2. Validate status exists SECOND
-    const status = await this.prisma.caseStatus.findUnique({ where: { code: statusCode } });
-    if (!status) {
-      throw new BadRequestException('Status code not found');
-    }
-
-    // 3. Update and return with includes
-    return this.prisma.mortgageCase.update({
-      where: { id },
-      data: { statusId: status.id },
       include: MORTGAGE_CASE_INCLUDE,
     });
   }

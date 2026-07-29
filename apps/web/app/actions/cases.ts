@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/app/lib/api";
 import type { MortgageCase, ActionState } from "@/app/lib/definitions";
 
@@ -91,25 +90,6 @@ export async function createCase(
 
   return {
     errors: result.errors ?? { _form: "Error al crear el expediente" },
-  };
-}
-
-export async function updateCaseStatus(
-  caseId: string,
-  statusCode: string,
-): Promise<ActionState> {
-  const result = await apiFetch<MortgageCase>(`/mortgage-cases/${caseId}`, {
-    method: "PATCH",
-    body: { statusCode },
-  });
-
-  if (result.ok) {
-    revalidatePath(`/dashboard/expedientes/${caseId}`);
-    return {};
-  }
-
-  return {
-    errors: result.errors ?? { _form: "Error al cambiar estado" },
   };
 }
 
