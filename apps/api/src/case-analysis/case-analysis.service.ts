@@ -11,6 +11,7 @@ import { IncomeCalculationService } from '../income-calculation/income-calculati
 import { LiabilityCalculationService } from '../liability/liability.service';
 import { mapBureauCreditToInput } from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
+import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
@@ -59,6 +60,7 @@ export class CaseAnalysisService {
     private readonly bankViabilityRule: BankViabilityRule,
     private readonly incomeCalcService: IncomeCalculationService,
     private readonly liabilityCalcService: LiabilityCalculationService,
+    private readonly caseStatusCalculator: CaseStatusCalculatorService,
   ) {
     // Phase A rules — pure evaluation, no side-effect-producing services.
     this.phaseARules = [identityMatchRule, bankarizationValidationRule];
@@ -147,6 +149,9 @@ export class CaseAnalysisService {
         },
       },
     });
+
+    // Recalculate case status — the new COMPLETED run may advance to PRELIMINARY_RESULT.
+    await this.caseStatusCalculator.recalculate(caseId);
 
     return {
       runId: createdRun.id,
