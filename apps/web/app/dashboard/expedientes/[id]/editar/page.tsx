@@ -9,13 +9,6 @@ interface CaseEditPageProps {
   params: Promise<{ id: string }>;
 }
 
-/**
- * Edit mortgage case page — server component wrapper.
- *
- * Fetches the mortgage case and credit types from the backend.
- * Passes both as props to the client-side CaseEditForm which
- * pre-fills fields and uses the existing `updateCase` server action.
- */
 export default async function CaseEditPage({ params }: CaseEditPageProps) {
   const { id } = await params;
 
@@ -33,7 +26,7 @@ export default async function CaseEditPage({ params }: CaseEditPageProps) {
           ]}
           title="Expediente no encontrado"
         />
-        <div className="bg-gf-surface border border-gf-border rounded-[var(--radius-md)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6">
+        <div className="bg-white border border-gf-border rounded-[12px] p-6">
           <p className="text-gf-text-muted mb-4">
             No se encontró un expediente con el ID especificado.
           </p>
@@ -82,23 +75,6 @@ export default async function CaseEditPage({ params }: CaseEditPageProps) {
     : [];
 
   const mortgageCase = result.data;
-  const expShort = id.slice(0, 12);
 
-  return (
-    <div>
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Expedientes", href: "/dashboard/expedientes" },
-          {
-            label: `EXP-${expShort.toUpperCase()}`,
-            href: `/dashboard/expedientes/${id}`,
-          },
-          { label: "Editar" },
-        ]}
-        title="Editar expediente"
-      />
-      <CaseEditForm mortgageCase={mortgageCase} creditTypes={creditTypes} />
-    </div>
-  );
+  return <CaseEditForm mortgageCase={mortgageCase} creditTypes={creditTypes} />;
 }

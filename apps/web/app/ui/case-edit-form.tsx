@@ -1,225 +1,392 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
+import Link from "next/link";
 import { updateCase } from "@/app/actions/cases";
-import ErrorMessage from "@/app/ui/error-message";
-import FormField from "@/app/ui/common/form-field";
-import Button from "@/app/ui/common/button";
-import Card from "@/app/ui/common/card";
 import type { ActionState, CreditType, MortgageCase } from "@/app/lib/definitions";
+import {
+  FolderEdit,
+  User,
+  CreditCard,
+  MapPin,
+  FileText,
+  ArrowLeft,
+  Save,
+  AlertCircle,
+} from "lucide-react";
 
 const initialState: ActionState = { errors: {} };
 
-/** Shared input styling matching the design tokens. */
 const INPUT_CLASS =
-  "block w-full h-[42px] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text " +
-  "placeholder-gf-text-soft bg-white " +
-  "focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red " +
-  "transition-colors duration-150";
+  "h-12 w-full px-4 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text " +
+  "placeholder-gf-text-muted focus:border-gf-red focus:ring-2 focus:ring-gf-red/20 focus:outline-none " +
+  "transition-all duration-150";
+
+const INPUT_CURRENCY_CLASS =
+  "h-12 w-full pl-8 pr-4 rounded-[10px] border border-gf-border bg-white text-sm font-medium text-gf-text " +
+  "placeholder-gf-text-muted focus:border-gf-red focus:ring-2 focus:ring-gf-red/20 focus:outline-none " +
+  "transition-all duration-150";
 
 const TEXTAREA_CLASS =
-  "block w-full rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text " +
-  "placeholder-gf-text-soft bg-white " +
-  "focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red " +
-  "transition-colors duration-150";
+  "w-full px-4 py-3 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text " +
+  "placeholder-gf-text-muted focus:border-gf-red focus:ring-2 focus:ring-gf-red/20 focus:outline-none " +
+  "transition-all duration-150 resize-none";
 
-// ── Person type → human-readable Spanish label ─────────────────────────
+function formatPesoGroup(raw: string): string {
+  const digitsOnly = raw.replace(/[^0-9]/g, "");
+  if (!digitsOnly) return "";
+  const parsed = parseInt(digitsOnly, 10);
+  return parsed.toLocaleString("es-MX");
+}
+
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
+  NON_SALARIED: "No asalariado",
+  PFAE: "Persona Física con Actividad Empresarial (PFAE)",
+  MORAL: "Persona Moral",
 };
-
-function personTypeLabel(code: string): string {
-  return PERSON_TYPE_LABELS[code] ?? code;
-}
 
 interface CaseEditFormProps {
   mortgageCase: MortgageCase;
   creditTypes: CreditType[];
 }
 
-/**
- * Edit mortgage case form — client component.
- *
- * Uses `useActionState` with `updateCase.bind(null, mortgageCase.id)`.
- * Fields are pre-filled with existing case values via `defaultValue`.
- * Labels are in Spanish with business meaning — never technical codes.
- * Preserves the existing pre-fill logic and server action.
- */
 export default function CaseEditForm({
   mortgageCase,
   creditTypes,
 }: CaseEditFormProps) {
   const [state, formAction, pending] = useActionState(
     updateCase.bind(null, mortgageCase.id),
-    initialState,
+    initialState
   );
 
-  const defaultCreditTypeId = mortgageCase.creditType.id;
+  // Term management (Initial term converted from months to years)
+  const initialMonths = mortgageCase.estimatedTermMonths ?? 240;
+  const initialYears = Math.round(initialMonths / 12);
+  const standardYears = ["10", "15", "20", "25", "30"];
+  const isStandard = standardYears.includes(String(initialYears));
+
+  const [selectedTermYears, setSelectedTermYears] = useState<string>(
+    isStandard ? String(initialYears) : "otro"
+  );
+  const [customTermYears, setCustomTermYears] = useState<string>(
+    isStandard ? "" : String(initialYears)
+  );
+
+  // Currency formatted values
+  const [reqAmountFormatted, setReqAmountFormatted] = useState<string>(
+    mortgageCase.requestedAmount ? formatPesoGroup(String(mortgageCase.requestedAmount)) : ""
+  );
+  const [propValueFormatted, setPropValueFormatted] = useState<string>(
+    mortgageCase.propertyValue ? formatPesoGroup(String(mortgageCase.propertyValue)) : ""
+  );
+
+  // Calculate final term in months
+  const termInYears =
+    selectedTermYears === "otro"
+      ? parseInt(customTermYears, 10) || 0
+      : parseInt(selectedTermYears, 10) || 20;
+
+  const estimatedTermMonths = termInYears > 0 ? termInYears * 12 : 240;
 
   return (
-    <form action={formAction} className="space-y-6">
-      {/* General form error */}
-      <ErrorMessage message={state?.errors?._form} />
-
-      <Card>
-        <h3 className="text-base font-semibold text-gf-text mb-4">
-          Datos del expediente
-        </h3>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
-          {/* Cliente — read-only display (cannot change after creation) */}
-          <div className="lg:col-span-2">
-            <FormField label="Cliente" name="clientId">
-              <input
-                id="clientId"
-                type="text"
-                disabled
-                defaultValue={mortgageCase.client.fullName}
-                className={`${INPUT_CLASS} bg-gf-bg/50 disabled:cursor-not-allowed`}
-                aria-readonly="true"
-              />
-            </FormField>
-          </div>
-
-          {/* Tipo de crédito */}
-          <FormField
-            label="Tipo de crédito"
-            name="creditTypeId"
-            required
-            error={state?.errors?.creditTypeId}
-          >
-            <select
-              id="creditTypeId"
-              name="creditTypeId"
-              required
-              defaultValue={defaultCreditTypeId ?? ""}
-              className={INPUT_CLASS}
-            >
-              <option value="" disabled>
-                Seleccionar...
-              </option>
-              {creditTypes.map((ct) => (
-                <option key={ct.id} value={ct.id}>
-                  {ct.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          {/* Tipo de persona — disabled, read-only display */}
-          <FormField label="Tipo de persona" name="personTypeDisplay">
-            <select
-              disabled
-              defaultValue={mortgageCase.personType}
-              className={`${INPUT_CLASS} bg-gf-bg/50 disabled:cursor-not-allowed`}
-              aria-readonly="true"
-            >
-              <option value={mortgageCase.personType}>
-                {personTypeLabel(mortgageCase.personType)}
-              </option>
-            </select>
-            <input type="hidden" name="personType" value={mortgageCase.personType} />
-          </FormField>
-
-          {/* Ubicación de la propiedad */}
-          <FormField
-            label="Ubicación de la propiedad"
-            name="propertyLocation"
-            error={state?.errors?.propertyLocation}
-          >
-            <input
-              id="propertyLocation"
-              name="propertyLocation"
-              type="text"
-              defaultValue={mortgageCase.propertyLocation ?? ""}
-              className={INPUT_CLASS}
-              placeholder="Ej. Av. Reforma 222, CDMX"
-            />
-          </FormField>
-
-          {/* Monto solicitado */}
-          <FormField
-            label="Monto solicitado"
-            name="requestedAmount"
-            error={state?.errors?.requestedAmount}
-          >
-            <input
-              id="requestedAmount"
-              name="requestedAmount"
-              type="number"
-              min="0"
-              step="0.01"
-              defaultValue={mortgageCase.requestedAmount ?? ""}
-              className={INPUT_CLASS}
-              placeholder="1500000"
-            />
-          </FormField>
-
-          {/* Valor de la propiedad */}
-          <FormField
-            label="Valor de la propiedad"
-            name="propertyValue"
-            error={state?.errors?.propertyValue}
-          >
-            <input
-              id="propertyValue"
-              name="propertyValue"
-              type="number"
-              min="0"
-              step="0.01"
-              defaultValue={mortgageCase.propertyValue ?? ""}
-              className={INPUT_CLASS}
-              placeholder="2000000"
-            />
-          </FormField>
-
-          {/* Plazo estimado (meses) */}
-          <FormField
-            label="Plazo estimado (meses)"
-            name="estimatedTermMonths"
-            error={state?.errors?.estimatedTermMonths}
-          >
-            <input
-              id="estimatedTermMonths"
-              name="estimatedTermMonths"
-              type="number"
-              min="1"
-              step="1"
-              defaultValue={mortgageCase.estimatedTermMonths ?? ""}
-              className={INPUT_CLASS}
-              placeholder="240"
-            />
-          </FormField>
+    <div className="flex flex-col items-center w-full max-w-6xl mx-auto py-4">
+      {/* Transactional Back Navigation Header */}
+      <div className="w-full flex items-center gap-3 mb-6">
+        <Link
+          href={`/dashboard/expedientes/${mortgageCase.id}`}
+          className="p-2 rounded-full text-gf-text-muted hover:text-gf-red hover:bg-gf-surface-dim transition-colors"
+          aria-label="Volver a Detalle de Expediente"
+        >
+          <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gf-text tracking-tight">
+            Gestión Financiera
+          </h1>
+          <p className="text-xs text-gf-text-muted">
+            Operaciones Hipotecarias
+          </p>
         </div>
-
-        {/* Observaciones — full width */}
-        <div className="mt-4">
-          <FormField
-            label="Observaciones"
-            name="notes"
-            error={state?.errors?.notes}
-          >
-            <textarea
-              id="notes"
-              name="notes"
-              rows={3}
-              defaultValue={mortgageCase.notes ?? ""}
-              className={TEXTAREA_CLASS}
-              placeholder="Información adicional del expediente"
-            />
-          </FormField>
-        </div>
-      </Card>
-
-      {/* Buttons */}
-      <div className="flex items-center gap-3 pt-2">
-        <Button variant="primary" type="submit" loading={pending}>
-          {pending ? "Guardando..." : "Actualizar expediente"}
-        </Button>
-        <Button variant="secondary" href={`/dashboard/expedientes/${mortgageCase.id}`}>
-          Cancelar
-        </Button>
       </div>
-    </form>
+
+      {/* Main Form Container Card */}
+      <div className="w-full bg-white border border-gf-border shadow-[0px_4px_12px_rgba(0,0,0,0.03)] rounded-[12px] overflow-hidden">
+        {/* Card Header */}
+        <div className="p-6 md:p-8 border-b border-gf-border bg-gf-surface-dim/40">
+          <div className="flex items-center gap-4 mb-1">
+            <div className="w-12 h-12 rounded-xl bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+              <FolderEdit className="w-6 h-6" strokeWidth={2} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gf-text">
+                Editar expediente #{mortgageCase.id.slice(0, 8)}
+              </h2>
+              <p className="text-xs text-gf-text-muted">
+                Actualice los datos del expediente de {mortgageCase.client.fullName}.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form action={formAction} className="p-6 md:p-8 space-y-10">
+          {/* General form error banner */}
+          {state?.errors?._form && (
+            <div
+              className="rounded-[10px] bg-red-50 border border-red-200 p-3.5 text-xs font-medium text-red-700 flex items-center gap-2"
+              role="alert"
+            >
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" strokeWidth={2} />
+              <span>{state.errors._form}</span>
+            </div>
+          )}
+
+          {/* ── Sección 1: Información del cliente ──────────────────── */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-gf-border-variant pb-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+                <User className="w-4 h-4" strokeWidth={2} />
+              </div>
+              <h3 className="text-sm font-semibold text-gf-text uppercase tracking-wider">
+                Información del cliente
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              {/* Cliente (Read-only) */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gf-text">Cliente</label>
+                <input
+                  type="text"
+                  disabled
+                  value={mortgageCase.client.fullName}
+                  className={`${INPUT_CLASS} bg-gf-surface-dim/50 cursor-not-allowed`}
+                />
+              </div>
+
+              {/* Perfil del solicitante (Read-only) */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gf-text">Perfil del solicitante</label>
+                <input
+                  type="text"
+                  disabled
+                  value={PERSON_TYPE_LABELS[mortgageCase.personType] ?? mortgageCase.personType}
+                  className={`${INPUT_CLASS} bg-gf-surface-dim/50 cursor-not-allowed`}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Sección 2: Información del crédito ──────────────────── */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-gf-border-variant pb-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+                <CreditCard className="w-4 h-4" strokeWidth={2} />
+              </div>
+              <h3 className="text-sm font-semibold text-gf-text uppercase tracking-wider">
+                Información del crédito
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              {/* Objetivo del crédito */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="creditTypeId" className="text-xs font-semibold text-gf-text">
+                  Objetivo del crédito <span className="text-gf-red">*</span>
+                </label>
+                <select
+                  id="creditTypeId"
+                  name="creditTypeId"
+                  required
+                  defaultValue={mortgageCase.creditType.id}
+                  className={INPUT_CLASS}
+                >
+                  {creditTypes.map((ct) => (
+                    <option key={ct.id} value={ct.id}>
+                      {ct.name}
+                    </option>
+                  ))}
+                </select>
+                {state?.errors?.creditTypeId && (
+                  <p className="text-xs text-red-600 mt-0.5">{state.errors.creditTypeId}</p>
+                )}
+              </div>
+
+              {/* Plazo del crédito (Años en UI ➔ Meses al backend) */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="termYearsSelect" className="text-xs font-semibold text-gf-text">
+                  Plazo del crédito
+                </label>
+                <select
+                  id="termYearsSelect"
+                  value={selectedTermYears}
+                  onChange={(e) => setSelectedTermYears(e.target.value)}
+                  className={INPUT_CLASS}
+                >
+                  <option value="10">10 años</option>
+                  <option value="15">15 años</option>
+                  <option value="20">20 años</option>
+                  <option value="25">25 años</option>
+                  <option value="30">30 años</option>
+                  <option value="otro">Otro...</option>
+                </select>
+
+                {/* Input condicional si selecciona "Otro" */}
+                {selectedTermYears === "otro" && (
+                  <div className="mt-2 flex flex-col gap-1">
+                    <input
+                      type="number"
+                      min="1"
+                      max="40"
+                      value={customTermYears}
+                      onChange={(e) => setCustomTermYears(e.target.value)}
+                      placeholder="Escriba el plazo en años (ej. 12)"
+                      className={INPUT_CLASS}
+                    />
+                    <p className="text-[11px] text-gf-text-muted">
+                      Equivalente a {(parseInt(customTermYears, 10) || 0) * 12} meses para comparativa bancaria.
+                    </p>
+                  </div>
+                )}
+
+                {/* Valor real enviado al backend en meses */}
+                <input
+                  type="hidden"
+                  name="estimatedTermMonths"
+                  value={estimatedTermMonths}
+                />
+                {state?.errors?.estimatedTermMonths && (
+                  <p className="text-xs text-red-600 mt-0.5">{state.errors.estimatedTermMonths}</p>
+                )}
+              </div>
+
+              {/* Monto solicitado (Pesos MXN) */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="requestedAmount" className="text-xs font-semibold text-gf-text">
+                  Monto solicitado
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-gf-text-muted font-bold text-sm pointer-events-none">$</span>
+                  <input
+                    id="requestedAmount"
+                    name="requestedAmount"
+                    type="text"
+                    inputMode="numeric"
+                    value={reqAmountFormatted}
+                    onChange={(e) => setReqAmountFormatted(formatPesoGroup(e.target.value))}
+                    placeholder="1,500,000"
+                    className={INPUT_CURRENCY_CLASS}
+                  />
+                </div>
+                <p className="text-[11px] text-gf-text-muted">Monto en pesos mexicanos (MXN)</p>
+                {state?.errors?.requestedAmount && (
+                  <p className="text-xs text-red-600 mt-0.5">{state.errors.requestedAmount}</p>
+                )}
+              </div>
+
+              {/* Valor del inmueble (Pesos MXN) */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="propertyValue" className="text-xs font-semibold text-gf-text">
+                  Valor del inmueble
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-gf-text-muted font-bold text-sm pointer-events-none">$</span>
+                  <input
+                    id="propertyValue"
+                    name="propertyValue"
+                    type="text"
+                    inputMode="numeric"
+                    value={propValueFormatted}
+                    onChange={(e) => setPropValueFormatted(formatPesoGroup(e.target.value))}
+                    placeholder="2,500,000"
+                    className={INPUT_CURRENCY_CLASS}
+                  />
+                </div>
+                <p className="text-[11px] text-gf-text-muted">Valor estimativo en pesos mexicanos (MXN)</p>
+                {state?.errors?.propertyValue && (
+                  <p className="text-xs text-red-600 mt-0.5">{state.errors.propertyValue}</p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ── Sección 3: Información del inmueble ────────────────── */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-gf-border-variant pb-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+                <MapPin className="w-4 h-4" strokeWidth={2} />
+              </div>
+              <h3 className="text-sm font-semibold text-gf-text uppercase tracking-wider">
+                Información del inmueble
+              </h3>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="propertyLocation" className="text-xs font-semibold text-gf-text">
+                Dirección del inmueble
+              </label>
+              <textarea
+                id="propertyLocation"
+                name="propertyLocation"
+                rows={3}
+                defaultValue={mortgageCase.propertyLocation ?? ""}
+                className={TEXTAREA_CLASS}
+                placeholder="Calle, número exterior/interior, colonia, C.P., Ciudad y Estado..."
+              />
+              {state?.errors?.propertyLocation && (
+                <p className="text-xs text-red-600 mt-0.5">{state.errors.propertyLocation}</p>
+              )}
+            </div>
+          </section>
+
+          {/* ── Sección 4: Observaciones ───────────────────────────── */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-gf-border-variant pb-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+                <FileText className="w-4 h-4" strokeWidth={2} />
+              </div>
+              <h3 className="text-sm font-semibold text-gf-text uppercase tracking-wider">
+                Observaciones
+              </h3>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="notes" className="text-xs font-semibold text-gf-text">
+                Comentarios adicionales
+              </label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows={4}
+                defaultValue={mortgageCase.notes ?? ""}
+                className={TEXTAREA_CLASS}
+                placeholder="Agregue cualquier nota relevante para el análisis inicial..."
+              />
+              {state?.errors?.notes && (
+                <p className="text-xs text-red-600 mt-0.5">{state.errors.notes}</p>
+              )}
+            </div>
+          </section>
+
+          {/* ── Form Action Buttons ────────────────────────────────── */}
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-6 border-t border-gf-border">
+            <Link
+              href={`/dashboard/expedientes/${mortgageCase.id}`}
+              className="w-full sm:w-auto h-12 px-6 rounded-[10px] border border-gf-border bg-white text-gf-text font-medium text-sm hover:bg-gf-surface-dim transition-colors flex items-center justify-center"
+            >
+              Cancelar
+            </Link>
+            <button
+              type="submit"
+              disabled={pending}
+              className="w-full sm:w-auto h-12 px-8 rounded-[10px] bg-gf-red text-white font-medium text-sm shadow-sm hover:bg-gf-red-dark transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" strokeWidth={2} />
+              <span>{pending ? "Guardando..." : "Actualizar expediente"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
