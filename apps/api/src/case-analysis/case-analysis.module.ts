@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { CaseStatusCalculatorModule } from '../case-status-calculator/case-status-calculator.module';
 import { CaseAnalysisService } from './case-analysis.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
@@ -10,7 +11,7 @@ import { IncomeCalculationModule } from '../income-calculation/income-calculatio
 import { LiabilityModule } from '../liability/liability.module';
 
 @Module({
-  imports: [PrismaModule, IncomeCalculationModule, LiabilityModule],
+  imports: [PrismaModule, IncomeCalculationModule, LiabilityModule, CaseStatusCalculatorModule],
   providers: [
     CaseAnalysisService,
     IdentityMatchRule,

@@ -1,68 +1,28 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
 import StatusBadge from "@/app/ui/common/badge";
 import Button from "@/app/ui/common/button";
-import CaseStatusDropdown from "@/app/ui/case-status-dropdown";
-
-interface CaseStatus {
-  code: string;
-  name: string;
-}
 
 interface CaseDetailHeaderProps {
   caseId: string;
   statusCode: string;
   statusName: string;
-  /** Catálogo de estados disponibles para el dropdown "Cambiar estado". */
-  statuses: CaseStatus[];
 }
 
 /**
  * CaseDetailHeader — encabezado compacto del workspace de expediente.
  *
  * Client component. Fila única (~52px) que contiene: flecha de retroceso,
- * breadcrumb, badge de estado, botón Editar y un botón "Cambiar estado"
- * que abre un popover compacto con el CaseStatusDropdown.
- *
- * El popover se cierra al hacer clic fuera o presionar Escape.
+ * breadcrumb, badge de estado y botón Editar.
  */
 export default function CaseDetailHeader({
   caseId,
   statusCode,
   statusName,
-  statuses,
 }: CaseDetailHeaderProps) {
   const expLabel = `EXP-${caseId.slice(0, 8).toUpperCase()}`;
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // ── Cerrar popover al hacer clic fuera ────────────────────────────────
-  useEffect(() => {
-    if (!popoverOpen) return;
-
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node)
-      ) {
-        setPopoverOpen(false);
-      }
-    }
-
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setPopoverOpen(false);
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [popoverOpen]);
 
   return (
     <header className="mb-3">
@@ -127,30 +87,6 @@ export default function CaseDetailHeader({
         >
           Editar
         </Button>
-
-        {/* Botón "Cambiar estado" con popover */}
-        <div ref={popoverRef} className="relative shrink-0">
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => setPopoverOpen((v) => !v)}
-          >
-            Cambiar estado
-          </Button>
-
-          {popoverOpen && (
-            <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-gf-border rounded-[var(--radius-md)] shadow-lg p-3 min-w-[280px]">
-              {/* Neutraliza el mt-4 pt-4 border-t del CaseStatusDropdown */}
-              <div className="[&>div]:mt-0 [&>div]:pt-0 [&>div]:border-0">
-                <CaseStatusDropdown
-                  caseId={caseId}
-                  currentCode={statusCode}
-                  statuses={statuses}
-                />
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </header>
   );

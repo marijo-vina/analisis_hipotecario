@@ -6,6 +6,7 @@ import { DocumentAiService } from './document-ai.service';
 import { OcrLayout } from './document-ai.types';
 import { GcsService } from './gcs.service';
 import { StoragePathService } from './storage-path.service';
+import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 
 const DOCUMENT_INCLUDE = {
   documentType: true,
@@ -22,6 +23,7 @@ export class DocumentsService {
     private readonly storagePathService: StoragePathService,
     private readonly gcsService: GcsService,
     private readonly documentAiService: DocumentAiService,
+    private readonly caseStatusCalculator: CaseStatusCalculatorService,
   ) {}
 
   async create(caseId: string, advisorId: string, dto: CreateDocumentDto) {
@@ -118,7 +120,7 @@ export class DocumentsService {
     }
 
     // 7. Create Document ONLY after GCS succeeds
-    return this.prisma.document.create({
+    const document = await this.prisma.document.create({
       data: {
         mortgageCaseId: caseId,
         documentTypeId: documentType.id,
@@ -132,6 +134,11 @@ export class DocumentsService {
       },
       include: DOCUMENT_INCLUDE,
     });
+
+    // 8. Recalculate case status after document upload
+    await this.caseStatusCalculator.recalculate(caseId);
+
+    return document;
   }
 
   async findAllByCase(caseId: string, dto?: QueryDocumentDto) {
@@ -196,6 +203,9 @@ export class DocumentsService {
 
     // 5. Delete DB record only after GCS succeeds
     await this.prisma.document.delete({ where: { id: documentId } });
+
+    // 6. Recalculate case status after document deletion
+    await this.caseStatusCalculator.recalculate(caseId);
   }
 
   async processDocument(caseId: string, documentId: string, force?: boolean) {
@@ -265,7 +275,7 @@ export class DocumentsService {
 
     // 7. AI call succeeded — save ocrText, processedAt, status=PROCESSED
     try {
-      return await this.prisma.document.update({
+      const result = await this.prisma.document.update({
         where: { id: documentId },
         data: {
           ocrText,
@@ -279,6 +289,11 @@ export class DocumentsService {
         },
         include: DOCUMENT_INCLUDE,
       });
+
+      // 8. Recalculate case status after successful document processing
+      await this.caseStatusCalculator.recalculate(caseId);
+
+      return result;
     } catch (dbError) {
       // 9. CRITICAL: if DB write fails, still attempt to set ERROR status
       this.logger.error(

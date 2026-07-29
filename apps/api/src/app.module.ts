@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CaseAnalysisModule } from './case-analysis/case-analysis.module';
+import { CaseStatusCalculatorModule } from './case-status-calculator/case-status-calculator.module';
 import { ClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
@@ -22,6 +23,7 @@ import { IncomeCalculationModule } from './income-calculation/income-calculation
     MortgageCasesModule,
     DocumentsModule,
     CaseAnalysisModule,
+    CaseStatusCalculatorModule,
     LiabilityModule,
     IncomeCalculationModule,
   ],

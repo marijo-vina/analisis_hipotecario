@@ -21,3 +21,5 @@ Thumbs.db
 # POC: credit bureau PDF coordinate extraction
 experiments/buro-pdf-coordinate-poc/samples/
 experiments/buro-pdf-coordinate-poc/output/
+# Local AI runtime state
+.atl/

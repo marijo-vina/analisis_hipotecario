@@ -15,11 +15,6 @@ import AnalysisSection from "@/app/ui/expedientes/analysis-section";
 
 // ── Tipos locales ──────────────────────────────────────────────────────────
 
-interface CaseStatusLite {
-  code: string;
-  name: string;
-}
-
 interface CaseSummaryData {
   id: string;
   requestedAmount?: number;
@@ -37,7 +32,6 @@ interface CaseDetailWorkspaceProps {
   caseId: string;
   statusCode: string;
   statusName: string;
-  statuses: CaseStatusLite[];
   client: Client | null;
   caseData: CaseSummaryData;
   documents: Document[];
@@ -77,7 +71,6 @@ export default function CaseDetailWorkspace({
   caseId,
   statusCode,
   statusName,
-  statuses,
   client,
   caseData,
   documents,
@@ -93,7 +86,6 @@ export default function CaseDetailWorkspace({
         caseId={caseId}
         statusCode={statusCode}
         statusName={statusName}
-        statuses={statuses}
       />
 
       {/* ── Resumen + Observaciones (2 columnas) ────────────────────────── */}
