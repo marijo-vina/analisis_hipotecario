@@ -1,97 +1,119 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ── Gestión Financiera Design System (design.md) ─────────────────── */
+  
+  /* Primary & Brand */
+  --gf-red: #9C001F;
+  --gf-red-dark: #7A0018;
+  --gf-red-soft: #FBE7E9;
+  --gf-black: #1F1F21;
+  --gf-sidebar: #1F1F21;
 
-  /* ── Gestión Financiera design tokens ─────────────────────── */
-  /* Brand colors */
-  --gf-red: #B0002A;
-  --gf-red-dark: #8F0022;
-  --gf-red-soft: #FDE8EC;
-  --gf-black: #101010;
-  --gf-sidebar: #111111;
-
-  /* Surfaces */
-  --gf-bg: #FFF7F7;
-  --gf-surface: #FFFFFF;
-  --gf-border: #F0C9CF;
+  /* Backgrounds & Surfaces */
+  --gf-bg: #FBF8F7;
+  --gf-surface: #FAF8F7;
+  --gf-surface-bright: #FFFFFF;
+  --gf-surface-dim: #F5F1F0;
+  --gf-border: #D7DCE2;
+  --gf-border-variant: #ECEFF3;
 
   /* Text */
-  --gf-text: #111827;
-  --gf-text-muted: #6B7280;
-  --gf-text-soft: #9CA3AF;
+  --gf-text: #1F1F21;
+  --gf-text-muted: #676B73;
+  --gf-text-soft: #676B73;
+
+  /* Secondary & Accent */
+  --gf-secondary: #667085;
+  --gf-tertiary: #0F5C81;
 
   /* Semantic */
-  --gf-success: #059669;
-  --gf-warning: #D97706;
-  --gf-info: #2563EB;
-  --gf-danger: #DC2626;
-  --gf-neutral: #6B7280;
+  --gf-success: #067647;
+  --gf-warning: #B54708;
+  --gf-info: #155EEF;
+  --gf-danger: #D92D20;
+  --gf-error: #D92D20;
+  --gf-neutral: #667085;
+
+  /* Kanban Columns */
+  --gf-kanban-pending: #FFF6F6;
+  --gf-kanban-complete: #F6FAFF;
+  --gf-kanban-processed: #F5FCF8;
+  --gf-kanban-result: #FAF7FF;
 
   /* Spacing */
-  --sidebar-width: 260px;
+  --sidebar-width: 280px;
   --topbar-height: 72px;
   --content-padding: 32px;
   --card-padding: 24px;
-  --input-height: 42px;
+  --input-height: 44px;
 
-  /* Radii */
-  --radius-sm: 8px;
+  /* Radii (Cards: 12px, Inputs: 10px, Buttons: 10px, Badges: 999px) */
+  --radius-input: 10px;
+  --radius-button: 10px;
+  --radius-card: 12px;
+  --radius-badge: 999px;
+  --radius-sm: 10px;
   --radius-md: 12px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--gf-bg);
+  --color-foreground: var(--gf-text);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* GF brand colors → Tailwind utilities (bg-gf-red, text-gf-red, border-gf-red, etc.) */
+  /* GF Brand */
   --color-gf-red: var(--gf-red);
   --color-gf-red-dark: var(--gf-red-dark);
   --color-gf-red-soft: var(--gf-red-soft);
   --color-gf-black: var(--gf-black);
   --color-gf-sidebar: var(--gf-sidebar);
 
-  /* GF surfaces */
+  /* GF Surfaces */
   --color-gf-bg: var(--gf-bg);
   --color-gf-surface: var(--gf-surface);
+  --color-gf-surface-bright: var(--gf-surface-bright);
+  --color-gf-surface-dim: var(--gf-surface-dim);
   --color-gf-border: var(--gf-border);
+  --color-gf-border-variant: var(--gf-border-variant);
 
-  /* GF text */
+  /* GF Text */
   --color-gf-text: var(--gf-text);
   --color-gf-text-muted: var(--gf-text-muted);
   --color-gf-text-soft: var(--gf-text-soft);
 
-  /* GF semantic */
+  /* GF Secondary & Tertiary */
+  --color-gf-secondary: var(--gf-secondary);
+  --color-gf-tertiary: var(--gf-tertiary);
+
+  /* GF Semantic */
   --color-gf-success: var(--gf-success);
   --color-gf-warning: var(--gf-warning);
   --color-gf-info: var(--gf-info);
   --color-gf-danger: var(--gf-danger);
+  --color-gf-error: var(--gf-error);
   --color-gf-neutral: var(--gf-neutral);
 
-  /* GF spacing → Tailwind utilities (w-sidebar, h-topbar, p-content, p-card, h-input) */
+  /* GF Spacing */
   --spacing-sidebar: var(--sidebar-width);
   --spacing-topbar: var(--topbar-height);
   --spacing-content: var(--content-padding);
   --spacing-card: var(--card-padding);
   --spacing-input: var(--input-height);
 
-  /* GF radii → Tailwind utilities (rounded-sm = 8px, rounded-md = 12px) */
+  /* GF Radii */
+  --radius-input: var(--radius-input);
+  --radius-button: var(--radius-button);
+  --radius-card: var(--radius-card);
+  --radius-badge: var(--radius-badge);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--gf-bg);
+  color: var(--gf-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-image: radial-gradient(circle at top right, rgba(156, 0, 31, 0.04) 0%, transparent 45%);
+  min-height: 100vh;
 }

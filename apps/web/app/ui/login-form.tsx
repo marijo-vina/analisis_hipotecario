@@ -5,6 +5,7 @@ import { login } from "@/app/actions/auth";
 import type { ActionState } from "@/app/lib/definitions";
 import FormField from "@/app/ui/common/form-field";
 import Button from "@/app/ui/common/button";
+import { Mail, Lock, AlertCircle } from "lucide-react";
 
 const initialState: ActionState = { errors: {} };
 
@@ -12,11 +13,15 @@ export default function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       {/* General form error banner */}
       {state?.errors?._form && (
-        <div className="rounded-[var(--radius-sm)] bg-red-50 border border-red-200 p-3 text-sm text-red-700" role="alert">
-          {state.errors._form}
+        <div 
+          className="rounded-[10px] bg-red-50 border border-red-200 p-3 text-xs font-medium text-red-700 flex items-center gap-2" 
+          role="alert"
+        >
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" strokeWidth={2} />
+          <span>{state.errors._form}</span>
         </div>
       )}
 
@@ -27,15 +32,20 @@ export default function LoginForm() {
         error={state?.errors?.email}
         required
       >
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="block w-full h-[var(--input-height)] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text shadow-sm placeholder-gray-400 focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
-          placeholder="correo@ejemplo.com"
-        />
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gf-text-muted">
+            <Mail className="w-4 h-4" strokeWidth={2} />
+          </span>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="block w-full h-[44px] pl-10 pr-3 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text placeholder-gf-text-muted focus:border-gf-red focus:outline-none focus:ring-2 focus:ring-gf-red/20 transition-all"
+            placeholder="asesor@gestionfinanciera.com"
+          />
+        </div>
       </FormField>
 
       {/* Password field */}
@@ -45,19 +55,35 @@ export default function LoginForm() {
         error={state?.errors?.password}
         required
       >
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="block w-full h-[var(--input-height)] rounded-[var(--radius-sm)] border border-gf-border px-3 py-2 text-sm text-gf-text shadow-sm placeholder-gray-400 focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red"
-          placeholder="••••••••"
-        />
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gf-text-muted">
+            <Lock className="w-4 h-4" strokeWidth={2} />
+          </span>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            className="block w-full h-[44px] pl-10 pr-3 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text placeholder-gf-text-muted focus:border-gf-red focus:outline-none focus:ring-2 focus:ring-gf-red/20 transition-all"
+            placeholder="••••••••"
+          />
+        </div>
       </FormField>
 
-      {/* Submit button — centered */}
-      <div className="flex justify-center">
+      {/* Forgot Password option */}
+      <div className="flex justify-end pt-1">
+        <a 
+          href="#" 
+          className="text-xs text-gf-red hover:underline font-medium transition-colors"
+          onClick={(e) => e.preventDefault()}
+        >
+          ¿Olvidaste tu contraseña?
+        </a>
+      </div>
+
+      {/* Submit button */}
+      <div className="pt-2">
         <Button
           variant="primary"
           type="submit"
