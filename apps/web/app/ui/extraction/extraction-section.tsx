@@ -7,7 +7,6 @@ import {
   docCategory,
   type ExtractionCategory,
 } from "@/app/lib/extraction";
-import ExtractionSummaryBar from "@/app/ui/extraction/extraction-summary-bar";
 import ExtractionCategoryTabs from "@/app/ui/extraction/extraction-category-tabs";
 import EmptyState from "@/app/ui/common/empty-state";
 import IdentidadTab from "@/app/ui/extraction/identidad-tab";
@@ -59,13 +58,11 @@ export default function ExtractionSection({
 
   return (
     <section id="extraccion" className="mt-6 scroll-mt-6">
-      <h2 className="text-lg font-semibold text-gf-text mb-4">
-        Datos extraidos
+      <h2 className="text-lg font-bold text-gf-text mb-4">
+        Datos extraídos
       </h2>
 
       <div className="space-y-4">
-        <ExtractionSummaryBar documents={documents} />
-
         <ExtractionCategoryTabs activeTab={activeTab} onChange={setActiveTab} />
 
         <div role="tabpanel" className="pt-2">
