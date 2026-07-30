@@ -7,6 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
+import { RotateCw, Loader2 } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -142,28 +143,48 @@ export default function AnalysisSection({
     switch (state.phase) {
       case "idle":
         return (
-          <Button variant="primary" type="button" onClick={handleAnalyze}>
-            Analizar expediente
-          </Button>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            <span>Analizar expediente</span>
+          </button>
         );
       case "result":
       case "observations":
         return (
-          <Button variant="primary" type="button" onClick={handleAnalyze}>
-            Re-ejecutar análisis
-          </Button>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            <span>Re-ejecutar análisis</span>
+          </button>
         );
       case "analyzing":
         return (
-          <Button variant="primary" type="button" disabled>
-            Analizando...
-          </Button>
+          <button
+            type="button"
+            disabled
+            className="bg-gf-red/60 text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm transition-all inline-flex items-center gap-2 cursor-not-allowed"
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Analizando...</span>
+          </button>
         );
       case "error":
         return (
-          <Button variant="primary" type="button" onClick={handleAnalyze}>
-            Reintentar análisis
-          </Button>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            <span>Reintentar análisis</span>
+          </button>
         );
       default:
         return null;
@@ -176,12 +197,16 @@ export default function AnalysisSection({
 
   return (
     <div className="mb-4 mt-8">
-      {/* ── Header row: título + botón ──────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold text-gf-text">
-          Análisis del expediente
-        </h2>
-        {headerButton}
+      {/* ── Header row: título + botón compacto ───────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gf-text">
+            Análisis del expediente
+          </h2>
+        </div>
+        <div className="self-start sm:self-auto">
+          {headerButton}
+        </div>
       </div>
 
       {/* ── Stepper — visible during analyzing or error ─────────────────── */}
@@ -200,25 +225,31 @@ export default function AnalysisSection({
         />
       )}
 
-      {/* ── Tabs ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center border-b border-gf-border mb-4 mt-4">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              if (!isAnalyzing) setActiveTab(tab.id);
-            }}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab.id
-                ? "border-gf-red text-gf-red"
-                : "border-transparent text-gf-text-muted hover:text-gf-text"
-            } ${isAnalyzing ? "pointer-events-none opacity-50" : ""}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <div className="flex-1 border-b-2 border-transparent" />
+      {/* ── Tabs (Distribuidos uniformemente a lo ancho de la sección) ────── */}
+      <div role="tablist" aria-label="Secciones de análisis del expediente" className="border-b border-gf-border mb-6 mt-4 w-full">
+        <nav className="flex w-full">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => {
+                  if (!isAnalyzing) setActiveTab(tab.id);
+                }}
+                className={`flex-1 pb-3 pt-2 text-sm transition-all border-b-2 text-center ${
+                  isActive
+                    ? "border-gf-red text-gf-red font-bold"
+                    : "border-transparent text-gf-text-muted hover:text-gf-text hover:border-gf-border font-semibold"
+                } ${isAnalyzing ? "pointer-events-none opacity-50" : ""}`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* ── Contenido del tab ───────────────────────────────────────────── */}
