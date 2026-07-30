@@ -36,22 +36,13 @@ export default function ExtractionCategoryTabs({
               role="tab"
               aria-selected={isActive}
               onClick={() => onChange(tab)}
-              className={`flex-1 min-w-[120px] pb-3 pt-2 text-sm transition-all border-b-2 flex items-center justify-center gap-2 ${
+              className={`flex-1 min-w-[120px] pb-3 pt-2 text-sm transition-all border-b-2 flex items-center justify-center ${
                 isActive
                   ? "border-gf-red text-gf-red font-bold"
                   : "border-transparent text-gf-text-muted hover:text-gf-text hover:border-gf-border font-semibold"
               }`}
             >
               <span>{CATEGORY_LABELS[tab]}</span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5 ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-gf-surface-dim text-gf-text-muted"
-                }`}
-              >
-                ✓ 1/1
-              </span>
             </button>
           );
         })}
