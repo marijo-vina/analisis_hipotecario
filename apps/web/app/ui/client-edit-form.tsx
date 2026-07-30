@@ -175,18 +175,16 @@ export default function ClientEditForm({ client }: ClientEditFormProps) {
                     name="phone"
                     type="tel"
                     required
-                    inputMode="numeric"
-                    maxLength={10}
-                    pattern="[0-9]{10}"
+                    maxLength={16}
                     onInput={(e) => {
-                      e.currentTarget.value = e.currentTarget.value.replace(/[^0-9]/g, "").slice(0, 10);
+                      e.currentTarget.value = e.currentTarget.value.replace(/[^0-9+ ]/g, "").slice(0, 16);
                     }}
                     defaultValue={client.phone}
                     className={INPUT_WITH_ICON_CLASS}
-                    placeholder="5512345678"
+                    placeholder="55 1234 5678 o +1 305 123 4567"
                   />
                 </div>
-                <p className="text-[11px] text-gf-text-muted">Exactamente 10 dígitos numéricos</p>
+                <p className="text-[11px] text-gf-text-muted">10 dígitos (México) o clave internacional (+1, +34, etc.)</p>
                 {state?.errors?.phone && (
                   <p className="text-xs text-red-600 mt-0.5">{state.errors.phone}</p>
                 )}

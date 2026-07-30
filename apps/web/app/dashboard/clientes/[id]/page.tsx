@@ -10,11 +10,13 @@ import {
   Eye,
   FolderOpen,
   User,
-  Clock,
+  ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
 import StatusBadge from "@/app/ui/status-badge";
+import CopyButton from "@/app/ui/common/copy-button";
 import type { Client, MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 
 interface ClientDetailPageProps {
@@ -28,12 +30,32 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+/** Helper to generate Gmail compose URL */
+function getGmailComposeUrl(email: string): string {
+  if (!email) return "#";
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
+}
+
+/** Helper to generate WhatsApp wa.me URL supporting Mexican 10-digit and international + codes */
+function getWhatsAppUrl(phone: string): string {
+  if (!phone) return "#";
+  const trimmed = phone.trim();
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/[^0-9]/g, "");
+  if (!digits) return "#";
+
+  if (hasPlus || digits.length > 10) {
+    return `https://wa.me/${digits}`;
+  }
+  return `https://wa.me/52${digits}`;
+}
+
 /**
  * Redesigned Client detail page — server component.
  *
  * Implements the Stitch "Workspace de Cliente" layout:
- * - Top Navigation Breadcrumb & Header with Avatar and action CTAs (Editar / Crear expediente)
- * - Bento-style Personal Information Card with context icons
+ * - Top Navigation Breadcrumb & Header with Avatar and action CTAs (Editar cliente)
+ * - Bento-style Personal Information Card with interactive Gmail & WhatsApp triggers
  * - Linked Mortgage Cases Card with currency formatting, StatusBadge, and direct Eye/Pencil links
  */
 export default async function ClientDetailPage({
@@ -94,6 +116,8 @@ export default async function ClientDetailPage({
   // ---- Success ------------------------------------------------------------
   const client = clientResult.data;
   const initials = getInitials(client.fullName);
+  const gmailUrl = getGmailComposeUrl(client.email);
+  const whatsappUrl = getWhatsAppUrl(client.phone);
 
   // Derive associated cases for this client
   const allCases: MortgageCase[] = casesResult.ok ? casesResult.data.data : [];
@@ -167,38 +191,68 @@ export default async function ClientDetailPage({
             </div>
           </div>
 
-          {/* Correo */}
+          {/* Correo Electrónico (Gmail Direct Trigger) */}
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-red shrink-0">
               <Mail className="w-4 h-4" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                Correo electrónico
-              </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                  Correo electrónico
+                </p>
+                <CopyButton value={client.email} label="Copiar" />
+              </div>
               <a
-                href={`mailto:${client.email}`}
-                className="text-sm font-medium text-gf-red hover:underline mt-1 block break-all"
+                href={gmailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-gf-red hover:underline mt-1 block truncate"
+                title="Abrir ventana de redactar correo en Gmail"
               >
                 {client.email}
+              </a>
+              <a
+                href={gmailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-gf-red hover:underline mt-1"
+              >
+                <span>Redactar en Gmail</span>
+                <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
-          {/* Teléfono */}
+          {/* Teléfono (WhatsApp Direct Trigger) */}
           <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
               <Phone className="w-4 h-4" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                Teléfono
-              </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                  Teléfono
+                </p>
+                <CopyButton value={client.phone} label="Copiar" />
+              </div>
               <a
-                href={`tel:${client.phone}`}
-                className="text-sm font-medium text-gf-text hover:text-gf-red transition-colors mt-1 block"
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-gf-text hover:text-emerald-700 transition-colors mt-1 block truncate"
+                title="Abrir chat directo en WhatsApp"
               >
                 {client.phone}
+              </a>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md hover:bg-emerald-100 transition-colors mt-1"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>Enviar WhatsApp</span>
               </a>
             </div>
           </div>
@@ -208,10 +262,13 @@ export default async function ClientDetailPage({
             <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
               <CreditCard className="w-4 h-4" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                RFC
-              </p>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                  RFC
+                </p>
+                {client.rfc && <CopyButton value={client.rfc} label="Copiar" />}
+              </div>
               <p className="text-sm font-mono font-medium text-gf-text mt-1">
                 {client.rfc || "—"}
               </p>
@@ -223,10 +280,13 @@ export default async function ClientDetailPage({
             <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
               <CreditCard className="w-4 h-4" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                CURP
-              </p>
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                  CURP
+                </p>
+                {client.curp && <CopyButton value={client.curp} label="Copiar" />}
+              </div>
               <p className="text-sm font-mono font-medium text-gf-text mt-1">
                 {client.curp || "—"}
               </p>
