@@ -44,9 +44,10 @@ function formatPesoGroup(raw: string): string {
 interface CaseFormProps {
   creditTypes: CreditType[];
   clients: Client[];
+  initialClientId?: string;
 }
 
-export default function CaseForm({ creditTypes, clients }: CaseFormProps) {
+export default function CaseForm({ creditTypes, clients, initialClientId }: CaseFormProps) {
   const [state, formAction, pending] = useActionState(
     createCase,
     initialState
@@ -135,7 +136,7 @@ export default function CaseForm({ creditTypes, clients }: CaseFormProps) {
                 <label htmlFor="clientId" className="text-xs font-semibold text-gf-text">
                   Cliente <span className="text-gf-red">*</span>
                 </label>
-                <ClientSelector clients={clients} />
+                <ClientSelector clients={clients} initialClientId={initialClientId} />
                 {state?.errors?.clientId && (
                   <p className="text-xs text-red-600 mt-0.5">{state.errors.clientId}</p>
                 )}
