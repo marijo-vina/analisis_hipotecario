@@ -2,23 +2,33 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import DataTable from "@/app/ui/common/data-table";
+import { Search, UserPlus, Eye, Pencil, Users } from "lucide-react";
 import EmptyState from "@/app/ui/common/empty-state";
+import Pagination from "@/app/ui/pagination";
 import type { Client } from "@/app/lib/definitions";
 
 interface ClientsTableProps {
   clients: Client[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 /**
- * Client-side wrapper for the clients list table.
+ * Redesigned Client-side list view for Clientes.
  *
- * Adds a search input that filters the client list by name or email
- * on the client side — no additional backend calls. Preserves the
- * existing pagination contract by only filtering the current page's
- * data.
+ * Implements the Stitch "Gestión de clientes - listado detallado" layout:
+ * - Header section with Title, Subtitle, Search Input, and "+ Nuevo cliente" CTA
+ * - Elevated data table with 56px row height and subtle hover states
+ * - Direct action icons (Eye for details, Pencil for editing)
+ * - Integrated Pagination bar with item counts and numbered buttons
  */
-export default function ClientsTable({ clients }: ClientsTableProps) {
+export default function ClientsTable({
+  clients,
+  total,
+  page,
+  limit,
+}: ClientsTableProps) {
   const [search, setSearch] = useState("");
 
   const term = search.trim().toLowerCase();
@@ -26,137 +36,149 @@ export default function ClientsTable({ clients }: ClientsTableProps) {
     ? clients.filter(
         (c) =>
           c.fullName.toLowerCase().includes(term) ||
-          c.email.toLowerCase().includes(term),
+          c.email.toLowerCase().includes(term) ||
+          (c.curp && c.curp.toLowerCase().includes(term)) ||
+          (c.rfc && c.rfc.toLowerCase().includes(term))
       )
     : clients;
 
-  // ---- Zero clients total (no data from server) ---------------------------
-  if (clients.length === 0) {
-    return (
-      <EmptyState
-        icon={
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header & Action Controls Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gf-text">
+            Clientes
+          </h1>
+          <p className="text-sm text-gf-text-muted mt-1">
+            Gestiona la información de tus clientes y sus expedientes.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gf-text-muted" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o correo"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gf-border rounded-xl text-sm font-medium text-gf-text placeholder-gf-text-muted focus:outline-none focus:ring-2 focus:ring-gf-red focus:border-transparent transition-all h-11 shadow-2xs"
             />
-          </svg>
-        }
-        message="No hay clientes registrados"
-        ctaLabel="Crear primer cliente"
-        ctaHref="/dashboard/clientes/nuevo"
-      />
-    );
-  }
+          </div>
 
-  // ---- Search active but zero matches -------------------------------------
-  if (term && filtered.length === 0) {
-    return (
-      <>
-        <SearchInput value={search} onChange={setSearch} />
-        <EmptyState
-          icon={
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-12 w-12"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          }
-          message={`No se encontraron clientes para "${term}"`}
-        />
-      </>
-    );
-  }
+          {/* CTA Button */}
+          <Link
+            href="/dashboard/clientes/nuevo"
+            className="inline-flex items-center justify-center gap-2 bg-gf-red hover:bg-gf-red-dark text-white px-5 h-11 rounded-xl text-sm font-semibold transition-all shadow-xs shrink-0 whitespace-nowrap active:scale-[0.98]"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Nuevo cliente</span>
+          </Link>
+        </div>
+      </div>
 
-  // ---- Data with optional search filter -----------------------------------
-  return (
-    <>
-      <SearchInput value={search} onChange={setSearch} />
-      <DataTable
-        columns={[
-          { key: "fullName", header: "Nombre completo" },
-          { key: "email", header: "Correo" },
-          { key: "phone", header: "Teléfono" },
-          { key: "rfc", header: "RFC" },
-          {
-            key: "actions",
-            header: "Acciones",
-            render: (client: Client) => (
-              <Link
-                href={`/dashboard/clientes/${client.id}`}
-                className="text-gf-text font-medium hover:underline"
-              >
-                Ver
-              </Link>
-            ),
-          },
-        ]}
-        rows={filtered}
-        emptyMessage="No hay clientes"
-      />
-      {term && (
-        <p className="text-gf-text-muted text-sm mt-2">
-          Mostrando {filtered.length} de {clients.length} cliente
-          {clients.length !== 1 ? "s" : ""} en esta p&aacute;gina
-          {clients.length > filtered.length ? " (filtrado)" : ""}
-        </p>
-      )}
-    </>
-  );
-}
+      {/* Main Table Card Container */}
+      <div className="bg-white rounded-xl border border-gf-border shadow-xs overflow-hidden min-h-[400px] flex flex-col">
+        {clients.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <EmptyState
+              icon={<Users className="w-12 h-12 text-gf-text-muted stroke-[1.5]" />}
+              message="No hay clientes registrados"
+              ctaLabel="Crear primer cliente"
+              ctaHref="/dashboard/clientes/nuevo"
+            />
+          </div>
+        ) : term && filtered.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <EmptyState
+              icon={<Search className="w-12 h-12 text-gf-text-muted stroke-[1.5]" />}
+              message={`No se encontraron clientes para "${term}"`}
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="border-b border-gf-border bg-gf-surface-dim/60">
+                  <th scope="col" className="py-4 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Nombre completo
+                  </th>
+                  <th scope="col" className="py-4 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Correo electrónico
+                  </th>
+                  <th scope="col" className="py-4 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Teléfono
+                  </th>
+                  <th scope="col" className="py-4 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    CURP / RFC
+                  </th>
+                  <th scope="col" className="py-4 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider text-right">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gf-border">
+                {filtered.map((client) => (
+                  <tr
+                    key={client.id}
+                    className="hover:bg-gf-surface-dim/40 transition-colors h-[56px] group"
+                  >
+                    <td className="py-3 px-6 text-sm font-semibold text-gf-text">
+                      {client.fullName}
+                    </td>
+                    <td className="py-3 px-6 text-sm text-gf-text-muted">
+                      {client.email}
+                    </td>
+                    <td className="py-3 px-6 text-sm text-gf-text-muted">
+                      {client.phone}
+                    </td>
+                    <td className="py-3 px-6 text-sm font-mono text-gf-text-muted">
+                      {client.curp || client.rfc || "—"}
+                    </td>
+                    <td className="py-3 px-6 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/dashboard/clientes/${client.id}`}
+                          className="p-2 text-gf-text-muted hover:text-gf-red hover:bg-gf-red-soft/40 transition-colors rounded-lg"
+                          title="Ver expediente del cliente"
+                          aria-label={`Ver expediente de ${client.fullName}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        <Link
+                          href={`/dashboard/clientes/${client.id}/editar`}
+                          className="p-2 text-gf-text-muted hover:text-gf-red hover:bg-gf-red-soft/40 transition-colors rounded-lg"
+                          title="Editar información del cliente"
+                          aria-label={`Editar cliente ${client.fullName}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-/** Small search input that lives above the table. */
-function SearchInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="mb-4">
-      <div className="relative max-w-md">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gf-text-soft"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        {/* Integrated Pagination Footer */}
+        {clients.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={total}
+            limit={limit}
+            basePath="/dashboard/clientes"
+            itemLabel="clientes"
           />
-        </svg>
-        <input
-          type="text"
-          placeholder="Buscar por nombre o correo..."
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 text-sm border border-gf-border rounded-[var(--radius-sm)]
-                     focus:outline-none focus:border-gf-red focus:ring-1 focus:ring-gf-red
-                     text-gf-text placeholder-gf-text-soft bg-white"
-        />
+        )}
       </div>
     </div>
   );
 }
+
