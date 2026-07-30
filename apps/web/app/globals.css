@@ -42,9 +42,9 @@
   --gf-kanban-result: #FAF7FF;
 
   /* Spacing */
-  --sidebar-width: 280px;
+  --sidebar-width: 220px;
   --topbar-height: 72px;
-  --content-padding: 32px;
+  --content-padding: 24px;
   --card-padding: 24px;
   --input-height: 44px;
 
