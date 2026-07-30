@@ -5,6 +5,7 @@ import {
   HttpCode,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -44,6 +45,7 @@ export class MortgageCasesController {
     return this.mortgageCasesService.findOne(id);
   }
 
+  @Patch(':id')
   @Put(':id')
   update(
     @Param('id') id: string,
