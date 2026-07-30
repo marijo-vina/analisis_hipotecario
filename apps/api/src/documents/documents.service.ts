@@ -184,10 +184,10 @@ export class DocumentsService {
     // 1. Find document — 404 if not found or wrong case
     const document = await this.findOneByCase(caseId, documentId);
 
-    // 2. Status gate: only UPLOADED documents are deletable
-    if (document.documentStatus.code !== 'UPLOADED') {
+    // 2. Status gate: reject deletion only if actively PROCESSING
+    if (document.documentStatus.code === 'PROCESSING') {
       throw new BadRequestException(
-        'Solo se pueden eliminar documentos no procesados',
+        'No se puede eliminar un documento mientras está en procesamiento',
       );
     }
 
