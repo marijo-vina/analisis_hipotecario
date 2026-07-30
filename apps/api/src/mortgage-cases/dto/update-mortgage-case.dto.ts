@@ -12,7 +12,8 @@ export class UpdateMortgageCaseDto {
   @Type(() => Number)
   @IsInt({ message: 'El tipo de crédito debe ser un número válido' })
   @IsPositive({ message: 'El tipo de crédito es obligatorio' })
-  creditTypeId!: number;
+  @IsOptional()
+  creditTypeId?: number;
 
   @IsString()
   @IsOptional()

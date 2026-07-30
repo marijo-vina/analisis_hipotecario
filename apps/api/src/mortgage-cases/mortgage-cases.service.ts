@@ -97,9 +97,11 @@ export class MortgageCasesService {
       throw new NotFoundException(`Mortgage case with ID ${id} not found`);
     }
 
-    const creditType = await this.prisma.creditType.findUnique({ where: { id: dto.creditTypeId } });
-    if (!creditType) {
-      throw new NotFoundException(`CreditType with ID ${dto.creditTypeId} not found`);
+    if (dto.creditTypeId != null) {
+      const creditType = await this.prisma.creditType.findUnique({ where: { id: dto.creditTypeId } });
+      if (!creditType) {
+        throw new NotFoundException(`CreditType with ID ${dto.creditTypeId} not found`);
+      }
     }
 
     return this.prisma.mortgageCase.update({
