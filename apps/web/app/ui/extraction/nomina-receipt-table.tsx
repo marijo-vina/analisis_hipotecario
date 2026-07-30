@@ -23,17 +23,17 @@ function formatCurrency(value: number | null): string {
 function statusPillStyle(code: string): string {
   switch (code) {
     case "PROCESSED":
-      return "bg-green-100 text-green-800";
+      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
     case "PROCESSING":
-      return "bg-blue-100 text-blue-800";
+      return "bg-blue-50 text-blue-700 border border-blue-200";
     case "UPLOADED":
-      return "bg-gray-100 text-gray-600";
+      return "bg-gray-100 text-gray-700 border border-gray-200";
     case "EXTRACTION_ERROR":
     case "ERROR":
     case "OCR_ERROR":
-      return "bg-red-100 text-red-800";
+      return "bg-red-50 text-red-700 border border-red-200";
     default:
-      return "bg-gray-100 text-gray-600";
+      return "bg-gray-100 text-gray-700 border border-gray-200";
   }
 }
 

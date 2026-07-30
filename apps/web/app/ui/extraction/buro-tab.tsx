@@ -80,13 +80,12 @@ function formatMxn(amount: number | null): string {
 }
 
 function mopBadgeColor(code: string): string {
-  if (code === "0" || code === "") return "bg-green-100 text-green-700";
-  if (code === "1")
-    return "bg-green-100 text-green-700";
+  if (code === "0" || code === "" || code === "1")
+    return "bg-emerald-50 text-emerald-700 border border-emerald-200";
   if (code === "2")
-    return "bg-yellow-100 text-yellow-700";
-  if (code === "U" || code === "-") return "bg-gray-100 text-gray-500";
-  return "bg-red-100 text-red-700";
+    return "bg-amber-50 text-amber-700 border border-amber-200";
+  if (code === "U" || code === "-") return "bg-gray-100 text-gray-600 border border-gray-200";
+  return "bg-red-50 text-red-700 border border-red-200";
 }
 
 // Classification chip colors
@@ -111,8 +110,8 @@ function classificationChipColor(cls: string): string {
 
 function statusChipColor(status: string): string {
   return status === "ACTIVE"
-    ? "bg-green-50 text-green-700 border-green-200"
-    : "bg-gray-50 text-gray-500 border-gray-200";
+    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+    : "bg-gray-100 text-gray-600 border border-gray-200";
 }
 
 // ---------------------------------------------------------------------------
@@ -125,25 +124,25 @@ function BuroHeader({ parsed }: { parsed: ParsedCreditBureau }) {
     parsed.statusCode === "DATA_EXTRACTED";
 
   return (
-    <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-gf-border bg-gf-surface px-5 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+    <div className="flex items-center justify-between rounded-xl border border-gf-border bg-white p-5 shadow-xs">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-semibold text-gf-text">
+          <h2 className="text-base font-bold text-gf-text">
             Buró de crédito
           </h2>
           {isProcessed && (
-            <span className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
               Procesado
             </span>
           )}
         </div>
-        <p className="text-[11px] text-gf-text-muted">
+        <p className="text-xs text-gf-text-muted">
           Datos extraídos del Reporte de Buró de Crédito Especial
         </p>
       </div>
 
       {parsed.consultationDate && (
-        <span className="text-[11px] text-gf-text-muted">
+        <span className="text-xs font-medium text-gf-text-muted">
           Consulta: {parsed.consultationDate}
         </span>
       )}

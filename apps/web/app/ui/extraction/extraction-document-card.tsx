@@ -246,24 +246,24 @@ export default function ExtractionDocumentCard({
 
         <div className="flex items-center gap-2">
           {isExpired && (
-            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+            <span className="inline-flex items-center rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold">
               Documento vencido
             </span>
           )}
           {alerts.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
               <span aria-hidden="true">⚠</span> {alerts.length}{" "}
               {alerts.length === 1 ? "alerta" : "alertas"}
             </span>
           )}
-          <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800">
+          <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
             {document.documentStatus.name}
           </span>
           {onValidate && (
             <button
               type="button"
               onClick={() => onValidate(document)}
-              className="rounded border border-gf-border bg-gf-bg px-2.5 py-1 text-xs font-medium text-gf-text transition-colors hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gf-border bg-white px-3 py-1.5 text-xs font-semibold text-gf-text transition-all hover:bg-gf-surface-dim shadow-2xs active:scale-[0.98]"
             >
               Validar manualmente
             </button>
