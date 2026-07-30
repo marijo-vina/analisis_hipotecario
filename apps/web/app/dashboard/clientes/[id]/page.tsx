@@ -16,7 +16,6 @@ import {
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
 import StatusBadge from "@/app/ui/status-badge";
-import CopyButton from "@/app/ui/common/copy-button";
 import type { Client, MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 
 interface ClientDetailPageProps {
@@ -197,12 +196,9 @@ export default async function ClientDetailPage({
               <Mail className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                  Correo electrónico
-                </p>
-                <CopyButton value={client.email} label="Copiar" />
-              </div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Correo electrónico
+              </p>
               <a
                 href={gmailUrl}
                 target="_blank"
@@ -230,12 +226,9 @@ export default async function ClientDetailPage({
               <Phone className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                  Teléfono
-                </p>
-                <CopyButton value={client.phone} label="Copiar" />
-              </div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Teléfono
+              </p>
               <a
                 href={whatsappUrl}
                 target="_blank"
@@ -263,12 +256,9 @@ export default async function ClientDetailPage({
               <CreditCard className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                  RFC
-                </p>
-                {client.rfc && <CopyButton value={client.rfc} label="Copiar" />}
-              </div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                RFC
+              </p>
               <p className="text-sm font-mono font-medium text-gf-text mt-1">
                 {client.rfc || "—"}
               </p>
@@ -281,12 +271,9 @@ export default async function ClientDetailPage({
               <CreditCard className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
-                  CURP
-                </p>
-                {client.curp && <CopyButton value={client.curp} label="Copiar" />}
-              </div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                CURP
+              </p>
               <p className="text-sm font-mono font-medium text-gf-text mt-1">
                 {client.curp || "—"}
               </p>
