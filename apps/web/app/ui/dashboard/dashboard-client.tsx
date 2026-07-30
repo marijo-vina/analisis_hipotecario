@@ -149,10 +149,10 @@ export default function DashboardClient({
       {/* ── Page Header & Action Buttons ──────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gf-border-variant">
         <div>
-          <h1 className="text-2xl font-bold text-gf-text tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gf-text">
             Dashboard
           </h1>
-          <p className="text-sm text-gf-text-muted mt-0.5">
+          <p className="text-sm text-gf-text-muted mt-1">
             Seguimiento operativo de expedientes hipotecarios para <span className="font-semibold text-gf-text">{userName}</span>.
           </p>
         </div>
