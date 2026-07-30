@@ -86,10 +86,10 @@ function StatItem({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-medium text-gf-text-soft uppercase tracking-wide">
+      <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
         {label}
       </span>
-      <span className={`text-lg font-bold text-gf-text ${valueClass ?? ""}`}>
+      <span className={`text-base font-bold text-gf-text ${valueClass ?? ""}`}>
         {value}
       </span>
     </div>
