@@ -1,10 +1,19 @@
 import Link from "next/link";
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  CreditCard,
+  Calendar,
+  Pencil,
+  Plus,
+  Eye,
+  FolderOpen,
+  User,
+  Clock,
+} from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import ErrorMessage from "@/app/ui/error-message";
-import PageHeader from "@/app/ui/common/page-header";
-import Button from "@/app/ui/common/button";
-import Card from "@/app/ui/common/card";
-import DataTable from "@/app/ui/common/data-table";
 import StatusBadge from "@/app/ui/status-badge";
 import type { Client, MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
 
@@ -12,14 +21,20 @@ interface ClientDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+function getInitials(name: string): string {
+  if (!name) return "CL";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 /**
- * Client detail page — server component.
+ * Redesigned Client detail page — server component.
  *
- * Fetches a single client by ID and renders a detail card with
- * personal information plus a table of associated mortgage cases.
- * Cases are fetched from the mortgage-cases endpoint and filtered
- * by clientId on the server side (backend does not yet support
- * clientId query param — see HU-08 design).
+ * Implements the Stitch "Workspace de Cliente" layout:
+ * - Top Navigation Breadcrumb & Header with Avatar and action CTAs (Editar / Crear expediente)
+ * - Bento-style Personal Information Card with context icons
+ * - Linked Mortgage Cases Card with currency formatting, StatusBadge, and direct Eye/Pencil links
  */
 export default async function ClientDetailPage({
   params,
@@ -29,34 +44,33 @@ export default async function ClientDetailPage({
   // Fetch client and cases in parallel
   const [clientResult, casesResult] = await Promise.all([
     apiFetch<Client>(`/clients/${id}`),
-    // Fetch all cases with high limit to filter by clientId client-side.
-    // Known limitation: clients with >100 cases will be truncated.
     apiFetch<PaginatedResponse<MortgageCase>>("/mortgage-cases?page=1&limit=100"),
   ]);
 
   // ---- Not found ----------------------------------------------------------
   if (!clientResult.ok && clientResult.notFound) {
     return (
-      <div>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Clientes", href: "/dashboard/clientes" },
-            { label: "Cliente no encontrado" },
-          ]}
-          title="Cliente no encontrado"
-        />
-        <Card>
-          <p className="text-slate-600 mb-4">
-            No se encontr&oacute; un cliente con el ID especificado.
+      <div className="space-y-6">
+        <Link
+          href="/dashboard/clientes"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gf-text-muted hover:text-gf-red transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver a clientes</span>
+        </Link>
+        <div className="bg-white border border-gf-border rounded-xl p-8 text-center max-w-lg mx-auto shadow-xs">
+          <User className="w-12 h-12 text-gf-text-muted mx-auto mb-3" />
+          <h2 className="text-xl font-bold text-gf-text mb-2">Cliente no encontrado</h2>
+          <p className="text-sm text-gf-text-muted mb-6">
+            No se encontró un cliente con el ID especificado o fue eliminado.
           </p>
           <Link
             href="/dashboard/clientes"
-            className="text-gf-text font-medium hover:underline"
+            className="inline-flex items-center justify-center bg-gf-red hover:bg-gf-red-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-xs"
           >
-            &larr; Volver al listado
+            Ir al listado de clientes
           </Link>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -64,151 +78,305 @@ export default async function ClientDetailPage({
   // ---- Generic error ------------------------------------------------------
   if (!clientResult.ok) {
     return (
-      <div>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Clientes", href: "/dashboard/clientes" },
-            { label: "Cliente" },
-          ]}
-          title="Cliente"
-        />
-        <ErrorMessage message="Error al cargar el cliente" />
-        <div className="mt-4">
-          <Link
-            href="/dashboard/clientes"
-            className="text-gf-text font-medium hover:underline"
-          >
-            &larr; Volver al listado
-          </Link>
-        </div>
+      <div className="space-y-6">
+        <Link
+          href="/dashboard/clientes"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gf-text-muted hover:text-gf-red transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver a clientes</span>
+        </Link>
+        <ErrorMessage message="Error al cargar la información del cliente." />
       </div>
     );
   }
 
   // ---- Success ------------------------------------------------------------
   const client = clientResult.data;
+  const initials = getInitials(client.fullName);
 
-  // Derive associated cases from the full case list
-  const allCases: MortgageCase[] =
-    casesResult.ok ? casesResult.data.data : [];
+  // Derive associated cases for this client
+  const allCases: MortgageCase[] = casesResult.ok ? casesResult.data.data : [];
   const associatedCases = allCases.filter((c) => c.clientId === id);
 
   return (
-    <div>
-      {/* Page header with breadcrumb + actions */}
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Clientes", href: "/dashboard/clientes" },
-          { label: client.fullName },
-        ]}
-        title={client.fullName}
-        action={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              href={`/dashboard/clientes/${id}/editar`}
-            >
-              Editar cliente
-            </Button>
+    <div className="space-y-8">
+      {/* Navigation Breadcrumb */}
+      <div>
+        <Link
+          href="/dashboard/clientes"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gf-text-muted hover:text-gf-red transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver al listado de clientes</span>
+        </Link>
+
+        {/* Header Profile Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gf-red-soft text-gf-red flex items-center justify-center font-bold text-xl shrink-0 shadow-2xs">
+              {initials}
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gf-text">
+                {client.fullName}
+              </h1>
+              <p className="text-sm text-gf-text-muted mt-0.5">
+                Cliente Hipotecario &bull; Registrado el{" "}
+                {new Date(client.createdAt).toLocaleDateString("es-MX", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
           </div>
-        }
-      />
 
-      {/* ── Datos personales card ─────────────────────────────────────── */}
-      <Card className="mb-6">
-        <h3 className="text-base font-semibold text-gf-text mb-4">
-          Datos personales
-        </h3>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nombre completo" value={client.fullName} />
-          <Field label="Correo electr&oacute;nico" value={client.email} />
-          <Field label="Tel&eacute;fono" value={client.phone} />
-          <Field label="RFC" value={client.rfc} />
-          <Field label="CURP" value={client.curp} />
-          <Field
-            label="Registrado"
-            value={new Date(client.createdAt).toLocaleDateString("es-MX")}
-          />
-          <Field
-            label="Actualizado"
-            value={new Date(client.updatedAt).toLocaleDateString("es-MX")}
-          />
-        </dl>
-      </Card>
-
-      {/* ── Expedientes vinculados section ──────────────────────────────── */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gf-text">
-          Expedientes vinculados
-        </h2>
-        <Button variant="primary" href="/dashboard/expedientes/nuevo">
-          Crear expediente
-        </Button>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/dashboard/clientes/${id}/editar`}
+              className="inline-flex items-center justify-center gap-2 bg-white border border-gf-border hover:bg-gf-surface-dim text-gf-text px-4 h-11 rounded-xl text-sm font-semibold transition-all shadow-2xs shrink-0"
+            >
+              <Pencil className="w-4 h-4 text-gf-text-muted" />
+              <span>Editar cliente</span>
+            </Link>
+            <Link
+              href={`/dashboard/expedientes/nuevo?clientId=${id}`}
+              className="inline-flex items-center justify-center gap-2 bg-gf-red hover:bg-gf-red-dark text-white px-5 h-11 rounded-xl text-sm font-semibold transition-all shadow-xs shrink-0 whitespace-nowrap active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Crear expediente</span>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {!casesResult.ok ? (
-        <ErrorMessage message="Error al cargar expedientes" />
-      ) : (
-        <DataTable
-          columns={[
-            {
-              key: "id",
-              header: "ID expediente",
-              render: (c: MortgageCase) => (
-                <span className="font-mono text-xs">{c.id.slice(0, 8)}...</span>
-              ),
-            },
-            {
-              key: "creditType",
-              header: "Tipo crédito",
-              render: (c: MortgageCase) => c.creditType.name,
-            },
-            {
-              key: "amount",
-              header: "Monto",
-              render: (c: MortgageCase) =>
-                c.requestedAmount != null
-                  ? `$${Number(c.requestedAmount).toLocaleString("es-MX")}`
-                  : "\u2014",
-            },
-            {
-              key: "status",
-              header: "Estado",
-              render: (c: MortgageCase) => (
-                <StatusBadge code={c.status.code} name={c.status.name} />
-              ),
-            },
-            {
-              key: "actions",
-              header: "Acciones",
-              render: (c: MortgageCase) => (
-                <Link
-                  href={`/dashboard/expedientes/${c.id}`}
-                  className="text-gf-text font-medium hover:underline"
-                >
-                  Ver
-                </Link>
-              ),
-            },
-          ]}
-          rows={associatedCases}
-          emptyMessage="Sin expedientes vinculados"
-        />
-      )}
+      {/* ── Datos Personales Bento Card ────────────────────────────────────── */}
+      <div className="bg-white border border-gf-border rounded-xl p-6 sm:p-8 shadow-xs">
+        <h2 className="text-lg font-bold text-gf-text mb-6 border-b border-gf-border pb-3 flex items-center gap-2">
+          <User className="w-5 h-5 text-gf-red" />
+          <span>Información General y de Contacto</span>
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Nombre */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <User className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Nombre completo
+              </p>
+              <p className="text-sm font-semibold text-gf-text mt-1">
+                {client.fullName}
+              </p>
+            </div>
+          </div>
+
+          {/* Correo */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <Mail className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Correo electrónico
+              </p>
+              <a
+                href={`mailto:${client.email}`}
+                className="text-sm font-medium text-gf-red hover:underline mt-1 block break-all"
+              >
+                {client.email}
+              </a>
+            </div>
+          </div>
+
+          {/* Teléfono */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <Phone className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Teléfono
+              </p>
+              <a
+                href={`tel:${client.phone}`}
+                className="text-sm font-medium text-gf-text hover:text-gf-red transition-colors mt-1 block"
+              >
+                {client.phone}
+              </a>
+            </div>
+          </div>
+
+          {/* RFC */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                RFC
+              </p>
+              <p className="text-sm font-mono font-medium text-gf-text mt-1">
+                {client.rfc || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* CURP */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                CURP
+              </p>
+              <p className="text-sm font-mono font-medium text-gf-text mt-1">
+                {client.curp || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Registro */}
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-gf-surface-dim text-gf-text-muted shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                Fecha de alta
+              </p>
+              <p className="text-sm font-medium text-gf-text mt-1">
+                {new Date(client.createdAt).toLocaleDateString("es-MX")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Expedientes Vinculados Section ─────────────────────────────────── */}
+      <div className="bg-white border border-gf-border rounded-xl shadow-xs overflow-hidden">
+        <div className="p-6 border-b border-gf-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gf-surface-dim/30">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-gf-text">
+              Expedientes vinculados
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gf-red-soft text-gf-red">
+              {associatedCases.length}
+            </span>
+          </div>
+
+          <Link
+            href={`/dashboard/expedientes/nuevo?clientId=${id}`}
+            className="inline-flex items-center justify-center gap-2 bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-lg text-xs font-semibold transition-all shadow-xs shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Crear expediente</span>
+          </Link>
+        </div>
+
+        {!casesResult.ok ? (
+          <div className="p-6">
+            <ErrorMessage message="Error al cargar los expedientes asociados." />
+          </div>
+        ) : associatedCases.length === 0 ? (
+          <div className="p-8 text-center">
+            <FolderOpen className="w-10 h-10 text-gf-text-muted mx-auto mb-2 stroke-[1.5]" />
+            <p className="text-sm font-medium text-gf-text-muted">
+              Este cliente aún no tiene expedientes hipotecarios asignados.
+            </p>
+            <Link
+              href={`/dashboard/expedientes/nuevo?clientId=${id}`}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-gf-red hover:underline mt-3"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Crear el primer expediente para este cliente</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="border-b border-gf-border bg-gf-surface-dim/60">
+                  <th scope="col" className="py-3.5 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Expediente
+                  </th>
+                  <th scope="col" className="py-3.5 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Tipo de crédito
+                  </th>
+                  <th scope="col" className="py-3.5 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Monto solicitado
+                  </th>
+                  <th scope="col" className="py-3.5 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider">
+                    Estatus
+                  </th>
+                  <th scope="col" className="py-3.5 px-6 text-xs font-semibold text-gf-text-muted uppercase tracking-wider text-right">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gf-border">
+                {associatedCases.map((c) => {
+                  const caseCode = `EXP-${c.id.slice(0, 8).toUpperCase()}`;
+                  const amountFormatted =
+                    c.requestedAmount != null
+                      ? `$${Number(c.requestedAmount).toLocaleString("es-MX", {
+                          minimumFractionDigits: 2,
+                        })} MXN`
+                      : "—";
+
+                  return (
+                    <tr
+                      key={c.id}
+                      className="hover:bg-gf-surface-dim/40 transition-colors h-[52px]"
+                    >
+                      <td className="py-3 px-6 text-sm font-semibold font-mono text-gf-red">
+                        {caseCode}
+                      </td>
+                      <td className="py-3 px-6 text-sm text-gf-text font-medium">
+                        {c.creditType?.name || "—"}
+                      </td>
+                      <td className="py-3 px-6 text-sm font-medium text-gf-text">
+                        {amountFormatted}
+                      </td>
+                      <td className="py-3 px-6 text-sm">
+                        <StatusBadge
+                          code={c.status?.code ?? "PENDING"}
+                          name={c.status?.name ?? "En Proceso"}
+                        />
+                      </td>
+                      <td className="py-3 px-6 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link
+                            href={`/dashboard/expedientes/${c.id}`}
+                            className="p-2 text-gf-text-muted hover:text-gf-red hover:bg-gf-red-soft/40 transition-colors rounded-lg"
+                            title="Ver expediente"
+                            aria-label={`Ver expediente ${caseCode}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                          <Link
+                            href={`/dashboard/expedientes/${c.id}/editar`}
+                            className="p-2 text-gf-text-muted hover:text-gf-red hover:bg-gf-red-soft/40 transition-colors rounded-lg"
+                            title="Editar expediente"
+                            aria-label={`Editar expediente ${caseCode}`}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/** Small reusable field for the detail card. */
-function Field({ label, value }: { label: string; value?: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm text-gf-text">{value || "\u2014"}</dd>
-    </div>
-  );
-}
