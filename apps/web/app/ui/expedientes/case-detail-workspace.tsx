@@ -93,7 +93,7 @@ export default function CaseDetailWorkspace({
         />
 
         {/* ── Right Main Content Area ─────────────────────────────────── */}
-        <div className="flex-1 min-w-0 w-full space-y-6 pb-24">
+        <div className="flex-1 min-w-0 w-full space-y-6">
           {/* ── Top Info Cards Section (12 Grid Columns) ─────────────── */}
           <section className="grid grid-cols-12 gap-6">
             {/* Client Details Bento Card (8 Cols) */}
@@ -196,21 +196,6 @@ export default function CaseDetailWorkspace({
           {/* ── Analysis Section (Sprint 3) ────────────────────────── */}
           <AnalysisSection caseId={caseId} statusCode={statusCode} documents={documents} />
         </div>
-      </div>
-
-      {/* ── Floating Action Bar (Stitch Layout) ─────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-t border-gf-border flex items-center justify-end px-6 sm:px-10 z-30 shadow-lg">
-        <button
-          type="button"
-          onClick={() => {
-            // Re-trigger route refresh to re-evaluate documents analysis
-            window.location.reload();
-          }}
-          className="bg-gf-red hover:bg-gf-red-dark text-white px-6 h-11 rounded-xl font-semibold text-sm shadow-md transition-all flex items-center gap-2 active:scale-[0.98]"
-        >
-          <RotateCw className="w-4 h-4" />
-          <span>Re-ejecutar análisis</span>
-        </button>
       </div>
 
       {/* ── Drawers (Controlados por `open`) ──────────────────────────── */}
