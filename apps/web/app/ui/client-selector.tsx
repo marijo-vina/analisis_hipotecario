@@ -5,6 +5,7 @@ import type { Client } from "@/app/lib/definitions";
 
 interface ClientSelectorProps {
   clients: Client[];
+  initialClientId?: string;
 }
 
 /**
@@ -13,14 +14,32 @@ interface ClientSelectorProps {
  * The user types a name, email, or phone number to filter the client list
  * locally. Matching clients appear in a dropdown. On selection the chosen
  * client is displayed as a chip and a hidden input carries the UUID into
- * the parent form (name="clientId").
+ * the parent form (name="clientId"). Supports pre-selecting an initial client.
  */
-export default function ClientSelector({ clients }: ClientSelectorProps) {
+export default function ClientSelector({
+  clients,
+  initialClientId,
+}: ClientSelectorProps) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Client | null>(null);
+  const [selected, setSelected] = useState<Client | null>(() => {
+    if (initialClientId) {
+      return clients.find((c) => c.id === initialClientId) ?? null;
+    }
+    return null;
+  });
   const [isOpen, setIsOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sync initialClientId when prop or clients list is loaded/updated
+  useEffect(() => {
+    if (initialClientId && !selected) {
+      const match = clients.find((c) => c.id === initialClientId);
+      if (match) {
+        setSelected(match);
+      }
+    }
+  }, [initialClientId, clients, selected]);
 
   // Close dropdown on outside click
   useEffect(() => {

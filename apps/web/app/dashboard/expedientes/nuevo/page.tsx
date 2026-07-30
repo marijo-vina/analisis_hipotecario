@@ -2,13 +2,21 @@ import { apiFetch } from "@/app/lib/api";
 import type { Client, CreditType, PaginatedResponse } from "@/app/lib/definitions";
 import CaseForm from "@/app/ui/case-form";
 
+interface NuevoExpedientePageProps {
+  searchParams: Promise<{ clientId?: string }>;
+}
+
 /**
  * New mortgage case page — server component wrapper.
  *
  * Fetches available credit types and the client list from the backend.
- * Passes both lists as props to the redesigned CaseForm.
+ * Optionally reads `clientId` from query params (when navigated from Client Detail)
+ * and passes it down to pre-select the client.
  */
-export default async function NuevoExpedientePage() {
+export default async function NuevoExpedientePage({
+  searchParams,
+}: NuevoExpedientePageProps) {
+  const { clientId } = await searchParams;
   let creditTypes: CreditType[] = [];
   let clients: Client[] = [];
 
@@ -32,5 +40,12 @@ export default async function NuevoExpedientePage() {
     );
   }
 
-  return <CaseForm creditTypes={creditTypes} clients={clients} />;
+  return (
+    <CaseForm
+      creditTypes={creditTypes}
+      clients={clients}
+      initialClientId={clientId}
+    />
+  );
 }
+
