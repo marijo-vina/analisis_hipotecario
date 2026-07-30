@@ -2,23 +2,24 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import {
+  FileText,
+  Plus,
+  ChevronsLeft,
+  ChevronsRight,
+  Eye,
+  RotateCw,
+  X,
+  FileSpreadsheet,
+} from "lucide-react";
 import type { Document, DocumentType } from "@/app/lib/definitions";
-import Button from "@/app/ui/common/button";
 import StatusBadge from "@/app/ui/common/badge";
 import DocumentActions from "@/app/ui/documents/document-actions";
 import DocumentUpload from "@/app/ui/documents/document-upload";
 
-// ---------------------------------------------------------------------------
-// Category definitions
-//
-// Categories group document types by `code`. All categories are always shown
-// in the left list (even with 0 documents), in a fixed display order.
-// ---------------------------------------------------------------------------
-
 interface CategoryDef {
   key: string;
   label: string;
-  /** DocumentType.code values that belong to this category. */
   codes: string[];
 }
 
@@ -33,109 +34,20 @@ interface DocumentBrowserProps {
   caseId: string;
   documents: Document[];
   documentTypes: DocumentType[];
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-// ── Icono por tipo de documento ────────────────────────────────────────────
-function docTypeIcon(code: string): string {
-  switch (code) {
-    case "PAYROLL_RECEIPT":
-      return "💰";
-    case "INE":
-      return "🪪";
-    case "PASSPORT":
-      return "📘";
-    case "BANK_STATEMENT":
-      return "🏦";
-    case "CREDIT_BUREAU_REPORT":
-      return "📊";
-    case "CREDIT_SCORE":
-      return "🎯";
-    default:
-      return "📄";
-  }
-}
-
-/**
- * DocumentRow — fila compacta inline para un documento.
- *
- * Layout: icono + nombre (truncado) | status + fecha | acciones.
- * Usa DocumentActions existente para los botones.
- */
-function DocumentRow({
-  caseId,
-  document,
-}: {
-  caseId: string;
-  document: Document;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-0 py-1.5 border-b border-gf-border last:border-b-0 hover:bg-gf-bg transition-colors">
-      {/* Icono + nombre (truncado) */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span aria-hidden="true" className="shrink-0 text-base">
-          {docTypeIcon(document.documentType.code)}
-        </span>
-        <p
-          className="text-sm font-medium text-gf-text truncate"
-          title={document.originalName}
-        >
-          {document.originalName}
-        </p>
-      </div>
-
-      {/* Status + fecha */}
-      <div className="flex items-center gap-2 shrink-0">
-        <StatusBadge
-          code={document.documentStatus.code}
-          name={document.documentStatus.name}
-        />
-        <time
-          className="text-xs text-gf-text-muted shrink-0"
-          dateTime={document.createdAt}
-        >
-          {new Date(document.createdAt).toLocaleDateString("es-MX", {
-            day: "numeric",
-            month: "short",
-          })}
-        </time>
-      </div>
-
-      {/* Acciones */}
-      <div className="shrink-0">
-        <DocumentActions caseId={caseId} document={document} />
-      </div>
-    </div>
-  );
-}
-
-/**
- * DocumentBrowser — two-column layout for a case's documentation section.
- *
- * Left column (desktop ~240px): clickable category list with a circular
- * count badge per category. The active category is highlighted.
- *
- * Right column: header (selected category title + "+ Agregar"
- * button) followed by a compact list of inline document rows for the
- * selected category. Each row shows icon + name, status badge + date,
- * and the existing DocumentActions component for action buttons.
- *
- * On screens below 640px the category list collapses into a horizontal
- * pill row above the document grid (functional, not advanced mobile).
- *
- * "Agregar documento" opens a centered modal that wraps the existing
- * `DocumentUpload`. When a category is selected the document type is
- * pre-selected to the first matching type of that category (additive
- * `defaultDocumentTypeId` prop). A successful upload closes the modal
- * and refreshes the route so the new document appears.
- */
 export default function DocumentBrowser({
   caseId,
   documents,
   documentTypes,
+  isCollapsed = false,
+  onToggleCollapse,
 }: DocumentBrowserProps) {
   const router = useRouter();
 
-  // ── Category → documents map (memoized on documents) ──────────────────
+  // Category -> documents map
   const categoryData = useMemo(() => {
     return CATEGORIES.map((cat) => {
       const docs = documents.filter((d) => cat.codes.includes(d.documentType.code));
@@ -143,7 +55,6 @@ export default function DocumentBrowser({
     });
   }, [documents]);
 
-  // ── Initial selection: first category with documents, else Identificación
   const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>(() => {
     const firstWithDocs = categoryData.find((c) => c.count > 0);
     return firstWithDocs ? firstWithDocs.key : CATEGORIES[0].key;
@@ -154,8 +65,6 @@ export default function DocumentBrowser({
   const selectedCategory =
     categoryData.find((c) => c.key === selectedCategoryKey) ?? categoryData[0];
 
-  // ── Pre-selected document type for the upload modal ────────────────────
-  // First documentType whose code matches the active category, if any.
   const preselectedDocumentTypeId = useMemo(() => {
     if (!selectedCategory) return undefined;
     const match = documentTypes.find((dt) =>
@@ -164,7 +73,6 @@ export default function DocumentBrowser({
     return match ? String(match.id) : undefined;
   }, [selectedCategory, documentTypes]);
 
-  // ── Upload success: close modal + refresh so the new doc appears ──────
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     router.refresh();
@@ -172,18 +80,100 @@ export default function DocumentBrowser({
 
   const handleUploadClose = () => setUploadModalOpen(false);
 
+  // If sidebar is in collapsed state (60px)
+  if (isCollapsed) {
+    return (
+      <aside className="w-16 bg-white border-r border-gf-border flex flex-col items-center py-6 shrink-0 rounded-xl transition-all shadow-xs">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="p-2 rounded-xl text-gf-text-muted hover:text-gf-red hover:bg-gf-surface-dim transition-colors mb-6"
+          title="Expandir barra de documentos"
+        >
+          <ChevronsRight className="w-5 h-5" strokeWidth={2} />
+        </button>
+
+        <div className="flex flex-col gap-4 items-center flex-1">
+          {categoryData.map((cat) => {
+            const active = cat.key === selectedCategoryKey;
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryKey(cat.key);
+                  if (onToggleCollapse) onToggleCollapse();
+                }}
+                className={`relative p-2.5 rounded-xl transition-all ${
+                  active
+                    ? "bg-gf-red text-white shadow-2xs"
+                    : "bg-gf-surface-dim/50 text-gf-text-muted hover:bg-gf-surface-dim hover:text-gf-text"
+                }`}
+                title={`${cat.label} (${cat.count})`}
+              >
+                <FileText className="w-4 h-4" />
+                {cat.count > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-gf-red-soft text-gf-red text-[10px] font-bold rounded-full flex items-center justify-center border border-white">
+                    {cat.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setUploadModalOpen(true)}
+          className="p-2.5 rounded-xl bg-gf-red text-white hover:bg-gf-red-dark transition-all shadow-2xs mt-auto"
+          title="Agregar documento"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </aside>
+    );
+  }
+
+  // Expanded Sidebar Layout (320px)
   return (
-    <div className="flex flex-col sm:flex-row gap-4">
-      {/* ── Left column: category list (desktop) / pills (mobile) ─────── */}
-      <nav
-        aria-label="Categorías de documentos"
-        className="
-          sm:w-60 sm:shrink-0
-          flex sm:flex-col gap-2 sm:gap-1
-          overflow-x-auto sm:overflow-visible
-          pb-2 sm:pb-0
-        "
-      >
+    <aside className="w-full xl:w-[320px] bg-white border border-gf-border rounded-xl p-5 flex flex-col shrink-0 transition-all shadow-xs">
+      {/* Sidebar Header */}
+      <div className="flex items-center justify-between mb-4 border-b border-gf-border pb-3">
+        <h2 className="text-base font-bold text-gf-text flex items-center gap-2">
+          <span>Documentos</span>
+          <span className="text-xs text-gf-text-muted font-normal bg-gf-surface-dim px-2 py-0.5 rounded-full">
+            ({documents.length})
+          </span>
+        </h2>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg text-gf-text-muted hover:text-gf-text hover:bg-gf-surface-dim transition-colors"
+            title="Colapsar panel"
+          >
+            <ChevronsLeft className="w-4 h-4" strokeWidth={2} />
+          </button>
+        )}
+      </div>
+
+      {/* Action Header */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="font-semibold text-xs text-gf-text-muted uppercase tracking-wider">
+          Categorías
+        </span>
+        <button
+          type="button"
+          onClick={() => setUploadModalOpen(true)}
+          className="inline-flex items-center gap-1 text-xs font-semibold border border-gf-border rounded-lg px-2.5 py-1 text-gf-text hover:bg-gf-surface-dim transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5 text-gf-red" />
+          <span>Agregar</span>
+        </button>
+      </div>
+
+      {/* Category Tabs */}
+      <div className="space-y-2 mb-6">
         {categoryData.map((cat) => {
           const active = cat.key === selectedCategoryKey;
           return (
@@ -191,106 +181,107 @@ export default function DocumentBrowser({
               key={cat.key}
               type="button"
               onClick={() => setSelectedCategoryKey(cat.key)}
-              aria-current={active ? "true" : undefined}
-              className={`
-                shrink-0 sm:w-full
-                flex items-center justify-between gap-3
-                rounded-[var(--radius-sm)] border
-                px-3 py-1.5 text-sm text-left
-                transition-colors
-                ${
-                  active
-                    ? "bg-gf-red-soft/60 border-gf-red text-gf-text border-l-4"
-                    : "bg-gf-surface border-gf-border border-l-4 border-l-transparent text-gf-text hover:bg-gf-bg"
-                }
-              `}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                active
+                  ? "bg-white border-gf-red text-gf-red shadow-2xs"
+                  : "bg-white border-gf-border text-gf-text hover:bg-gf-surface-dim/40"
+              }`}
             >
-              <span className="font-medium whitespace-nowrap sm:whitespace-normal">
-                {cat.label}
-              </span>
+              <span>{cat.label}</span>
               <span
-                aria-label={`${cat.count} documento${cat.count === 1 ? "" : "s"}`}
-                className={`
-                  inline-flex items-center justify-center
-                  min-w-[1.5rem] h-6 px-1.5 rounded-full text-xs font-semibold
-                  ${
-                    active
-                      ? "bg-gf-red text-white"
-                      : "bg-gf-bg text-gf-text-muted"
-                  }
-                `}
+                className={`w-5 h-5 text-[10px] rounded-full flex items-center justify-center font-bold ${
+                  active
+                    ? "bg-gf-red text-white"
+                    : "bg-gf-surface-dim text-gf-text-muted"
+                }`}
               >
                 {cat.count}
               </span>
             </button>
           );
         })}
-      </nav>
+      </div>
 
-      {/* ── Right column: header + document grid ─────────────────────── */}
-      <section className="flex-1 min-w-0">
-        <header className="flex items-center justify-between gap-3 mb-4">
-          <h3 className="text-base font-semibold text-gf-text">
-            {selectedCategory?.label}
-          </h3>
-          <Button
-            variant="secondary"
-            onClick={() => setUploadModalOpen(true)}
-            type="button"
-          >
-            + Agregar
-          </Button>
-        </header>
+      {/* Active Category Documents List */}
+      <div className="space-y-3 flex-1 overflow-y-auto max-h-[420px] pr-1">
+        <h3 className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider mb-2">
+          {selectedCategory?.label} ({selectedCategory?.documents.length ?? 0})
+        </h3>
 
         {selectedCategory && selectedCategory.documents.length > 0 ? (
-          <div className="rounded-[var(--radius-md)] border border-gf-border bg-gf-surface px-3">
-            {selectedCategory.documents.map((doc) => (
-              <DocumentRow
-                key={doc.id}
-                caseId={caseId}
-                document={doc}
-              />
-            ))}
-          </div>
+          selectedCategory.documents.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex flex-col gap-3 bg-white border border-gf-border p-3.5 rounded-xl hover:border-gf-red/30 transition-all shadow-2xs"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0 mt-0.5">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <p
+                  className="text-xs font-semibold text-gf-text break-all leading-tight line-clamp-2"
+                  title={doc.originalName}
+                >
+                  {doc.originalName}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-gf-border/60">
+                <div className="flex flex-col gap-0.5">
+                  <StatusBadge
+                    code={doc.documentStatus.code}
+                    name={doc.documentStatus.name}
+                  />
+                  <span className="text-[10px] text-gf-text-muted mt-0.5">
+                    {new Date(doc.createdAt).toLocaleDateString("es-MX", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </span>
+                </div>
+                <DocumentActions caseId={caseId} document={doc} />
+              </div>
+            </div>
+          ))
         ) : (
-          <div className="rounded-[var(--radius-md)] border border-dashed border-gf-border bg-gf-bg/30 p-8 text-center">
-            <p className="text-sm text-gf-text-muted">
-              No hay documentos de este tipo. Usa el botón{" "}
-              <span className="font-medium text-gf-text">+ Agregar</span>{" "}
-              para subir uno.
+          <div className="bg-gf-surface-dim/30 border border-dashed border-gf-border p-6 rounded-xl text-center">
+            <p className="text-xs text-gf-text-muted">
+              No hay documentos en esta categoría.
             </p>
+            <button
+              type="button"
+              onClick={() => setUploadModalOpen(true)}
+              className="text-xs font-semibold text-gf-red hover:underline mt-2 inline-block"
+            >
+              + Subir documento
+            </button>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* ── Upload modal ──────────────────────────────────────────────── */}
+      {/* Upload Modal */}
       {uploadModalOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
           onClick={handleUploadClose}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="upload-dialog-title"
         >
           <div
-            className="w-full max-w-lg"
+            className="w-full max-w-lg bg-white rounded-2xl p-6 shadow-xl border border-gf-border relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Shell header — DocumentUpload renders its own Card body */}
-            <div className="flex items-center justify-between mb-3 px-1">
-              <h2
-                id="upload-dialog-title"
-                className="text-lg font-semibold text-gf-text"
-              >
+            <div className="flex items-center justify-between mb-4 border-b border-gf-border pb-3">
+              <h2 className="text-lg font-bold text-gf-text">
                 Agregar documento
               </h2>
               <button
                 type="button"
                 onClick={handleUploadClose}
                 aria-label="Cerrar"
-                className="text-gf-text-muted hover:text-gf-text text-2xl leading-none px-2"
+                className="p-1 rounded-lg text-gf-text-muted hover:text-gf-text hover:bg-gf-surface-dim transition-colors"
               >
-                &times;
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -303,6 +294,6 @@ export default function DocumentBrowser({
           </div>
         </div>
       )}
-    </div>
+    </aside>
   );
-}
+}

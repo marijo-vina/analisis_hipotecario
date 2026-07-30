@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-
+import { ArrowLeft, Pencil } from "lucide-react";
 import StatusBadge from "@/app/ui/common/badge";
-import Button from "@/app/ui/common/button";
 
 interface CaseDetailHeaderProps {
   caseId: string;
@@ -12,10 +11,10 @@ interface CaseDetailHeaderProps {
 }
 
 /**
- * CaseDetailHeader — encabezado compacto del workspace de expediente.
+ * CaseDetailHeader — encabezado estilizado del workspace de expediente según Stitch.
  *
- * Client component. Fila única (~52px) que contiene: flecha de retroceso,
- * breadcrumb, badge de estado y botón Editar.
+ * Contiene: navegación de retorno ("Volver al listado de expedientes"), ID corto formateado,
+ * StatusBadge con estilo del sistema y botón de edición rápida.
  */
 export default function CaseDetailHeader({
   caseId,
@@ -25,69 +24,34 @@ export default function CaseDetailHeader({
   const expLabel = `EXP-${caseId.slice(0, 8).toUpperCase()}`;
 
   return (
-    <header className="mb-3">
-      {/* ── Fila compacta ~52px ────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 min-h-[52px] flex-wrap">
-        {/* Flecha ← */}
+    <header className="h-16 bg-white border-b border-gf-border flex items-center justify-between px-4 sm:px-6 shrink-0 rounded-xl mb-6 shadow-2xs">
+      {/* Navigation Breadcrumb */}
+      <div className="flex items-center gap-3 text-sm">
         <Link
           href="/dashboard/expedientes"
-          aria-label="Volver a expedientes"
-          className="rounded-[var(--radius-sm)] p-1.5 text-gf-text-muted hover:text-gf-text hover:bg-gf-bg transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-gf-red/40 focus-visible:outline-none"
+          className="inline-flex items-center gap-2 text-gf-text-muted hover:text-gf-red font-semibold transition-colors group"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-5 h-5"
-            aria-hidden="true"
-          >
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" strokeWidth={2} />
+          <span>Volver al listado de expedientes</span>
         </Link>
+        <span className="text-gf-border select-none">|</span>
+        <span className="font-mono text-xs font-bold text-gf-red bg-gf-red-soft px-2 py-0.5 rounded-md">
+          {expLabel}
+        </span>
+      </div>
 
-        {/* Breadcrumb */}
-        <nav
-          className="flex items-center gap-1.5 text-sm text-gf-text-soft min-w-0"
-          aria-label="Breadcrumb"
-        >
-          <Link
-            href="/dashboard"
-            className="hover:text-gf-text transition-colors truncate"
-          >
-            Dashboard
-          </Link>
-          <span className="text-gf-text-soft select-none">/</span>
-          <Link
-            href="/dashboard/expedientes"
-            className="hover:text-gf-text transition-colors truncate"
-          >
-            Expedientes
-          </Link>
-          <span className="text-gf-text-soft select-none">/</span>
-          <span className="text-gf-text-muted font-medium truncate">
-            {expLabel}
-          </span>
-        </nav>
-
-        {/* Relleno flexible para empujar acciones a la derecha */}
-        <div className="flex-1" />
-
-        {/* Badge de estado */}
+      {/* Right Actions: Status Badge & Edit CTA */}
+      <div className="flex items-center gap-3">
         <StatusBadge code={statusCode} name={statusName} />
-
-        {/* Botón Editar */}
-        <Button
-          variant="secondary"
+        <Link
           href={`/dashboard/expedientes/${caseId}/editar`}
+          className="inline-flex items-center justify-center gap-2 bg-white border border-gf-border hover:bg-gf-surface-dim text-gf-text px-4 h-9 rounded-xl text-xs font-semibold transition-all shadow-2xs shrink-0 active:scale-[0.98]"
         >
-          Editar
-        </Button>
+          <Pencil className="w-3.5 h-3.5 text-gf-text-muted" />
+          <span>Editar</span>
+        </Link>
       </div>
     </header>
   );
 }
+
