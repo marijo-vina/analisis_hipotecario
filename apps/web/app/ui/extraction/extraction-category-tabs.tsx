@@ -49,4 +49,4 @@ export default function ExtractionCategoryTabs({
       </nav>
     </div>
   );
-}
+}
