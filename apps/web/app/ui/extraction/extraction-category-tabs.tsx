@@ -16,13 +16,6 @@ const TAB_ORDER: ExtractionCategory[] = [
   "buro",
 ];
 
-/**
- * ExtractionCategoryTabs — tab navigation for the extraction section.
- *
- * Controlled component: the parent (ExtractionSection) owns `activeTab` state
- * and passes `onChange` to update it. The active tab is highlighted; inactive
- * tabs are muted.
- */
 export default function ExtractionCategoryTabs({
   activeTab,
   onChange,
@@ -31,27 +24,38 @@ export default function ExtractionCategoryTabs({
     <div
       role="tablist"
       aria-label="Categorias de datos extraidos"
-      className="flex flex-wrap gap-1 border-b border-gf-border"
+      className="border-b border-gf-border mb-6 w-full"
     >
-      {TAB_ORDER.map((tab) => {
-        const isActive = tab === activeTab;
-        return (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onChange(tab)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              isActive
-                ? "border-gf-red text-gf-text"
-                : "border-transparent text-gf-text-muted hover:text-gf-text"
-            }`}
-          >
-            {CATEGORY_LABELS[tab]}
-          </button>
-        );
-      })}
+      <nav className="flex w-full overflow-x-auto">
+        {TAB_ORDER.map((tab) => {
+          const isActive = tab === activeTab;
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onChange(tab)}
+              className={`flex-1 min-w-[120px] pb-3 pt-2 text-sm transition-all border-b-2 flex items-center justify-center gap-2 ${
+                isActive
+                  ? "border-gf-red text-gf-red font-bold"
+                  : "border-transparent text-gf-text-muted hover:text-gf-text hover:border-gf-border font-semibold"
+              }`}
+            >
+              <span>{CATEGORY_LABELS[tab]}</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5 ${
+                  isActive
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-gf-surface-dim text-gf-text-muted"
+                }`}
+              >
+                ✓ 1/1
+              </span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
-}
+}
