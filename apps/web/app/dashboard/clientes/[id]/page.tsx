@@ -135,17 +135,10 @@ export default async function ClientDetailPage({
           <div className="flex items-center gap-3">
             <Link
               href={`/dashboard/clientes/${id}/editar`}
-              className="inline-flex items-center justify-center gap-2 bg-white border border-gf-border hover:bg-gf-surface-dim text-gf-text px-4 h-11 rounded-xl text-sm font-semibold transition-all shadow-2xs shrink-0"
+              className="inline-flex items-center justify-center gap-2 bg-white border border-gf-border hover:bg-gf-surface-dim text-gf-text px-5 h-11 rounded-xl text-sm font-semibold transition-all shadow-2xs shrink-0 active:scale-[0.98]"
             >
               <Pencil className="w-4 h-4 text-gf-text-muted" />
               <span>Editar cliente</span>
-            </Link>
-            <Link
-              href={`/dashboard/expedientes/nuevo?clientId=${id}`}
-              className="inline-flex items-center justify-center gap-2 bg-gf-red hover:bg-gf-red-dark text-white px-5 h-11 rounded-xl text-sm font-semibold transition-all shadow-xs shrink-0 whitespace-nowrap active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Crear expediente</span>
             </Link>
           </div>
         </div>
