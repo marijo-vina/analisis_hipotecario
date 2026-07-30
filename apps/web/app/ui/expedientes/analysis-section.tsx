@@ -7,7 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
-import { RotateCw, Loader2 } from "lucide-react";
+import { RotateCw, Loader2, FolderPlus, FileCheck } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -85,6 +85,11 @@ export default function AnalysisSection({
   const [activeTab, setActiveTab] = useState<TabId>("validaciones");
   const [state, setState] = useState<UiState>({ phase: "loading" });
 
+  const hasUploadedDocs = documents.length > 0;
+  const hasProcessedDocs = documents.some(
+    (d) => d.documentStatus.code === "PROCESSED",
+  );
+
   // Determinar si el resultado tiene observaciones
   const isObservations = useCallback((run: AnalysisRun): boolean => {
     const bv = run.detail.bankViability;
@@ -120,6 +125,7 @@ export default function AnalysisSection({
 
   // Disparar análisis
   const handleAnalyze = async () => {
+    if (!hasProcessedDocs) return;
     setState({ phase: "analyzing" });
     const res = await triggerAnalysis(caseId);
     if (!res.success || !res.data) {
@@ -140,6 +146,20 @@ export default function AnalysisSection({
 
   // ── Button label/variant based on phase ─────────────────────────────────
   const headerButton = (() => {
+    if (!hasProcessedDocs) {
+      return (
+        <button
+          type="button"
+          disabled
+          title="Se requiere procesar al menos un documento antes de ejecutar el análisis"
+          className="bg-gray-100 text-gray-400 border border-gray-200 px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm cursor-not-allowed inline-flex items-center gap-2"
+        >
+          <RotateCw className="w-3.5 h-3.5 opacity-50" />
+          <span>Analizar expediente</span>
+        </button>
+      );
+    }
+
     switch (state.phase) {
       case "idle":
         return (
@@ -193,7 +213,44 @@ export default function AnalysisSection({
 
   const isAnalyzing = state.phase === "analyzing";
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Onboarding Cards cuando falta información ───────────────────────────
+  if (!hasUploadedDocs) {
+    return (
+      <div className="bg-white border border-gf-border rounded-xl p-8 shadow-xs text-center space-y-3 my-8">
+        <div className="w-12 h-12 rounded-full bg-gf-red-soft text-gf-red flex items-center justify-center mx-auto">
+          <FolderPlus className="w-6 h-6" />
+        </div>
+        <div className="max-w-md mx-auto space-y-1">
+          <h3 className="text-base font-bold text-gf-text">
+            Paso 1: Sube la documentación del cliente
+          </h3>
+          <p className="text-xs text-gf-text-muted leading-relaxed">
+            Este expediente aún no cuenta con documentos subidos. Usa el botón <span className="font-semibold text-gf-text">+ Agregar</span> o el panel lateral izquierdo para cargar la identificación, nómina o estados de cuenta.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasProcessedDocs) {
+    return (
+      <div className="bg-white border border-gf-border rounded-xl p-8 shadow-xs text-center space-y-3 my-8">
+        <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center mx-auto">
+          <FileCheck className="w-6 h-6" />
+        </div>
+        <div className="max-w-md mx-auto space-y-1">
+          <h3 className="text-base font-bold text-gf-text">
+            Paso 2: Procesa los documentos cargados
+          </h3>
+          <p className="text-xs text-gf-text-muted leading-relaxed">
+            Los documentos han sido subidos pero aún no se han procesado. Haz clic en el icono de procesamiento (<span className="font-semibold text-gf-text">▶ Procesar</span>) en el panel lateral de cada documento para extraer su información.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render Normal de Análisis ───────────────────────────────────────────
 
   return (
     <div className="mb-4 mt-8">
