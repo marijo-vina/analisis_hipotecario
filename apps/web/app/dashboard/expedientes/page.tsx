@@ -1,9 +1,6 @@
 import { apiFetch } from "@/app/lib/api";
 import type { MortgageCase, PaginatedResponse } from "@/app/lib/definitions";
-import Pagination from "@/app/ui/pagination";
 import ErrorMessage from "@/app/ui/error-message";
-import PageHeader from "@/app/ui/common/page-header";
-import Button from "@/app/ui/common/button";
 import CasesTable from "@/app/ui/cases-table";
 
 interface CasesPageProps {
@@ -13,9 +10,8 @@ interface CasesPageProps {
 /**
  * Mortgage case list page — server component.
  *
- * Fetches paginated case data from the backend and renders a PageHeader
- * with action button, a CasesTable client component with filter dropdowns,
- * and Pagination controls. Error and empty states are handled inline.
+ * Fetches paginated case data from the backend and renders the redesigned
+ * CasesTable matching the Stitch "Expedientes - Gestión Financiera" specification.
  */
 export default async function CasesPage({ searchParams }: CasesPageProps) {
   const params = await searchParams;
@@ -29,28 +25,12 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
     `/mortgage-cases?page=${page}&limit=${limit}`,
   );
 
-  // Shared header rendered in all states
-  const header = (
-    <PageHeader
-      breadcrumbs={[
-        { label: "Dashboard", href: "/dashboard" },
-        { label: "Expedientes" },
-      ]}
-      title="Expedientes"
-      action={
-        <Button variant="primary" href="/dashboard/expedientes/nuevo">
-          Nuevo expediente
-        </Button>
-      }
-    />
-  );
-
   // ── Error state ───────────────────────────────────────────────────────
   if (!result.ok) {
     return (
-      <div>
-        {header}
-        <ErrorMessage message="Error al cargar expedientes" />
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-gf-text">Expedientes</h1>
+        <ErrorMessage message="Error al cargar la lista de expedientes." />
       </div>
     );
   }
@@ -58,18 +38,12 @@ export default async function CasesPage({ searchParams }: CasesPageProps) {
   const { data: cases, meta } = result.data;
 
   return (
-    <div>
-      {header}
-
-      <CasesTable cases={cases} />
-
-      {meta.total > limit && (
-        <Pagination
-          currentPage={page}
-          totalPages={Math.ceil(meta.total / limit)}
-          basePath="/dashboard/expedientes"
-        />
-      )}
-    </div>
+    <CasesTable
+      cases={cases}
+      total={meta.total}
+      page={page}
+      limit={limit}
+    />
   );
 }
+

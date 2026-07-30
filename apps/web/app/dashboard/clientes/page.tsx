@@ -1,9 +1,6 @@
 import { apiFetch } from "@/app/lib/api";
 import type { Client, PaginatedResponse } from "@/app/lib/definitions";
-import Pagination from "@/app/ui/pagination";
 import ErrorMessage from "@/app/ui/error-message";
-import PageHeader from "@/app/ui/common/page-header";
-import Button from "@/app/ui/common/button";
 import ClientsTable from "@/app/ui/clients-table";
 
 interface ClientsPageProps {
@@ -13,9 +10,8 @@ interface ClientsPageProps {
 /**
  * Client list page — server component.
  *
- * Fetches paginated client data from the backend, then renders a
- * PageHeader with breadcrumb + "Nuevo cliente" action, a search
- * input that filters client-side, and a DataTable with pagination.
+ * Fetches paginated client data from the backend and renders the redesigned
+ * ClientsTable matching the Stitch "Gestión de clientes - listado detallado" specification.
  */
 export default async function ClientsPage({
   searchParams,
@@ -34,15 +30,9 @@ export default async function ClientsPage({
   // ---- Error state --------------------------------------------------------
   if (!result.ok) {
     return (
-      <div>
-        <PageHeader
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Clientes" },
-          ]}
-          title="Clientes"
-        />
-        <ErrorMessage message="Error al cargar clientes" />
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-gf-text">Clientes</h1>
+        <ErrorMessage message="Error al cargar la lista de clientes." />
       </div>
     );
   }
@@ -50,27 +40,11 @@ export default async function ClientsPage({
   const { data: clients, meta } = result.data;
 
   return (
-    <div>
-      {/* Page header with breadcrumb + CTA */}
-      <PageHeader
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Clientes" },
-        ]}
-        title="Clientes"
-      />
-
-      {/* Search + table — client component for interactive filtering */}
-      <ClientsTable clients={clients} />
-
-      {/* Pagination — only shown when there are clients */}
-      {clients.length > 0 && (
-        <Pagination
-          currentPage={page}
-          totalPages={Math.ceil(meta.total / limit)}
-          basePath="/dashboard/clientes"
-        />
-      )}
-    </div>
+    <ClientsTable
+      clients={clients}
+      total={meta.total}
+      page={page}
+      limit={limit}
+    />
   );
 }
