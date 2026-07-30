@@ -2,42 +2,26 @@
 
 import { useState, useCallback, useRef } from "react";
 import type { DocumentType } from "@/app/lib/definitions";
-import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
+import { FileText, X, UploadCloud } from "lucide-react";
 
 interface DocumentUploadProps {
   caseId: string;
   documentTypes: DocumentType[];
   onSuccess: () => void;
-  /**
-   * Optional pre-selected document type id. When provided, the type
-   * selector initializes to this value instead of the empty placeholder.
-   * The user can still change the selection. Additive and backward
-   * compatible — existing callers that omit this prop behave as before.
-   */
   defaultDocumentTypeId?: string;
 }
 
-/**
- * Client component for uploading documents to a mortgage case.
- *
- * Renders a Card-wrapped form with a drag-and-drop zone (or browse file
- * button), a document type selector dropdown, file info display, and a
- * primary submit button. Posts FormData to the existing Next.js Route
- * Handler which proxies to the NestJS upload endpoint.
- *
- * Preserves the existing upload API call — only the UI is redesigned.
- */
 export default function DocumentUpload({
   caseId,
   documentTypes,
   onSuccess,
   defaultDocumentTypeId,
 }: DocumentUploadProps) {
-  const [file, setFile] = useState<File | null>(null);
-  // Initialize from pre-select prop when provided and valid; otherwise empty.
+  const [files, setFiles] = useState<File[]>([]);
   const [documentTypeId, setDocumentTypeId] = useState<string>(
-    defaultDocumentTypeId && documentTypes.some((dt) => dt.id === Number(defaultDocumentTypeId))
+    defaultDocumentTypeId &&
+      documentTypes.some((dt) => dt.id === Number(defaultDocumentTypeId))
       ? defaultDocumentTypeId
       : "",
   );
@@ -64,21 +48,29 @@ export default function DocumentUpload({
     e.stopPropagation();
     setDragOver(false);
 
-    const dropped = e.dataTransfer.files?.[0] ?? null;
-    if (dropped) {
-      setFile(dropped);
+    const droppedFiles = Array.from(e.dataTransfer.files ?? []);
+    if (droppedFiles.length > 0) {
+      setFiles((prev) => [...prev, ...droppedFiles]);
       setError(null);
     }
   }, []);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = e.target.files?.[0] ?? null;
-      setFile(selected);
-      setError(null);
+      const selectedFiles = Array.from(e.target.files ?? []);
+      if (selectedFiles.length > 0) {
+        setFiles((prev) => [...prev, ...selectedFiles]);
+        setError(null);
+      }
+      // Reset input value to allow selecting same file again if deleted
+      if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [],
   );
+
+  const removeFile = useCallback((indexToRemove: number) => {
+    setFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  }, []);
 
   // ---- Submit -------------------------------------------------------------
   const handleSubmit = useCallback(
@@ -86,64 +78,76 @@ export default function DocumentUpload({
       e.preventDefault();
       setError(null);
 
-      if (!file) {
-        setError("Selecciona un archivo");
+      if (files.length === 0) {
+        setError("Selecciona al menos un archivo.");
         return;
       }
       if (!documentTypeId) {
-        setError("Selecciona un tipo de documento");
+        setError("Selecciona el tipo de documento.");
         return;
       }
 
       setLoading(true);
 
+      let successCount = 0;
+      const uploadErrors: string[] = [];
+
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("documentTypeId", documentTypeId);
+        for (const f of files) {
+          const formData = new FormData();
+          formData.append("file", f);
+          formData.append("documentTypeId", documentTypeId);
 
-        const res = await fetch(
-          `/api/mortgage-cases/${caseId}/documents/upload`,
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
+          const res = await fetch(
+            `/api/mortgage-cases/${caseId}/documents/upload`,
+            {
+              method: "POST",
+              body: formData,
+            },
+          );
 
-        const body = await res.json();
-
-        if (!res.ok) {
-          const msg =
-            typeof body.message === "string"
-              ? body.message
-              : "Error al subir el documento.";
-          setError(msg);
-          return;
+          if (res.ok) {
+            successCount++;
+          } else {
+            const body = await res.json().catch(() => ({}));
+            uploadErrors.push(
+              typeof body.message === "string"
+                ? body.message
+                : `Error al subir ${f.name}`,
+            );
+          }
         }
 
-        // Success — reset form and notify parent
-        setFile(null);
-        setDocumentTypeId("");
-        onSuccess();
+        if (successCount > 0) {
+          setFiles([]);
+          setDocumentTypeId("");
+          onSuccess();
+        }
+
+        if (uploadErrors.length > 0) {
+          setError(uploadErrors.join(" | "));
+        }
       } catch {
         setError("No se pudo conectar con el servidor.");
       } finally {
         setLoading(false);
       }
     },
-    [file, documentTypeId, caseId, onSuccess],
+    [files, documentTypeId, caseId, onSuccess],
   );
 
-  return (
-    <Card>
-      <h3 className="text-lg font-semibold text-gf-text mb-4">
-        Cargar documento
-      </h3>
+  const submitLabel = (() => {
+    if (loading) return "Subiendo...";
+    if (files.length <= 1) return "Subir documento";
+    return `Subir ${files.length} documentos`;
+  })();
 
+  return (
+    <div className="space-y-4">
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"
+          className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-medium text-red-700"
         >
           {error}
         </div>
@@ -154,7 +158,7 @@ export default function DocumentUpload({
         <div>
           <label
             htmlFor="documentTypeId"
-            className="block text-sm font-medium text-gf-text mb-1"
+            className="block text-xs font-semibold text-gf-text mb-1"
           >
             Tipo de documento
           </label>
@@ -166,10 +170,9 @@ export default function DocumentUpload({
               setError(null);
             }}
             disabled={loading}
-            className="block w-full rounded-[var(--radius-sm)] border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-sm focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50"
-            style={{ height: 'var(--input-height)' }}
+            className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
           >
-            <option value="">-- Seleccionar --</option>
+            <option value="">-- Seleccionar categoría --</option>
             {documentTypes.map((dt) => (
               <option key={dt.id} value={dt.id}>
                 {dt.name}
@@ -180,15 +183,15 @@ export default function DocumentUpload({
 
         {/* Drag-and-drop zone / file input */}
         <div>
-          <label className="block text-sm font-medium text-gf-text mb-1">
-            Archivo
+          <label className="block text-xs font-semibold text-gf-text mb-1">
+            Archivos ({files.length})
           </label>
 
           <div
-            className={`border-2 border-dashed rounded-[var(--radius-md)] p-6 text-center transition-colors cursor-pointer ${
+            className={`border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer ${
               dragOver
-                ? 'border-gf-red bg-gf-red-soft/50'
-                : 'border-gf-border bg-gf-bg/30 hover:border-gf-red hover:bg-gf-red-soft/20'
+                ? "border-gf-red bg-gf-red-soft/40"
+                : "border-gf-border bg-gf-bg/30 hover:border-gf-red/60 hover:bg-gf-surface-dim/40"
             }`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -199,46 +202,68 @@ export default function DocumentUpload({
               ref={fileInputRef}
               id="file"
               type="file"
+              multiple
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={handleFileChange}
               disabled={loading}
               className="hidden"
             />
 
-            {file ? (
-              <div className="text-sm text-gf-text">
-                <p className="font-medium break-all">{file.name}</p>
-                <p className="text-gf-text-muted text-xs mt-0.5">
-                  {(file.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm text-gf-text-muted mb-1">
-                  Arrastra el archivo aquí o
-                </p>
-                <span className="text-sm font-medium text-gf-red hover:text-gf-red-dark underline">
-                  selecciona un archivo
-                </span>
-              </div>
-            )}
+            <UploadCloud className="w-8 h-8 text-gf-text-muted mx-auto mb-1.5 stroke-[1.5]" />
+
+            <p className="text-xs text-gf-text-muted mb-1 font-medium">
+              Arrastra tus archivos aquí o
+            </p>
+            <span className="text-xs font-bold text-gf-red hover:underline">
+              selecciona varios archivos
+            </span>
           </div>
 
-          <p className="mt-1.5 text-xs text-gf-text-muted">
-            PDF, JPG, PNG hasta 10MB
+          <p className="mt-1 text-[11px] text-gf-text-muted">
+            PDF, JPG, PNG hasta 10MB cada uno. Puedes seleccionar múltiples archivos.
           </p>
         </div>
 
-        {/* Upload button */}
+        {/* Lista de archivos seleccionados */}
+        {files.length > 0 && (
+          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            {files.map((file, idx) => (
+              <div
+                key={`${file.name}-${idx}`}
+                className="flex items-center justify-between p-2 rounded-lg bg-gf-surface-dim/50 border border-gf-border text-xs"
+              >
+                <div className="flex items-center gap-2 truncate pr-2">
+                  <FileText className="w-4 h-4 text-gf-text-muted shrink-0" />
+                  <span className="font-semibold text-gf-text truncate">
+                    {file.name}
+                  </span>
+                  <span className="text-gf-text-muted text-[10px] shrink-0">
+                    ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFile(idx)}
+                  className="text-gf-text-muted hover:text-red-600 p-1 rounded-md transition-colors"
+                  title="Quitar archivo"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Submit Button */}
         <Button
           variant="primary"
           type="submit"
-          disabled={loading || !file || !documentTypeId}
+          disabled={loading || files.length === 0 || !documentTypeId}
           loading={loading}
         >
-          {loading ? "Subiendo..." : "Subir documento"}
+          {submitLabel}
         </Button>
       </form>
-    </Card>
+    </div>
   );
 }
