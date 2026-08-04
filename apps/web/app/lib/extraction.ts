@@ -19,9 +19,9 @@ export type ExtractionCategory = "identidad" | "nomina" | "estados" | "buro";
 
 export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
   identidad: "Identidad",
-  nomina: "Nomina",
+  nomina: "Recibos de nómina",
   estados: "Estados de cuenta",
-  buro: "Buro",
+  buro: "Buró de crédito",
 };
 
 /**
