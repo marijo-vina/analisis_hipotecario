@@ -39,16 +39,16 @@ export default function FieldGrid({
 }: FieldGridProps) {
   return (
     <dl
-      className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${className}`}
+      className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${className}`}
     >
       {fields.map((field) => (
-        <div key={field.label}>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-gf-text-muted">
+        <div key={field.label} className="flex flex-col justify-start">
+          <dt className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted">
             {field.label}
           </dt>
-          <dd className="mt-1 flex items-center gap-2 text-sm text-gf-text">
+          <dd className="mt-0.5 flex flex-wrap items-center gap-2 text-xs font-semibold text-gf-text">
             {field.missing || !field.value || field.value.length === 0 ? (
-              <span className="text-gf-text-muted">&mdash;</span>
+              <span className="text-gf-text-muted font-normal">&mdash;</span>
             ) : (
               <span className="break-words">{field.value}</span>
             )}

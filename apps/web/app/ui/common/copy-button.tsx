@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { Copy, Check } from "lucide-react";
 
 interface CopyButtonProps {
   /** Text to copy to clipboard. */
@@ -40,47 +41,23 @@ export default function CopyButton({
       type="button"
       onClick={handleCopy}
       disabled={disabled}
-      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors border ${
+      className={`inline-flex items-center gap-1.5 rounded-[10px] px-2.5 py-1 text-xs font-semibold transition-all border shadow-2xs ${
         disabled
-          ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300"
+          ? "cursor-not-allowed border-gf-border/50 bg-gf-surface-dim text-gf-text-muted/50"
           : copied
-            ? "border-green-300 bg-green-50 text-green-700"
-            : "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+            : "border-gf-border bg-white text-gf-text hover:bg-gf-surface-dim hover:border-gf-border/80 active:scale-[0.98]"
       }`}
     >
       {copied ? (
         <>
-          <svg
-            className="h-3 w-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          Copiado
+          <Check className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Copiado</span>
         </>
       ) : (
         <>
-          <svg
-            className="h-3 w-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-            />
-          </svg>
-          {label}
+          <Copy className="h-3.5 w-3.5 text-gf-text-muted" />
+          <span>{label}</span>
         </>
       )}
     </button>

@@ -1,4 +1,5 @@
 import type { CorrectionSource } from "@/app/lib/extraction";
+import { Check, AlertCircle } from "lucide-react";
 
 interface ManualCorrectionIndicatorProps {
   source: CorrectionSource;
@@ -20,33 +21,17 @@ export default function ManualCorrectionIndicator({
 
   if (source === "PENDING") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-        <span
-          className="inline-block h-2 w-2 rounded-full bg-amber-500"
-          aria-hidden="true"
-        />
-        Pendiente
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-semibold">
+        <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" aria-hidden="true" />
+        <span>Pendiente</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-      <svg
-        className="h-3 w-3"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M5 13l4 4L19 7"
-        />
-      </svg>
-      Editado manualmente
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
+      <Check className="h-3 w-3 text-emerald-600 shrink-0" aria-hidden="true" />
+      <span>Editado manualmente</span>
     </span>
   );
 }

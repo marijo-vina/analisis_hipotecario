@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/app/lib/api";
 
 /**
@@ -396,4 +397,37 @@ export async function extractCreditScore(
   }
 
   return result.data.data;
+}
+
+/**
+ * Actualiza manualmente un campo extraído de un documento.
+ *
+ * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/extracted-data`
+ * del backend NestJS y revalida la ruta del expediente.
+ */
+export async function updateDocumentExtractedDataField(
+  caseId: string,
+  documentId: string,
+  label: string,
+  value: string,
+): Promise<{ success: boolean; extractedData: Record<string, unknown> }> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extracted-data`,
+    {
+      method: "PATCH",
+      body: { label, value },
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ??
+        "Error al actualizar los datos extraídos del documento",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+  return { success: true, extractedData: result.data.data };
 }

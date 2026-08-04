@@ -332,6 +332,80 @@ export class DocumentsService {
     });
   }
 
+  /**
+   * Persists a manual edit to an extracted field in Document.extractedData.
+   * Updates identity/ineValidation/manualCorrections structures.
+   */
+  async updateExtractedDataField(
+    caseId: string,
+    documentId: string,
+    label: string,
+    value: string,
+  ): Promise<Record<string, unknown>> {
+    const doc = await this.findOneByCase(caseId, documentId);
+    if (!doc) {
+      throw new NotFoundException(`Document ${documentId} not found`);
+    }
+
+    const currentData = (doc.extractedData as Record<string, any>) || {};
+    const identity = { ...(currentData.identity || {}) };
+    const ineValidation = { ...(currentData.ineValidation || {}) };
+    const manualCorrections = { ...(currentData.manualCorrections || {}) };
+
+    const normalizedLabel = label.trim().toLowerCase();
+
+    if (normalizedLabel === 'nombre completo' || normalizedLabel === 'nombre') {
+      identity.fullName = value;
+    } else if (normalizedLabel === 'fecha de nacimiento') {
+      identity.birthDate = value;
+    } else if (normalizedLabel === 'curp') {
+      identity.curp = value;
+    } else if (normalizedLabel === 'clave de elector') {
+      identity.voterKey = value;
+    } else if (
+      normalizedLabel === 'numero de documento' ||
+      normalizedLabel === 'número de documento'
+    ) {
+      identity.idNumber = value;
+    } else if (normalizedLabel === 'vigencia') {
+      identity.visibleExpirationDate = value;
+      identity.expirationDate = value;
+    } else if (normalizedLabel === 'tipo de documento') {
+      identity.idType = value;
+    } else if (normalizedLabel === 'cic') {
+      ineValidation.cic = value;
+    } else if (
+      normalizedLabel === 'identificador del ciudadano' ||
+      normalizedLabel === 'identificador de ciudadano'
+    ) {
+      ineValidation.citizenIdentifier = value;
+    } else {
+      identity[label] = value;
+    }
+
+    manualCorrections[label] = {
+      value,
+      source: 'MANUAL',
+      updatedAt: new Date().toISOString(),
+    };
+
+    const newExtractedData = {
+      ...currentData,
+      identity,
+      ineValidation,
+      manualCorrections,
+    };
+
+    const updatedDoc = await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        extractedData: newExtractedData as any,
+      },
+    });
+
+    return updatedDoc.extractedData as Record<string, unknown>;
+  }
+
   private async resolveStatusId(code: string): Promise<number> {
     const status = await this.prisma.documentStatus.findUnique({
       where: { code },
