@@ -1086,10 +1086,10 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
       {/* ── Risk Filter Chips ─────────────────────────────────────────── */}
       <RiskChips parsed={parsed} />
 
-      {/* ── Main Body (Responsive Grid 2-column or stacked) ───────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+      {/* ── Main Body (Responsive Flex Layout with items-start) ──────── */}
+      <div className="flex flex-col xl:flex-row gap-5 items-start">
         {/* Left Column: Tables */}
-        <div className="xl:col-span-8 2xl:col-span-9 space-y-5 min-w-0">
+        <div className="flex-1 min-w-0 space-y-5">
           <CreditsTable
             parsed={parsed}
             caseId={caseId}
@@ -1098,7 +1098,7 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
         </div>
 
         {/* Right Column / Stacked: Sidebar Cards */}
-        <div className="xl:col-span-4 2xl:col-span-3 min-w-0 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-5">
+        <div className="w-full xl:w-80 shrink-0 space-y-5">
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
           <BuroBehaviorLegend />
