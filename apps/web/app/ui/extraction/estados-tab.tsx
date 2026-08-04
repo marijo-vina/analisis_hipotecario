@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Document } from "@/app/lib/definitions";
 import { parseBankStatements } from "@/app/lib/extraction";
 import EmptyState from "@/app/ui/common/empty-state";
@@ -14,14 +17,18 @@ interface EstadosTabProps {
 /**
  * EstadosTab — renders bank statement extraction data.
  *
- * Composes: summary bar → statement cards (expandable) → providers
- * (horizontal scroll) → conciliación with payroll → months coverage
- * + other movements.
+ * Single-accordion logic: all cards are collapsed by default (`expandedId: null`),
+ * and only one card can be expanded at a time.
  */
 export default function EstadosTab({
   documents,
 }: EstadosTabProps) {
   const parsed = parseBankStatements(documents);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const toggleStatement = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
 
   if (!parsed.summary) {
     return (
@@ -44,7 +51,12 @@ export default function EstadosTab({
 
       {/* ── Statement cards ──────────────────────────────────────────── */}
       {parsed.statements.map((stmt) => (
-        <EstadosStatementCard key={stmt.documentId} statement={stmt} />
+        <EstadosStatementCard
+          key={stmt.documentId}
+          statement={stmt}
+          isExpanded={expandedId === stmt.documentId}
+          onToggle={() => toggleStatement(stmt.documentId)}
+        />
       ))}
 
       {/* ── Providers (only when >0) ─────────────────────────────────── */}

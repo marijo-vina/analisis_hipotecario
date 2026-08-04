@@ -18,6 +18,8 @@ import type { ParsedBankStatement } from "@/app/lib/extraction";
 
 interface EstadosStatementCardProps {
   statement: ParsedBankStatement;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
 /**
@@ -25,6 +27,8 @@ interface EstadosStatementCardProps {
  */
 export default function EstadosStatementCard({
   statement,
+  isExpanded,
+  onToggle,
 }: EstadosStatementCardProps) {
   const visibleAlerts = statement.alerts.filter(
     (a) => a.code !== "BANK_FEWER_MONTHS_THAN_REQUIRED",
@@ -33,7 +37,9 @@ export default function EstadosStatementCard({
     (a) => a.severity === "CRITICAL",
   );
 
-  const [expanded, setExpanded] = useState<boolean>(true);
+  const [internalExpanded, setInternalExpanded] = useState<boolean>(false);
+  const expanded = isExpanded !== undefined ? isExpanded : internalExpanded;
+  const handleToggle = onToggle ?? (() => setInternalExpanded((prev) => !prev));
 
   const bankInitial = statement.bankName?.charAt(0).toUpperCase() ?? "?";
 
@@ -126,7 +132,7 @@ export default function EstadosStatementCard({
     <div className="bg-white rounded-xl border border-gf-border shadow-2xs overflow-hidden transition-all">
       {/* ── Header Row (Stitch Layout) ──────────────────────────────── */}
       <div
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         className="px-5 py-4 bg-white hover:bg-gf-surface-dim/60 flex items-center justify-between cursor-pointer transition-colors select-none border-b border-gf-border/50"
       >
         <div className="flex items-center gap-4 min-w-0">
