@@ -1176,8 +1176,33 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
   const buroDocs = documents.filter(
     (d) => d.documentType.code === "CREDIT_BUREAU_REPORT",
   );
+  const scoreDocs = documents.filter(
+    (d) => d.documentType.code === "CREDIT_SCORE",
+  );
 
-  if (buroDocs.length === 0) return null;
+  if (buroDocs.length === 0 && scoreDocs.length === 0) return null;
+
+  // Fallback: If only CREDIT_SCORE doc exists without CREDIT_BUREAU_REPORT yet
+  if (buroDocs.length === 0) {
+    const scoreDoc = scoreDocs[0];
+    const base = emptyBuro(scoreDoc);
+    if (!scoreDoc.extractedData) return base;
+    const sdEd = scoreDoc.extractedData as Record<string, unknown>;
+    const sdScore = (sdEd.score as number) ?? null;
+    const scoreIsExcluded = sdScore != null && sdScore < 0;
+    return {
+      ...base,
+      hasData: sdScore != null,
+      score: sdScore,
+      scoreIsExcluded,
+      scoreExclusionReason: scoreIsExcluded
+        ? ((sdEd.scoreExclusionReason as string) ??
+          SCORE_EXCLUSION_LABELS[sdScore as number] ??
+          `Exclusión código ${sdScore}`)
+        : null,
+      scoreSource: "CREDIT_SCORE",
+    };
+  }
 
   // Take the first (and typically only) credit bureau document
   const doc = buroDocs[0];
@@ -1219,9 +1244,6 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
   // ── Score merge: prefer CREDIT_SCORE document, fall back to bureau ─────
   // MRG-001/002/003/004: score comes from a separate "Mi Score" document.
   // The bureau report's publicScore is always null (score bleed prevention).
-  const scoreDocs = documents.filter(
-    (d) => d.documentType.code === "CREDIT_SCORE",
-  );
   let score: number | null = null;
   let scoreSource: string | null = null;
   let scoreDocData: Record<string, unknown> | null = null;
