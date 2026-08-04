@@ -892,6 +892,10 @@ function CreditsTable({
 // 6. Leyenda de Comportamiento MOP
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 6. Leyenda de Comportamiento MOP (Sidebar)
+// ---------------------------------------------------------------------------
+
 function BuroBehaviorLegend() {
   return (
     <div className="bg-white border border-gf-border rounded-xl p-5 shadow-2xs space-y-3">
@@ -899,26 +903,26 @@ function BuroBehaviorLegend() {
         Información sobre el comportamiento
       </h4>
       <p className="text-xs text-gf-text-muted leading-relaxed">
-        El comportamiento de cada una de sus cuentas, tanto activas como cerradas, se traduce en un ícono en la columna de Comportamiento. Pasa el cursor o haz clic en el ícono para ver la clave detallada.
+        El comportamiento de cada una de sus cuentas se traduce en un ícono en la columna de Comportamiento. Pasa el cursor o haz clic en el ícono para ver la clave detallada.
       </p>
 
-      <div className="flex flex-wrap gap-5 items-center text-xs font-semibold pt-1">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-6 rounded-lg bg-[#99cc00] text-gf-text flex items-center justify-center shadow-2xs">
+      <div className="space-y-2.5 pt-1 text-xs font-semibold">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-6 rounded-lg bg-[#99cc00] text-gf-text flex items-center justify-center shadow-2xs shrink-0">
             <Smile className="h-4 w-4" />
           </div>
           <span className="text-gf-text">CUENTA AL CORRIENTE</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-6 rounded-lg bg-[#ffd54f] text-gf-text flex items-center justify-center shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-6 rounded-lg bg-[#ffd54f] text-gf-text flex items-center justify-center shadow-2xs shrink-0">
             <Meh className="h-4 w-4" />
           </div>
           <span className="text-gf-text">ATRASO DE 1 A 89 DÍAS</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-6 rounded-lg bg-[#ff6b6b] text-white flex items-center justify-center shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-6 rounded-lg bg-[#ff6b6b] text-white flex items-center justify-center shadow-2xs shrink-0">
             <Frown className="h-4 w-4" />
           </div>
           <span className="text-gf-text">ATRASADO MAYOR A 90 DÍAS, QUITA O QUEBRANTO</span>
@@ -929,7 +933,7 @@ function BuroBehaviorLegend() {
 }
 
 // ---------------------------------------------------------------------------
-// 7. Sidebar Derecha (Datos del Acreditado y Alertas)
+// 7. Sidebar Derecha (Datos del Acreditado, Alertas y Leyenda)
 // ---------------------------------------------------------------------------
 
 function BorrowerInfoCard({ parsed }: { parsed: ParsedCreditBureau }) {
@@ -1093,20 +1097,20 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
 
       {/* ── Two Column Main Body ──────────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row gap-5">
-        {/* Left Column: Tables & Legend */}
-        <div className="flex-1 min-w-0 space-y-5">
+        {/* Left Column: Tables */}
+        <div className="flex-1 min-w-0">
           <CreditsTable
             parsed={parsed}
             caseId={caseId}
             onPaymentDueUpdate={handlePaymentDueUpdate}
           />
-          <BuroBehaviorLegend />
         </div>
 
         {/* Right Column: Sidebar */}
         <div className="w-full lg:w-80 shrink-0 space-y-5">
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
+          <BuroBehaviorLegend />
         </div>
       </div>
     </div>
