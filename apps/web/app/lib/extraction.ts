@@ -128,6 +128,7 @@ export interface ParsedIdentity {
     citizenIdentifier: string | undefined;
   } | null;
   alerts: ExtractionAlert[];
+  manualCorrections?: Record<string, { value: string; source: CorrectionSource }>;
 }
 
 /**
@@ -198,12 +199,17 @@ export function parseIdentity(doc: Document): ParsedIdentity | null {
       }
     : null;
 
+  const manualCorrections = data.manualCorrections as
+    | Record<string, { value: string; source: CorrectionSource }>
+    | undefined;
+
   return {
     idType,
     fields,
     isExpired: identity.isExpiredByVisibleDate === true,
     ineValidation,
     alerts,
+    manualCorrections,
   };
 }
 

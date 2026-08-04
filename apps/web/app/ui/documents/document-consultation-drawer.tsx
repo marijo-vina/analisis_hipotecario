@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- signed URLs can't use next/image */
 
 import { useState, useEffect, useCallback } from "react";
+import { X } from "lucide-react";
 
 import type { Document } from "@/app/lib/definitions";
 import { getDocumentViewUrl } from "@/app/actions/documents";
@@ -112,9 +113,14 @@ export default function DocumentConsultationDrawer({
               {document.originalName}
             </p>
           </div>
-          <Button variant="secondary" onClick={onClose}>
-            Cerrar
-          </Button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-[10px] p-2 text-gf-text-muted hover:text-gf-text hover:bg-gf-surface-dim transition-colors focus-visible:ring-2 focus-visible:ring-gf-red/40 focus-visible:outline-none shrink-0"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* ── Content ────────────────────────────────────────────────── */}

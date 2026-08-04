@@ -250,6 +250,27 @@ export class DocumentsController {
     return { data };
   }
 
+  /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/extracted-data
+   *
+   * Persists a manual correction/edit for an extracted data field.
+   */
+  @Patch(':documentId/extracted-data')
+  @HttpCode(200)
+  async updateExtractedDataField(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Body() body: { label: string; value: string },
+  ) {
+    const data = await this.documentsService.updateExtractedDataField(
+      caseId,
+      documentId,
+      body.label,
+      body.value,
+    );
+    return { data };
+  }
+
 /**
    * DEV-ONLY: Coordinate-based extraction (POC v3.1 integration).
    * Reads the document from GCS, extracts coordinate words via pdfjs-dist,
