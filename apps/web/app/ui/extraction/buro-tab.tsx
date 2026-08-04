@@ -107,8 +107,8 @@ function classificationChipColor(cls: string): string {
 
 function statusChipColor(status: string): string {
   return status === "ACTIVE"
-    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-    : "bg-gf-surface-dim text-gf-text-muted border border-gf-border";
+    ? "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold"
+    : "bg-slate-200/80 text-slate-600 border border-slate-300 font-medium";
 }
 
 function formatWithCommas(value: string): string {
@@ -642,12 +642,12 @@ function CreditRow({
   const isClosed = credit.isClosed;
 
   const rowBg = isRisky
-    ? "bg-red-50/40 hover:bg-red-50/70"
+    ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-500 font-medium"
     : isWarning
-      ? "bg-amber-50/30 hover:bg-amber-50/60"
+      ? "bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-400 font-medium"
       : isClosed
-        ? "bg-gf-surface/40 text-gf-text-muted opacity-75 hover:bg-gf-surface/80"
-        : "bg-white hover:bg-gf-surface-dim/40";
+        ? "bg-slate-100/60 text-slate-500 opacity-65 hover:opacity-100 transition-opacity border-l-4 border-l-slate-300"
+        : "bg-white hover:bg-emerald-50/30 border-l-4 border-l-emerald-500 font-medium";
 
   const effectiveForDisplay =
     credit.paymentDueAmountEffective ?? credit.paymentDueAmount ?? null;
