@@ -1,13 +1,19 @@
+import {
+  Landmark,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+} from "lucide-react";
 import type { ParsedBankStatements } from "@/app/lib/extraction";
-import Card from "@/app/ui/common/card";
 
 interface EstadosSummaryBarProps {
   summary: NonNullable<ParsedBankStatements["summary"]>;
 }
 
 /**
- * Compact summary bar showing statement counts, banks, period,
- * payroll deposits detected, and alert counts.
+ * EstadosSummaryBar — Barra de resumen de estados de cuenta según Stitch / design.md.
  */
 export default function EstadosSummaryBar({
   summary,
@@ -30,74 +36,109 @@ export default function EstadosSummaryBar({
         : "—";
 
   return (
-    <Card className="flex flex-wrap items-center gap-6 px-5 py-4">
-      {/* Statements count */}
-      <StatItem label="Estados de cuenta" value={`${totalStatements} procesados`} />
+    <div className="bg-white border border-gf-border rounded-xl p-5 shadow-2xs flex flex-wrap gap-6 items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center gap-6 sm:gap-8">
+        {/* Statements count */}
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-gf-surface-dim text-gf-text-muted">
+            <Landmark className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+              Estados de cuenta
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-gf-text">
+                {totalStatements}
+              </span>
+              <span className="text-xs font-semibold text-gf-text-muted">
+                procesado{totalStatements !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
 
-      <Divider />
+        <div className="hidden sm:block h-8 w-px bg-gf-border" />
 
-      {/* Banks */}
-      <StatItem label="Bancos" value={`${banks.length} detectados`} />
+        {/* Banks */}
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-gf-surface-dim text-gf-text-muted">
+            <Building2 className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+              Bancos
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-gf-text">
+                {banks.length}
+              </span>
+              <span className="text-xs font-semibold text-gf-text-muted">
+                detectado{banks.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
 
-      <Divider />
+        <div className="hidden sm:block h-8 w-px bg-gf-border" />
 
-      {/* Period */}
-      <StatItem label="Periodo" value={periodLabel} />
+        {/* Period */}
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-gf-surface-dim text-gf-text-muted">
+            <Calendar className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+              Periodo
+            </span>
+            <span className="text-sm font-bold text-gf-text">
+              {periodLabel}
+            </span>
+          </div>
+        </div>
 
-      <Divider />
+        <div className="hidden sm:block h-8 w-px bg-gf-border" />
 
-      {/* Payroll deposits */}
-      <StatItem
-        label="Depósitos nómina"
-        value={`${totalDeposits} detectados`}
-        valueClass="text-green-600"
-      />
-
-      {/* Spacer */}
-      <div className="flex-1" />
+        {/* Payroll deposits */}
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+              Depósitos nómina
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-emerald-700">
+                {totalDeposits}
+              </span>
+              <span className="text-xs font-semibold text-emerald-700">
+                detectado{totalDeposits !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Alert chips */}
-      <div className="flex items-center gap-3">
-        {totalCriticalAlerts > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            {totalCriticalAlerts} críticas
-          </span>
-        )}
-        {totalWarningAlerts > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-            {totalWarningAlerts} advertencias
-          </span>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function StatItem({
-  label,
-  value,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-        {label}
-      </span>
-      <span className={`text-base font-bold text-gf-text ${valueClass ?? ""}`}>
-        {value}
-      </span>
+      {(totalCriticalAlerts > 0 || totalWarningAlerts > 0) && (
+        <div className="flex items-center gap-2">
+          {totalCriticalAlerts > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold">
+              <AlertCircle className="h-3 w-3 text-red-600" />
+              {totalCriticalAlerts} críticas
+            </span>
+          )}
+          {totalWarningAlerts > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+              <AlertTriangle className="h-3 w-3 text-amber-600" />
+              {totalWarningAlerts} advertencias
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
-}
-
-function Divider() {
-  return <div className="h-10 w-px bg-gf-border" />;
 }
 
 /** Converts "2026-01-15" → "Ene 2026" */

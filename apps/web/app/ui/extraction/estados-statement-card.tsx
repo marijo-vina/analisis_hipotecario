@@ -1,27 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ChevronDown,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Building,
+  User,
+  Wallet,
+  Calendar,
+  Clock,
+  ShieldCheck,
+  Check,
+} from "lucide-react";
 import type { ParsedBankStatement } from "@/app/lib/extraction";
-import { formatDateDisplay } from "@/app/lib/extraction";
-import Card from "@/app/ui/common/card";
 
 interface EstadosStatementCardProps {
   statement: ParsedBankStatement;
 }
 
 /**
- * Expandable card for a single bank statement.
- *
- * Collapsed: bank icon + name, period, balance chip, alert badges, expand icon.
- * Expanded: + account details, deposit rows, inline alerts.
- *
- * Critical alerts get a red left-border accent.
+ * EstadosStatementCard — Tarjeta acordeón de estado de cuenta según Stitch / design.md.
  */
 export default function EstadosStatementCard({
   statement,
 }: EstadosStatementCardProps) {
-  // Filter out per-statement month-count warnings; they're misleading
-  // because each statement sees only itself, not the aggregate.
   const visibleAlerts = statement.alerts.filter(
     (a) => a.code !== "BANK_FEWER_MONTHS_THAN_REQUIRED",
   );
@@ -29,17 +33,10 @@ export default function EstadosStatementCard({
     (a) => a.severity === "CRITICAL",
   );
 
-  const [expanded, setExpanded] = useState(visibleHasCritical);
-
-  const borderClass = visibleHasCritical
-    ? "border-l-4 border-l-red-500"
-    : visibleAlerts.length > 0
-      ? "border-l-4 border-l-amber-500"
-      : "";
+  const [expanded, setExpanded] = useState<boolean>(true);
 
   const bankInitial = statement.bankName?.charAt(0).toUpperCase() ?? "?";
 
-  // Bank color (approximate mapping for visual distinction)
   const bankColors: Record<string, string> = {
     BBVA: "bg-[#004481]",
     Santander: "bg-[#EC0000]",
@@ -50,8 +47,7 @@ export default function EstadosStatementCard({
     Azteca: "bg-[#1A1A1A]",
     Inbursa: "bg-[#003C71]",
   };
-  const bankBg =
-    bankColors[statement.bankName ?? ""] ?? "bg-gf-red";
+  const bankBg = bankColors[statement.bankName ?? ""] ?? "bg-gf-red";
 
   const periodLabel =
     statement.periodStart && statement.periodEnd
@@ -63,11 +59,8 @@ export default function EstadosStatementCard({
   const balanceIsNegative =
     statement.endingBalance != null && statement.endingBalance < 0;
 
-  /**
-   * Determine if the month is truly closed.
-   * Uses backend flag first; falls back to date check (periodEnd in the past).
-   */
-  const isMonthClosed = statement.isClosedMonth ||
+  const isMonthClosed =
+    statement.isClosedMonth ||
     (statement.periodEnd != null && new Date(statement.periodEnd) < new Date());
 
   const isError =
@@ -79,119 +72,113 @@ export default function EstadosStatementCard({
 
   // ── Non-data state: show filename + status badge ─────────────────────
   if (!statement.hasData) {
-    const statusBadgeClass = isError
-      ? "bg-red-50 text-red-700"
-      : isPending
-        ? "bg-gray-100 text-gray-600"
-        : "bg-gray-100 text-gray-600";
-
     return (
-      <Card className={`overflow-hidden border-l-4 ${isError ? "border-l-red-400" : "border-l-gray-300"}`}>
-        <div className="flex w-full items-center gap-3 px-5 py-4">
-          {/* File icon */}
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-200 text-sm text-gray-500">
-            📄
-          </span>
-
-          {/* Filename + status */}
-          <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium text-gf-text truncate">
-              {statement.originalName}
-            </span>
-            <span className="text-xs text-gf-text-muted">
-              {statement.statusName}
-            </span>
+      <div className="bg-white rounded-xl border border-gf-border shadow-2xs overflow-hidden">
+        <div className="flex w-full items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gf-surface-dim text-gf-text-muted">
+              <Building className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-gf-text truncate">
+                {statement.originalName}
+              </span>
+              <span className="text-xs text-gf-text-muted">
+                {statement.statusName}
+              </span>
+            </div>
           </div>
 
-          {/* Status badge */}
-          <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold ${statusBadgeClass}`}>
-            {isError ? "⚠ Error" : isPending ? "⏳ Pendiente" : statement.statusName}
+          <span
+            className={
+              isError
+                ? "inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold"
+                : "inline-flex items-center gap-1 rounded-full bg-gf-surface-dim text-gf-text-muted border border-gf-border px-2.5 py-0.5 text-xs font-semibold"
+            }
+          >
+            {isError ? (
+              <>
+                <AlertTriangle className="h-3 w-3 text-red-600" /> Error
+              </>
+            ) : isPending ? (
+              <>
+                <Clock className="h-3 w-3 animate-spin" /> Pendiente
+              </>
+            ) : (
+              statement.statusName
+            )}
           </span>
         </div>
 
         {isError && (
           <div className="border-t border-gf-border px-5 py-3 bg-red-50/50">
             <p className="text-xs text-red-700">
-              La extracción de datos falló. Usá &quot;Reintentar extracción&quot; en el explorador de documentos para volver a intentarlo.
+              La extracción de datos falló. Usa &quot;Reintentar extracción&quot; en el explorador de documentos para volver a intentarlo.
             </p>
           </div>
         )}
-      </Card>
+      </div>
     );
   }
 
   // ── Data state: normal expandable card ───────────────────────────────
-
   return (
-    <Card className={`overflow-hidden ${borderClass}`}>
-      {/* ── Header row (always visible) ──────────────────────────────── */}
-      <button
-        type="button"
-        className="flex w-full items-center gap-3.5 px-5 py-4 text-left hover:bg-gf-bg/50 transition-colors"
+    <div className="bg-white rounded-xl border border-gf-border shadow-2xs overflow-hidden transition-all">
+      {/* ── Header Row (Stitch Layout) ──────────────────────────────── */}
+      <div
         onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
+        className="px-5 py-4 bg-white hover:bg-gf-surface-dim/60 flex items-center justify-between cursor-pointer transition-colors select-none border-b border-gf-border/50"
       >
-        {/* Bank icon */}
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bankBg} text-base font-bold text-white`}
-        >
-          {bankInitial}
-        </span>
-
-        {/* Bank name + subtitle */}
-        <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-gf-text">
-              {statement.originalName ?? statement.bankName ?? "Desconocido"}
+        <div className="flex items-center gap-4 min-w-0">
+          <div
+            className={`w-10 h-10 rounded-xl ${bankBg} text-white flex items-center justify-center font-bold text-base shrink-0 shadow-2xs`}
+          >
+            {bankInitial}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold text-gf-text truncate">
+              {statement.originalName ?? statement.bankName ?? "Estado de cuenta"}
             </span>
-            {visibleHasCritical && (
-              <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
-                ● CRÍTICA
-              </span>
-            )}
-            {!visibleHasCritical && visibleAlerts.length > 0 && (
-              <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
-                ● ADVERTENCIA
-              </span>
-            )}
+            <span className="text-xs text-gf-text-muted">
+              {statement.bankName ?? "Banco detectado"}
+            </span>
           </div>
         </div>
 
-        {/* Deposit count + period badge */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          {statement.deposits.length > 0 && (
-            <span className="rounded-md bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600">
-              {statement.deposits.length} dép.
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-2">
+            {statement.deposits.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                {statement.deposits.length} dép.
+              </span>
+            )}
+            <span
+              className={
+                isMonthClosed
+                  ? "inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold"
+                  : "inline-flex items-center gap-1 rounded-full bg-gf-surface-dim text-gf-text-muted border border-gf-border px-2.5 py-0.5 text-xs font-semibold"
+              }
+            >
+              {periodLabel} · {isMonthClosed ? "Cerrado" : "En curso"}
             </span>
-          )}
-          <span
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-              isMonthClosed
-                ? "bg-green-50 text-green-700"
-                : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            {periodLabel}
-            {" · "}
-            {isMonthClosed ? "Cerrado" : "En curso"}
-          </span>
+          </div>
+
+          <div className="p-1.5 rounded-lg text-gf-text-muted hover:text-gf-text hover:bg-gf-surface transition-colors">
+            <ChevronDown
+              className={`h-5 w-5 transition-transform duration-200 ${
+                expanded ? "rotate-180 text-gf-text" : ""
+              }`}
+            />
+          </div>
         </div>
+      </div>
 
-        {/* Expand icon */}
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-sm text-gf-text-muted transition-transform ${
-            expanded ? "rotate-180" : ""
-          }`}
-        >
-          ▾
-        </span>
-      </button>
-
-      {/* ── Expanded detail ──────────────────────────────────────────── */}
+      {/* ── Expanded Detail (Stitch Layout) ─────────────────────────── */}
       {expanded && (
-        <div className="border-t border-gf-border">
-          {/* ── Key Metrics Row ──────────────────────────────────────── */}
-          <div className="grid grid-cols-4 divide-x divide-gf-border px-5 py-5">
+        <div className="p-6 bg-white space-y-6">
+          {/* 1. KPIs Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCell
               label="Saldo promedio"
               value={
@@ -232,206 +219,173 @@ export default function EstadosStatementCard({
             />
           </div>
 
-          <div className="border-t border-gf-border" />
-
-          {/* ── Account Details ────────────────────────────────────────── */}
-          <div className="space-y-4 px-5 py-5">
-            <h4 className="text-[13px] font-semibold text-gf-text">
+          {/* 2. Datos de la cuenta */}
+          <div>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted mb-3 flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5 text-gf-tertiary" />
               Datos de la cuenta
             </h4>
-            <div className="grid grid-cols-5 gap-6">
-              <FieldCell label="Titular">
-                {statement.accountHolder ?? "—"}
-              </FieldCell>
-              <FieldCell label="RFC" mono>
-                {statement.accountHolderRfc ?? "—"}
-              </FieldCell>
-              <FieldCell label="No. de cuenta" mono>
-                {statement.accountNumber
-                  ? `**** ${statement.accountNumber}`
-                  : "—"}
-              </FieldCell>
-              <FieldCell label="CLABE" mono>
-                {statement.clabe ? maskClabe(statement.clabe) : "—"}
-              </FieldCell>
-              <FieldCell label="Tipo de cuenta">
-                {statement.isJointAccount != null ? (
+            <div className="bg-gf-surface p-4 rounded-xl border border-gf-border/60 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <FieldCell label="Titular">
+                  {statement.accountHolder ?? "—"}
+                </FieldCell>
+                <FieldCell label="RFC" mono>
+                  {statement.accountHolderRfc ?? "—"}
+                </FieldCell>
+                <FieldCell label="No. de cuenta" mono>
+                  {statement.accountNumber
+                    ? `**** ${statement.accountNumber}`
+                    : "—"}
+                </FieldCell>
+                <FieldCell label="CLABE" mono>
+                  {statement.clabe ? maskClabe(statement.clabe) : "—"}
+                </FieldCell>
+                <FieldCell label="Tipo de cuenta">
+                  {statement.isJointAccount != null ? (
+                    <span
+                      className={
+                        statement.isJointAccount
+                          ? "inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold"
+                          : "inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold"
+                      }
+                    >
+                      {statement.isJointAccount ? "Mancomunada" : "Individual"}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </FieldCell>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gf-border/40">
+                <FieldCell label="Periodo">
+                  {periodLabel}
+                </FieldCell>
+                <FieldCell label="Fecha de corte">
+                  {statement.cutoffDate
+                    ? fmtShort(statement.cutoffDate)
+                    : "—"}
+                </FieldCell>
+                <FieldCell label="Estado del mes">
                   <span
-                    className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
-                      statement.isJointAccount
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-green-50 text-green-700"
-                    }`}
+                    className={
+                      isMonthClosed
+                        ? "inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold"
+                        : "inline-flex items-center gap-1 rounded-full bg-gf-surface-dim text-gf-text-muted border border-gf-border px-2 py-0.5 text-[11px] font-semibold"
+                    }
                   >
-                    {statement.isJointAccount ? "Mancomunada" : "Individual"}
+                    {isMonthClosed ? "Mes cerrado" : "En curso"}
                   </span>
-                ) : (
-                  "—"
-                )}
-              </FieldCell>
-            </div>
-            <div className="grid grid-cols-3 gap-6">
-              <FieldCell label="Periodo">
-                {periodLabel}
-              </FieldCell>
-              <FieldCell label="Fecha de corte">
-                {statement.cutoffDate
-                  ? fmtShort(statement.cutoffDate)
-                  : "—"}
-              </FieldCell>
-              <FieldCell label="Estado del mes">
-                <span
-                  className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
-                    isMonthClosed
-                      ? "bg-green-50 text-green-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {isMonthClosed ? "Mes cerrado" : "En curso"}
-                </span>
-              </FieldCell>
+                </FieldCell>
+              </div>
             </div>
           </div>
 
-          {/* ── Payroll deposits ──────────────────────────────────────── */}
+          {/* 3. Depósitos de nómina detectados */}
           {statement.deposits.length > 0 && (
-            <>
-              <div className="border-t border-gf-border" />
-              <div className="space-y-3 px-5 py-5">
-                <div className="flex items-center gap-2.5">
-                  <h4 className="text-[13px] font-semibold text-gf-text">
-                    Depósitos de nómina detectados
-                  </h4>
-                  <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-600">
-                    {statement.deposits.length} encontrados
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {statement.deposits.map((dep, i) => {
-                    const dateParts = dep.date
-                      ? parseDateParts(dep.date)
-                      : null;
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center gap-4 rounded-xl bg-gf-bg px-4 py-3.5"
-                      >
-                        {/* Date block */}
-                        <div className="flex w-[72px] shrink-0 flex-col items-center gap-0.5">
-                          <span className="text-[11px] font-medium text-gf-red">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Depósitos de nómina detectados
+                </h4>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
+                  {statement.deposits.length} encontrado{statement.deposits.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {statement.deposits.map((dep, i) => {
+                  const dateParts = dep.date ? parseDateParts(dep.date) : null;
+                  return (
+                    <div
+                      key={i}
+                      className="bg-gf-surface rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-gf-border/60 hover:border-gf-border transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Date badge */}
+                        <div className="flex flex-col items-center justify-center w-12 text-center bg-white p-2 rounded-lg border border-gf-border/60 shrink-0">
+                          <span className="text-[10px] font-bold text-gf-red uppercase">
                             {dateParts?.monthAbbr ?? "—"}
                           </span>
-                          <span className="text-lg font-bold leading-none text-gf-text">
+                          <span className="text-base font-bold text-gf-text leading-tight">
                             {dateParts?.day ?? "—"}
                           </span>
-                          <span className="text-[10px] text-gf-text-muted">
+                          <span className="text-[9px] text-gf-text-muted">
                             {dateParts?.year ?? "—"}
                           </span>
                         </div>
 
-                        {/* Divider */}
-                        <div className="h-12 w-px bg-gf-border" />
-
-                        {/* Info */}
-                        <div className="flex flex-1 flex-col gap-1 min-w-0">
-                          <span className="text-[15px] font-bold text-green-600">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-base font-bold text-emerald-700">
                             {dep.amount != null
                               ? `${fmtCurrency(dep.amount)} MXN`
                               : "—"}
                           </span>
-                          <span className="text-[13px] font-semibold text-gf-text truncate">
+                          <span className="text-xs font-semibold text-gf-text uppercase">
                             {dep.employerName ?? dep.originalConcept ?? "—"}
                           </span>
-                          <span className="text-xs text-gf-text-muted">
-                            {dep.employerRfc && `RFC: ${dep.employerRfc}`}
-                            {dep.employerRfc && dep.originalConcept && " · "}
-                            {dep.originalConcept &&
-                              `Concepto: ${dep.originalConcept}`}
-                          </span>
-                        </div>
-
-                        {/* Match badge */}
-                        <div className="shrink-0">
-                          {dep.matchCandidateForPayroll && (
-                            <span className="rounded-md bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600">
-                              ✓ Coincide con recibo de nómina
+                          {dep.originalConcept && (
+                            <span className="text-[11px] text-gf-text-muted">
+                              Concepto: {dep.originalConcept}
                             </span>
                           )}
-                          {dep.isPayrollConcept &&
-                            !dep.matchCandidateForPayroll && (
-                              <span className="rounded-md bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600">
-                                ✓ Concepto nómina
-                              </span>
-                            )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      <div className="shrink-0">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 text-xs font-semibold shadow-2xs">
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          Concepto nómina
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </>
+            </div>
           )}
 
-          {/* ── Alerts (excluding month-count warnings) ────────────────── */}
+          {/* 4. Alertas del estado de cuenta */}
           {visibleAlerts.length > 0 && (
-            <>
-              <div className="border-t border-gf-border" />
-              <div className="space-y-2.5 px-5 py-5">
-                <div className="flex items-center gap-2.5">
-                  <h4 className="text-[13px] font-semibold text-gf-text">
-                    Alertas del estado de cuenta
-                  </h4>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      visibleHasCritical
-                        ? "bg-red-50 text-red-600"
-                        : "bg-amber-50 text-amber-600"
-                    }`}
-                  >
-                    {visibleAlerts.length}{" "}
-                    {visibleHasCritical ? "críticas" : "advertencias"}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {visibleAlerts.map((alert) => {
-                      const isCrit = alert.severity === "CRITICAL";
-                      return (
-                        <div
-                          key={alert.code}
-                          className={`flex items-start gap-3 rounded-lg px-4 py-3 ${
-                            isCrit ? "bg-red-50" : "bg-amber-50"
-                          }`}
-                        >
-                          <span
-                            className={`mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                              isCrit ? "bg-red-500" : "bg-amber-500"
-                            }`}
-                          >
-                            !
-                          </span>
-                          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                            <span
-                              className={`text-[13px] font-semibold ${
-                                isCrit ? "text-red-800" : "text-amber-800"
-                              }`}
-                            >
-                              {alert.message}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
+            <div>
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted mb-3 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Alertas del estado de cuenta
+              </h4>
+              <div className="space-y-2">
+                {visibleAlerts.map((alert) => {
+                  const isCrit = alert.severity === "CRITICAL";
+                  return (
+                    <div
+                      key={alert.code}
+                      className={
+                        isCrit
+                          ? "rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-800 flex items-start gap-2.5"
+                          : "rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 flex items-start gap-2.5"
+                      }
+                    >
+                      {isCrit ? (
+                        <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-bold">{alert.severity}</p>
+                        <p className="mt-0.5 leading-relaxed">{alert.message}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function MetricCell({
   label,
@@ -448,28 +402,27 @@ function MetricCell({
   warning?: boolean;
   accent?: boolean;
 }) {
-  const valueColor = danger
-    ? "text-red-600"
-    : warning
-      ? "text-amber-600"
-      : accent
-        ? "text-green-600"
-        : "text-gf-text";
-  const subColor = danger
-    ? "text-red-500"
-    : warning
-      ? "text-amber-500"
-      : accent
-        ? "text-green-600"
-        : "text-gf-text-muted";
-
   return (
-    <div className="flex flex-col items-center gap-1 px-3">
-      <span className="text-[11px] font-medium text-gf-text-soft text-center">
+    <div className="bg-gf-surface p-4 rounded-xl border border-gf-border/60 flex flex-col items-center justify-center text-center">
+      <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider mb-1">
         {label}
       </span>
-      <span className={`text-xl font-bold ${valueColor}`}>{value}</span>
-      <span className={`text-[10px] ${subColor}`}>{sub}</span>
+      <span
+        className={`text-lg font-bold ${
+          danger
+            ? "text-red-600"
+            : warning
+              ? "text-amber-600"
+              : accent
+                ? "text-emerald-700"
+                : "text-gf-text"
+        }`}
+      >
+        {value}
+      </span>
+      <span className="text-[10px] font-medium text-gf-text-muted mt-0.5">
+        {sub}
+      </span>
     </div>
   );
 }
@@ -484,10 +437,12 @@ function FieldCell({
   mono?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-gf-text-soft">{label}</span>
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+        {label}
+      </span>
       <span
-        className={`text-[13px] font-semibold text-gf-text ${
+        className={`text-xs font-semibold text-gf-text ${
           mono ? "font-mono tracking-tight" : ""
         }`}
       >
@@ -497,7 +452,6 @@ function FieldCell({
   );
 }
 
-/** Parse ISO date into { monthAbbr, day, year } for the visual date block. */
 function parseDateParts(
   iso: string,
 ): { monthAbbr: string; day: string; year: string } | null {
@@ -524,17 +478,6 @@ function fmtMonthAbbr(mm: string): string {
     "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic",
   };
   return months[mm] ?? mm;
-}
-
-function fmtMonthYear(iso: string): string {
-  const m = /^(\d{4})-(\d{2})/.exec(iso);
-  if (!m) return iso;
-  const months: Record<string, string> = {
-    "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
-    "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
-    "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre",
-  };
-  return `${months[m[2]] ?? m[2]} ${m[1]}`;
 }
 
 function fmtCurrency(amount: number): string {
