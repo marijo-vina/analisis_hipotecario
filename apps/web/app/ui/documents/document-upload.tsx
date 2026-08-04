@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import type { DocumentType } from "@/app/lib/definitions";
 import Button from "@/app/ui/common/button";
 import { FileText, X, UploadCloud } from "lucide-react";
@@ -18,10 +18,31 @@ export default function DocumentUpload({
   onSuccess,
   defaultDocumentTypeId,
 }: DocumentUploadProps) {
+  const availableDocumentTypes = useMemo<DocumentType[]>(() => {
+    // 1. Exclude PROOF_OF_ADDRESS
+    const filtered = documentTypes.filter(
+      (dt: DocumentType) => dt.code !== "PROOF_OF_ADDRESS",
+    );
+
+    // 2. Ensure PASSPORT is present in the list
+    const hasPassport = filtered.some((dt: DocumentType) => dt.code === "PASSPORT");
+    if (!hasPassport) {
+      const maxId = Math.max(0, ...filtered.map((dt: DocumentType) => Number(dt.id) || 0));
+      filtered.push({
+        id: maxId + 1000,
+        code: "PASSPORT",
+        name: "Pasaporte",
+        isActive: true,
+      });
+    }
+
+    return filtered;
+  }, [documentTypes]);
+
   const [files, setFiles] = useState<File[]>([]);
   const [documentTypeId, setDocumentTypeId] = useState<string>(
     defaultDocumentTypeId &&
-      documentTypes.some((dt) => dt.id === Number(defaultDocumentTypeId))
+      availableDocumentTypes.some((dt: DocumentType) => dt.id === Number(defaultDocumentTypeId))
       ? defaultDocumentTypeId
       : "",
   );
@@ -173,7 +194,7 @@ export default function DocumentUpload({
             className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
           >
             <option value="">-- Seleccionar categoría --</option>
-            {documentTypes.map((dt) => (
+            {availableDocumentTypes.map((dt: DocumentType) => (
               <option key={dt.id} value={dt.id}>
                 {dt.name}
               </option>
