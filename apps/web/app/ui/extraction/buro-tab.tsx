@@ -684,36 +684,36 @@ function CreditRow({
   return (
     <tr className={`border-b border-gf-border/60 transition-colors ${rowBg} text-xs`}>
       {/* # */}
-      <td className="px-4 py-3 text-gf-text-muted font-semibold w-8">
+      <td className="px-2 py-2.5 text-gf-text-muted font-semibold text-center w-7">
         {displayNumber}.
       </td>
 
       {/* Institución */}
-      <td className="px-4 py-3 font-semibold text-gf-text">
+      <td className="px-2.5 py-2.5 font-semibold text-gf-text">
         {credit.institution ?? "—"}
       </td>
 
       {/* Tipo de crédito */}
-      <td className="px-4 py-3">
-        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${classificationChipColor(credit.classification)}`}>
+      <td className="px-2.5 py-2.5">
+        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${classificationChipColor(credit.classification)}`}>
           {CLASSIFICATION_LABELS[credit.classification] ?? credit.classification}
         </span>
       </td>
 
       {/* Estado */}
-      <td className="px-4 py-3">
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusChipColor(credit.status)}`}>
+      <td className="px-2.5 py-2.5">
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusChipColor(credit.status)}`}>
           {STATUS_LABELS[credit.status] ?? credit.status}
         </span>
       </td>
 
       {/* Saldo actual */}
-      <td className="px-4 py-3 text-right font-mono text-xs font-medium text-gf-text">
+      <td className="px-2.5 py-2.5 text-right font-mono text-xs font-medium text-gf-text">
         {formatMxn(credit.currentBalance)}
       </td>
 
       {/* Monto a pagar */}
-      <td className="px-4 py-3 text-right">
+      <td className="px-2.5 py-2.5 text-right">
         {isClosed ? (
           <span className="text-gf-text-muted font-mono text-xs">—</span>
         ) : editing ? (
@@ -728,7 +728,7 @@ function CreditRow({
                 if (e.key === "Escape") handleCancel();
               }}
               autoFocus
-              className="w-24 rounded border border-gf-border px-1.5 py-0.5 text-right font-mono text-xs text-gf-text focus:border-blue-500 focus:outline-none bg-white"
+              className="w-20 rounded border border-gf-border px-1.5 py-0.5 text-right font-mono text-xs text-gf-text focus:border-blue-500 focus:outline-none bg-white"
             />
             <button
               type="button"
@@ -748,15 +748,10 @@ function CreditRow({
             </button>
           </div>
         ) : (
-          <div className="inline-flex items-center gap-1.5 justify-end">
+          <div className="inline-flex items-center gap-1 justify-end">
             <span className="font-mono font-bold text-xs text-gf-text">
               {effectiveForDisplay != null ? formatMxn(effectiveForDisplay) : "—"}
             </span>
-            {credit.paymentDueAmountSource === PaymentDueAmountSource.BAND_MATCH && (
-              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold inline-flex items-center gap-0.5">
-                <Check className="h-2.5 w-2.5" /> Coord.
-              </span>
-            )}
             <button
               type="button"
               onClick={handleStartEdit}
@@ -770,12 +765,12 @@ function CreditRow({
       </td>
 
       {/* Límite / crédito */}
-      <td className="px-4 py-3 text-right font-mono text-xs text-gf-text">
+      <td className="px-2.5 py-2.5 text-right font-mono text-xs text-gf-text">
         {formatMxn(credit.creditLimit)}
       </td>
 
       {/* Comportamiento MOP (Carita + Globo) */}
-      <td className="px-4 py-3 text-center">
+      <td className="px-2.5 py-2.5 text-center">
         <MopBehaviorBadge credit={credit} />
       </td>
     </tr>
@@ -822,14 +817,14 @@ function CreditTableSection({
         <table className="w-full text-left">
           <thead className="bg-gf-surface/60 border-b border-gf-border text-[11px] font-bold text-gf-text-muted uppercase tracking-wider">
             <tr>
-              <th className="px-4 py-3 w-8">#</th>
-              <th className="px-4 py-3">Institución</th>
-              <th className="px-4 py-3">Tipo de crédito</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Saldo actual</th>
-              <th className="px-4 py-3 text-right">Monto a pagar</th>
-              <th className="px-4 py-3 text-right">Límite / crédito</th>
-              <th className="px-4 py-3 text-center">Comportamiento</th>
+              <th className="px-2 py-2.5 text-center w-7">#</th>
+              <th className="px-2.5 py-2.5">Institución</th>
+              <th className="px-2.5 py-2.5">Tipo de crédito</th>
+              <th className="px-2.5 py-2.5">Estado</th>
+              <th className="px-2.5 py-2.5 text-right">Saldo actual</th>
+              <th className="px-2.5 py-2.5 text-right">Monto a pagar</th>
+              <th className="px-2.5 py-2.5 text-right">Límite / crédito</th>
+              <th className="px-2.5 py-2.5 text-center">Comportamiento</th>
             </tr>
           </thead>
           <tbody>
@@ -887,10 +882,6 @@ function CreditsTable({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// 6. Leyenda de Comportamiento MOP
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // 6. Leyenda de Comportamiento MOP (Sidebar)
@@ -1095,10 +1086,10 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
       {/* ── Risk Filter Chips ─────────────────────────────────────────── */}
       <RiskChips parsed={parsed} />
 
-      {/* ── Two Column Main Body ──────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row gap-5">
+      {/* ── Main Body (Responsive Grid 2-column or stacked) ───────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Left Column: Tables */}
-        <div className="flex-1 min-w-0">
+        <div className="xl:col-span-8 2xl:col-span-9 space-y-5 min-w-0">
           <CreditsTable
             parsed={parsed}
             caseId={caseId}
@@ -1106,8 +1097,8 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
           />
         </div>
 
-        {/* Right Column: Sidebar */}
-        <div className="w-full lg:w-80 shrink-0 space-y-5">
+        {/* Right Column / Stacked: Sidebar Cards */}
+        <div className="xl:col-span-4 2xl:col-span-3 min-w-0 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-5">
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
           <BuroBehaviorLegend />
