@@ -172,6 +172,12 @@ export function parseIdentity(doc: Document): ParsedIdentity | null {
   }
 
   const idType = (identity.idType as string) ?? undefined;
+  const idTypeLabel =
+    idType === "PASSPORT"
+      ? "Pasaporte"
+      : idType === "INE"
+        ? "INE"
+        : idType;
   const fullName = (identity.fullName as string) ?? undefined;
   const birthDate = formatDateDisplay((identity.birthDate as string) ?? undefined);
   const curp = (identity.curp as string) ?? undefined;
@@ -179,7 +185,7 @@ export function parseIdentity(doc: Document): ParsedIdentity | null {
   const idNumber = (identity.idNumber as string) ?? undefined;
 
   const fields: IdentityFieldDef[] = [
-    { label: "Tipo de documento", value: idType },
+    { label: "Tipo de documento", value: idTypeLabel },
     { label: "Nombre completo", value: fullName },
     { label: "Fecha de nacimiento", value: birthDate },
     { label: "CURP", value: curp },
