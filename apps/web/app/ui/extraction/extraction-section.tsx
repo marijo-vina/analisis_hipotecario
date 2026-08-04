@@ -57,10 +57,12 @@ export default function ExtractionSection({
   if (!hasProcessed) return null;
 
   return (
-    <section id="extraccion" className="mt-6 scroll-mt-6">
-      <h2 className="text-lg font-bold text-gf-text mb-4">
-        Datos extraídos
-      </h2>
+    <section id="extraccion" className="mt-8 pt-6 border-t border-gf-border/60 scroll-mt-6">
+      <div className="flex items-center gap-3 mb-5">
+        <h2 className="text-xl sm:text-2xl font-bold text-gf-text tracking-tight">
+          Datos extraídos
+        </h2>
+      </div>
 
       <div className="space-y-4">
         <ExtractionCategoryTabs activeTab={activeTab} onChange={setActiveTab} />
