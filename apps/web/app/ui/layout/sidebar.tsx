@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/actions/auth";
 import Image from "next/image";
-import { LayoutDashboard, Users, FolderOpen, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FolderOpen, LogOut, Building2 } from "lucide-react";
 
 const NAV_ITEMS = [
   {
@@ -16,6 +16,11 @@ const NAV_ITEMS = [
     href: "/dashboard/clientes",
     label: "Clientes",
     icon: Users,
+  },
+  {
+    href: "/dashboard/bancos",
+    label: "Bancos",
+    icon: Building2,
   },
   {
     href: "/dashboard/expedientes",

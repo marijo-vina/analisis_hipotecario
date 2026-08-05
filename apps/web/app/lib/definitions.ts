@@ -39,6 +39,35 @@ export interface CreditType {
   isActive: boolean;
 }
 
+// ---- CMA Bank Catalog (PR 6) -----------------------------------------------
+
+export interface Bank {
+  id: string;
+  code: string;
+  name: string;
+  incomeCriterion: 'NET' | 'GROSS';
+  debtCommitmentFactor: number;
+  minimumBureauScore: number | null;
+  isActive: boolean;
+  _count?: { policies: number };
+}
+
+export interface BankPolicy {
+  id: string;
+  bankId: string;
+  destination: string;
+  minimumIncome: number | null;
+  minimumPropertyValue: number | null;
+  minimumEmploymentTenureMonths: number | null;
+  minimumApplicantAgeMonths: number | null;
+  maximumApplicationAgeMonths: number | null;
+  isActive: boolean;
+}
+
+export interface BankDetail extends Bank {
+  policies: BankPolicy[];
+}
+
 export interface CaseStatus {
   id: number;
   code: string;
@@ -302,6 +331,11 @@ export const REASON_LABELS: Record<string, string> = {
   UNSUPPORTED_DESTINATION: "Destino no soportado",
   MISSING_BIRTH_DATE: "Fecha de nacimiento no disponible",
   MISSING_EMPLOYMENT_DATA: "Datos de empleo no disponibles",
+};
+
+export const INCOME_CRITERION_LABELS: Record<string, string> = {
+  NET: 'Neto',
+  GROSS: 'Bruto',
 };
 
 export const DESTINATION_LABELS: Record<string, string> = {
