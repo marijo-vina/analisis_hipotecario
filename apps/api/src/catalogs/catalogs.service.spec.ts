@@ -21,7 +21,7 @@ describe('CatalogsService', () => {
     bank: {
       findMany: jest.fn(),
     },
-    bankProductPolicy: {
+    bankPolicy: {
       findMany: jest.fn(),
     },
   };
@@ -170,12 +170,12 @@ describe('CatalogsService', () => {
         { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
       ];
 
-      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue(products);
+      mockPrismaService.bankPolicy.findMany.mockResolvedValue(products);
 
       const result = await service.getBankProducts();
 
       expect(result).toEqual(products);
-      expect(mockPrismaService.bankProductPolicy.findMany).toHaveBeenCalledWith({
+      expect(mockPrismaService.bankPolicy.findMany).toHaveBeenCalledWith({
         where: {
           isActive: true,
           bank: { isActive: true },
@@ -190,12 +190,12 @@ describe('CatalogsService', () => {
         { id: '1', code: 'BANORTE_ADQ_HF', destination: 'ACQUISITION', bank: { code: 'BANORTE' } },
       ];
 
-      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue(products);
+      mockPrismaService.bankPolicy.findMany.mockResolvedValue(products);
 
       const result = await service.getBankProducts('ACQUISITION');
 
       expect(result).toEqual(products);
-      expect(mockPrismaService.bankProductPolicy.findMany).toHaveBeenCalledWith({
+      expect(mockPrismaService.bankPolicy.findMany).toHaveBeenCalledWith({
         where: {
           isActive: true,
           destination: 'ACQUISITION',
@@ -207,7 +207,7 @@ describe('CatalogsService', () => {
     });
 
     it('should return empty array when no products match', async () => {
-      mockPrismaService.bankProductPolicy.findMany.mockResolvedValue([]);
+      mockPrismaService.bankPolicy.findMany.mockResolvedValue([]);
 
       const result = await service.getBankProducts('LIQUIDITY');
 

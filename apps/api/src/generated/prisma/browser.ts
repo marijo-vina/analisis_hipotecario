@@ -88,7 +88,7 @@ export type CaseStatus = Prisma.CaseStatusModel
  */
 export type Bank = Prisma.BankModel
 /**
- * Model BankProductPolicy
+ * Model BankPolicy
  * 
  */
-export type BankProductPolicy = Prisma.BankProductPolicyModel
+export type BankPolicy = Prisma.BankPolicyModel

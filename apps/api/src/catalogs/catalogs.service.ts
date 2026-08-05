@@ -39,7 +39,7 @@ export class CatalogsService {
   }
 
   getBankProducts(destination?: string) {
-    return this.prisma.bankProductPolicy.findMany({
+    return this.prisma.bankPolicy.findMany({
       where: {
         isActive: true,
         ...(destination ? { destination: destination as any } : {}),
