@@ -17,7 +17,7 @@ interface BankDetailPageProps {
  */
 export default async function BankDetailPage({ params }: BankDetailPageProps) {
   const { code } = await params;
-  const result = await apiFetch<BankDetail>(`/banks/${code}`);
+  const result = await apiFetch<{ data: BankDetail }>(`/banks/${code}`);
 
   if (!result.ok && result.notFound) {
     return (
@@ -51,5 +51,5 @@ export default async function BankDetailPage({ params }: BankDetailPageProps) {
     );
   }
 
-  return <BankDetailCard bank={result.data} />;
+  return <BankDetailCard bank={result.data.data} />;
 }
