@@ -134,7 +134,7 @@ export default function BankDetailCard({ bank }: BankDetailCardProps) {
       {/* Policies card */}
       <Card>
         <h2 className="text-sm font-semibold text-gf-text mb-4">
-          Políticas por destino
+          Políticas por objetivo del crédito
         </h2>
         <PolicyEditor bankCode={bank.code} policies={bank.policies} />
       </Card>
