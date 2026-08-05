@@ -76,7 +76,7 @@ describe('BanksService', () => {
         orderBy: { code: 'asc' },
         include: {
           _count: {
-            select: { policies: true },
+            select: { policies: { where: { isActive: true } } },
           },
         },
       });
