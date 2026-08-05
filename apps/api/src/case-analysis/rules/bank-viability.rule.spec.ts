@@ -797,7 +797,7 @@ describe('BankViabilityRule', () => {
           },
         ];
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), docs);
@@ -816,7 +816,7 @@ describe('BankViabilityRule', () => {
           },
         ];
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), docs);
@@ -842,13 +842,32 @@ describe('BankViabilityRule', () => {
         expect(getBv(result).bankResults[0].reasons).toContain('BANREGIO_SCORE_BELOW_THRESHOLD');
       });
 
-      it('Banregio: score = 629 → passes boundary', async () => {
+      it('Banregio: score = 629 → rejected (≤ cutoff)', async () => {
         const { rule, prisma } = makeRuleAndMock();
         const docs = [
           ...defaultDocuments(),
           {
             documentType: { code: 'CREDIT_BUREAU' },
             extractedData: { creditData: { score: 629 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'BANREGIO', minimumBureauScore: 629 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('BANREGIO_SCORE_BELOW_THRESHOLD');
+      });
+
+      it('Banregio: score = 630 → passes boundary', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 630 } },
             processingResults: null,
           },
         ];
@@ -871,7 +890,7 @@ describe('BankViabilityRule', () => {
           },
         ];
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), docs);
@@ -890,7 +909,7 @@ describe('BankViabilityRule', () => {
           },
         ];
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), docs);
@@ -909,7 +928,7 @@ describe('BankViabilityRule', () => {
           },
         ];
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), docs);
@@ -997,7 +1016,7 @@ describe('BankViabilityRule', () => {
       it('no bureau document → skip all bureau checks', async () => {
         const { rule, prisma } = makeRuleAndMock();
         prisma.bankPolicy.findMany.mockResolvedValue([
-          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 541 }) }),
         ]);
 
         const result = await rule.execute(defaultContext(), defaultDocuments());

@@ -508,7 +508,7 @@ export class BankViabilityRule implements AnalysisRule {
 
     // ── Bureau Score Check (bank-specific) ────────────────────────────
     if (bureauData && bureauData.score !== null && policy.bank.minimumBureauScore !== null) {
-      if (bureauData.score < policy.bank.minimumBureauScore) {
+      if (bureauData.score <= policy.bank.minimumBureauScore) {
         reasons.push(`${policy.bank.code}_SCORE_BELOW_THRESHOLD`);
       }
     }
