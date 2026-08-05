@@ -95,7 +95,7 @@ export default function AnalysisSection({
     const bv = run.detail.bankViability;
     if (!bv) return false;
     if (run.outcome === "PARTIAL") return true;
-    return bv.productMatches.some(
+    return bv.bankResults.some(
       (m) => m.status === "CONDITIONED" || m.status === "REQUIRES_REVIEW",
     );
   }, []);
