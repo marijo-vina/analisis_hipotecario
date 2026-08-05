@@ -7,7 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
-import { RotateCw, Loader2, FolderPlus, FileCheck } from "lucide-react";
+import { RotateCw, Loader2, FolderPlus, FileCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -265,6 +265,14 @@ export default function AnalysisSection({
           {headerButton}
         </div>
       </div>
+
+      {/* ── Readiness Checklist (Opción A: pre-análisis) ────────────────── */}
+      {state.phase === "idle" && (
+        <AnalysisReadinessCard
+          documents={documents}
+          onAnalyze={handleAnalyze}
+        />
+      )}
 
       {/* ── Stepper — visible during analyzing or error ─────────────────── */}
       {(state.phase === "analyzing" || state.phase === "error") && (
@@ -802,6 +810,137 @@ function CompactStatusBar({
       style={{ backgroundColor: "#ECFDF5" }}
     >
       ✓ Análisis completado el {date} · 3 fases exitosas
+    </div>
+  );
+}
+
+// ── AnalysisReadinessCard (Checklist dinámico pre-análisis) ───────────────────
+
+function AnalysisReadinessCard({
+  documents,
+  onAnalyze,
+}: {
+  documents: Document[];
+  onAnalyze: () => void;
+}) {
+  const identityDocs = documents.filter(
+    (d) => d.documentType.code === "INE" || d.documentType.code === "PASSPORT",
+  );
+  const incomeDocs = documents.filter(
+    (d) =>
+      d.documentType.code === "PAYROLL_RECEIPT" ||
+      d.documentType.code === "BANK_STATEMENT",
+  );
+  const buroDocs = documents.filter(
+    (d) =>
+      d.documentType.code === "CREDIT_BUREAU_REPORT" ||
+      d.documentType.code === "CREDIT_SCORE",
+  );
+
+  const identityProcessed = identityDocs.some(
+    (d) => d.documentStatus.code === "PROCESSED",
+  );
+  const incomeProcessed = incomeDocs.some(
+    (d) => d.documentStatus.code === "PROCESSED",
+  );
+  const buroProcessed = buroDocs.some(
+    (d) => d.documentStatus.code === "PROCESSED",
+  );
+
+  const isAllReady = identityProcessed && incomeProcessed && buroProcessed;
+
+  const items = [
+    {
+      title: "Identificación oficial",
+      subtitle: "INE o Pasaporte procesado",
+      ready: identityProcessed,
+      count: identityDocs.length,
+    },
+    {
+      title: "Comprobantes de ingresos",
+      subtitle: "Recibos de nómina o Estados de cuenta procesados",
+      ready: incomeProcessed,
+      count: incomeDocs.length,
+    },
+    {
+      title: "Reporte de Buró de crédito",
+      subtitle: "Buró de crédito o Mi Score procesado",
+      ready: buroProcessed,
+      count: buroDocs.length,
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-gf-border rounded-xl p-5 sm:p-6 shadow-2xs space-y-4 my-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gf-border/60 pb-4">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base font-bold text-gf-text">
+              Lista de verificación antes de analizar
+            </h3>
+            {isAllReady ? (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Listo para análisis
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold inline-flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Documentación pendiente
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gf-text-muted mt-1 leading-relaxed">
+            Para obtener un cálculo preciso de capacidad de pago y comparativa bancaria, asegúrate de haber cargado y procesado los 3 bloques de documentos.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAnalyze}
+          className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-2xs transition-all inline-flex items-center justify-center gap-2 shrink-0 ${
+            isAllReady
+              ? "bg-gf-red hover:bg-gf-red-dark text-white active:scale-[0.98]"
+              : "bg-gf-surface-dim text-gf-text-muted border border-gf-border hover:bg-gf-surface"
+          }`}
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          <span>Ejecutar análisis ahora</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className={`p-3.5 rounded-xl border transition-colors ${
+              item.ready
+                ? "bg-emerald-50/40 border-emerald-200"
+                : "bg-amber-50/30 border-amber-200"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-xs font-bold text-gf-text">{item.title}</span>
+              {item.ready ? (
+                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">
+                  ✓
+                </span>
+              ) : (
+                <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center text-[10px] font-bold">
+                  !
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gf-text-muted leading-tight">
+              {item.subtitle}
+            </p>
+            <div className="mt-2.5 pt-2 border-t border-gf-border/40 flex items-center justify-between text-[10px] font-semibold text-gf-text-muted">
+              <span>Estado:</span>
+              <span className={item.ready ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+                {item.ready ? "✓ Procesado" : item.count > 0 ? "Pendiente de procesar" : "No cargado"}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

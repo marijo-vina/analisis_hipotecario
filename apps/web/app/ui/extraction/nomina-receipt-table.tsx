@@ -163,14 +163,8 @@ function EmptyDetail({ row }: { row: ParsedPayrollReceipt }) {
 export default function NominaReceiptTable({
   rows,
 }: NominaReceiptTableProps) {
-  // First card expanded by default
-  const [expandedSet, setExpandedSet] = useState<Set<string>>(() => {
-    const set = new Set<string>();
-    if (rows.length > 0) {
-      set.add(rows[0].documentId);
-    }
-    return set;
-  });
+  // All receipt cards collapsed by default
+  const [expandedSet, setExpandedSet] = useState<Set<string>>(() => new Set<string>());
 
   const toggle = (documentId: string) => {
     setExpandedSet((prev) => {
