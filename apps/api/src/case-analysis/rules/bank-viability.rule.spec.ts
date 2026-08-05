@@ -1,7 +1,8 @@
 // Tests unitarios para BankViabilityRule (HU-13).
 // PrismaService se mockea; se verifica la resolución de inputs,
-// los 7 controles por producto, la precedencia de status, el
-// resultado agregado y la estructura del snapshot de auditoría.
+// los 5 controles por policy (capacity, minimum age, maximum application
+// age, employment tenure, scotiabank pagadora), la precedencia de status,
+// el resultado agregado y la estructura del snapshot de auditoría.
 
 import { BankViabilityRule } from './bank-viability.rule';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -80,7 +81,7 @@ function makeBank(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeProduct(overrides: Record<string, unknown> = {}) {
+function makePolicy(overrides: Record<string, unknown> = {}) {
   return {
     id: 'prod-1',
     bankId: 'bank-banorte',
@@ -88,11 +89,11 @@ function makeProduct(overrides: Record<string, unknown> = {}) {
     name: 'Adquisición Hipoteca Fija',
     destination: 'ACQUISITION',
     personType: 'SALARIED',
+    minimumIncome: null,
+    minimumPropertyValue: null,
     minimumEmploymentTenureMonths: 6,
     minimumApplicantAgeMonths: 300,
     maximumApplicationAgeMonths: 839,
-    maximumMaturityAgeMonths: 960,
-    maximumLtv: { toString: () => '0.90' },
     isActive: true,
     sourceVersion: SOURCE_VERSION,
     bank: makeBank(),
@@ -127,7 +128,7 @@ function makeRuleAndMock() {
   prisma.incomeCalculation.findFirst.mockResolvedValue(defaultIncomeCalculation());
   prisma.liabilitySnapshot.findFirst.mockResolvedValue(defaultLiabilitySnapshot());
   prisma.creditType.findUnique.mockResolvedValue(defaultCreditType());
-  prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+  prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
   prisma.document.findMany.mockResolvedValue([]);
 
   return { rule, prisma };
@@ -160,7 +161,7 @@ describe('BankViabilityRule', () => {
     it('derives birthDate from INE processingResults', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumMaturityAgeMonths: 960 }),
+        makePolicy(),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
@@ -177,7 +178,7 @@ describe('BankViabilityRule', () => {
           processingResults: null,
         },
       ];
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), docs);
       expect(getBv(result).inputs.birthDate).toBe('1990-01-15');
@@ -186,7 +187,7 @@ describe('BankViabilityRule', () => {
     it('returns MISSING_BIRTH_DATE when no birthDate found', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.document.findMany.mockResolvedValue([]);
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), []);
       expect(getBv(result).reasons).toContain('MISSING_BIRTH_DATE');
@@ -209,7 +210,7 @@ describe('BankViabilityRule', () => {
           processingResults: null,
         },
       ]);
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(getBv(result).inputs.employmentStartDate).toBe('2024-01-15');
@@ -239,7 +240,7 @@ describe('BankViabilityRule', () => {
           processingResults: null,
         },
       ]);
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(getBv(result).reasons).toContain('CONFLICTING_EMPLOYMENT_DATES');
@@ -248,7 +249,7 @@ describe('BankViabilityRule', () => {
     it('reads hasPagadoraIncome and scotiabankExcluded from bankarizationFlags context', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ code: 'SCOTIABANK' }) }),
+        makePolicy({ bank: makeBank({ code: 'SCOTIABANK' }) }),
       ]);
 
       const result = await rule.execute(
@@ -256,8 +257,8 @@ describe('BankViabilityRule', () => {
         defaultDocuments(),
       );
       // Scotiabank + pagadora → REQUIRES_REVIEW
-      expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('REQUIRES_REVIEW');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
@@ -270,22 +271,22 @@ describe('BankViabilityRule', () => {
     it('selects NET income when bank incomeCriterion is NET', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ incomeCriterion: 'NET', debtCommitmentFactor: { toString: () => '0.60' } }) }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'NET', debtCommitmentFactor: { toString: () => '0.60' } }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const calc = getBv(result).productMatches[0].calculation;
+      const calc = getBv(result).bankResults[0].calculation;
       expect(calc.incomeUsed).toBe('56976.33');
     });
 
     it('selects GROSS income when bank incomeCriterion is GROSS', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ incomeCriterion: 'GROSS', debtCommitmentFactor: { toString: () => '0.55' } }) }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'GROSS', debtCommitmentFactor: { toString: () => '0.55' } }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const calc = getBv(result).productMatches[0].calculation;
+      const calc = getBv(result).bankResults[0].calculation;
       expect(calc.incomeUsed).toBe('83427.21');
     });
 
@@ -297,12 +298,12 @@ describe('BankViabilityRule', () => {
         averageNetIncome: null,
       });
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ incomeCriterion: 'NET' }) }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'NET' }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
-      expect(getBv(result).productMatches[0].reasons).toContain('UNCONFIRMED_INCOME');
+      expect(getBv(result).bankResults[0].status).toBe('REQUIRES_REVIEW');
+      expect(getBv(result).bankResults[0].reasons).toContain('UNCONFIRMED_INCOME');
     });
 
     it('falls back to averageNetIncome when confirmedNetIncome is null', async () => {
@@ -315,11 +316,11 @@ describe('BankViabilityRule', () => {
         averageNetIncome: { toString: () => '50000.00' },
       });
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ incomeCriterion: 'NET', debtCommitmentFactor: { toString: () => '0.60' } }) }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'NET', debtCommitmentFactor: { toString: () => '0.60' } }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const calc = getBv(result).productMatches[0].calculation;
+      const calc = getBv(result).bankResults[0].calculation;
       // Should use averageNetIncome = 50000.00 as fallback
       expect(calc.incomeUsed).toBe('50000.00');
     });
@@ -334,11 +335,11 @@ describe('BankViabilityRule', () => {
         averageNetIncome: { toString: () => '50000.00' },
       });
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ incomeCriterion: 'GROSS', debtCommitmentFactor: { toString: () => '0.55' } }) }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'GROSS', debtCommitmentFactor: { toString: () => '0.55' } }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const calc = getBv(result).productMatches[0].calculation;
+      const calc = getBv(result).bankResults[0].calculation;
       // Should use averageGrossIncome = 75000.00 as fallback
       expect(calc.incomeUsed).toBe('75000.00');
     });
@@ -351,7 +352,7 @@ describe('BankViabilityRule', () => {
     it('passes when available capacity is positive', async () => {
       const { rule } = makeRuleAndMock();
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const checks = getBv(result).productMatches[0].checks;
+      const checks = getBv(result).bankResults[0].checks;
       expect(checks.capacity.status).toBe('PASS');
     });
 
@@ -363,110 +364,25 @@ describe('BankViabilityRule', () => {
         ...defaultLiabilitySnapshot(),
         grossCurrentMonthlyDebt: { toString: () => '40000.00' },
       });
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'NEGATIVE_CAPACITY',
       );
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 4. LTV Control
-  // ─────────────────────────────────────────────────────────────────────
-  describe('ltv control', () => {
-    it('passes when LTV is within limit', async () => {
-      const { rule } = makeRuleAndMock();
-      // requestedAmount=1,600,000 / propertyValue=2,000,000 = 0.80 < 0.90
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      const checks = getBv(result).productMatches[0].checks;
-      expect(checks.ltv.status).toBe('PASS');
-    });
-
-    it('returns CONDITIONED when LTV exceeds maximum', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        requestedAmount: { toString: () => '1900000.00' },
-        propertyValue: { toString: () => '2000000.00' },
-      });
-      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
-      prisma.document.findMany.mockResolvedValue([
-        {
-          id: 'doc-payroll-1',
-          documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employment: { hireDate: '2024-01-15' } },
-          processingResults: null,
-        },
-      ]);
-      prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumLtv: { toString: () => '0.90' } }),
-      ]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      // LTV = 0.95 > 0.90 → CONDITIONED
-      expect(getBv(result).productMatches[0].status).toBe('CONDITIONED');
-      expect(getBv(result).productMatches[0].reasons).toContain('LTV_EXCEEDED');
-    });
-
-    it('returns REQUIRES_REVIEW when requestedAmount is null', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        requestedAmount: null,
-      });
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.ltv.status).toBe(
-        'REQUIRES_REVIEW',
-      );
-      expect(getBv(result).productMatches[0].reasons).toContain(
-        'INVALID_REQUESTED_AMOUNT',
-      );
-    });
-
-    it('returns REQUIRES_REVIEW when propertyValue is zero', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        propertyValue: { toString: () => '0' },
-      });
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.ltv.status).toBe(
-        'REQUIRES_REVIEW',
-      );
-      expect(getBv(result).productMatches[0].reasons).toContain(
-        'INVALID_PROPERTY_VALUE',
-      );
-    });
-
-    it('returns NOT_APPLICABLE when maximumLtv policy is null', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumLtv: null }),
-      ]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.ltv.status).toBe(
-        'NOT_APPLICABLE',
-      );
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────
-  // 5. Minimum Age Control
+  // 4. Minimum Age Control
   // ─────────────────────────────────────────────────────────────────────
   describe('minimum age control', () => {
     it('passes when age is above minimum', async () => {
       const { rule } = makeRuleAndMock();
       // birthDate 1992-06-14, calculatedAt 2026-07-20 = 409 months > 300
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.minimumApplicantAge.status).toBe(
+      expect(getBv(result).bankResults[0].checks.minimumApplicantAge.status).toBe(
         'PASS',
       );
     });
@@ -482,12 +398,12 @@ describe('BankViabilityRule', () => {
         },
       ];
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ minimumApplicantAgeMonths: 300 }),
+        makePolicy({ minimumApplicantAgeMonths: 300 }),
       ]);
 
       const result = await rule.execute(defaultContext(), docs);
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'MINIMUM_AGE_NOT_MET',
       );
     });
@@ -495,18 +411,18 @@ describe('BankViabilityRule', () => {
     it('returns NOT_APPLICABLE when minimumApplicantAgeMonths is null', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ minimumApplicantAgeMonths: null }),
+        makePolicy({ minimumApplicantAgeMonths: null }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(
-        getBv(result).productMatches[0].checks.minimumApplicantAge.status,
+        getBv(result).bankResults[0].checks.minimumApplicantAge.status,
       ).toBe('NOT_APPLICABLE');
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 6. Maximum Application Age Control
+  // 5. Maximum Application Age Control
   // ─────────────────────────────────────────────────────────────────────
   describe('maximum application age control', () => {
     it('passes when age is within limit', async () => {
@@ -514,7 +430,7 @@ describe('BankViabilityRule', () => {
       // birthDate 1992-06-14, calculatedAt 2026-07-20 = 409 months < 839
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(
-        getBv(result).productMatches[0].checks.maximumApplicationAge.status,
+        getBv(result).bankResults[0].checks.maximumApplicationAge.status,
       ).toBe('PASS');
     });
 
@@ -529,12 +445,12 @@ describe('BankViabilityRule', () => {
         },
       ];
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumApplicationAgeMonths: 839 }),
+        makePolicy({ maximumApplicationAgeMonths: 839 }),
       ]);
 
       const result = await rule.execute(defaultContext(), docs);
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'MAXIMUM_APPLICATION_AGE_EXCEEDED',
       );
     });
@@ -542,84 +458,18 @@ describe('BankViabilityRule', () => {
     it('returns NOT_APPLICABLE when maximumApplicationAgeMonths is null', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumApplicationAgeMonths: null }),
+        makePolicy({ maximumApplicationAgeMonths: null }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(
-        getBv(result).productMatches[0].checks.maximumApplicationAge.status,
+        getBv(result).bankResults[0].checks.maximumApplicationAge.status,
       ).toBe('NOT_APPLICABLE');
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 7. Maturity Age Control
-  // ─────────────────────────────────────────────────────────────────────
-  describe('maturity age control', () => {
-    it('passes when age at maturity is within limit', async () => {
-      const { rule } = makeRuleAndMock();
-      // currentAgeMonths=409, estimatedTermMonths=240 → ageAtMaturity=649 < 960
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.maturityAge.status).toBe('PASS');
-    });
-
-    it('returns CONDITIONED when maturity age is exceeded but theoretical term > 0', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      // currentAgeMonths=409, estimatedTermMonths=600 → ageAtMaturity=1009 > 960
-      // maxTheoreticalTerm = 960 - 409 = 551 > 0 → CONDITIONED
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        estimatedTermMonths: 600,
-      });
-      // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW beats CONDITIONED)
-      prisma.document.findMany.mockResolvedValue([
-        {
-          id: 'doc-payroll-1',
-          documentType: { code: 'PAYROLL_RECEIPT' },
-          extractedData: { employment: { hireDate: '2024-01-15' } },
-          processingResults: null,
-        },
-      ]);
-      prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumMaturityAgeMonths: 960 }),
-      ]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('CONDITIONED');
-      expect(getBv(result).productMatches[0].reasons).toContain(
-        'MATURITY_AGE_EXCEEDED',
-      );
-    });
-
-    it('returns NOT_COMPATIBLE when maximumTheoreticalTermMonths is 0', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      // currentAgeMonths=409, maximumMaturityAgeMonths=400 → theoretical=0
-      prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumMaturityAgeMonths: 400 }),
-      ]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
-      expect(getBv(result).productMatches[0].reasons).toContain(
-        'NO_VALID_TERM_AVAILABLE',
-      );
-    });
-
-    it('returns NOT_APPLICABLE when maximumMaturityAgeMonths is null', async () => {
-      const { rule, prisma } = makeRuleAndMock();
-      prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumMaturityAgeMonths: null }),
-      ]);
-
-      const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].checks.maturityAge.status).toBe(
-        'NOT_APPLICABLE',
-      );
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────
-  // 8. Employment Tenure Control
+  // 6. Employment Tenure Control
   // ─────────────────────────────────────────────────────────────────────
   describe('employment tenure control', () => {
     it('passes when tenure is sufficient', async () => {
@@ -634,12 +484,12 @@ describe('BankViabilityRule', () => {
         },
       ]);
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ minimumEmploymentTenureMonths: 6 }),
+        makePolicy({ minimumEmploymentTenureMonths: 6 }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(
-        getBv(result).productMatches[0].checks.employmentTenure.status,
+        getBv(result).bankResults[0].checks.employmentTenure.status,
       ).toBe('PASS');
     });
 
@@ -655,12 +505,12 @@ describe('BankViabilityRule', () => {
         },
       ]);
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ minimumEmploymentTenureMonths: 6 }),
+        makePolicy({ minimumEmploymentTenureMonths: 6 }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'INSUFFICIENT_EMPLOYMENT_TENURE',
       );
     });
@@ -668,32 +518,32 @@ describe('BankViabilityRule', () => {
     it('returns NOT_APPLICABLE when minimumEmploymentTenureMonths is null', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ minimumEmploymentTenureMonths: null }),
+        makePolicy({ minimumEmploymentTenureMonths: null }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(
-        getBv(result).productMatches[0].checks.employmentTenure.status,
+        getBv(result).bankResults[0].checks.employmentTenure.status,
       ).toBe('NOT_APPLICABLE');
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 9. Scotiabank Pagadora Rule
+  // 7. Scotiabank Pagadora Rule
   // ─────────────────────────────────────────────────────────────────────
   describe('Scotiabank pagadora rule', () => {
     it('returns REQUIRES_REVIEW for Scotiabank when hasPagadoraIncome and scotiabankExcluded are true', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
+        makePolicy({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
       ]);
 
       const result = await rule.execute(
         defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: true }),
         defaultDocuments(),
       );
-      expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
-      expect(getBv(result).productMatches[0].reasons).toContain(
+      expect(getBv(result).bankResults[0].status).toBe('REQUIRES_REVIEW');
+      expect(getBv(result).bankResults[0].reasons).toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
@@ -701,7 +551,7 @@ describe('BankViabilityRule', () => {
     it('does not flag Scotiabank when scotiabankExcluded is false', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
+        makePolicy({ bank: makeBank({ code: 'SCOTIABANK', debtCommitmentFactor: { toString: () => '0.55' }, incomeCriterion: 'GROSS' }) }),
       ]);
 
       const result = await rule.execute(
@@ -709,7 +559,7 @@ describe('BankViabilityRule', () => {
         defaultDocuments(),
       );
       // Not REQUIRES_REVIEW due to Scotiabank (may be PRELIMINARY_VIABLE or other)
-      expect(getBv(result).productMatches[0].reasons).not.toContain(
+      expect(getBv(result).bankResults[0].reasons).not.toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
@@ -717,14 +567,14 @@ describe('BankViabilityRule', () => {
     it('does not affect non-Scotiabank products when flags are true', async () => {
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ code: 'BANORTE' }) }),
+        makePolicy({ bank: makeBank({ code: 'BANORTE' }) }),
       ]);
 
       const result = await rule.execute(
         defaultContext({ hasPagadoraIncome: true, scotiabankExcluded: true }),
         defaultDocuments(),
       );
-      expect(getBv(result).productMatches[0].reasons).not.toContain(
+      expect(getBv(result).bankResults[0].reasons).not.toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
@@ -737,7 +587,7 @@ describe('BankViabilityRule', () => {
       // reading stale data from the DB.
       const { rule, prisma } = makeRuleAndMock();
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ bank: makeBank({ code: 'SCOTIABANK' }) }),
+        makePolicy({ bank: makeBank({ code: 'SCOTIABANK' }) }),
       ]);
 
       // defaultContext() with no args yields a context that does NOT
@@ -748,64 +598,55 @@ describe('BankViabilityRule', () => {
       expect(inputs.hasPagadoraIncome).toBe(false);
       expect(inputs.scotiabankExcluded).toBe(false);
       // Scotiabank without pagadora → must not be flagged for exclusion
-      expect(getBv(result).productMatches[0].reasons).not.toContain(
+      expect(getBv(result).bankResults[0].reasons).not.toContain(
         'SCOTIABANK_PAGADORA_EXCLUSION',
       );
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 10. Status Precedence
+  // 8. Status Precedence
   // ─────────────────────────────────────────────────────────────────────
   describe('status precedence', () => {
-    it('NOT_COMPATIBLE takes precedence over CONDITIONED', async () => {
+    it('NOT_COMPATIBLE takes precedence over REQUIRES_REVIEW', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      // Make capacity negative (NOT_COMPATIBLE) AND LTV exceeded (CONDITIONED)
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        requestedAmount: { toString: () => '1900000.00' },
-        propertyValue: { toString: () => '2000000.00' },
-      });
+      // Negative capacity (NOT_COMPATIBLE) AND missing employment data (REQUIRES_REVIEW)
       prisma.liabilitySnapshot.findFirst.mockResolvedValue({
         ...defaultLiabilitySnapshot(),
         grossCurrentMonthlyDebt: { toString: () => '40000.00' },
       });
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumLtv: { toString: () => '0.90' } }),
+        makePolicy({ minimumEmploymentTenureMonths: 6 }),
       ]);
+      // No employment data → REQUIRES_REVIEW; negative capacity → NOT_COMPATIBLE
+      prisma.document.findMany.mockResolvedValue([]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      // Negative capacity → NOT_COMPATIBLE (beats CONDITIONED from LTV)
-      expect(getBv(result).productMatches[0].status).toBe('NOT_COMPATIBLE');
+      // NOT_COMPATIBLE beats REQUIRES_REVIEW
+      expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
     });
 
-    it('REQUIRES_REVIEW takes precedence over CONDITIONED', async () => {
+    it('REQUIRES_REVIEW when income is missing and other checks pass', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      // Null net income AND null average → REQUIRES_REVIEW, AND LTV exceeded → CONDITIONED
       prisma.incomeCalculation.findFirst.mockResolvedValue({
         ...defaultIncomeCalculation(),
         confirmedNetIncome: null,
         averageNetIncome: null,
       });
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        requestedAmount: { toString: () => '1900000.00' },
-        propertyValue: { toString: () => '2000000.00' },
-      });
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumLtv: { toString: () => '0.90' } }),
+        makePolicy({ bank: makeBank({ incomeCriterion: 'NET' }) }),
       ]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      expect(getBv(result).productMatches[0].status).toBe('REQUIRES_REVIEW');
+      expect(getBv(result).bankResults[0].status).toBe('REQUIRES_REVIEW');
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 11. Aggregate Outcome
+  // 9. Aggregate Outcome
   // ─────────────────────────────────────────────────────────────────────
   describe('aggregate outcome', () => {
-    it('returns PASS when at least one product is PRELIMINARY_VIABLE', async () => {
+    it('returns PASS when at least one policy is PRELIMINARY_VIABLE', async () => {
       const { rule, prisma } = makeRuleAndMock();
       // Provide employment data so tenure check passes (otherwise REQUIRES_REVIEW prevents PRELIMINARY_VIABLE)
       prisma.document.findMany.mockResolvedValue([
@@ -820,30 +661,27 @@ describe('BankViabilityRule', () => {
       expect(result.outcome).toBe('PASS');
     });
 
-    it('returns PARTIAL when no viable but at least one CONDITIONED', async () => {
+    it('returns PARTIAL when no viable but at least one REQUIRES_REVIEW', async () => {
       const { rule, prisma } = makeRuleAndMock();
-      // LTV exceeded → CONDITIONED, all other checks pass
-      prisma.mortgageCase.findUnique.mockResolvedValue({
-        ...defaultCase(),
-        requestedAmount: { toString: () => '1900000.00' },
-        propertyValue: { toString: () => '2000000.00' },
-      });
+      // Missing employment data → REQUIRES_REVIEW
       prisma.bankPolicy.findMany.mockResolvedValue([
-        makeProduct({ maximumLtv: { toString: () => '0.80' } }),
+        makePolicy({ minimumEmploymentTenureMonths: 6 }),
       ]);
+      // No employment data provided → REQUIRES_REVIEW
+      prisma.document.findMany.mockResolvedValue([]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(result.outcome).toBe('PARTIAL');
     });
 
-    it('returns FAIL when all products are NOT_COMPATIBLE', async () => {
+    it('returns FAIL when all policies are NOT_COMPATIBLE', async () => {
       const { rule, prisma } = makeRuleAndMock();
       // Negative capacity → NOT_COMPATIBLE for all
       prisma.liabilitySnapshot.findFirst.mockResolvedValue({
         ...defaultLiabilitySnapshot(),
         grossCurrentMonthlyDebt: { toString: () => '50000.00' },
       });
-      prisma.bankPolicy.findMany.mockResolvedValue([makeProduct()]);
+      prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
 
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(result.outcome).toBe('FAIL');
@@ -861,12 +699,21 @@ describe('BankViabilityRule', () => {
       const result = await rule.execute(defaultContext(), defaultDocuments());
       expect(result.outcome).toBe('PARTIAL');
       expect(getBv(result).reasons).toContain('UNSUPPORTED_DESTINATION');
-      expect(getBv(result).productMatches).toHaveLength(0);
+      expect(getBv(result).bankResults).toHaveLength(0);
+    });
+
+    it('returns PARTIAL when destination is valid but no active policies exist', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.bankPolicy.findMany.mockResolvedValue([]);
+
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+      expect(result.outcome).toBe('PARTIAL');
+      expect(getBv(result).bankResults).toHaveLength(0);
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 12. Audit Snapshot
+  // 10. Audit Snapshot
   // ─────────────────────────────────────────────────────────────────────
   describe('audit snapshot', () => {
     it('includes all required fields in the snapshot structure', async () => {
@@ -881,21 +728,18 @@ describe('BankViabilityRule', () => {
       expect(bv.warningLegend).toBeDefined();
       expect(Array.isArray(bv.reasons)).toBe(true);
       expect(bv.inputs).toBeDefined();
-      expect(Array.isArray(bv.productMatches)).toBe(true);
+      expect(Array.isArray(bv.bankResults)).toBe(true);
     });
 
     it('serializes all Decimal values as strings', async () => {
       const { rule } = makeRuleAndMock();
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const calc = getBv(result).productMatches[0].calculation;
+      const calc = getBv(result).bankResults[0].calculation;
 
       expect(typeof calc.incomeUsed).toBe('string');
       expect(typeof calc.maximumDebt).toBe('string');
       expect(typeof calc.totalMonthlyLiabilities).toBe('string');
       expect(typeof calc.availableCapacity).toBe('string');
-      expect(typeof calc.requestedLtv).toBe('string');
-      expect(typeof calc.maximumAmountByLtv).toBe('string');
-      expect(typeof calc.requiredReduction).toBe('string');
 
       // Verify actual computed values
       // incomeUsed = 56976.33, maximumDebt = 56976.33 * 0.60 = 34185.798 → 34185.80
@@ -904,23 +748,21 @@ describe('BankViabilityRule', () => {
       expect(calc.totalMonthlyLiabilities).toBe('19304.74');
       // availableCapacity = 34185.80 - 19304.74 = 14881.06
       expect(calc.availableCapacity).toBe('14881.06');
-      // requestedLtv = 1600000 / 2000000 = 0.80
-      expect(calc.requestedLtv).toBe('0.80');
     });
 
-    it('places warningLegend at bankViability level, not per product', async () => {
+    it('places warningLegend at bankViability level, not per policy', async () => {
       const { rule } = makeRuleAndMock();
       const result = await rule.execute(defaultContext(), defaultDocuments());
       const bv = getBv(result);
 
       expect(bv.warningLegend).toBeTruthy();
-      // warningLegend should NOT be inside productMatches
-      for (const pm of bv.productMatches) {
-        expect((pm as unknown as Record<string, unknown>).warningLegend).toBeUndefined();
+      // warningLegend should NOT be inside bankResults
+      for (const br of bv.bankResults) {
+        expect((br as unknown as Record<string, unknown>).warningLegend).toBeUndefined();
       }
     });
 
-    it('uses two-level reasons: global vs per-product', async () => {
+    it('uses two-level reasons: global vs per-policy', async () => {
       const { rule, prisma } = makeRuleAndMock();
       // Null destination → global reason
       prisma.creditType.findUnique.mockResolvedValue({
@@ -933,31 +775,30 @@ describe('BankViabilityRule', () => {
       const result = await rule.execute(defaultContext(), defaultDocuments());
       // Global reasons
       expect(getBv(result).reasons).toContain('UNSUPPORTED_DESTINATION');
-      // No product matches when destination is null
-      expect(getBv(result).productMatches).toHaveLength(0);
+      // No bank results when destination is null
+      expect(getBv(result).bankResults).toHaveLength(0);
     });
 
-    it('includes policySnapshot with bank and product policy data', async () => {
+    it('includes policySnapshot with bank policy data', async () => {
       const { rule } = makeRuleAndMock();
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const pm = getBv(result).productMatches[0];
+      const br = getBv(result).bankResults[0];
 
-      expect(pm.policySnapshot).toBeDefined();
-      expect(pm.policySnapshot.incomeCriterion).toBe('NET');
-      expect(pm.policySnapshot.debtCommitmentFactor).toBe('0.60');
-      expect(pm.policySnapshot.maximumLtv).toBe('0.90');
+      expect(br.policySnapshot).toBeDefined();
+      expect(br.policySnapshot.incomeCriterion).toBe('NET');
+      expect(br.policySnapshot.debtCommitmentFactor).toBe('0.60');
+      expect(br.policySnapshot.bankName).toBe('Banorte');
+      expect(br.policySnapshot.minimumIncome).toBeNull();
+      expect(br.policySnapshot.minimumPropertyValue).toBeNull();
     });
 
-    it('includes product-level checks with status and values', async () => {
+    it('includes policy-level checks with status and values', async () => {
       const { rule } = makeRuleAndMock();
       const result = await rule.execute(defaultContext(), defaultDocuments());
-      const checks = getBv(result).productMatches[0].checks;
+      const checks = getBv(result).bankResults[0].checks;
 
       expect(checks.capacity).toBeDefined();
       expect(checks.capacity.status).toBe('PASS');
-      expect(checks.ltv).toBeDefined();
-      expect(checks.ltv.status).toBe('PASS');
-      expect(checks.maturityAge).toBeDefined();
       expect(checks.minimumApplicantAge).toBeDefined();
       expect(checks.maximumApplicationAge).toBeDefined();
       expect(checks.employmentTenure).toBeDefined();

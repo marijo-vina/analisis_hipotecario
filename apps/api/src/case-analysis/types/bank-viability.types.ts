@@ -15,6 +15,9 @@ export type ProductMatchStatus =
   | 'NOT_COMPATIBLE'
   | 'REQUIRES_REVIEW';
 
+/** @deprecated Use BankResultStatus instead. Kept for backward compat. */
+export type BankResultStatus = ProductMatchStatus;
+
 export interface BankViabilityInputs {
   confirmedGrossIncome: string | null;
   confirmedNetIncome: string | null;
@@ -28,34 +31,47 @@ export interface BankViabilityInputs {
   scotiabankExcluded: boolean;
 }
 
-export interface ProductMatchCalculation {
+export interface BankResultCalculation {
   incomeUsed: string | null;
   maximumDebt: string | null;
   totalMonthlyLiabilities: string | null;
   availableCapacity: string | null;
-  requestedLtv: string | null;
-  maximumAmountByLtv: string | null;
-  requiredReduction: string | null;
   currentAgeMonths: number | null;
   ageAtMaturityMonths: number | null;
   employmentTenureMonths: number | null;
-  maximumTheoreticalTermMonths: number | null;
 }
+
+/** @deprecated Use BankResultCalculation instead. Kept for backward compat. */
+export type ProductMatchCalculation = BankResultCalculation;
 
 export interface CheckResult {
   status: CheckStatus;
   [key: string]: unknown;
 }
 
-export interface ProductMatch {
+export interface BankPolicySnapshot {
+  bankName: string;
+  incomeCriterion: string;
+  debtCommitmentFactor: string;
+  minimumEmploymentTenureMonths: number | null;
+  minimumApplicantAgeMonths: number | null;
+  maximumApplicationAgeMonths: number | null;
+  minimumIncome: string | null;
+  minimumPropertyValue: string | null;
+}
+
+export interface BankResult {
   bankCode: string;
   productCode: string;
   status: ProductMatchStatus;
   reasons: string[];
-  policySnapshot: Record<string, unknown>;
-  calculation: ProductMatchCalculation;
+  policySnapshot: BankPolicySnapshot;
+  calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
 }
+
+/** @deprecated Use BankResult instead. Kept for backward compat. */
+export type ProductMatch = BankResult;
 
 export interface CaseAnalysisContext {
   client: Record<string, unknown>;
@@ -71,5 +87,5 @@ export interface BankViabilitySnapshot {
   warningLegend: string;
   reasons: string[];
   inputs: BankViabilityInputs;
-  productMatches: ProductMatch[];
+  bankResults: BankResult[];
 }

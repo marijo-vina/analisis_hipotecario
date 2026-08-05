@@ -74,7 +74,7 @@ describe('CaseAnalysisService', () => {
     ruleId: 'bank-viability',
     outcome: 'PASS',
     severity: 'INFO',
-    detail: { sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'bank-catalog'], fields: [], bankViability: { sourceVersion: 'ANAQUEL_MAYO_2026', productMatches: [] } },
+    detail: { sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'bank-catalog'], fields: [], bankViability: { sourceVersion: 'ANAQUEL_MAYO_2026', bankResults: [] } },
     alerts: [],
   };
 
