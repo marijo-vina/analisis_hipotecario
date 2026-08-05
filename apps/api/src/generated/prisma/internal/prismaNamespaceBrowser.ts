@@ -288,18 +288,13 @@ export const BankPolicyScalarFieldEnum = {
   id: 'id',
   bankId: 'bankId',
   code: 'code',
-  name: 'name',
   destination: 'destination',
-  personType: 'personType',
   minimumIncome: 'minimumIncome',
   minimumPropertyValue: 'minimumPropertyValue',
   minimumEmploymentTenureMonths: 'minimumEmploymentTenureMonths',
   minimumApplicantAgeMonths: 'minimumApplicantAgeMonths',
   maximumApplicationAgeMonths: 'maximumApplicationAgeMonths',
-  maximumMaturityAgeMonths: 'maximumMaturityAgeMonths',
-  maximumLtv: 'maximumLtv',
   isActive: 'isActive',
-  sourceVersion: 'sourceVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
