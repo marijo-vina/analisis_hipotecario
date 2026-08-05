@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 import {
   triggerAnalysis,
@@ -123,9 +123,44 @@ export default function AnalysisSection({
     loadLatest();
   }, [loadLatest]);
 
-  // Disparar análisis
-  const handleAnalyze = async () => {
+  // Disparar análisis con comprobación de confirmación (Propuesta 2)
+  const hasMissingDocs = useMemo(() => {
+    const hasIdentity = documents.some(
+      (d) =>
+        (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
+        d.documentStatus.code === "PROCESSED",
+    );
+    const hasIncome = documents.some(
+      (d) =>
+        (d.documentType.code === "PAYROLL_RECEIPT" ||
+          d.documentType.code === "BANK_STATEMENT") &&
+        d.documentStatus.code === "PROCESSED",
+    );
+    const hasBuro = documents.some(
+      (d) =>
+        (d.documentType.code === "CREDIT_BUREAU_REPORT" ||
+          d.documentType.code === "CREDIT_SCORE") &&
+        d.documentStatus.code === "PROCESSED",
+    );
+    const hasUnprocessed = documents.some(
+      (d) => d.documentStatus.code !== "PROCESSED",
+    );
+    return !hasIdentity || !hasIncome || !hasBuro || hasUnprocessed;
+  }, [documents]);
+
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
+  const handleAnalyzeClick = () => {
     if (!hasProcessedDocs) return;
+    if (hasMissingDocs) {
+      setConfirmModalOpen(true);
+    } else {
+      executeAnalysis();
+    }
+  };
+
+  const executeAnalysis = async () => {
+    setConfirmModalOpen(false);
     setState({ phase: "analyzing" });
     const res = await triggerAnalysis(caseId);
     if (!res.success || !res.data) {
@@ -165,7 +200,7 @@ export default function AnalysisSection({
         return (
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -177,7 +212,7 @@ export default function AnalysisSection({
         return (
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -199,7 +234,7 @@ export default function AnalysisSection({
         return (
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -250,6 +285,10 @@ export default function AnalysisSection({
     );
   }
 
+  const processedCount = documents.filter(
+    (d) => d.documentStatus.code === "PROCESSED",
+  ).length;
+
   // ── Render Normal de Análisis ───────────────────────────────────────────
 
   return (
@@ -266,13 +305,18 @@ export default function AnalysisSection({
         </div>
       </div>
 
-      {/* ── Readiness Checklist (Opción A: pre-análisis) ────────────────── */}
-      {state.phase === "idle" && (
-        <AnalysisReadinessCard
-          documents={documents}
-          onAnalyze={handleAnalyze}
-        />
-      )}
+      {/* ── Propuesta 3: Cinta delgada de 1 sola fila (Inline Notice Banner) ── */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3 mb-4 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+          <span>
+            <strong>Indicación para la asesora:</strong> Asegúrate de haber cargado y procesado toda la documentación necesaria antes de ejecutar el análisis.
+          </span>
+        </div>
+        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full shrink-0">
+          {processedCount}/{documents.length} procesados
+        </span>
+      </div>
 
       {/* ── Stepper — visible during analyzing or error ─────────────────── */}
       {(state.phase === "analyzing" || state.phase === "error") && (
@@ -352,6 +396,14 @@ export default function AnalysisSection({
           )}
         </>
       )}
+
+      {/* ── Modal de Confirmación Pre-Análisis (Propuesta 2) ───────────── */}
+      <AnalysisConfirmModal
+        isOpen={confirmModalOpen}
+        documents={documents}
+        onClose={() => setConfirmModalOpen(false)}
+        onConfirm={executeAnalysis}
+      />
     </div>
   );
 }
@@ -814,132 +866,102 @@ function CompactStatusBar({
   );
 }
 
-// ── AnalysisReadinessCard (Checklist dinámico pre-análisis) ───────────────────
+// ── AnalysisConfirmModal (Propuesta 2: Modal de confirmación pre-análisis) ───
 
-function AnalysisReadinessCard({
+function AnalysisConfirmModal({
+  isOpen,
   documents,
-  onAnalyze,
+  onClose,
+  onConfirm,
 }: {
+  isOpen: boolean;
   documents: Document[];
-  onAnalyze: () => void;
+  onClose: () => void;
+  onConfirm: () => void;
 }) {
-  const identityDocs = documents.filter(
-    (d) => d.documentType.code === "INE" || d.documentType.code === "PASSPORT",
-  );
-  const incomeDocs = documents.filter(
+  if (!isOpen) return null;
+
+  const identityReady = documents.some(
     (d) =>
-      d.documentType.code === "PAYROLL_RECEIPT" ||
-      d.documentType.code === "BANK_STATEMENT",
+      (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
+      d.documentStatus.code === "PROCESSED",
   );
-  const buroDocs = documents.filter(
+  const incomeReady = documents.some(
     (d) =>
-      d.documentType.code === "CREDIT_BUREAU_REPORT" ||
-      d.documentType.code === "CREDIT_SCORE",
+      (d.documentType.code === "PAYROLL_RECEIPT" ||
+        d.documentType.code === "BANK_STATEMENT") &&
+      d.documentStatus.code === "PROCESSED",
   );
-
-  const identityProcessed = identityDocs.some(
-    (d) => d.documentStatus.code === "PROCESSED",
+  const buroReady = documents.some(
+    (d) =>
+      (d.documentType.code === "CREDIT_BUREAU_REPORT" ||
+        d.documentType.code === "CREDIT_SCORE") &&
+      d.documentStatus.code === "PROCESSED",
   );
-  const incomeProcessed = incomeDocs.some(
-    (d) => d.documentStatus.code === "PROCESSED",
-  );
-  const buroProcessed = buroDocs.some(
-    (d) => d.documentStatus.code === "PROCESSED",
-  );
-
-  const isAllReady = identityProcessed && incomeProcessed && buroProcessed;
-
-  const items = [
-    {
-      title: "Identificación oficial",
-      subtitle: "INE o Pasaporte procesado",
-      ready: identityProcessed,
-      count: identityDocs.length,
-    },
-    {
-      title: "Comprobantes de ingresos",
-      subtitle: "Recibos de nómina o Estados de cuenta procesados",
-      ready: incomeProcessed,
-      count: incomeDocs.length,
-    },
-    {
-      title: "Reporte de Buró de crédito",
-      subtitle: "Buró de crédito o Mi Score procesado",
-      ready: buroProcessed,
-      count: buroDocs.length,
-    },
-  ];
+  const unprocessedCount = documents.filter(
+    (d) => d.documentStatus.code !== "PROCESSED",
+  ).length;
 
   return (
-    <div className="bg-white border border-gf-border rounded-xl p-5 sm:p-6 shadow-2xs space-y-4 my-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gf-border/60 pb-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-gf-text">
-              Lista de verificación antes de analizar
-            </h3>
-            {isAllReady ? (
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold inline-flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Listo para análisis
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold inline-flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Documentación pendiente
-              </span>
-            )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl border border-gf-border shadow-xl max-w-md w-full p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+            <AlertTriangle className="h-5 w-5" />
           </div>
-          <p className="text-xs text-gf-text-muted mt-1 leading-relaxed">
-            Para obtener un cálculo preciso de capacidad de pago y comparativa bancaria, asegúrate de haber cargado y procesado los 3 bloques de documentos.
-          </p>
+          <div>
+            <h3 className="text-base font-bold text-gf-text">
+              ¿Deseas ejecutar el análisis ahora?
+            </h3>
+            <p className="text-xs text-gf-text-muted mt-1 leading-relaxed">
+              La capacidad de pago y la viabilidad bancaria se calculan mejor con la información completa. Detectamos el siguiente estado de los documentos:
+            </p>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onAnalyze}
-          className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-2xs transition-all inline-flex items-center justify-center gap-2 shrink-0 ${
-            isAllReady
-              ? "bg-gf-red hover:bg-gf-red-dark text-white active:scale-[0.98]"
-              : "bg-gf-surface-dim text-gf-text-muted border border-gf-border hover:bg-gf-surface"
-          }`}
-        >
-          <RotateCw className="w-3.5 h-3.5" />
-          <span>Ejecutar análisis ahora</span>
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        {items.map((item, i) => (
-          <div
-            key={i}
-            className={`p-3.5 rounded-xl border transition-colors ${
-              item.ready
-                ? "bg-emerald-50/40 border-emerald-200"
-                : "bg-amber-50/30 border-amber-200"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-xs font-bold text-gf-text">{item.title}</span>
-              {item.ready ? (
-                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">
-                  ✓
-                </span>
-              ) : (
-                <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center text-[10px] font-bold">
-                  !
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-gf-text-muted leading-tight">
-              {item.subtitle}
-            </p>
-            <div className="mt-2.5 pt-2 border-t border-gf-border/40 flex items-center justify-between text-[10px] font-semibold text-gf-text-muted">
-              <span>Estado:</span>
-              <span className={item.ready ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-                {item.ready ? "✓ Procesado" : item.count > 0 ? "Pendiente de procesar" : "No cargado"}
-              </span>
-            </div>
+        <div className="bg-gf-surface border border-gf-border/60 rounded-xl p-3.5 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-gf-text">Identificación oficial:</span>
+            <span className={identityReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+              {identityReady ? "✓ Procesada" : "⚠ Pendiente"}
+            </span>
           </div>
-        ))}
+          <div className="flex items-center justify-between">
+            <span className="text-gf-text">Comprobantes de ingresos:</span>
+            <span className={incomeReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+              {incomeReady ? "✓ Procesados" : "⚠ Pendiente"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gf-text">Buró de crédito / Score:</span>
+            <span className={buroReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+              {buroReady ? "✓ Procesado" : "⚠ Pendiente"}
+            </span>
+          </div>
+          {unprocessedCount > 0 && (
+            <div className="pt-1.5 border-t border-gf-border/40 flex items-center justify-between text-amber-800 font-medium">
+              <span>Archivos sin procesar:</span>
+              <span className="font-bold">{unprocessedCount} archivo(s)</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-gf-border bg-white text-gf-text text-xs font-bold hover:bg-gf-surface-dim transition-colors"
+          >
+            Cancelar y revisar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-xl bg-gf-red text-white text-xs font-bold hover:bg-gf-red-dark transition-colors shadow-2xs"
+          >
+            Continuar análisis
+          </button>
+        </div>
       </div>
     </div>
   );
