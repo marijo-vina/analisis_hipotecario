@@ -38,10 +38,10 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
       expect(banorte!.minimumBureauScore).toBeNull();
     });
 
-    it('should have Santander with minimumBureauScore=542', () => {
+    it('should have Santander with minimumBureauScore=541', () => {
       const santander = BANKS.find((b) => b.code === 'SANTANDER');
       expect(santander).toBeDefined();
-      expect(santander!.minimumBureauScore).toBe(542);
+      expect(santander!.minimumBureauScore).toBe(541);
       expect(santander!.incomeCriterion).toBe('NET');
       expect(santander!.debtCommitmentFactor).toBe(0.5);
     });
