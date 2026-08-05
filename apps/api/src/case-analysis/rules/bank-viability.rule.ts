@@ -11,8 +11,9 @@ import type {
   BankViabilitySnapshot,
   BankViabilityInputs,
   BankarizationFlags,
-  ProductMatch,
-  ProductMatchCalculation,
+  BankResult,
+  BankResultCalculation,
+  BankPolicySnapshot,
   ProductMatchStatus,
   CheckResult,
   CaseAnalysisContext,
@@ -24,20 +25,20 @@ const WARNING_LEGEND =
 
 const SOURCE_VERSION = 'ANAQUEL_MAYO_2026';
 
-// ── Product policy shape from Prisma findMany ────────────────────────────
+// ── Policy shape from Prisma findMany ────────────────────────────────────
 
-interface ProductWithBank {
+interface PolicyWithBank {
   id: string;
   bankId: string;
   code: string;
   name: string;
   destination: string;
   personType: string;
+  minimumIncome: Prisma.Decimal | null;
+  minimumPropertyValue: Prisma.Decimal | null;
   minimumEmploymentTenureMonths: number | null;
   minimumApplicantAgeMonths: number | null;
   maximumApplicationAgeMonths: number | null;
-  maximumMaturityAgeMonths: number | null;
-  maximumLtv: Prisma.Decimal | null;
   isActive: boolean;
   sourceVersion: string;
   bank: {
@@ -77,7 +78,6 @@ export class BankViabilityRule implements AnalysisRule {
         requestedAmount: true,
         propertyValue: true,
         estimatedTermMonths: true,
-        personType: true,
         creditTypeId: true,
       },
     });
@@ -112,7 +112,6 @@ export class BankViabilityRule implements AnalysisRule {
     const requestedAmount = mortgageCase?.requestedAmount ?? null;
     const propertyValue = mortgageCase?.propertyValue ?? null;
     const estimatedTermMonths = mortgageCase?.estimatedTermMonths ?? null;
-    const personType = (mortgageCase?.personType as string) ?? 'SALARIED';
 
     // Income fallback: confirmed → average → null
     const confirmedGrossIncome = incomeCalc?.confirmedGrossIncome ?? incomeCalc?.averageGrossIncome ?? null;
@@ -151,30 +150,29 @@ export class BankViabilityRule implements AnalysisRule {
     if (!birthDate) globalReasons.push('MISSING_BIRTH_DATE');
     if (conflictingDates) globalReasons.push('CONFLICTING_EMPLOYMENT_DATES');
 
-    // ── 2. Product Query ─────────────────────────────────────────────
-    let products: ProductWithBank[] = [];
+    // ── 2. Policy Query ────────────────────────────────────────────────
+    let policies: PolicyWithBank[] = [];
     if (destination) {
-      products = await this.prisma.bankPolicy.findMany({
+      policies = await this.prisma.bankPolicy.findMany({
         where: {
           isActive: true,
           destination: destination as never,
-          personType: personType as never,
           bank: { isActive: true },
         },
         include: { bank: true },
       });
     }
 
-    // ── 3. Evaluate each product ─────────────────────────────────────
+    // ── 3. Evaluate each policy ──────────────────────────────────────
     const currentAgeMonths = birthDate
       ? completeMonthsBetween(birthDate, calculatedAt)
       : null;
 
-    const productMatches: ProductMatch[] = [];
+    const bankResults: BankResult[] = [];
 
-    for (const product of products) {
-      const match = this.evaluateProduct(
-        product,
+    for (const policy of policies) {
+      const result = this.evaluateBank(
+        policy,
         inputs,
         currentAgeMonths,
         employmentStartDate,
@@ -182,11 +180,11 @@ export class BankViabilityRule implements AnalysisRule {
         hasPagadoraIncome,
         scotiabankExcluded,
       );
-      productMatches.push(match);
+      bankResults.push(result);
     }
 
     // ── 4. Aggregate Outcome ─────────────────────────────────────────
-    const outcome = this.computeAggregateOutcome(productMatches, destination);
+    const outcome = this.computeAggregateOutcome(bankResults, destination);
 
     // ── 5. Build Snapshot ────────────────────────────────────────────
     const snapshot: BankViabilitySnapshot = {
@@ -197,7 +195,7 @@ export class BankViabilityRule implements AnalysisRule {
       warningLegend: WARNING_LEGEND,
       reasons: globalReasons,
       inputs,
-      productMatches,
+      bankResults,
     };
 
     const severity: Severity =
@@ -295,22 +293,22 @@ export class BankViabilityRule implements AnalysisRule {
     };
   }
 
-  // ── Product Evaluation ─────────────────────────────────────────────
+  // ── Bank Evaluation ────────────────────────────────────────────────
 
-  private evaluateProduct(
-    product: ProductWithBank,
+  private evaluateBank(
+    policy: PolicyWithBank,
     inputs: BankViabilityInputs,
     currentAgeMonths: number | null,
     employmentStartDate: string | null,
     calculatedAt: Date,
     hasPagadoraIncome: boolean,
     scotiabankExcluded: boolean,
-  ): ProductMatch {
+  ): BankResult {
     const reasons: string[] = [];
     const checks: Record<string, CheckResult> = {};
 
-    const incomeCriterion = product.bank.incomeCriterion as 'NET' | 'GROSS';
-    const debtCommitmentFactor = new Prisma.Decimal(product.bank.debtCommitmentFactor.toString());
+    const incomeCriterion = policy.bank.incomeCriterion as 'NET' | 'GROSS';
+    const debtCommitmentFactor = new Prisma.Decimal(policy.bank.debtCommitmentFactor.toString());
 
     // ── Income Selection ─────────────────────────────────────────────
     const incomeUsedStr =
@@ -342,96 +340,23 @@ export class BankViabilityRule implements AnalysisRule {
       reasons.push('NEGATIVE_CAPACITY');
     }
 
-    // ── LTV Control ──────────────────────────────────────────────────
-    const reqAmount = inputs.requestedAmount ? new Prisma.Decimal(inputs.requestedAmount) : null;
-    const propValue = inputs.propertyValue ? new Prisma.Decimal(inputs.propertyValue) : null;
-    const maxLtv = product.maximumLtv ? new Prisma.Decimal(product.maximumLtv.toString()) : null;
-
-    let requestedLtv: Prisma.Decimal | null = null;
-    let maximumAmountByLtv: Prisma.Decimal | null = null;
-    let requiredReduction: Prisma.Decimal | null = null;
-
-    if (maxLtv === null) {
-      checks.ltv = { status: 'NOT_APPLICABLE' };
-    } else if (!reqAmount || reqAmount.lte(0)) {
-      checks.ltv = { status: 'REQUIRES_REVIEW', reason: 'INVALID_REQUESTED_AMOUNT' };
-      reasons.push('INVALID_REQUESTED_AMOUNT');
-    } else if (!propValue || propValue.lte(0)) {
-      checks.ltv = { status: 'REQUIRES_REVIEW', reason: 'INVALID_PROPERTY_VALUE' };
-      reasons.push('INVALID_PROPERTY_VALUE');
-    } else {
-      requestedLtv = reqAmount.div(propValue);
-      maximumAmountByLtv = propValue.mul(maxLtv);
-      requiredReduction = reqAmount.gt(maximumAmountByLtv)
-        ? reqAmount.minus(maximumAmountByLtv)
-        : new Prisma.Decimal(0);
-
-      const ltvExceeded = requestedLtv.gt(maxLtv);
-      checks.ltv = {
-        status: ltvExceeded ? 'FAIL' : 'PASS',
-        requestedLtv: d2(requestedLtv),
-        maximumLtv: d2(maxLtv),
-      };
-      if (ltvExceeded) reasons.push('LTV_EXCEEDED');
-    }
-
-    // ── Maturity Age Control ─────────────────────────────────────────
-    let ageAtMaturityMonths: number | null = null;
-    let maximumTheoreticalTermMonths: number | null = null;
-
-    if (currentAgeMonths !== null && product.maximumMaturityAgeMonths !== null) {
-      ageAtMaturityMonths = currentAgeMonths + (inputs.estimatedTermMonths ?? 0);
-      maximumTheoreticalTermMonths = Math.max(
-        0,
-        product.maximumMaturityAgeMonths - currentAgeMonths,
-      );
-
-      if (maximumTheoreticalTermMonths <= 0) {
-        checks.maturityAge = {
-          status: 'FAIL',
-          actualMonths: ageAtMaturityMonths,
-          maximumMonths: product.maximumMaturityAgeMonths,
-          reason: 'NO_VALID_TERM_AVAILABLE',
-        };
-        reasons.push('NO_VALID_TERM_AVAILABLE');
-      } else if (ageAtMaturityMonths > product.maximumMaturityAgeMonths) {
-        checks.maturityAge = {
-          status: 'FAIL',
-          actualMonths: ageAtMaturityMonths,
-          maximumMonths: product.maximumMaturityAgeMonths,
-        };
-        reasons.push('MATURITY_AGE_EXCEEDED');
-      } else {
-        checks.maturityAge = {
-          status: 'PASS',
-          actualMonths: ageAtMaturityMonths,
-          maximumMonths: product.maximumMaturityAgeMonths,
-        };
-      }
-    } else if (product.maximumMaturityAgeMonths !== null) {
-      // Policy exists but birth date data missing
-      checks.maturityAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
-    } else {
-      checks.maturityAge = { status: 'NOT_APPLICABLE' };
-    }
-
     // ── Minimum Applicant Age Control ────────────────────────────────
-    if (currentAgeMonths !== null && product.minimumApplicantAgeMonths !== null) {
-      if (currentAgeMonths < product.minimumApplicantAgeMonths) {
+    if (currentAgeMonths !== null && policy.minimumApplicantAgeMonths !== null) {
+      if (currentAgeMonths < policy.minimumApplicantAgeMonths) {
         checks.minimumApplicantAge = {
           status: 'FAIL',
           actualMonths: currentAgeMonths,
-          requiredMonths: product.minimumApplicantAgeMonths,
+          requiredMonths: policy.minimumApplicantAgeMonths,
         };
         reasons.push('MINIMUM_AGE_NOT_MET');
       } else {
         checks.minimumApplicantAge = {
           status: 'PASS',
           actualMonths: currentAgeMonths,
-          requiredMonths: product.minimumApplicantAgeMonths,
+          requiredMonths: policy.minimumApplicantAgeMonths,
         };
       }
-    } else if (product.minimumApplicantAgeMonths !== null) {
+    } else if (policy.minimumApplicantAgeMonths !== null) {
       // Policy exists but birth date data missing
       checks.minimumApplicantAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
@@ -439,22 +364,22 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Maximum Application Age Control ──────────────────────────────
-    if (currentAgeMonths !== null && product.maximumApplicationAgeMonths !== null) {
-      if (currentAgeMonths > product.maximumApplicationAgeMonths) {
+    if (currentAgeMonths !== null && policy.maximumApplicationAgeMonths !== null) {
+      if (currentAgeMonths > policy.maximumApplicationAgeMonths) {
         checks.maximumApplicationAge = {
           status: 'FAIL',
           actualMonths: currentAgeMonths,
-          maximumMonths: product.maximumApplicationAgeMonths,
+          maximumMonths: policy.maximumApplicationAgeMonths,
         };
         reasons.push('MAXIMUM_APPLICATION_AGE_EXCEEDED');
       } else {
         checks.maximumApplicationAge = {
           status: 'PASS',
           actualMonths: currentAgeMonths,
-          maximumMonths: product.maximumApplicationAgeMonths,
+          maximumMonths: policy.maximumApplicationAgeMonths,
         };
       }
-    } else if (product.maximumApplicationAgeMonths !== null) {
+    } else if (policy.maximumApplicationAgeMonths !== null) {
       // Policy exists but birth date data missing
       checks.maximumApplicationAge = { status: 'REQUIRES_REVIEW', reason: 'MISSING_BIRTH_DATE' };
     } else {
@@ -462,23 +387,23 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Employment Tenure Control ────────────────────────────────────
-    if (employmentStartDate !== null && product.minimumEmploymentTenureMonths !== null) {
+    if (employmentStartDate !== null && policy.minimumEmploymentTenureMonths !== null) {
       const tenureMonths = completeMonthsBetween(employmentStartDate, calculatedAt);
-      if (tenureMonths < product.minimumEmploymentTenureMonths) {
+      if (tenureMonths < policy.minimumEmploymentTenureMonths) {
         checks.employmentTenure = {
           status: 'FAIL',
           actualMonths: tenureMonths,
-          requiredMonths: product.minimumEmploymentTenureMonths,
+          requiredMonths: policy.minimumEmploymentTenureMonths,
         };
         reasons.push('INSUFFICIENT_EMPLOYMENT_TENURE');
       } else {
         checks.employmentTenure = {
           status: 'PASS',
           actualMonths: tenureMonths,
-          requiredMonths: product.minimumEmploymentTenureMonths,
+          requiredMonths: policy.minimumEmploymentTenureMonths,
         };
       }
-    } else if (product.minimumEmploymentTenureMonths !== null) {
+    } else if (policy.minimumEmploymentTenureMonths !== null) {
       // Policy exists but employment data missing
       checks.employmentTenure = { status: 'REQUIRES_REVIEW', reason: 'MISSING_EMPLOYMENT_DATA' };
       reasons.push('MISSING_EMPLOYMENT_DATA');
@@ -487,7 +412,7 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Scotiabank Pagadora Exclusion ────────────────────────────────
-    if (product.bank.code === 'SCOTIABANK' && hasPagadoraIncome && scotiabankExcluded) {
+    if (policy.bank.code === 'SCOTIABANK' && hasPagadoraIncome && scotiabankExcluded) {
       reasons.push('SCOTIABANK_PAGADORA_EXCLUSION');
     }
 
@@ -495,39 +420,37 @@ export class BankViabilityRule implements AnalysisRule {
     const status = this.resolveProductStatus(checks, reasons, !incomeUsed, currentAgeMonths === null);
 
     // ── Calculation ──────────────────────────────────────────────────
-    const calculation: ProductMatchCalculation = {
+    const ageAtMaturityMonths =
+      currentAgeMonths !== null ? currentAgeMonths + (inputs.estimatedTermMonths ?? 0) : null;
+
+    const calculation: BankResultCalculation = {
       incomeUsed: incomeUsed ? d2(incomeUsed) : null,
       maximumDebt: maximumDebt ? d2(maximumDebt) : null,
       totalMonthlyLiabilities: inputs.totalMonthlyLiabilities,
       availableCapacity: availableCapacity ? d2(availableCapacity) : null,
-      requestedLtv: requestedLtv ? d2(requestedLtv) : null,
-      maximumAmountByLtv: maximumAmountByLtv ? d2(maximumAmountByLtv) : null,
-      requiredReduction: requiredReduction ? d2(requiredReduction) : null,
       currentAgeMonths,
       ageAtMaturityMonths,
       employmentTenureMonths:
         employmentStartDate !== null
           ? completeMonthsBetween(employmentStartDate, calculatedAt)
           : null,
-      maximumTheoreticalTermMonths,
     };
 
     // ── Policy Snapshot ──────────────────────────────────────────────
-    const policySnapshot = {
-      bankName: product.bank.name,
-      productName: product.name,
-      incomeCriterion: product.bank.incomeCriterion,
-      debtCommitmentFactor: d2(new Prisma.Decimal(product.bank.debtCommitmentFactor.toString())),
-      minimumEmploymentTenureMonths: product.minimumEmploymentTenureMonths,
-      minimumApplicantAgeMonths: product.minimumApplicantAgeMonths,
-      maximumApplicationAgeMonths: product.maximumApplicationAgeMonths,
-      maximumMaturityAgeMonths: product.maximumMaturityAgeMonths,
-      maximumLtv: product.maximumLtv ? d2(new Prisma.Decimal(product.maximumLtv.toString())) : null,
+    const policySnapshot: BankPolicySnapshot = {
+      bankName: policy.bank.name,
+      incomeCriterion: policy.bank.incomeCriterion,
+      debtCommitmentFactor: d2(new Prisma.Decimal(policy.bank.debtCommitmentFactor.toString())),
+      minimumEmploymentTenureMonths: policy.minimumEmploymentTenureMonths,
+      minimumApplicantAgeMonths: policy.minimumApplicantAgeMonths,
+      maximumApplicationAgeMonths: policy.maximumApplicationAgeMonths,
+      minimumIncome: policy.minimumIncome ? policy.minimumIncome.toString() : null,
+      minimumPropertyValue: policy.minimumPropertyValue ? policy.minimumPropertyValue.toString() : null,
     };
 
     return {
-      bankCode: product.bank.code,
-      productCode: product.code,
+      bankCode: policy.bank.code,
+      productCode: policy.code,
       status,
       reasons,
       policySnapshot,
@@ -546,7 +469,6 @@ export class BankViabilityRule implements AnalysisRule {
   ): ProductMatchStatus {
     // NOT_COMPATIBLE: non-correctable fails
     const hasNotCompatible =
-      reasons.includes('NO_VALID_TERM_AVAILABLE') ||
       reasons.includes('NEGATIVE_CAPACITY') ||
       reasons.includes('MINIMUM_AGE_NOT_MET') ||
       reasons.includes('MAXIMUM_APPLICATION_AGE_EXCEEDED') ||
@@ -560,19 +482,11 @@ export class BankViabilityRule implements AnalysisRule {
       incomeMissing ||
       birthDateMissing ||
       reasons.includes('UNCONFIRMED_INCOME') ||
-      reasons.includes('INVALID_REQUESTED_AMOUNT') ||
-      reasons.includes('INVALID_PROPERTY_VALUE') ||
       reasons.includes('SCOTIABANK_PAGADORA_EXCLUSION') ||
       reasons.includes('CONFLICTING_EMPLOYMENT_DATES') ||
       Object.values(checks).some((c) => c.status === 'REQUIRES_REVIEW');
 
     if (hasRequiresReview) return 'REQUIRES_REVIEW';
-
-    // CONDITIONED: correctable fails
-    const hasConditioned =
-      reasons.includes('LTV_EXCEEDED') || reasons.includes('MATURITY_AGE_EXCEEDED');
-
-    if (hasConditioned) return 'CONDITIONED';
 
     return 'PRELIMINARY_VIABLE';
   }
@@ -580,16 +494,16 @@ export class BankViabilityRule implements AnalysisRule {
   // ── Aggregate Outcome ──────────────────────────────────────────────
 
   private computeAggregateOutcome(
-    productMatches: ProductMatch[],
+    bankResults: BankResult[],
     destination: string | null,
   ): AnalysisOutcome {
     if (!destination) return 'PARTIAL';
-    if (productMatches.length === 0) return 'PARTIAL';
+    if (bankResults.length === 0) return 'PARTIAL';
 
-    const hasViable = productMatches.some((m) => m.status === 'PRELIMINARY_VIABLE');
+    const hasViable = bankResults.some((m) => m.status === 'PRELIMINARY_VIABLE');
     if (hasViable) return 'PASS';
 
-    const hasConditionedOrReview = productMatches.some(
+    const hasConditionedOrReview = bankResults.some(
       (m) => m.status === 'CONDITIONED' || m.status === 'REQUIRES_REVIEW',
     );
     if (hasConditionedOrReview) return 'PARTIAL';
