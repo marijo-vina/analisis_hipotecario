@@ -155,33 +155,35 @@ interface NumberFieldProps {
 
 function NumberField({ defaultValue, suffix, nullable, onSave }: NumberFieldProps) {
   const [value, setValue] = useState(defaultValue);
+  const [draft, setDraft] = useState(value != null ? String(value) : "");
 
   // Sync when server data changes (after revalidation)
   useEffect(() => {
     setValue(defaultValue);
+    setDraft(defaultValue != null ? String(defaultValue) : "");
   }, [defaultValue]);
 
   const commit = () => {
-    if (value !== defaultValue) onSave(value);
+    const numeric = draft === "" ? null : Number(draft);
+    if (numeric !== defaultValue) {
+      setValue(numeric);
+      onSave(numeric);
+    }
   };
 
   return (
     <div className="relative">
       <input
-        type="number"
-        value={value != null ? value : ""}
-        onChange={(e) => {
-          const raw = e.target.value;
-          setValue(raw === "" ? null : Number(raw));
-        }}
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
         }}
         placeholder={nullable ? "Sin límite" : undefined}
-        className={`h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 pr-10 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red ${
-          suffix ? "" : ""
-        }`}
+        className={`h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 pr-10 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red`}
       />
       {suffix && (
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gf-text-muted pointer-events-none">
