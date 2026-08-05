@@ -47,7 +47,7 @@ export default function PolicyEditor({ bankCode, policies }: PolicyEditorProps) 
           </tr>
         </thead>
         <tbody className="divide-y divide-gf-border">
-          {policies.map((policy) => (
+          {policies?.map((policy) => (
             <PolicyRow
               key={policy.id}
               policy={policy}
