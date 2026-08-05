@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type {
   BankViabilitySnapshot,
-  ProductMatch,
-  ProductMatchStatus,
+  BankResult,
+  BankResultStatus,
 } from "@/app/lib/definitions";
 import { STATUS_LABELS, REASON_LABELS, DESTINATION_LABELS } from "@/app/lib/definitions";
 import DataTable, { type Column } from "@/app/ui/common/data-table";
@@ -92,12 +92,12 @@ export default function BankComparisonTab({
     );
   }
 
-  const { destination, productMatches, reasons } = bankViability;
+  const { destination, bankResults, reasons } = bankViability;
 
   // 2. Results — products exist
-  if (productMatches.length > 0) {
+  if (bankResults.length > 0) {
     // Sort: by status order, then availableCapacity DESC (nulls last)
-    const sorted = [...productMatches].sort((a, b) => {
+    const sorted = [...bankResults].sort((a, b) => {
       const sa = STATUS_ORDER[a.status] ?? 99;
       const sb = STATUS_ORDER[b.status] ?? 99;
       if (sa !== sb) return sa - sb;
@@ -112,7 +112,7 @@ export default function BankComparisonTab({
     return (
       <div className="space-y-4">
         <StatusHeader
-          productMatches={productMatches}
+          bankResults={bankResults}
           destination={destination}
           calculatedAt={bankViability.calculatedAt}
           sourceVersion={bankViability.sourceVersion}
@@ -161,28 +161,28 @@ function EmptyState({ message }: { message: string }) {
 // ── Status Header ────────────────────────────────────────────────────────────
 
 function StatusHeader({
-  productMatches,
+  bankResults,
   destination,
   calculatedAt,
   sourceVersion,
 }: {
-  productMatches: ProductMatch[];
+  bankResults: BankResult[];
   destination: string | null;
   calculatedAt: string;
   sourceVersion: string;
 }) {
-  const counts: Record<ProductMatchStatus, number> = {
+  const counts: Record<BankResultStatus, number> = {
     PRELIMINARY_VIABLE: 0,
     CONDITIONED: 0,
     REQUIRES_REVIEW: 0,
     NOT_COMPATIBLE: 0,
   };
-  for (const m of productMatches) {
+  for (const m of bankResults) {
     counts[m.status]++;
   }
 
   const hasViable = counts.PRELIMINARY_VIABLE > 0;
-  const total = productMatches.length;
+  const total = bankResults.length;
   const destLabel = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
 
   return (
@@ -302,11 +302,11 @@ function ProductTable({
   expandedIndex,
   onToggle,
 }: {
-  rows: ProductMatch[];
+  rows: BankResult[];
   expandedIndex: number | null;
   onToggle: (index: number) => void;
 }) {
-  const columns: Column<ProductMatch>[] = [
+  const columns: Column<BankResult>[] = [
     {
       key: "bankCode",
       header: "Banco",
@@ -330,13 +330,9 @@ function ProductTable({
     {
       key: "productCode",
       header: "Producto",
-      render: (m) => {
-        const snap = m.policySnapshot as unknown as Record<string, unknown>;
-        const name = (snap.productName as string) || m.productCode;
-        return (
-          <span className="text-xs text-gf-text">{name}</span>
-        );
-      },
+      render: (m) => (
+        <span className="text-xs text-gf-text">{m.productCode}</span>
+      ),
     },
     {
       key: "income",
@@ -382,33 +378,6 @@ function ProductTable({
       ),
     },
     {
-      key: "aforo",
-      header: "Aforo",
-      render: (m) => {
-        const requested = formatPercent(m.calculation.requestedLtv);
-        const maxLtv = formatPercent(m.policySnapshot.maximumLtv);
-        const hasLtvExceeded = m.reasons.includes("LTV_EXCEEDED");
-
-        if (requested === "—" && maxLtv === "—") {
-          return <span className="text-xs text-gf-text">—</span>;
-        }
-
-        if (maxLtv !== "—") {
-          const text = requested !== "—" ? `${requested} / máx. ${maxLtv}` : `máx. ${maxLtv}`;
-          return (
-            <span
-              className="text-xs"
-              style={{ color: hasLtvExceeded ? "#92400E" : undefined }}
-            >
-              {text}
-            </span>
-          );
-        }
-
-        return <span className="text-xs text-gf-text">{requested}</span>;
-      },
-    },
-    {
       key: "status",
       header: "Estado",
       render: (m) => {
@@ -438,7 +407,7 @@ function ProductTable({
 
   return (
     <div className="space-y-0">
-      <DataTable<ProductMatch>
+      <DataTable<BankResult>
         columns={columns}
         rows={rows}
         emptyMessage="Sin productos evaluados"
@@ -455,11 +424,11 @@ function ProductTable({
 
 // ── Product Detail (expandable) ──────────────────────────────────────────────
 
-function ProductDetail({ match }: { match: ProductMatch }) {
+function ProductDetail({ match }: { match: BankResult }) {
   const { calculation, checks, reasons, policySnapshot } = match;
   const snap = policySnapshot as unknown as Record<string, unknown>;
   const bankName = (snap.bankName as string) || match.bankCode;
-  const productName = (snap.productName as string) || match.productCode;
+  const productName = match.productCode;
 
   const criterion = policySnapshot.incomeCriterion;
   const isNet = String(criterion).toUpperCase().includes("NET");
@@ -468,20 +437,17 @@ function ProductDetail({ match }: { match: ProductMatch }) {
   const mainReason =
     reasons.length > 0 ? REASON_LABELS[reasons[0]] ?? reasons[0] : "Sin restricciones detectadas";
 
-  const controlKeys = ["capacity","ltv","minimumApplicantAge","maximumApplicationAge","maturityAge","employmentTenure"] as const;
-  const controlLabels: Record<string, string> = { capacity: "Capacidad de pago", ltv: "Aforo", minimumApplicantAge: "Edad mínima solicitante", maximumApplicationAge: "Edad máxima de solicitud", maturityAge: "Edad al vencimiento", employmentTenure: "Antigüedad laboral" };
+  const controlKeys = ["capacity","minimumApplicantAge","maximumApplicationAge","maturityAge","employmentTenure"] as const;
+  const controlLabels: Record<string, string> = { capacity: "Capacidad de pago", minimumApplicantAge: "Edad mínima solicitante", maximumApplicationAge: "Edad máxima de solicitud", maturityAge: "Edad al vencimiento", employmentTenure: "Antigüedad laboral" };
   const resultBadge: Record<string, { color: string; label: string }> = { PASS: { color: "#166534", label: "Cumple" }, FAIL: { color: "#991B1B", label: "No cumple" }, NOT_APPLICABLE: { color: "#6B7280", label: "No aplica" }, REQUIRES_REVIEW: { color: "#1D4ED8", label: "Requiere revisión" } };
 
   function getPolicyText(key: string): string {
-    const maxLtv = snap.maximumLtv as string | null | undefined;
-    const maxMaturity = snap.maximumMaturityAgeMonths as number | null | undefined;
     const minAge = snap.minimumApplicantAgeMonths as number | null | undefined;
     const maxAge = snap.maximumApplicationAgeMonths as number | null | undefined;
     const minTenure = snap.minimumEmploymentTenureMonths as number | null | undefined;
     switch (key) {
       case "capacity": return "Debe ser mayor que $0.00";
-      case "ltv": return maxLtv ? `Máx. ${formatPercent(maxLtv)}` : "—";
-      case "maturityAge": return maxMaturity ? `Máx. ${formatAge(maxMaturity)}` : "—";
+      case "maturityAge": return "—";
       case "minimumApplicantAge": return minAge ? `Mín. ${formatAge(minAge)}` : "—";
       case "maximumApplicationAge": return maxAge ? `Máx. ${formatAge(maxAge)}` : "—";
       case "employmentTenure": return minTenure ? `Mín. ${formatAge(minTenure)}` : "—";
@@ -492,7 +458,6 @@ function ProductDetail({ match }: { match: ProductMatch }) {
   function getExpedienteValue(key: string): string {
     switch (key) {
       case "capacity": return formatCurrency(calculation.availableCapacity);
-      case "ltv": return formatPercent(calculation.requestedLtv);
       case "maturityAge": return formatAge(calculation.ageAtMaturityMonths);
       case "minimumApplicantAge": return formatAge(calculation.currentAgeMonths);
       case "maximumApplicationAge": return formatAge(calculation.currentAgeMonths);
@@ -580,28 +545,8 @@ function ProductDetail({ match }: { match: ProductMatch }) {
 
 // ── Suggested Adjustments ────────────────────────────────────────────────────
 
-function SuggestedAdjustments({ match }: { match: ProductMatch }) {
-  const { calculation, reasons } = match;
+function SuggestedAdjustments({ match }: { match: BankResult }) {
   const items: string[] = [];
-
-  if (
-    reasons.includes("LTV_EXCEEDED") &&
-    calculation.maximumAmountByLtv != null
-  ) {
-    const max = formatCurrency(calculation.maximumAmountByLtv);
-    const reduction = formatCurrency(calculation.requiredReduction);
-    items.push(
-      `Monto máximo por aforo: ${max}. Reducción requerida: ${reduction}`,
-    );
-  }
-
-  if (
-    reasons.includes("MATURITY_AGE_EXCEEDED") &&
-    calculation.maximumTheoreticalTermMonths != null
-  ) {
-    const termLabel = formatAge(calculation.maximumTheoreticalTermMonths);
-    items.push(`Plazo máximo teórico: ${termLabel}`);
-  }
 
   if (items.length === 0) return null;
 

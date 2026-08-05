@@ -225,6 +225,9 @@ export type ProductMatchStatus =
   | "NOT_COMPATIBLE"
   | "REQUIRES_REVIEW";
 
+/** @deprecated Use BankResultStatus instead. Kept for backward compat. */
+export type BankResultStatus = ProductMatchStatus;
+
 export type CheckStatus =
   | "PASS"
   | "FAIL"
@@ -249,51 +252,49 @@ export interface BankViabilityInputs {
   scotiabankExcluded: boolean;
 }
 
-export interface ProductMatchCalculation {
+export interface BankResultCalculation {
   incomeUsed: string | null;
   maximumDebt: string | null;
   totalMonthlyLiabilities: string | null;
   availableCapacity: string | null;
-  requestedLtv: string | null;
-  maximumAmountByLtv: string | null;
-  requiredReduction: string | null;
   currentAgeMonths: number | null;
   ageAtMaturityMonths: number | null;
   employmentTenureMonths: number | null;
-  maximumTheoreticalTermMonths: number | null;
 }
 
-export interface ProductPolicySnapshot {
+/** @deprecated Use BankResultCalculation instead. Kept for backward compat. */
+export type ProductMatchCalculation = BankResultCalculation;
+
+export interface BankPolicySnapshot {
   /**
-   * Optional bank display name. The backend `policySnapshot` is currently
-   * typed as `Record<string, unknown>` and does NOT include `bankName` yet;
-   * the UI falls back to `bankCode` when this is absent.
+   * Optional bank display name. The backend `policySnapshot` may not include
+   * `bankName`; the UI falls back to `bankCode` when this is absent.
    */
   bankName?: string;
-  /**
-   * Optional product display name. The backend `policySnapshot` is currently
-   * typed as `Record<string, unknown>` and does NOT include `productName` yet;
-   * the UI falls back to `productCode` when this is absent.
-   */
-  productName?: string;
   incomeCriterion: string;
   debtCommitmentFactor: string;
   minimumEmploymentTenureMonths: number | null;
   minimumApplicantAgeMonths: number | null;
   maximumApplicationAgeMonths: number | null;
-  maximumMaturityAgeMonths: number | null;
-  maximumLtv: string | null;
+  minimumIncome: string | null;
+  minimumPropertyValue: string | null;
 }
 
-export interface ProductMatch {
+/** @deprecated Use BankPolicySnapshot instead. Kept for backward compat. */
+export type ProductPolicySnapshot = BankPolicySnapshot;
+
+export interface BankResult {
   bankCode: string;
   productCode: string;
   status: ProductMatchStatus;
   reasons: string[];
-  policySnapshot: ProductPolicySnapshot;
-  calculation: ProductMatchCalculation;
+  policySnapshot: BankPolicySnapshot;
+  calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
 }
+
+/** @deprecated Use BankResult instead. Kept for backward compat. */
+export type ProductMatch = BankResult;
 
 export interface BankViabilitySnapshot {
   sourceVersion: string;
@@ -303,7 +304,7 @@ export interface BankViabilitySnapshot {
   warningLegend: string;
   reasons: string[];
   inputs: BankViabilityInputs;
-  productMatches: ProductMatch[];
+  bankResults: BankResult[];
 }
 
 export const STATUS_LABELS: Record<string, string> = {
