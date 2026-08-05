@@ -19,6 +19,7 @@ describe('HU-03 foundation artifacts', () => {
   });
 
   it('contains minimum CreditType and CaseStatus catalog seeds', () => {
+    const seedData = readProjectFile('prisma/seed-data.ts');
     const seed = readProjectFile('prisma/seed.ts');
 
     const requiredCreditTypeCodes = [
@@ -38,7 +39,7 @@ describe('HU-03 foundation artifacts', () => {
     ];
 
     for (const code of requiredCreditTypeCodes) {
-      expect(seed).toContain(`code: '${code}'`);
+      expect(seedData).toContain(`code: '${code}'`);
     }
 
     for (const code of requiredCaseStatusCodes) {
