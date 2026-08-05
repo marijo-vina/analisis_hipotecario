@@ -130,10 +130,14 @@ export default function AnalysisSection({
         (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
         d.documentStatus.code === "PROCESSED",
     );
-    const hasIncome = documents.some(
+    const hasPayroll = documents.some(
       (d) =>
-        (d.documentType.code === "PAYROLL_RECEIPT" ||
-          d.documentType.code === "BANK_STATEMENT") &&
+        d.documentType.code === "PAYROLL_RECEIPT" &&
+        d.documentStatus.code === "PROCESSED",
+    );
+    const hasBankStatement = documents.some(
+      (d) =>
+        d.documentType.code === "BANK_STATEMENT" &&
         d.documentStatus.code === "PROCESSED",
     );
     const hasBuro = documents.some(
@@ -145,7 +149,7 @@ export default function AnalysisSection({
     const hasUnprocessed = documents.some(
       (d) => d.documentStatus.code !== "PROCESSED",
     );
-    return !hasIdentity || !hasIncome || !hasBuro || hasUnprocessed;
+    return !hasIdentity || !hasPayroll || !hasBankStatement || !hasBuro || hasUnprocessed;
   }, [documents]);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -886,10 +890,14 @@ function AnalysisConfirmModal({
       (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
       d.documentStatus.code === "PROCESSED",
   );
-  const incomeReady = documents.some(
+  const payrollReady = documents.some(
     (d) =>
-      (d.documentType.code === "PAYROLL_RECEIPT" ||
-        d.documentType.code === "BANK_STATEMENT") &&
+      d.documentType.code === "PAYROLL_RECEIPT" &&
+      d.documentStatus.code === "PROCESSED",
+  );
+  const bankReady = documents.some(
+    (d) =>
+      d.documentType.code === "BANK_STATEMENT" &&
       d.documentStatus.code === "PROCESSED",
   );
   const buroReady = documents.some(
@@ -914,26 +922,32 @@ function AnalysisConfirmModal({
               ¿Deseas ejecutar el análisis ahora?
             </h3>
             <p className="text-xs text-gf-text-muted mt-1 leading-relaxed">
-              La capacidad de pago y la viabilidad bancaria se calculan mejor con la información completa. Detectamos el siguiente estado de los documentos:
+              Para obtener un análisis de capacidad y conciliación bancaria óptimo, se requiere al menos 1 documento procesado de cada categoría:
             </p>
           </div>
         </div>
 
         <div className="bg-gf-surface border border-gf-border/60 rounded-xl p-3.5 space-y-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-gf-text">Identificación oficial:</span>
+            <span className="text-gf-text font-medium">1. Identificación oficial (INE/Pasaporte):</span>
             <span className={identityReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
               {identityReady ? "✓ Procesada" : "⚠ Pendiente"}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-gf-text">Comprobantes de ingresos:</span>
-            <span className={incomeReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-              {incomeReady ? "✓ Procesados" : "⚠ Pendiente"}
+            <span className="text-gf-text font-medium">2. Recibo de nómina:</span>
+            <span className={payrollReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+              {payrollReady ? "✓ Procesado" : "⚠ Pendiente"}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-gf-text">Buró de crédito / Score:</span>
+            <span className="text-gf-text font-medium">3. Estado de cuenta bancario:</span>
+            <span className={bankReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+              {bankReady ? "✓ Procesado" : "⚠ Pendiente"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gf-text font-medium">4. Buró de crédito / Score:</span>
             <span className={buroReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
               {buroReady ? "✓ Procesado" : "⚠ Pendiente"}
             </span>
