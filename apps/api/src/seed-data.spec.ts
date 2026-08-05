@@ -386,14 +386,6 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
           expect(p.code).toMatch(/^BANORTE_|SCOTIABANK_|SANTANDER_|HSBC_|CITIBANAMEX_|MIFEL_|BANREGIO_/);
         }
       });
-
-      it('should have all policies with personType=SALARIED', () => {
-        expect(BANK_POLICIES.every((p) => p.personType === 'SALARIED')).toBe(true);
-      });
-
-      it('should have all policies with sourceVersion matching SOURCE_VERSION', () => {
-        expect(BANK_POLICIES.every((p) => p.sourceVersion === SOURCE_VERSION)).toBe(true);
-      });
     });
   });
 });

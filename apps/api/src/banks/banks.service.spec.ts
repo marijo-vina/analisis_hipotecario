@@ -246,9 +246,6 @@ describe('BanksService', () => {
           destination: ProductDestination.ACQUISITION,
           ...policyData,
           code: expect.any(String),
-          name: expect.any(String),
-          personType: expect.any(String),
-          sourceVersion: expect.any(String),
         },
         update: policyData,
       });

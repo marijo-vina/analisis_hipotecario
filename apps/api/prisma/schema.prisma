@@ -244,18 +244,13 @@ model BankPolicy {
   id                            String             @id @default(uuid())
   bankId                        String
   code                          String             @unique
-  name                          String
   destination                   ProductDestination
-  personType                    PersonType
   minimumIncome                 Decimal?           @db.Decimal(12, 2)
   minimumPropertyValue          Decimal?           @db.Decimal(12, 2)
   minimumEmploymentTenureMonths Int?
   minimumApplicantAgeMonths     Int?
   maximumApplicationAgeMonths   Int?
-  maximumMaturityAgeMonths      Int?
-  maximumLtv                    Decimal?           @db.Decimal(5, 4)
   isActive                      Boolean            @default(true)
-  sourceVersion                 String
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
 

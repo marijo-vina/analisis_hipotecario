@@ -72,7 +72,6 @@ export class BanksService {
     }
 
     const policyCode = `${bankCode}_${destination}`;
-    const policyName = `${bank.name} - ${destination}`;
 
     return this.prisma.bankPolicy.upsert({
       where: {
@@ -85,9 +84,6 @@ export class BanksService {
         bankId: bank.id,
         destination,
         code: policyCode,
-        name: policyName,
-        personType: 'INDIVIDUAL',
-        sourceVersion: 'manual',
         ...data,
       },
       update: data,
