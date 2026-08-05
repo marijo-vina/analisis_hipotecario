@@ -169,10 +169,11 @@ function NumberField({ defaultValue, suffix, nullable, onSave }: NumberFieldProp
     <div className="relative">
       <input
         type="number"
-        defaultValue={value ?? ""}
-        onChange={(e) =>
-          setValue(e.target.value === "" ? null : Number(e.target.value))
-        }
+        value={value != null ? value : ""}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setValue(raw === "" ? null : Number(raw));
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
