@@ -86,16 +86,13 @@ function makePolicy(overrides: Record<string, unknown> = {}) {
     id: 'prod-1',
     bankId: 'bank-banorte',
     code: 'BANORTE_ADQ_HF',
-    name: 'Adquisición Hipoteca Fija',
     destination: 'ACQUISITION',
-    personType: 'SALARIED',
     minimumIncome: null,
     minimumPropertyValue: null,
     minimumEmploymentTenureMonths: 6,
     minimumApplicantAgeMonths: 300,
     maximumApplicationAgeMonths: 839,
     isActive: true,
-    sourceVersion: SOURCE_VERSION,
     bank: makeBank(),
     ...overrides,
   };
@@ -713,7 +710,322 @@ describe('BankViabilityRule', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // 10. Audit Snapshot
+  // 10. Bureau Knockout Rules
+  // ─────────────────────────────────────────────────────────────────────
+  describe('bureau knockout rules', () => {
+    // Universal knockouts (short-circuit)
+    describe('universal knockouts', () => {
+      it('FAIL with BUREAU_SCORE_UNIVERSAL_REJECTION when bureau score < 500', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 499 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(result.outcome).toBe('FAIL');
+        expect(getBv(result).reasons).toContain('BUREAU_SCORE_UNIVERSAL_REJECTION');
+      });
+
+      it('skip check when bureau score is null/undefined', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: null } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(result.outcome).not.toBe('FAIL');
+        expect(getBv(result).reasons).not.toContain('BUREAU_SCORE_UNIVERSAL_REJECTION');
+      });
+
+      it('FAIL with QUITA_QUEBRANTO_REJECTED when hasQuita=true', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 700, hasQuita: true } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(result.outcome).toBe('FAIL');
+        expect(getBv(result).reasons).toContain('QUITA_QUEBRANTO_REJECTED');
+      });
+
+      it('FAIL with QUITA_QUEBRANTO_REJECTED when hasQuebranto=true', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 700, hasQuebranto: true } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(result.outcome).toBe('FAIL');
+        expect(getBv(result).reasons).toContain('QUITA_QUEBRANTO_REJECTED');
+      });
+    });
+
+    // Bank-specific knockouts
+    describe('bank-specific knockouts', () => {
+      it('Santander: score < 542 → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 541 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('SANTANDER_SCORE_BELOW_THRESHOLD');
+      });
+
+      it('Santander: score = 542 → passes boundary', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 542 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].reasons).not.toContain('SANTANDER_SCORE_BELOW_THRESHOLD');
+      });
+
+      it('Banregio: score < 629 → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 628 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'BANREGIO', minimumBureauScore: 629 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('BANREGIO_SCORE_BELOW_THRESHOLD');
+      });
+
+      it('Banregio: score = 629 → passes boundary', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 629 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'BANREGIO', minimumBureauScore: 629 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].reasons).not.toContain('BANREGIO_SCORE_BELOW_THRESHOLD');
+      });
+
+      it('Santander MOP: 2 PV with total > $3K → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 700, pastDueMonths: 2, pastDueTotalAmount: 3500 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('SANTANDER_MOP_KNOCKOUT');
+      });
+
+      it('Santander MOP: 3 PV any amount → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 700, pastDueMonths: 3, pastDueTotalAmount: 100 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('SANTANDER_MOP_KNOCKOUT');
+      });
+
+      it('Santander MOP: 2 PV with total ≤ $3K → passes', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 700, pastDueMonths: 2, pastDueTotalAmount: 3000 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults[0].reasons).not.toContain('SANTANDER_MOP_KNOCKOUT');
+      });
+    });
+
+    // CMA checks
+    describe('CMA checks', () => {
+      it('minimumIncome: income < minimum → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.incomeCalculation.findFirst.mockResolvedValue({
+          ...defaultIncomeCalculation(),
+          confirmedNetIncome: { toString: () => '5000.00' },
+        });
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ minimumIncome: { toString: () => '7500.00' } }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('INCOME_BELOW_MINIMUM');
+        expect(getBv(result).bankResults[0].checks.minimumIncome.status).toBe('FAIL');
+      });
+
+      it('minimumIncome: income >= minimum → passes', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.incomeCalculation.findFirst.mockResolvedValue({
+          ...defaultIncomeCalculation(),
+          confirmedNetIncome: { toString: () => '7500.00' },
+        });
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ minimumIncome: { toString: () => '7500.00' } }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].reasons).not.toContain('INCOME_BELOW_MINIMUM');
+        expect(getBv(result).bankResults[0].checks.minimumIncome.status).toBe('PASS');
+      });
+
+      it('minimumPropertyValue: propertyValue < minimum → NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.mortgageCase.findUnique.mockResolvedValue({
+          ...defaultCase(),
+          propertyValue: { toString: () => '200000.00' },
+        });
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ minimumPropertyValue: { toString: () => '250000.00' } }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].status).toBe('NOT_COMPATIBLE');
+        expect(getBv(result).bankResults[0].reasons).toContain('PROPERTY_VALUE_BELOW_MINIMUM');
+        expect(getBv(result).bankResults[0].checks.minimumPropertyValue.status).toBe('FAIL');
+      });
+
+      it('minimumPropertyValue: propertyValue >= minimum → passes', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.mortgageCase.findUnique.mockResolvedValue({
+          ...defaultCase(),
+          propertyValue: { toString: () => '250000.00' },
+        });
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ minimumPropertyValue: { toString: () => '250000.00' } }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].reasons).not.toContain('PROPERTY_VALUE_BELOW_MINIMUM');
+        expect(getBv(result).bankResults[0].checks.minimumPropertyValue.status).toBe('PASS');
+      });
+
+      it('minimumIncome: null → skip check', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ minimumIncome: null }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].checks.minimumIncome).toBeUndefined();
+      });
+    });
+
+    // Edge cases
+    describe('edge cases', () => {
+      it('no bureau document → skip all bureau checks', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.bankPolicy.findMany.mockResolvedValue([
+          makePolicy({ bank: makeBank({ code: 'SANTANDER', minimumBureauScore: 542 }) }),
+        ]);
+
+        const result = await rule.execute(defaultContext(), defaultDocuments());
+        expect(getBv(result).bankResults[0].reasons).not.toContain('SANTANDER_SCORE_BELOW_THRESHOLD');
+        expect(getBv(result).bankResults[0].reasons).not.toContain('SANTANDER_MOP_KNOCKOUT');
+      });
+
+      it('universal knockout short-circuits (no per-bank eval)', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        const docs = [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CREDIT_BUREAU' },
+            extractedData: { creditData: { score: 499 } },
+            processingResults: null,
+          },
+        ];
+        prisma.bankPolicy.findMany.mockResolvedValue([makePolicy()]);
+
+        const result = await rule.execute(defaultContext(), docs);
+        expect(getBv(result).bankResults).toHaveLength(0);
+        expect(result.outcome).toBe('FAIL');
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 11. Audit Snapshot
   // ─────────────────────────────────────────────────────────────────────
   describe('audit snapshot', () => {
     it('includes all required fields in the snapshot structure', async () => {

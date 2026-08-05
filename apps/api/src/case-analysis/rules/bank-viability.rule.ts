@@ -25,28 +25,36 @@ const WARNING_LEGEND =
 
 const SOURCE_VERSION = 'ANAQUEL_MAYO_2026';
 
+// ── Bureau Data ────────────────────────────────────────────────────────
+
+interface BureauData {
+  score: number | null;
+  hasQuita: boolean;
+  hasQuebranto: boolean;
+  pastDueMonths: number | null;
+  pastDueTotalAmount: number | null;
+}
+
 // ── Policy shape from Prisma findMany ────────────────────────────────────
 
 interface PolicyWithBank {
   id: string;
   bankId: string;
   code: string;
-  name: string;
   destination: string;
-  personType: string;
   minimumIncome: Prisma.Decimal | null;
   minimumPropertyValue: Prisma.Decimal | null;
   minimumEmploymentTenureMonths: number | null;
   minimumApplicantAgeMonths: number | null;
   maximumApplicationAgeMonths: number | null;
   isActive: boolean;
-  sourceVersion: string;
   bank: {
     id: string;
     code: string;
     name: string;
     debtCommitmentFactor: Prisma.Decimal;
     incomeCriterion: string;
+    minimumBureauScore: number | null;
     isActive: boolean;
     sourceVersion: string;
   };
@@ -150,6 +158,61 @@ export class BankViabilityRule implements AnalysisRule {
     if (!birthDate) globalReasons.push('MISSING_BIRTH_DATE');
     if (conflictingDates) globalReasons.push('CONFLICTING_EMPLOYMENT_DATES');
 
+    // ── Bureau Data Extraction ────────────────────────────────────────
+    const bureauData = this.extractBureauData(documents);
+
+    // ── Universal Bureau Knockouts (short-circuit) ────────────────────
+    if (bureauData) {
+      if (bureauData.score !== null && bureauData.score < 500) {
+        globalReasons.push('BUREAU_SCORE_UNIVERSAL_REJECTION');
+        const snapshot: BankViabilitySnapshot = {
+          sourceVersion: SOURCE_VERSION,
+          creditTypeCode,
+          destination,
+          calculatedAt: calculatedAt.toISOString(),
+          warningLegend: WARNING_LEGEND,
+          reasons: globalReasons,
+          inputs,
+          bankResults: [],
+        };
+        return {
+          ruleId: this.ruleId,
+          outcome: 'FAIL' as AnalysisOutcome,
+          severity: 'ERROR' as Severity,
+          detail: {
+            sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'bank-catalog', 'bureau-data'],
+            fields: [],
+            bankViability: snapshot,
+          } as never,
+          alerts: [],
+        };
+      }
+      if (bureauData.hasQuita || bureauData.hasQuebranto) {
+        globalReasons.push('QUITA_QUEBRANTO_REJECTED');
+        const snapshot: BankViabilitySnapshot = {
+          sourceVersion: SOURCE_VERSION,
+          creditTypeCode,
+          destination,
+          calculatedAt: calculatedAt.toISOString(),
+          warningLegend: WARNING_LEGEND,
+          reasons: globalReasons,
+          inputs,
+          bankResults: [],
+        };
+        return {
+          ruleId: this.ruleId,
+          outcome: 'FAIL' as AnalysisOutcome,
+          severity: 'ERROR' as Severity,
+          detail: {
+            sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'bank-catalog', 'bureau-data'],
+            fields: [],
+            bankViability: snapshot,
+          } as never,
+          alerts: [],
+        };
+      }
+    }
+
     // ── 2. Policy Query ────────────────────────────────────────────────
     let policies: PolicyWithBank[] = [];
     if (destination) {
@@ -179,6 +242,8 @@ export class BankViabilityRule implements AnalysisRule {
         calculatedAt,
         hasPagadoraIncome,
         scotiabankExcluded,
+        bureauData,
+        propertyValue,
       );
       bankResults.push(result);
     }
@@ -212,6 +277,29 @@ export class BankViabilityRule implements AnalysisRule {
       } as never,
       alerts: [],
     };
+  }
+
+  // ── Bureau Data Extraction (from documents array) ────────────────────
+
+  private extractBureauData(documents: Record<string, unknown>[]): BureauData | null {
+    for (const doc of documents) {
+      const ed = doc.extractedData as Record<string, unknown> | null;
+      const pr = doc.processingResults as Record<string, unknown> | null;
+
+      // Check for credit bureau document type — creditData can be in extractedData or processingResults
+      const creditData = (ed?.creditData ?? ed?.bureauData ?? pr?.creditData) as Record<string, unknown> | null;
+      if (creditData) {
+        const rawScore = (creditData.score ?? creditData.bureauScore ?? creditData.bcScore) as number | null | undefined;
+        return {
+          score: rawScore != null ? Number(rawScore) : null,
+          hasQuita: !!(creditData.hasQuita ?? creditData.hasSettlement),
+          hasQuebranto: !!(creditData.hasQuebranto ?? creditData.hasWriteOff),
+          pastDueMonths: (creditData.pastDueMonths ?? creditData.mopCount) as number | null,
+          pastDueTotalAmount: (creditData.pastDueTotalAmount ?? creditData.pastDueAmount) as number | null,
+        };
+      }
+    }
+    return null;
   }
 
   // ── Birth Date Derivation (from documents array) ───────────────────
@@ -303,6 +391,8 @@ export class BankViabilityRule implements AnalysisRule {
     calculatedAt: Date,
     hasPagadoraIncome: boolean,
     scotiabankExcluded: boolean,
+    bureauData: BureauData | null,
+    propertyValue: Prisma.Decimal | null,
   ): BankResult {
     const reasons: string[] = [];
     const checks: Record<string, CheckResult> = {};
@@ -416,6 +506,53 @@ export class BankViabilityRule implements AnalysisRule {
       reasons.push('SCOTIABANK_PAGADORA_EXCLUSION');
     }
 
+    // ── Bureau Score Check (bank-specific) ────────────────────────────
+    if (bureauData && bureauData.score !== null && policy.bank.minimumBureauScore !== null) {
+      if (bureauData.score < policy.bank.minimumBureauScore) {
+        reasons.push(`${policy.bank.code}_SCORE_BELOW_THRESHOLD`);
+      }
+    }
+
+    // ── Santander MOP Check ───────────────────────────────────────────
+    if (bureauData && policy.bank.code === 'SANTANDER') {
+      const pvMonths = bureauData.pastDueMonths ?? 0;
+      const pvAmount = bureauData.pastDueTotalAmount ?? 0;
+      if (pvMonths >= 3 || (pvMonths >= 2 && pvAmount > 3000)) {
+        reasons.push('SANTANDER_MOP_KNOCKOUT');
+      }
+    }
+
+    // ── Minimum Income CMA Check ──────────────────────────────────────
+    if (policy.minimumIncome !== null && incomeUsed) {
+      const minIncome = new Prisma.Decimal(policy.minimumIncome.toString());
+      if (incomeUsed.lt(minIncome)) {
+        checks.minimumIncome = {
+          status: 'FAIL',
+          actual: d2(incomeUsed),
+          required: d2(minIncome),
+        };
+        reasons.push('INCOME_BELOW_MINIMUM');
+      } else {
+        checks.minimumIncome = { status: 'PASS' };
+      }
+    }
+
+    // ── Minimum Property Value CMA Check ──────────────────────────────
+    if (policy.minimumPropertyValue !== null && propertyValue) {
+      const propValue = new Prisma.Decimal(propertyValue.toString());
+      const minProp = new Prisma.Decimal(policy.minimumPropertyValue.toString());
+      if (propValue.lt(minProp)) {
+        checks.minimumPropertyValue = {
+          status: 'FAIL',
+          actual: d2(propValue),
+          required: d2(minProp),
+        };
+        reasons.push('PROPERTY_VALUE_BELOW_MINIMUM');
+      } else {
+        checks.minimumPropertyValue = { status: 'PASS' };
+      }
+    }
+
     // ── Status Precedence ────────────────────────────────────────────
     const status = this.resolveProductStatus(checks, reasons, !incomeUsed, currentAgeMonths === null);
 
@@ -473,6 +610,10 @@ export class BankViabilityRule implements AnalysisRule {
       reasons.includes('MINIMUM_AGE_NOT_MET') ||
       reasons.includes('MAXIMUM_APPLICATION_AGE_EXCEEDED') ||
       reasons.includes('INSUFFICIENT_EMPLOYMENT_TENURE') ||
+      reasons.includes('INCOME_BELOW_MINIMUM') ||
+      reasons.includes('PROPERTY_VALUE_BELOW_MINIMUM') ||
+      reasons.some((r) => r.endsWith('_SCORE_BELOW_THRESHOLD')) ||
+      reasons.includes('SANTANDER_MOP_KNOCKOUT') ||
       checks.capacity.status === 'FAIL';
 
     if (hasNotCompatible) return 'NOT_COMPATIBLE';
