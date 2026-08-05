@@ -15,7 +15,7 @@ export class BanksService {
       orderBy: { code: 'asc' },
       include: {
         _count: {
-          select: { policies: { where: { isActive: true } } },
+          select: { policies: true },
         },
       },
     });

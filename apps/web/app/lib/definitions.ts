@@ -340,10 +340,10 @@ export const INCOME_CRITERION_LABELS: Record<string, string> = {
 };
 
 export const DESTINATION_LABELS: Record<string, string> = {
-  ACQUISITION: "Adquisición de vivienda",
-  CONSTRUCTION: "Construcción",
-  REMODELING: "Remodelación",
-  REFINANCING: "Refinanciamiento",
-  LAND_PURCHASE: "Compra de terreno",
-  COMMERCIAL: "Comercial",
+  ACQUISITION: "Adquisición",
+  LIQUIDITY: "Liquidez",
+  MORTGAGE_REPLACEMENT: "Sustitución",
+  TERRENO: "Terreno",
+  CONSTRUCCION: "Construcción",
+  REMODELACION: "Remodelación",
 };
