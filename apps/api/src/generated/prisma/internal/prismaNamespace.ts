@@ -398,7 +398,7 @@ export const ModelName = {
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus',
   Bank: 'Bank',
-  BankProductPolicy: 'BankProductPolicy'
+  BankPolicy: 'BankPolicy'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -414,7 +414,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "client" | "mortgageCase" | "liabilitySnapshot" | "incomeCalculation" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus" | "bank" | "bankProductPolicy"
+    modelProps: "user" | "client" | "mortgageCase" | "liabilitySnapshot" | "incomeCalculation" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus" | "bank" | "bankPolicy"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1454,77 +1454,77 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    BankProductPolicy: {
-      payload: Prisma.$BankProductPolicyPayload<ExtArgs>
-      fields: Prisma.BankProductPolicyFieldRefs
+    BankPolicy: {
+      payload: Prisma.$BankPolicyPayload<ExtArgs>
+      fields: Prisma.BankPolicyFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.BankProductPolicyFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload> | null
+          args: Prisma.BankPolicyFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.BankProductPolicyFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         findFirst: {
-          args: Prisma.BankProductPolicyFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload> | null
+          args: Prisma.BankPolicyFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.BankProductPolicyFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         findMany: {
-          args: Prisma.BankProductPolicyFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>[]
+          args: Prisma.BankPolicyFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>[]
         }
         create: {
-          args: Prisma.BankProductPolicyCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         createMany: {
-          args: Prisma.BankProductPolicyCreateManyArgs<ExtArgs>
+          args: Prisma.BankPolicyCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.BankProductPolicyCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>[]
+          args: Prisma.BankPolicyCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>[]
         }
         delete: {
-          args: Prisma.BankProductPolicyDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         update: {
-          args: Prisma.BankProductPolicyUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         deleteMany: {
-          args: Prisma.BankProductPolicyDeleteManyArgs<ExtArgs>
+          args: Prisma.BankPolicyDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.BankProductPolicyUpdateManyArgs<ExtArgs>
+          args: Prisma.BankPolicyUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.BankProductPolicyUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>[]
+          args: Prisma.BankPolicyUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>[]
         }
         upsert: {
-          args: Prisma.BankProductPolicyUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankProductPolicyPayload>
+          args: Prisma.BankPolicyUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankPolicyPayload>
         }
         aggregate: {
-          args: Prisma.BankProductPolicyAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateBankProductPolicy>
+          args: Prisma.BankPolicyAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBankPolicy>
         }
         groupBy: {
-          args: Prisma.BankProductPolicyGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.BankProductPolicyGroupByOutputType>[]
+          args: Prisma.BankPolicyGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BankPolicyGroupByOutputType>[]
         }
         count: {
-          args: Prisma.BankProductPolicyCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.BankProductPolicyCountAggregateOutputType> | number
+          args: Prisma.BankPolicyCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BankPolicyCountAggregateOutputType> | number
         }
       }
     }
@@ -1757,6 +1757,7 @@ export const BankScalarFieldEnum = {
   name: 'name',
   debtCommitmentFactor: 'debtCommitmentFactor',
   incomeCriterion: 'incomeCriterion',
+  minimumBureauScore: 'minimumBureauScore',
   isActive: 'isActive',
   sourceVersion: 'sourceVersion',
   createdAt: 'createdAt',
@@ -1766,13 +1767,15 @@ export const BankScalarFieldEnum = {
 export type BankScalarFieldEnum = (typeof BankScalarFieldEnum)[keyof typeof BankScalarFieldEnum]
 
 
-export const BankProductPolicyScalarFieldEnum = {
+export const BankPolicyScalarFieldEnum = {
   id: 'id',
   bankId: 'bankId',
   code: 'code',
   name: 'name',
   destination: 'destination',
   personType: 'personType',
+  minimumIncome: 'minimumIncome',
+  minimumPropertyValue: 'minimumPropertyValue',
   minimumEmploymentTenureMonths: 'minimumEmploymentTenureMonths',
   minimumApplicantAgeMonths: 'minimumApplicantAgeMonths',
   maximumApplicationAgeMonths: 'maximumApplicationAgeMonths',
@@ -1784,7 +1787,7 @@ export const BankProductPolicyScalarFieldEnum = {
   updatedAt: 'updatedAt'
 } as const
 
-export type BankProductPolicyScalarFieldEnum = (typeof BankProductPolicyScalarFieldEnum)[keyof typeof BankProductPolicyScalarFieldEnum]
+export type BankPolicyScalarFieldEnum = (typeof BankPolicyScalarFieldEnum)[keyof typeof BankPolicyScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2153,7 +2156,7 @@ export type GlobalOmitConfig = {
   creditType?: Prisma.CreditTypeOmit
   caseStatus?: Prisma.CaseStatusOmit
   bank?: Prisma.BankOmit
-  bankProductPolicy?: Prisma.BankProductPolicyOmit
+  bankPolicy?: Prisma.BankPolicyOmit
 }
 
 /* Types for Logging */

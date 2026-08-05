@@ -7,6 +7,7 @@ import { CaseStatusCalculatorModule } from './case-status-calculator/case-status
 import { ClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogsModule } from './catalogs/catalogs.module';
+import { BanksModule } from './banks/banks.module';
 import { MortgageCasesModule } from './mortgage-cases/mortgage-cases.module';
 import { DocumentsModule } from './documents/documents.module';
 import { LiabilityModule } from './liability/liability.module';
@@ -20,6 +21,7 @@ import { IncomeCalculationModule } from './income-calculation/income-calculation
     AuthModule,
     ClientsModule,
     CatalogsModule,
+    BanksModule,
     MortgageCasesModule,
     DocumentsModule,
     CaseAnalysisModule,

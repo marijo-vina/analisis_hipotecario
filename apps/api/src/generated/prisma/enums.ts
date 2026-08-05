@@ -63,7 +63,10 @@ export type IncomeCriterion = (typeof IncomeCriterion)[keyof typeof IncomeCriter
 export const ProductDestination = {
   ACQUISITION: 'ACQUISITION',
   LIQUIDITY: 'LIQUIDITY',
-  MORTGAGE_REPLACEMENT: 'MORTGAGE_REPLACEMENT'
+  MORTGAGE_REPLACEMENT: 'MORTGAGE_REPLACEMENT',
+  TERRENO: 'TERRENO',
+  CONSTRUCCION: 'CONSTRUCCION',
+  REMODELACION: 'REMODELACION'
 } as const
 
 export type ProductDestination = (typeof ProductDestination)[keyof typeof ProductDestination]

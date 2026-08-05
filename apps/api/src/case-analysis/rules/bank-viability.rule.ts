@@ -154,7 +154,7 @@ export class BankViabilityRule implements AnalysisRule {
     // ── 2. Product Query ─────────────────────────────────────────────
     let products: ProductWithBank[] = [];
     if (destination) {
-      products = await this.prisma.bankProductPolicy.findMany({
+      products = await this.prisma.bankPolicy.findMany({
         where: {
           isActive: true,
           destination: destination as never,

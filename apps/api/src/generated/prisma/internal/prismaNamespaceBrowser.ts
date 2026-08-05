@@ -65,7 +65,7 @@ export const ModelName = {
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus',
   Bank: 'Bank',
-  BankProductPolicy: 'BankProductPolicy'
+  BankPolicy: 'BankPolicy'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -274,6 +274,7 @@ export const BankScalarFieldEnum = {
   name: 'name',
   debtCommitmentFactor: 'debtCommitmentFactor',
   incomeCriterion: 'incomeCriterion',
+  minimumBureauScore: 'minimumBureauScore',
   isActive: 'isActive',
   sourceVersion: 'sourceVersion',
   createdAt: 'createdAt',
@@ -283,13 +284,15 @@ export const BankScalarFieldEnum = {
 export type BankScalarFieldEnum = (typeof BankScalarFieldEnum)[keyof typeof BankScalarFieldEnum]
 
 
-export const BankProductPolicyScalarFieldEnum = {
+export const BankPolicyScalarFieldEnum = {
   id: 'id',
   bankId: 'bankId',
   code: 'code',
   name: 'name',
   destination: 'destination',
   personType: 'personType',
+  minimumIncome: 'minimumIncome',
+  minimumPropertyValue: 'minimumPropertyValue',
   minimumEmploymentTenureMonths: 'minimumEmploymentTenureMonths',
   minimumApplicantAgeMonths: 'minimumApplicantAgeMonths',
   maximumApplicationAgeMonths: 'maximumApplicationAgeMonths',
@@ -301,7 +304,7 @@ export const BankProductPolicyScalarFieldEnum = {
   updatedAt: 'updatedAt'
 } as const
 
-export type BankProductPolicyScalarFieldEnum = (typeof BankProductPolicyScalarFieldEnum)[keyof typeof BankProductPolicyScalarFieldEnum]
+export type BankPolicyScalarFieldEnum = (typeof BankPolicyScalarFieldEnum)[keyof typeof BankPolicyScalarFieldEnum]
 
 
 export const SortOrder = {

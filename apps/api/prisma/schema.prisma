@@ -221,6 +221,9 @@ enum ProductDestination {
   ACQUISITION
   LIQUIDITY
   MORTGAGE_REPLACEMENT
+  TERRENO
+  CONSTRUCCION
+  REMODELACION
 }
 
 model Bank {
@@ -229,20 +232,23 @@ model Bank {
   name                 String
   debtCommitmentFactor Decimal             @db.Decimal(5, 4)
   incomeCriterion      IncomeCriterion
+  minimumBureauScore   Int?
   isActive             Boolean             @default(true)
   sourceVersion        String
-  products             BankProductPolicy[]
+  policies             BankPolicy[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 }
 
-model BankProductPolicy {
+model BankPolicy {
   id                            String             @id @default(uuid())
   bankId                        String
   code                          String             @unique
   name                          String
   destination                   ProductDestination
   personType                    PersonType
+  minimumIncome                 Decimal?           @db.Decimal(12, 2)
+  minimumPropertyValue          Decimal?           @db.Decimal(12, 2)
   minimumEmploymentTenureMonths Int?
   minimumApplicantAgeMonths     Int?
   maximumApplicationAgeMonths   Int?
@@ -255,6 +261,6 @@ model BankProductPolicy {
 
   bank Bank @relation(fields: [bankId], references: [id])
 
-  @@index([destination, personType, isActive])
-  @@index([bankId])
+  @@unique([bankId, destination])
+  @@index([destination, isActive])
 }

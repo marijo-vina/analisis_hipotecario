@@ -168,7 +168,7 @@ async function main() {
 
     // Seed bank product policies
     for (const product of BANK_PRODUCTS) {
-      await prisma.bankProductPolicy.upsert({
+      await prisma.bankPolicy.upsert({
         where: { code: product.code },
         update: {
           name: product.name,
