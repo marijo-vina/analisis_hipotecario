@@ -12,7 +12,6 @@ export async function createCase(
   const creditTypeId = formData.get("creditTypeId");
   const personType = formData.get("personType");
   const propertyLocation = formData.get("propertyLocation");
-  const requestedAmount = formData.get("requestedAmount");
   const propertyValue = formData.get("propertyValue");
   const estimatedTermMonths = formData.get("estimatedTermMonths");
   const notes = formData.get("notes");
@@ -67,9 +66,6 @@ export async function createCase(
   const loc = str(propertyLocation);
   if (loc) body.propertyLocation = loc;
 
-  const amt = num(requestedAmount);
-  if (amt !== undefined) body.requestedAmount = amt;
-
   const val = num(propertyValue);
   if (val !== undefined) body.propertyValue = val;
 
@@ -101,7 +97,6 @@ export async function updateCase(
 ): Promise<ActionState> {
   const creditTypeId = formData.get("creditTypeId");
   const propertyLocation = formData.get("propertyLocation");
-  const requestedAmount = formData.get("requestedAmount");
   const propertyValue = formData.get("propertyValue");
   const estimatedTermMonths = formData.get("estimatedTermMonths");
   const notes = formData.get("notes");
@@ -132,11 +127,6 @@ export async function updateCase(
     return Number.isNaN(n) ? undefined : n;
   };
 
-  const amt = num(requestedAmount);
-  if (amt !== undefined && amt <= 0) {
-    errors.requestedAmount = "El monto solicitado debe ser positivo";
-  }
-
   const val = num(propertyValue);
   if (val !== undefined && val <= 0) {
     errors.propertyValue = "El valor de la propiedad debe ser positivo";
@@ -158,8 +148,6 @@ export async function updateCase(
 
   const loc = str(propertyLocation);
   if (loc) body.propertyLocation = loc;
-
-  if (amt !== undefined) body.requestedAmount = amt;
 
   if (val !== undefined) body.propertyValue = val;
 

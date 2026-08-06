@@ -26,6 +26,7 @@ export default function EstadosSummaryBar({
     totalDeposits,
     totalCriticalAlerts,
     totalWarningAlerts,
+    statementsWithData,
   } = summary;
 
   const periodLabel =
@@ -49,10 +50,10 @@ export default function EstadosSummaryBar({
             </span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base font-bold text-gf-text">
-                {totalStatements}
+                {statementsWithData}/{totalStatements}
               </span>
               <span className="text-xs font-semibold text-gf-text-muted">
-                procesado{totalStatements !== 1 ? "s" : ""}
+                procesado{statementsWithData !== 1 ? "s" : ""}
               </span>
             </div>
           </div>

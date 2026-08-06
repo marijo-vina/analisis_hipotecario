@@ -43,15 +43,7 @@ export default function ExtractionCategoryTabs({
               }`}
             >
               <span>{CATEGORY_LABELS[tab]}</span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5 ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-gf-surface-dim text-gf-text-muted"
-                }`}
-              >
-                ✓ 1/1
-              </span>
+
             </button>
           );
         })}

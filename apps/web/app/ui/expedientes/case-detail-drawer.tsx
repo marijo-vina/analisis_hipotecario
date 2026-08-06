@@ -74,12 +74,6 @@ export default function CaseDetailDrawer({
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-gf-text-muted">Monto solicitado</dt>
-              <dd className="text-sm font-medium text-gf-text mt-0.5">
-                {formatCurrency(caseData.requestedAmount)}
-              </dd>
-            </div>
-            <div>
               <dt className="text-xs text-gf-text-muted">Valor propiedad</dt>
               <dd className="text-sm font-medium text-gf-text mt-0.5">
                 {formatCurrency(caseData.propertyValue)}

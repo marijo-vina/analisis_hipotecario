@@ -10,12 +10,12 @@ export const SOURCE_VERSION = 'ANAQUEL_AGOSTO_2026';
 // ─── Credit Types ─────────────────────────────────────────────────────────────
 
 export const CREDIT_TYPES = [
-  { code: 'COMPRA', name: 'Compra', isActive: true, destination: 'ACQUISITION' as const },
-  { code: 'MEJORA_HIPOTECA', name: 'Mejora Hipoteca', isActive: true, destination: 'MORTGAGE_REPLACEMENT' as const },
+  { code: 'COMPRA', name: 'Adquisición', isActive: true, destination: 'ACQUISITION' as const },
+  { code: 'MEJORA_HIPOTECA', name: 'Sustitución', isActive: true, destination: 'MORTGAGE_REPLACEMENT' as const },
   { code: 'LIQUIDEZ', name: 'Liquidez', isActive: true, destination: 'LIQUIDITY' as const },
   { code: 'TERRENO', name: 'Terreno', isActive: true, destination: 'TERRENO' as const },
-  { code: 'REMODELACION', name: 'Remodelación', isActive: true, destination: 'REMODELACION' as const },
   { code: 'CONSTRUCCION', name: 'Construcción', isActive: true, destination: 'CONSTRUCCION' as const },
+  { code: 'REMODELACION', name: 'Remodelación', isActive: true, destination: 'REMODELACION' as const },
 ];
 
 // ─── Banks ────────────────────────────────────────────────────────────────────

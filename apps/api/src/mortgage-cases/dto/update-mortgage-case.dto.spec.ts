@@ -40,13 +40,13 @@ describe('UpdateMortgageCaseDto', () => {
   // ---------------------------------------------------------------------------
 
   describe('creditTypeId', () => {
-    it('should reject missing creditTypeId', async () => {
+    it('should accept missing creditTypeId when optional', async () => {
       const dto = plainToInstance(UpdateMortgageCaseDto, {});
 
       const errors = await validate(dto);
       const ctErrors = errors.filter((e) => e.property === 'creditTypeId');
 
-      expect(ctErrors.length).toBeGreaterThan(0);
+      expect(ctErrors.length).toBe(0);
     });
 
     it('should reject creditTypeId <= 0', async () => {

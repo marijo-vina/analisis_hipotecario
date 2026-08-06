@@ -7,7 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
-import { RotateCw, Loader2, FolderPlus, FileCheck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, FolderPlus, FileCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -193,7 +193,7 @@ export default function AnalysisSection({
           title="Se requiere procesar al menos un documento antes de ejecutar el análisis"
           className="bg-gray-100 text-gray-400 border border-gray-200 px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm cursor-not-allowed inline-flex items-center gap-2"
         >
-          <RotateCw className="w-3.5 h-3.5 opacity-50" />
+          <Sparkles className="w-3.5 h-3.5 opacity-50" />
           <span>Analizar expediente</span>
         </button>
       );
@@ -207,7 +207,7 @@ export default function AnalysisSection({
             onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
-            <RotateCw className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5" />
             <span>Analizar expediente</span>
           </button>
         );
@@ -219,7 +219,7 @@ export default function AnalysisSection({
             onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
-            <RotateCw className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5" />
             <span>Re-ejecutar análisis</span>
           </button>
         );
@@ -241,7 +241,7 @@ export default function AnalysisSection({
             onClick={handleAnalyzeClick}
             className="bg-gf-red hover:bg-gf-red-dark text-white px-4 h-9 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all inline-flex items-center gap-2 active:scale-[0.98]"
           >
-            <RotateCw className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5" />
             <span>Reintentar análisis</span>
           </button>
         );
@@ -304,23 +304,33 @@ export default function AnalysisSection({
             Análisis del expediente
           </h2>
         </div>
-        <div className="self-start sm:self-auto">
-          {headerButton}
-        </div>
+        {state.phase !== "idle" && (
+          <div className="self-start sm:self-auto">
+            {headerButton}
+          </div>
+        )}
       </div>
 
-      {/* ── Propuesta 3: Cinta delgada de 1 sola fila (Inline Notice Banner) ── */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3 mb-4 shadow-2xs">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-          <span>
-            <strong>Indicación para la asesora:</strong> Asegúrate de haber cargado y procesado toda la documentación necesaria antes de ejecutar el análisis.
-          </span>
+      {state.phase === "idle" ? (
+        <div className="flex flex-col items-center justify-center bg-white border border-dashed border-gf-border rounded-xl p-10 shadow-xs mt-6 mb-8 text-center">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 text-sm text-amber-900 flex flex-col items-center gap-3 mb-6 max-w-lg shadow-2xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <span className="font-bold text-base">Paso 3: Análisis de Viabilidad Bancaria</span>
+            </div>
+            <p className="text-amber-800 leading-relaxed">
+              Para obtener una comparativa bancaria precisa y cálculos correctos, asegúrate de haber subido y procesado los comprobantes de ingresos y documentos de identidad.
+            </p>
+            <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full mt-1">
+              {processedCount}/{documents.length} documentos procesados
+            </span>
+          </div>
+          <div className="scale-110">
+            {headerButton}
+          </div>
         </div>
-        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full shrink-0">
-          {processedCount}/{documents.length} procesados
-        </span>
-      </div>
+      ) : (
+        <>
 
       {/* ── Stepper — visible during analyzing or error ─────────────────── */}
       {(state.phase === "analyzing" || state.phase === "error") && (
@@ -398,6 +408,8 @@ export default function AnalysisSection({
               }
             />
           )}
+        </>
+      )}
         </>
       )}
 
