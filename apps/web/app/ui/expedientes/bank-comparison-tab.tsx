@@ -264,7 +264,6 @@ function FinancialSummary({
     { label: "Ingreso bruto", value: formatCurrency(inputs.confirmedGrossIncome) },
     { label: "Ingreso neto", value: formatCurrency(inputs.confirmedNetIncome) },
     { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
-    { label: "Monto solicitado", value: formatCurrency(inputs.requestedAmount) },
     { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
     { label: "Plazo", value: termYears ?? "—" },
     { label: "Destino", value: DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—" },
@@ -437,20 +436,30 @@ function ProductDetail({ match }: { match: BankResult }) {
   const mainReason =
     reasons.length > 0 ? REASON_LABELS[reasons[0]] ?? reasons[0] : "Sin restricciones detectadas";
 
-  const controlKeys = ["capacity","minimumApplicantAge","maximumApplicationAge","maturityAge","employmentTenure"] as const;
-  const controlLabels: Record<string, string> = { capacity: "Capacidad de pago", minimumApplicantAge: "Edad mínima solicitante", maximumApplicationAge: "Edad máxima de solicitud", maturityAge: "Edad al vencimiento", employmentTenure: "Antigüedad laboral" };
+  const controlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue"] as const;
+  const controlLabels: Record<string, string> = {
+    capacity: "Capacidad de pago",
+    minimumApplicantAge: "Edad mínima solicitante",
+    maximumApplicationAge: "Edad máxima de solicitud",
+    employmentTenure: "Antigüedad laboral",
+    minimumIncome: "Ingreso mínimo",
+    minimumPropertyValue: "Valor mínimo inmueble",
+  };
   const resultBadge: Record<string, { color: string; label: string }> = { PASS: { color: "#166534", label: "Cumple" }, FAIL: { color: "#991B1B", label: "No cumple" }, NOT_APPLICABLE: { color: "#6B7280", label: "No aplica" }, REQUIRES_REVIEW: { color: "#1D4ED8", label: "Requiere revisión" } };
 
   function getPolicyText(key: string): string {
     const minAge = snap.minimumApplicantAgeMonths as number | null | undefined;
     const maxAge = snap.maximumApplicationAgeMonths as number | null | undefined;
     const minTenure = snap.minimumEmploymentTenureMonths as number | null | undefined;
+    const minInc = snap.minimumIncome as string | null | undefined;
+    const minProp = snap.minimumPropertyValue as string | null | undefined;
     switch (key) {
       case "capacity": return "Debe ser mayor que $0.00";
-      case "maturityAge": return "—";
       case "minimumApplicantAge": return minAge ? `Mín. ${formatAge(minAge)}` : "—";
       case "maximumApplicationAge": return maxAge ? `Máx. ${formatAge(maxAge)}` : "—";
       case "employmentTenure": return minTenure ? `Mín. ${formatAge(minTenure)}` : "—";
+      case "minimumIncome": return minInc ? `Mín. ${formatCurrency(minInc)}` : "—";
+      case "minimumPropertyValue": return minProp ? `Mín. ${formatCurrency(minProp)}` : "—";
       default: return "—";
     }
   }
@@ -458,10 +467,11 @@ function ProductDetail({ match }: { match: BankResult }) {
   function getExpedienteValue(key: string): string {
     switch (key) {
       case "capacity": return formatCurrency(calculation.availableCapacity);
-      case "maturityAge": return formatAge(calculation.ageAtMaturityMonths);
       case "minimumApplicantAge": return formatAge(calculation.currentAgeMonths);
       case "maximumApplicationAge": return formatAge(calculation.currentAgeMonths);
       case "employmentTenure": return formatAge(calculation.employmentTenureMonths);
+      case "minimumIncome": return formatCurrency(calculation.incomeUsed);
+      case "minimumPropertyValue": return formatCurrency((match.checks?.minimumPropertyValue?.actual as string) ?? null);
       default: return "—";
     }
   }

@@ -27,7 +27,7 @@ function makePrismaMock() {
 }
 
 const CALCULATED_AT = new Date('2026-07-20T15:00:00Z');
-const SOURCE_VERSION = 'ANAQUEL_MAYO_2026';
+const SOURCE_VERSION = 'ANAQUEL_AGOSTO_2026';
 
 /** Default case with viable values for BANORTE_ADQ_HF. */
 function defaultCase() {

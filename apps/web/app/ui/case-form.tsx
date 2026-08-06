@@ -58,7 +58,6 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
   const [customTermYears, setCustomTermYears] = useState<string>("");
 
   // Currency formatted values
-  const [reqAmountFormatted, setReqAmountFormatted] = useState<string>("");
   const [propValueFormatted, setPropValueFormatted] = useState<string>("");
 
   // Calculate final term in months
@@ -248,29 +247,7 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
                 )}
               </div>
 
-              {/* Monto solicitado (Pesos MXN) */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="requestedAmount" className="text-xs font-semibold text-gf-text">
-                  Monto solicitado
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-gf-text-muted font-bold text-sm pointer-events-none">$</span>
-                  <input
-                    id="requestedAmount"
-                    name="requestedAmount"
-                    type="text"
-                    inputMode="numeric"
-                    value={reqAmountFormatted}
-                    onChange={(e) => setReqAmountFormatted(formatPesoGroup(e.target.value))}
-                    placeholder="1,500,000"
-                    className={INPUT_CURRENCY_CLASS}
-                  />
-                </div>
-                <p className="text-[11px] text-gf-text-muted">Monto en pesos mexicanos (MXN)</p>
-                {state?.errors?.requestedAmount && (
-                  <p className="text-xs text-red-600 mt-0.5">{state.errors.requestedAmount}</p>
-                )}
-              </div>
+
 
               {/* Valor del inmueble (Pesos MXN) */}
               <div className="flex flex-col gap-1.5">

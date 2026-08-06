@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, ExternalLink, RotateCw, User, FolderOpen, CreditCard, Building } from "lucide-react";
+import { Eye, ExternalLink, RotateCw, User, FolderOpen, CreditCard, Building, Sparkles, Loader2 } from "lucide-react";
 import type { Client, Document, DocumentType } from "@/app/lib/definitions";
 import CaseDetailHeader from "@/app/ui/expedientes/case-detail-header";
 import ObservationsEditor from "@/app/ui/expedientes/observations-editor";
@@ -10,6 +10,7 @@ import CaseDetailDrawer from "@/app/ui/expedientes/case-detail-drawer";
 import DocumentBrowser from "@/app/ui/documents/document-browser";
 import ExtractionSection from "@/app/ui/extraction/extraction-section";
 import AnalysisSection from "@/app/ui/expedientes/analysis-section";
+
 
 interface CaseSummaryData {
   id: string;
@@ -166,20 +167,22 @@ export default function CaseDetailWorkspace({
                 <div className="text-right flex flex-col justify-between items-end shrink-0 sm:self-stretch">
                   <div>
                     <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-                      Monto Solicitado
+                      Valor del Inmueble
                     </p>
                     <p className="text-xl font-bold text-gf-text mt-0.5">
-                      {formatCurrency(caseData.requestedAmount)}
+                      {formatCurrency(caseData.propertyValue)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCaseDrawerOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-gf-text border border-gf-border rounded-xl px-3 py-2 hover:bg-gf-surface-dim transition-all shadow-2xs mt-4"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-gf-text-muted" />
-                    <span>Ver expediente completo</span>
-                  </button>
+                  <div className="flex items-center gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setCaseDrawerOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-gf-text border border-gf-border rounded-xl px-3 py-2 hover:bg-gf-surface-dim transition-all shadow-2xs cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-gf-text-muted" />
+                      <span>Ver expediente</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -18,14 +18,14 @@ const NAV_ITEMS = [
     icon: Users,
   },
   {
-    href: "/dashboard/bancos",
-    label: "Bancos",
-    icon: Building2,
-  },
-  {
     href: "/dashboard/expedientes",
     label: "Expedientes",
     icon: FolderOpen,
+  },
+  {
+    href: "/dashboard/bancos",
+    label: "Bancos",
+    icon: Building2,
   },
 ] as const;
 

@@ -23,7 +23,7 @@ import { completeMonthsBetween } from '../../shared/utils/dates';
 const WARNING_LEGEND =
   'Evaluación preliminar basada en la información disponible y en políticas internas registradas. No constituye una aprobación o autorización de crédito por parte del banco.';
 
-const SOURCE_VERSION = 'ANAQUEL_MAYO_2026';
+const SOURCE_VERSION = 'ANAQUEL_AGOSTO_2026';
 
 // ── Bureau Data ────────────────────────────────────────────────────────
 
