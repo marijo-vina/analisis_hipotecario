@@ -3,10 +3,13 @@ import type { Bank } from "@/app/lib/definitions";
 import ErrorMessage from "@/app/ui/error-message";
 import BanksTable from "@/app/ui/banks/banks-table";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * Bank catalog list page — server component.
  *
- * Fetches the full bank list from the backend and delegates rendering
+ * Fetches the full bank list from the backend dynamically and delegates rendering
  * to the BanksTable client component.
  */
 export default async function BancosPage() {

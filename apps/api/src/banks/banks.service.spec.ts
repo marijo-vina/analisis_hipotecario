@@ -16,6 +16,7 @@ describe('BanksService', () => {
     },
     bankPolicy: {
       findMany: jest.fn(),
+      create: jest.fn(),
       upsert: jest.fn(),
     },
   };
@@ -66,17 +67,24 @@ describe('BanksService', () => {
         },
       ];
 
-      mockPrismaService.bank.findMany.mockResolvedValue(banks);
+      mockPrismaService.bank.findMany.mockResolvedValue([
+        { ...banks[0], policies: [1, 2, 3, 4, 5, 6].map((i) => ({ id: `${i}` })) },
+        { ...banks[1], policies: [{ id: '1' }] },
+      ]);
 
       const result = await service.findAll();
 
       expect(result).toEqual(banks);
       expect(mockPrismaService.bank.findMany).toHaveBeenCalledTimes(1);
       expect(mockPrismaService.bank.findMany).toHaveBeenCalledWith({
-        orderBy: { code: 'asc' },
+        orderBy: [
+          { isActive: 'desc' },
+          { name: 'asc' },
+        ],
         include: {
-          _count: {
-            select: { policies: true },
+          policies: {
+            where: { isActive: true },
+            select: { id: true },
           },
         },
       });
