@@ -6,18 +6,41 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductDestination } from '../generated/prisma/client';
 
+const ALL_DESTINATIONS: ProductDestination[] = [
+  ProductDestination.ACQUISITION,
+  ProductDestination.LIQUIDITY,
+  ProductDestination.MORTGAGE_REPLACEMENT,
+  ProductDestination.TERRENO,
+  ProductDestination.CONSTRUCCION,
+  ProductDestination.REMODELACION,
+];
+
 @Injectable()
 export class BanksService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    return this.prisma.bank.findMany({
-      orderBy: { code: 'asc' },
+    const banks = await this.prisma.bank.findMany({
+      orderBy: [
+        { isActive: 'desc' },
+        { name: 'asc' },
+      ],
       include: {
-        _count: {
-          select: { policies: true },
+        policies: {
+          where: { isActive: true },
+          select: { id: true },
         },
       },
+    });
+
+    return banks.map((bank: any) => {
+      const { policies = [], _count, ...rest } = bank;
+      return {
+        ...rest,
+        _count: {
+          policies: policies.length,
+        },
+      };
     });
   }
 
@@ -25,9 +48,7 @@ export class BanksService {
     const bank = await this.prisma.bank.findUnique({
       where: { code },
       include: {
-        policies: {
-          orderBy: { destination: 'asc' },
-        },
+        policies: true,
       },
     });
 
@@ -35,7 +56,33 @@ export class BanksService {
       throw new NotFoundException(`Bank with code ${code} not found`);
     }
 
-    return bank;
+    // Ensure all 6 standard credit destinations exist in BankPolicy for this bank
+    const existingDestinations = new Set((bank.policies || []).map((p) => p.destination));
+    const missingDestinations = ALL_DESTINATIONS.filter(
+      (dest) => !existingDestinations.has(dest),
+    );
+
+    if (missingDestinations.length > 0 && this.prisma.bankPolicy?.create) {
+      for (const dest of missingDestinations) {
+        await this.prisma.bankPolicy.create({
+          data: {
+            bankId: bank.id,
+            code: `${bank.code}_${dest}`,
+            destination: dest,
+            isActive: false,
+          },
+        });
+      }
+    }
+
+    return this.prisma.bank.findUnique({
+      where: { code },
+      include: {
+        policies: {
+          orderBy: { destination: 'asc' },
+        },
+      },
+    });
   }
 
   async update(code: string, data: any) {

@@ -35,7 +35,7 @@ export class CatalogsController {
     return { data };
   }
 
-  @Get('banks')
+  @Get('catalogs/banks')
   async findBanks() {
     const data = await this.catalogsService.getBanks();
 

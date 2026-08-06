@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, FileText, AlertTriangle } from "lucide-react";
 import { useTransition, useState, useEffect } from "react";
 import type { BankDetail } from "@/app/lib/definitions";
 import { INCOME_CRITERION_LABELS } from "@/app/lib/definitions";
@@ -13,28 +13,45 @@ interface BankDetailCardProps {
   bank: BankDetail;
 }
 
-/**
- * Bank-level detail card with inline editing for top-level fields
- * (incomeCriterion, debtCommitmentFactor, minimumBureauScore) plus the
- * policies table rendered by the PolicyEditor client island.
- */
 export default function BankDetailCard({ bank }: BankDetailCardProps) {
   const [isPending, startTransition] = useTransition();
+  const [showGeneralConfirm, setShowGeneralConfirm] = useState(false);
 
-  const save = (field: string, value: unknown) => {
-    startTransition(async () => {
-      await updateBank(bank.code, { [field]: value });
-    });
-  };
+  const [incomeCriterion, setIncomeCriterion] = useState<"NET" | "GROSS">(
+    bank.incomeCriterion
+  );
+  const [debtPct, setDebtPct] = useState<number>(
+    Math.round(bank.debtCommitmentFactor * 100)
+  );
+  const [minimumBureauScore, setMinimumBureauScore] = useState<number | null>(
+    bank.minimumBureauScore
+  );
+  const [bankIsActive, setBankIsActive] = useState<boolean>(bank.isActive);
 
-  const [incomeCriterion, setIncomeCriterion] = useState(bank.incomeCriterion);
-
-  // Sync when server data changes (after revalidation)
   useEffect(() => {
     setIncomeCriterion(bank.incomeCriterion);
-  }, [bank.incomeCriterion]);
+    setDebtPct(Math.round(bank.debtCommitmentFactor * 100));
+    setMinimumBureauScore(bank.minimumBureauScore);
+    setBankIsActive(bank.isActive);
+  }, [bank]);
 
-  const debtPct = Math.round(bank.debtCommitmentFactor * 100);
+  const hasGeneralChanges =
+    incomeCriterion !== bank.incomeCriterion ||
+    debtPct !== Math.round(bank.debtCommitmentFactor * 100) ||
+    minimumBureauScore !== bank.minimumBureauScore ||
+    bankIsActive !== bank.isActive;
+
+  const handleConfirmGeneralSave = () => {
+    startTransition(async () => {
+      await updateBank(bank.code, {
+        incomeCriterion,
+        debtCommitmentFactor: debtPct / 100,
+        minimumBureauScore,
+        isActive: bankIsActive,
+      });
+      setShowGeneralConfirm(false);
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -42,45 +59,81 @@ export default function BankDetailCard({ bank }: BankDetailCardProps) {
       <div className="flex items-center gap-3">
         <Link
           href="/dashboard/bancos"
-          className="flex items-center gap-1 text-sm text-gf-text-muted hover:text-gf-text transition-colors"
+          className="flex items-center gap-2 text-sm font-medium text-gf-text-muted hover:text-gf-red transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Volver
+          Volver a Bancos
         </Link>
       </div>
 
-      {/* Bank info card */}
-      <Card className={isPending ? "opacity-60 transition-opacity" : ""}>
-        <div className="flex items-center justify-between mb-6">
+      {/* Bank General Parameters card */}
+      <Card className={isPending ? "opacity-75 transition-opacity" : ""}>
+        <div className="flex items-center justify-between border-b border-gf-border pb-4 mb-5">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gf-red-soft text-gf-red">
               <BuildingIcon />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gf-text">{bank.name}</h1>
-              <p className="text-sm text-gf-text-muted">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gf-text">{bank.name}</h1>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    bankIsActive
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-gray-100 text-gray-600 border border-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                      bankIsActive ? "bg-emerald-500" : "bg-gray-400"
+                    }`}
+                  />
+                  {bankIsActive ? "Banco Activo" : "Banco Inactivo"}
+                </span>
+              </div>
+              <p className="text-xs text-gf-text-muted mt-0.5">
                 {INCOME_CRITERION_LABELS[bank.incomeCriterion] ?? bank.incomeCriterion}
                 {" · "}
-                CE: {debtPct}%
+                CE: {Math.round(bank.debtCommitmentFactor * 100)}%
                 {" · "}
                 Score mín: {bank.minimumBureauScore ?? "—"}
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowGeneralConfirm(true)}
+            disabled={!hasGeneralChanges || isPending}
+            className="px-4 py-2 text-xs font-semibold rounded-full bg-gf-red hover:bg-gf-red-dark text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+          >
+            {isPending ? "Guardando..." : "Guardar cambios"}
+          </button>
         </div>
 
-        <div className="border-t border-gf-border pt-5">
-          <h2 className="text-sm font-semibold text-gf-text mb-4">
-            Datos Generales
+        {/* Warning banner when Bank is inactive */}
+        {!bankIsActive && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-amber-800 font-medium mb-5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Este banco se encuentra actualmente <strong>Inactivo</strong>. Ninguno de sus objetivos de crédito será evaluado en el motor de viabilidad de expedientes.
+            </span>
+          </div>
+        )}
+
+        <div>
+          <h2 className="text-sm font-semibold text-gf-text flex items-center gap-2 mb-4">
+            <SlidersHorizontal className="w-4 h-4 text-gf-red" />
+            Parámetros Generales
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Bank name — readonly */}
             <div>
               <label className="block text-xs font-medium text-gf-text-muted mb-1">
-                Banco
+                Nombre de Institución
               </label>
-              <div className="h-10 rounded-[10px] border border-gf-border bg-gf-surface-dim/60 px-3 flex items-center text-sm text-gf-text-muted">
+              <div className="h-10 rounded-[10px] border border-gf-border bg-gf-surface-dim/60 px-3 flex items-center text-sm text-gf-text-muted font-medium">
                 {bank.name}
               </div>
             </div>
@@ -88,44 +141,69 @@ export default function BankDetailCard({ bank }: BankDetailCardProps) {
             {/* Income criterion dropdown */}
             <div>
               <label className="block text-xs font-medium text-gf-text-muted mb-1">
-                Tipo Ingreso
+                Tipo de Ingreso Evaluado
               </label>
               <select
                 value={incomeCriterion}
-                onChange={(e) => {
-                  const next = e.target.value as "NET" | "GROSS";
-                  setIncomeCriterion(next);
-                  save("incomeCriterion", next);
-                }}
-                className="h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red"
+                onChange={(e) => setIncomeCriterion(e.target.value as "NET" | "GROSS")}
+                className="h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red font-medium"
               >
-                <option value="NET">Neto</option>
-                <option value="GROSS">Bruto</option>
+                <option value="NET">Neto (Libre)</option>
+                <option value="GROSS">Bruto (Antes de imptos)</option>
               </select>
             </div>
 
             {/* Debt commitment factor (%) */}
             <div>
               <label className="block text-xs font-medium text-gf-text-muted mb-1">
-                Factor CE
+                Factor CE (Capacidad)
               </label>
-              <NumberField
-                defaultValue={debtPct}
-                suffix="%"
-                onSave={(v) => save("debtCommitmentFactor", v != null ? v / 100 : null)}
+              <div className="relative">
+                <input
+                  type="number"
+                  value={debtPct}
+                  onChange={(e) => setDebtPct(Number(e.target.value))}
+                  className="h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 pr-8 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red font-medium"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gf-text-muted pointer-events-none">
+                  %
+                </span>
+              </div>
+            </div>
+
+            {/* Minimum bureau score */}
+            <div>
+              <label className="block text-xs font-medium text-gf-text-muted mb-1">
+                Score Mínimo Buró
+              </label>
+              <input
+                type="number"
+                value={minimumBureauScore ?? ""}
+                onChange={(e) =>
+                  setMinimumBureauScore(e.target.value === "" ? null : Number(e.target.value))
+                }
+                placeholder="Sin mínimo"
+                className="h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red font-medium"
               />
             </div>
 
-            {/* Minimum bureau score — nullable */}
+            {/* Bank Active Status */}
             <div>
               <label className="block text-xs font-medium text-gf-text-muted mb-1">
-                Score Mínimo Buro
+                Estado del Banco
               </label>
-              <NumberField
-                defaultValue={bank.minimumBureauScore}
-                nullable
-                onSave={(v) => save("minimumBureauScore", v)}
-              />
+              <select
+                value={bankIsActive ? "active" : "inactive"}
+                onChange={(e) => setBankIsActive(e.target.value === "active")}
+                className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red ${
+                  bankIsActive
+                    ? "border-emerald-300 text-emerald-700 bg-emerald-50/50"
+                    : "border-gray-300 text-gray-600 bg-gray-50"
+                }`}
+              >
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+              </select>
             </div>
           </div>
         </div>
@@ -133,62 +211,70 @@ export default function BankDetailCard({ bank }: BankDetailCardProps) {
 
       {/* Policies card */}
       <Card>
-        <h2 className="text-sm font-semibold text-gf-text mb-4">
-          Políticas por objetivo del crédito
-        </h2>
+        <div className="border-b border-gf-border pb-3 mb-4">
+          <h2 className="text-sm font-semibold text-gf-text flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gf-red" />
+            Políticas por Objetivo del Crédito
+          </h2>
+          <p className="text-xs text-gf-text-muted mt-1">
+            Haz clic en los valores numéricos para editarlos directamente. La edad mínima y máxima se gestionan en años.
+          </p>
+        </div>
         <PolicyEditor bankCode={bank.code} policies={bank.policies} />
       </Card>
-    </div>
-  );
-}
 
-/* ---------------------------------------------------------------------------
- * Inline helpers
- * ------------------------------------------------------------------------- */
+      {/* Confirmation Modal for General Parameters */}
+      {showGeneralConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-gf-text">
+                Confirmar cambios en parámetros generales
+              </h3>
+            </div>
 
-interface NumberFieldProps {
-  defaultValue: number | null;
-  suffix?: string;
-  nullable?: boolean;
-  onSave: (value: number | null) => void;
-}
+            <div className="space-y-3 text-sm text-gf-text-muted">
+              <p>
+                Está a punto de modificar los parámetros generales de{" "}
+                <strong className="text-gf-text">{bank.name}</strong> (Tipo de ingreso, Factor CE, Score mínimo o Estado del Banco).
+              </p>
 
-function NumberField({ defaultValue, suffix, nullable, onSave }: NumberFieldProps) {
-  const [value, setValue] = useState(defaultValue);
-  const [draft, setDraft] = useState(value != null ? String(value) : "");
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 space-y-1">
+                <p className="font-semibold text-amber-950">
+                  ⚠️ Aviso de impacto en análisis:
+                </p>
+                <p>
+                  • Este cambio afectará todas las evaluaciones de viabilidad que se ejecuten a partir de este momento.
+                </p>
+                <p>
+                  • Los expedientes ya analizados <strong>no se verán alterados</strong> y mantendrán su historial con los parámetros vigentes al momento de su evaluación.
+                </p>
+              </div>
+            </div>
 
-  // Sync when server data changes (after revalidation)
-  useEffect(() => {
-    setValue(defaultValue);
-    setDraft(defaultValue != null ? String(defaultValue) : "");
-  }, [defaultValue]);
-
-  const commit = () => {
-    const numeric = draft === "" ? null : Number(draft);
-    if (numeric !== defaultValue) {
-      setValue(numeric);
-      onSave(numeric);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <input
-        type="text"
-        inputMode="numeric"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-        }}
-        placeholder={nullable ? "Sin límite" : undefined}
-        className={`h-10 w-full rounded-[10px] border border-gf-border bg-white px-3 pr-10 text-sm text-gf-text focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red`}
-      />
-      {suffix && (
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gf-text-muted pointer-events-none">
-          {suffix}
-        </span>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowGeneralConfirm(false)}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-semibold rounded-full border border-gf-border text-gf-text hover:bg-gray-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGeneralSave}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-semibold rounded-full bg-gf-red hover:bg-gf-red-dark text-white transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                {isPending ? "Guardando..." : "Confirmar y guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -220,4 +306,3 @@ function BuildingIcon() {
     </svg>
   );
 }
-

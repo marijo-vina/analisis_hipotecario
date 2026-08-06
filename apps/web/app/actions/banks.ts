@@ -8,7 +8,7 @@ import type { ApiResult, BankDetail } from "@/app/lib/definitions";
  * Update a bank's top-level fields (incomeCriterion, debtCommitmentFactor,
  * minimumBureauScore, isActive).
  *
- * Revalidates the bank detail page so server components reflect the change.
+ * Revalidates the bank detail page and list page so server components reflect the change.
  */
 export async function updateBank(
   code: string,
@@ -21,6 +21,7 @@ export async function updateBank(
 
   if (result.ok) {
     revalidatePath(`/dashboard/bancos/${code}`);
+    revalidatePath("/dashboard/bancos");
   }
 
   return result;
@@ -29,7 +30,7 @@ export async function updateBank(
 /**
  * Update a single policy row for a bank+destination pair.
  *
- * Revalidates the bank detail page so the policies table reflects the change.
+ * Revalidates the bank detail page and list page so server components reflect the change.
  */
 export async function updatePolicy(
   code: string,
@@ -43,6 +44,7 @@ export async function updatePolicy(
 
   if (result.ok) {
     revalidatePath(`/dashboard/bancos/${code}`);
+    revalidatePath("/dashboard/bancos");
   }
 
   return result;
