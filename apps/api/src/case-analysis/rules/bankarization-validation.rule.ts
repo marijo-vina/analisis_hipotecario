@@ -12,7 +12,7 @@
 // mancomunada, forzada por PayrollBankMatchingService).
 // ---------------------------------------------------------------------------
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { AnalysisOutcome } from '../../generated/prisma/client';
 import type {
   AnalysisRule,
@@ -169,6 +169,7 @@ function pad(n: number): string {
 @Injectable()
 export class BankarizationValidationRule implements AnalysisRule {
   readonly ruleId = 'bankarization-validation';
+  private readonly logger = new Logger(BankarizationValidationRule.name);
 
   constructor(
     private readonly matching: PayrollBankMatchingService,
@@ -200,6 +201,14 @@ export class BankarizationValidationRule implements AnalysisRule {
     const alerts = this.buildAlerts(merged, isJointAccount);
     const outcome = this.computeOutcome(merged);
     const severity = this.computeSeverity(outcome);
+
+    const matchedCount = merged.filter(
+      (r) => r.status === 'MATCHED' || r.status === 'PROVIDER_MIRROR_CONFIRMED',
+    ).length;
+
+    this.logger.log(
+      `[BankarizationValidationRule] Finalizado: ${matchedCount}/${merged.length} recibos conciliados. Outcome=${outcome}, Severity=${severity}`,
+    );
 
     // 6. Compute case-level bankarization flags for Phase C (bank-viability).
     const hasPagadoraIncome = merged.some(
