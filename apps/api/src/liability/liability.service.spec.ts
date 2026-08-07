@@ -285,6 +285,35 @@ describe('LiabilityCalculationService', () => {
       expect(credit.classificationReason).toContain('TARJETA');
       expect(credit.classificationReason).toContain('PERSONAL');
     });
+
+    it('revolving card with OTROS in type (ej: TARJETA DE CREDITO OTROS) → REVOLVING', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'TARJETA DE CREDITO OTROS',
+          classification: 'UNKNOWN',
+          currentBalance: 50000,
+          paymentDueAmountEffective: 3000,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.REVOLVING);
+    });
+
+    it('non-revolving OTROS credit (ej: SKY TV) → FIXED', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'OTROS',
+          institution: 'SKY',
+          classification: 'OTHER',
+          currentBalance: 1000,
+          paymentDueAmountEffective: 350,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+    });
   });
 
   // ── Closed credit ──────────────────────────────────────────────────────

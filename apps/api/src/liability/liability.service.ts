@@ -23,10 +23,6 @@ const FIXED_KEYWORDS = [
   'NÓMINA',
   'SERVICIO',
   'SIMPLE',
-  'OTRO',
-  'OTROS',
-  'OTHER',
-  'SKY',
 ];
 
 // ── Institution name → category mapping ──────────────────────────────────
@@ -330,7 +326,7 @@ export class LiabilityCalculationService {
     source: ClassificationSource;
     reason: string | null;
   } {
-    // Step 1: Gemini already classified it
+    // Step 1: Gemini explicit classification
     const geminiClass = (input.classification ?? '').toUpperCase();
     if (geminiClass === 'REVOLVING') {
       return {
@@ -342,11 +338,7 @@ export class LiabilityCalculationService {
     if (
       geminiClass === 'FIXED_PAYMENT' ||
       geminiClass === 'FIXED' ||
-      geminiClass === 'FIXED_INSTALLMENT' ||
-      geminiClass === 'OTHER' ||
-      geminiClass === 'OTROS' ||
-      geminiClass === 'OTRO' ||
-      geminiClass === 'NON_BANK_SERVICE'
+      geminiClass === 'FIXED_INSTALLMENT'
     ) {
       return {
         nature: CreditNature.FIXED,
@@ -355,8 +347,8 @@ export class LiabilityCalculationService {
       };
     }
 
-    // Step 2: Keyword matching on creditType + productName
-    const searchText = [input.creditType, input.productName ?? '']
+    // Step 2: Keyword matching on creditType + productName + institution
+    const searchText = [input.creditType, input.productName ?? '', input.institution ?? '']
       .join(' ')
       .toUpperCase();
 
@@ -367,8 +359,8 @@ export class LiabilityCalculationService {
       searchText.includes(kw),
     );
 
+    // Collision — if both revolving and fixed keywords match, return UNKNOWN
     if (revolvingMatches.length > 0 && fixedMatches.length > 0) {
-      // Collision — do not arbitrarily resolve
       const allMatches = [...revolvingMatches, ...fixedMatches];
       return {
         nature: CreditNature.UNKNOWN,
@@ -393,7 +385,28 @@ export class LiabilityCalculationService {
       };
     }
 
-    // Step 3: Fallback — UNKNOWN conservative
+    // Step 3: Non-revolving "Otros" / "NON_BANK_SERVICE" / "SKY" → Default to FIXED per user requirement
+    const isOtros =
+      geminiClass === 'OTHER' ||
+      geminiClass === 'OTROS' ||
+      geminiClass === 'OTRO' ||
+      geminiClass === 'NON_BANK_SERVICE' ||
+      searchText.includes('OTRO') ||
+      searchText.includes('OTROS') ||
+      searchText.includes('OTHER') ||
+      searchText.includes('SKY') ||
+      searchText.includes('CABLE') ||
+      searchText.includes('TELEFON');
+
+    if (isOtros) {
+      return {
+        nature: CreditNature.FIXED,
+        source: ClassificationSource.FALLBACK,
+        reason: 'Crédito tipo "Otros" o servicio clasificado como FIJO por defecto',
+      };
+    }
+
+    // Step 4: Fallback conservador — UNKNOWN
     return {
       nature: CreditNature.UNKNOWN,
       source: ClassificationSource.FALLBACK,
