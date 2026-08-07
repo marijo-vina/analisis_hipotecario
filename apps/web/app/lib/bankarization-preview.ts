@@ -48,6 +48,7 @@ import type {
 
 export type PreviewStatus =
   | "MATCHED"
+  | "MATCHED_2_OF_3"
   | "NOT_MATCHED"
   | "DISCREPANCY"
   | "RFC_INCOMPATIBLE"
@@ -493,34 +494,55 @@ function matchByFallback(
       const ad = amountDiffPct(receipt.netIncome, d.amount) ?? Infinity;
       const concept = normalizeConceptLower(d.concept);
       const kw = matchKeyword(concept);
-      return { d, dd, ad, kw };
+      const passDate = dd <= DATE_TOLERANCE_DAYS;
+      const passAmount = ad <= AMOUNT_TOLERANCE_PCT;
+      const passConcept = kw != null;
+      const passCount = (passDate ? 1 : 0) + (passAmount ? 1 : 0) + (passConcept ? 1 : 0);
+      return { d, dd, ad, kw, passDate, passAmount, passConcept, passCount };
     })
-    .filter(
-      (c) =>
-        c.dd <= DATE_TOLERANCE_DAYS &&
-        c.ad <= AMOUNT_TOLERANCE_PCT &&
-        c.kw != null,
-    )
     .map((c) => ({
       ...c,
       score:
         Math.max(0, SCORE_WEIGHT_AMOUNT * (1 - c.ad / AMOUNT_TOLERANCE_PCT)) +
-        SCORE_WEIGHT_DATE +
-        (c.kw != null ? SCORE_WEIGHT_CONCEPT : 0),
+        (c.passDate ? SCORE_WEIGHT_DATE : 0) +
+        (c.passConcept ? SCORE_WEIGHT_CONCEPT : 0),
     }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (b.passCount !== a.passCount) return b.passCount - a.passCount;
+      return b.score - a.score;
+    });
 
-  if (scored.length === 0) return EMPTY;
+  const eligible = scored.filter((c) => c.passCount >= 2);
 
-  const top = scored[0];
-  const runner = scored[1];
+  if (eligible.length === 0) {
+    const best = scored[0] ?? null;
+    return {
+      status: "NOT_MATCHED",
+      method: "NONE",
+      candidate: best ? best.d : null,
+      amountDiffPctVal: best ? round2(best.ad) : null,
+      dateDiffVal: best ? best.dd : null,
+      scoreVal: best ? round2(best.score) : null,
+      conceptKeyword: best ? best.kw : null,
+    };
+  }
+
+  const top = eligible[0];
+  const runner = eligible[1];
   const ambiguous =
     runner != null &&
+    runner.passCount === top.passCount &&
     Math.abs(round2(runner.score) - round2(top.score)) <= SCORE_TIE_EPSILON;
 
   used.add(top.d.id);
+  const status: PreviewStatus = ambiguous
+    ? "AMBIGUOUS"
+    : top.passCount === 3
+    ? "MATCHED"
+    : "MATCHED_2_OF_3";
+
   return {
-    status: ambiguous ? "AMBIGUOUS" : "MATCHED",
+    status,
     method: "FALLBACK",
     candidate: top.d,
     amountDiffPctVal: round2(top.ad),
@@ -658,6 +680,7 @@ function buildAlerts(
 
 export const STATUS_LABELS: Record<PreviewStatus, string> = {
   MATCHED: "Conciliado",
+  MATCHED_2_OF_3: "Conciliado",
   NOT_MATCHED: "Sin conciliar",
   DISCREPANCY: "Discrepancia",
   RFC_INCOMPATIBLE: "RFC incompatible",

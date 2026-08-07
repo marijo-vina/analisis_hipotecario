@@ -11,6 +11,7 @@
 // ── Estados de conciliacion (8 valores del proposal) ───────────────────────
 export const PAYROLL_RECONCILIATION_STATUSES = [
   'MATCHED',
+  'MATCHED_2_OF_3',
   'NOT_MATCHED',
   'DISCREPANCY',
   'RFC_INCOMPATIBLE',

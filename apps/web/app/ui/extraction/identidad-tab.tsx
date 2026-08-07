@@ -53,7 +53,6 @@ export default function IdentidadTab({ documents }: IdentidadTabProps) {
               alerts={parsed.alerts}
               isExpired={parsed.isExpired}
               onValidate={setDrawerDoc}
-              alwaysExpanded
               manualCorrections={parsed.manualCorrections}
             />
           );

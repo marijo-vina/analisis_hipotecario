@@ -426,6 +426,8 @@ export class PayrollBankMatchingService {
             `     • Regla 3 (Concepto catálogo): "${keyword ?? 'SIN_COINCIDENCIA'}" -> ${passConcept ? '✓ PASS' : '✗ FAIL'}`,
         );
 
+        const passCount = (passDate ? 1 : 0) + (passAmount ? 1 : 0) + (passConcept ? 1 : 0);
+
         // Registrar descartes
         if (!passDate) {
           discardReasons.push({
@@ -449,45 +451,67 @@ export class PayrollBankMatchingService {
           });
         }
 
-        return { d, dd, ad, keyword, passDate, passAmount, passConcept };
+        return { d, dd, ad, keyword, passDate, passAmount, passConcept, passCount };
       })
-      .filter((c) => c.passDate && c.passAmount && c.passConcept)
       .map((c) => ({
         ...c,
-        score: this.computeScore(c.ad, c.dd, c.keyword != null),
+        score: this.computeScore(c.ad, c.dd, c.passConcept),
       }))
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        if (b.passCount !== a.passCount) return b.passCount - a.passCount;
+        return b.score - a.score;
+      });
 
-    if (scored.length === 0) {
+    const eligible = scored.filter((c) => c.passCount >= 2);
+
+    if (eligible.length === 0) {
+      const best = scored[0] ?? null;
       this.logger.warn(
-        `[Recibo #${receipt.index + 1}] NOT_MATCHED: 0 de ${candidates.length} candidato(s) cumplieron las 3 reglas obligatorias.`,
+        `[Recibo #${receipt.index + 1}] NOT_MATCHED: Ningún candidato cumplió 2 o más reglas (de ${candidates.length} evaluados).`,
       );
       return {
         receiptIndex: receipt.index,
         status: 'NOT_MATCHED',
         method: 'NONE',
-        candidateDepositId: null,
-        candidateAmount: null,
-        candidateDate: null,
-        candidateConcept: null,
-        score: null,
+        candidateDepositId: best ? best.d.id : null,
+        candidateAmount: best ? best.d.amount : null,
+        candidateDate: best ? best.d.date : null,
+        candidateConcept: best ? best.d.originalConcept : null,
+        score: best ? round2(best.score) : null,
         scotiabankExcluded: false,
         usedPaymentDate: paymentDate,
-        traceability: { rule: 'NONE', discardReasons },
+        traceability: {
+          rule: 'NONE',
+          dateDiff: best ? best.dd : undefined,
+          amountDiffPercent: best ? round2(best.ad) : undefined,
+          conceptKeyword: best ? (best.keyword ?? undefined) : undefined,
+          discardReasons,
+        },
       };
     }
 
-    const top = scored[0];
-    const runner = scored[1];
+    const top = eligible[0];
+    const runner = eligible[1];
     const isAmbiguous =
       runner != null &&
+      runner.passCount === top.passCount &&
       Math.abs(round2(runner.score) - round2(top.score)) <= SCORE_TIE_EPSILON;
 
     used.add(top.d.id);
 
+    const status: PayrollReconciliationStatus = isAmbiguous
+      ? 'AMBIGUOUS'
+      : top.passCount === 3
+      ? 'MATCHED'
+      : 'MATCHED_2_OF_3';
+
+    this.logger.log(
+      `[Recibo #${receipt.index + 1}] ${status}: Depósito ${top.d.id} (${top.passCount}/3 reglas PASS: Fecha=${top.passDate}, Monto=${top.passAmount}, Concepto=${top.passConcept}).`,
+    );
+
     return {
       receiptIndex: receipt.index,
-      status: isAmbiguous ? 'AMBIGUOUS' : 'MATCHED',
+      status,
       method: 'FALLBACK',
       candidateDepositId: top.d.id,
       candidateAmount: top.d.amount,

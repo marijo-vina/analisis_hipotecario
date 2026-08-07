@@ -203,7 +203,10 @@ export class BankarizationValidationRule implements AnalysisRule {
     const severity = this.computeSeverity(outcome);
 
     const matchedCount = merged.filter(
-      (r) => r.status === 'MATCHED' || r.status === 'PROVIDER_MIRROR_CONFIRMED',
+      (r) =>
+        r.status === 'MATCHED' ||
+        r.status === 'MATCHED_2_OF_3' ||
+        r.status === 'PROVIDER_MIRROR_CONFIRMED',
     ).length;
 
     this.logger.log(
@@ -395,12 +398,14 @@ export class BankarizationValidationRule implements AnalysisRule {
 
   // ── Calculo de outcome (PASS/PARTIAL/FAIL) ─────────────────────────────────
   private computeOutcome(results: PayrollMatchResult[]): AnalysisOutcome {
-    // PASS: todos MATCHED o PROVIDER_MIRROR_CONFIRMED.
+    // PASS: todos MATCHED, MATCHED_2_OF_3 o PROVIDER_MIRROR_CONFIRMED.
     if (results.length === 0) return 'PASS';
     if (
       results.every(
         (r) =>
-          r.status === 'MATCHED' || r.status === 'PROVIDER_MIRROR_CONFIRMED',
+          r.status === 'MATCHED' ||
+          r.status === 'MATCHED_2_OF_3' ||
+          r.status === 'PROVIDER_MIRROR_CONFIRMED',
       )
     ) {
       return 'PASS';
