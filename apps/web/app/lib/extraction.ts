@@ -1411,6 +1411,11 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
 
   // ── Risk summary ──────────────────────────────────────────────────────
   const riskRaw = (ed.riskSummary ?? {}) as Record<string, unknown>;
+  const neutralKeys = ["CC", "CA", "AD"];
+  const hasNonNeutralObsKeys = credits.some((c) =>
+    c.observationKeys.some((k) => !neutralKeys.includes(k.toUpperCase())),
+  );
+
   const riskSummary = {
     hasWriteOff: riskRaw.hasWriteOff === true,
     hasSettlementOrDiscount: riskRaw.hasSettlementOrDiscount === true,
@@ -1418,13 +1423,16 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     hasIdentityTheft: riskRaw.hasIdentityTheft === true,
     hasMinorDelinquency: riskRaw.hasMinorDelinquency === true,
     hasSeriousDelinquency: riskRaw.hasSeriousDelinquency === true,
-    hasPreventiveKeys: riskRaw.hasPreventiveKeys === true,
+    hasPreventiveKeys: hasNonNeutralObsKeys,
     possibleHomonym: (riskRaw.possibleHomonym as boolean) ?? null,
     riskNotes: (riskRaw.riskNotes as string) ?? null,
   };
 
   // ── Alerts ────────────────────────────────────────────────────────────
-  const alerts = filterAlerts(ed.alerts);
+  let alerts = filterAlerts(ed.alerts);
+  if (!hasNonNeutralObsKeys) {
+    alerts = alerts.filter((a) => a.code !== "BURO_PREVENTIVE_KEYS");
+  }
   // Merge score-related alerts from CREDIT_SCORE documents
   for (const sd of scoreDocs) {
     if (

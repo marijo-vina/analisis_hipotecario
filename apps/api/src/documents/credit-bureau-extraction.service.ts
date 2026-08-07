@@ -1850,6 +1850,12 @@ export class CreditBureauExtractionService {
             this.rawHasObservationKey(upperRaw, ['RI']);
         }
 
+        // hasLegalAction: observation keys SG, FR, VR, CO (demandas / ejecucion de garantias)
+        if (credit.hasLegalAction == null) {
+          credit.hasLegalAction = obsKeys.some((k) => ['SG', 'FR', 'VR', 'CO'].includes(k)) ||
+            this.rawHasObservationKey(upperRaw, ['SG', 'FR', 'VR', 'CO']);
+        }
+
         // Validate classification enum
         const validClassifications = [
           'REVOLVING',
@@ -1991,6 +1997,18 @@ export class CreditBureauExtractionService {
           (c) => c.hasSeriousDelinquency === true,
         );
       }
+      if (riskSummary.hasLegalAction == null) {
+        riskSummary.hasLegalAction = credits.some(
+          (c) => c.hasLegalAction === true,
+        );
+      }
+
+      // hasPreventiveKeys: ONLY if there are observation keys that are NOT neutral (CC, CA, AD)
+      const neutralKeys = ['CC', 'CA', 'AD'];
+      riskSummary.hasPreventiveKeys = credits.some((c) => {
+        const obs = (c.observationKeys as string[] | undefined) ?? [];
+        return obs.some((k) => !neutralKeys.includes(k.toUpperCase()));
+      });
     }
 
     data.riskSummary = riskSummary;
