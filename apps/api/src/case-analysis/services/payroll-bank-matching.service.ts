@@ -419,12 +419,6 @@ export class PayrollBankMatchingService {
         const passAmount = ad <= AMOUNT_TOLERANCE_PCT;
         const passConcept = keyword != null;
 
-        this.logger.debug(
-          `  👉 Depósito ${d.id} (${d.date}, $${d.amount}, concepto="${d.originalConcept ?? ''}"):\n` +
-            `     • Regla 1 (Fecha ±${DATE_TOLERANCE_DAYS}d): diff ${dd}d -> ${passDate ? '✓ PASS' : '✗ FAIL'}\n` +
-            `     • Regla 2 (Monto ≤${AMOUNT_TOLERANCE_PCT}%): diff ${round2(ad)}% -> ${passAmount ? '✓ PASS' : '✗ FAIL'}\n` +
-            `     • Regla 3 (Concepto catálogo): "${keyword ?? 'SIN_COINCIDENCIA'}" -> ${passConcept ? '✓ PASS' : '✗ FAIL'}`,
-        );
 
         const passCount = (passDate ? 1 : 0) + (passAmount ? 1 : 0) + (passConcept ? 1 : 0);
 
