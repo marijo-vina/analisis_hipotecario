@@ -31,6 +31,9 @@ interface BureauData {
   score: number | null;
   hasQuita: boolean;
   hasQuebranto: boolean;
+  hasFraud: boolean;
+  hasIdentityTheft: boolean;
+  hasLegalAction: boolean;
   pastDueMonths: number | null;
   pastDueTotalAmount: number | null;
 }
@@ -187,8 +190,20 @@ export class BankViabilityRule implements AnalysisRule {
           alerts: [],
         };
       }
-      if (bureauData.hasQuita || bureauData.hasQuebranto) {
-        globalReasons.push('QUITA_QUEBRANTO_REJECTED');
+      if (
+        bureauData.hasQuita ||
+        bureauData.hasQuebranto ||
+        bureauData.hasFraud ||
+        bureauData.hasIdentityTheft ||
+        bureauData.hasLegalAction
+      ) {
+        if (bureauData.hasFraud || bureauData.hasIdentityTheft) {
+          globalReasons.push('FRAUD_OR_IDENTITY_THEFT_REJECTED');
+        } else if (bureauData.hasLegalAction) {
+          globalReasons.push('LEGAL_ACTION_REJECTED');
+        } else {
+          globalReasons.push('QUITA_QUEBRANTO_REJECTED');
+        }
         const snapshot: BankViabilitySnapshot = {
           sourceVersion: SOURCE_VERSION,
           creditTypeCode,
@@ -288,14 +303,45 @@ export class BankViabilityRule implements AnalysisRule {
 
       // Check for credit bureau document type — creditData can be in extractedData or processingResults
       const creditData = (ed?.creditData ?? ed?.bureauData ?? pr?.creditData) as Record<string, unknown> | null;
-      if (creditData) {
-        const rawScore = (creditData.score ?? creditData.bureauScore ?? creditData.bcScore) as number | null | undefined;
+      const riskSummary = (ed?.riskSummary ?? pr?.riskSummary) as Record<string, unknown> | null;
+      const credits = (ed?.credits ?? pr?.credits) as Record<string, unknown>[] | undefined;
+
+      if (creditData || riskSummary || credits) {
+        const rawScore = (creditData?.score ?? creditData?.bureauScore ?? creditData?.bcScore) as number | null | undefined;
+        const hasFraud = !!(
+          riskSummary?.hasFraudFlag ??
+          credits?.some((c) => c.hasFraudFlag === true)
+        );
+        const hasIdentityTheft = !!(
+          riskSummary?.hasIdentityTheft ??
+          credits?.some((c) => c.hasIdentityTheft === true)
+        );
+        const hasLegalAction = !!(
+          riskSummary?.hasLegalAction ??
+          credits?.some((c) => c.hasLegalAction === true)
+        );
+        const hasQuita = !!(
+          creditData?.hasQuita ??
+          creditData?.hasSettlement ??
+          riskSummary?.hasSettlementOrDiscount ??
+          credits?.some((c) => c.hasSettlementOrDiscount === true)
+        );
+        const hasQuebranto = !!(
+          creditData?.hasQuebranto ??
+          creditData?.hasWriteOff ??
+          riskSummary?.hasWriteOff ??
+          credits?.some((c) => c.hasWriteOff === true)
+        );
+
         return {
           score: rawScore != null ? Number(rawScore) : null,
-          hasQuita: !!(creditData.hasQuita ?? creditData.hasSettlement),
-          hasQuebranto: !!(creditData.hasQuebranto ?? creditData.hasWriteOff),
-          pastDueMonths: (creditData.pastDueMonths ?? creditData.mopCount) as number | null,
-          pastDueTotalAmount: (creditData.pastDueTotalAmount ?? creditData.pastDueAmount) as number | null,
+          hasQuita,
+          hasQuebranto,
+          hasFraud,
+          hasIdentityTheft,
+          hasLegalAction,
+          pastDueMonths: (creditData?.pastDueMonths ?? creditData?.mopCount) as number | null,
+          pastDueTotalAmount: (creditData?.pastDueTotalAmount ?? creditData?.pastDueAmount) as number | null,
         };
       }
     }

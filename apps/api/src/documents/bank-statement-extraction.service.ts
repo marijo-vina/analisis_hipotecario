@@ -74,13 +74,16 @@ const BANK_STATEMENT_INSTRUCTIONS = [
   '    matchConfidence: null.',
   '',
   '─── Posibles pagadoras (possiblePayrollProviders[]) ───',
-  '  Extraé depósitos recurrentes provenientes de Personas Morales (empresas) que podrían ser de un empleador/pagadora (outsourcing).',
-  '  REGLAS CRÍTICAS:',
-  '  - IGNORA transferencias a o desde personas físicas (ej. "Transf a Alejandro").',
-  '  - IGNORA transferencias entre cuentas propias.',
-  '  - IGNORA conceptos genéricos de SPEI (ej. "BNET", "Traspaso", "SPEI") si no está claro que provienen de una empresa.',
-  '  - EXIGE recurrencia: no extraigas si es un pago aislado (no puede ser IRREGULAR).',
-  '  - Prioriza conceptos como: "remanente", "asimilados", "bonos", "compensación", "jubilación", "nómina", "abono nómina", "pago de nómina".',
+  '  Extraé ÚNICAMENTE depósitos recurrentes provenientes de Personas Morales (empresas) que podrían ser de un empleador/pagadora (outsourcing).',
+  '  REGLAS CRÍTICAS DE DETECCIÓN (Aplicar estrictamente):',
+  '  1. REGLA DE PERSONA MORAL: El emisor DEBE ser una empresa (Persona Moral).',
+  '     - IGNORA transferencias de personas físicas (ej. "Transf a Alejandro", "Juan Perez").',
+  '     - IGNORA transferencias entre cuentas propias.',
+  '  2. REGLA DE CONCEPTOS CLAVE: El concepto debe ser relacionado a pagos laborales:',
+  '     - Ejemplos: "nómina", "abono nómina", "pago de nómina", "remanente", "asimilados", "bonos", "compensación".',
+  '  3. EXIGE RECURRENCIA:',
+  '     - NO extraigas si es un pago aislado (no puede ser IRREGULAR).',
+  '     - IGNORA conceptos genéricos de SPEI (ej. "BNET", "Traspaso", "SPEI") a menos que provengan claramente de una empresa con patrón de pago.',
   '  Para cada uno:',
   '    payerName: nombre del pagador detectado.',
   '    depositDate: YYYY-MM-DD.',
@@ -508,6 +511,24 @@ export class BankStatementExtractionService {
           provider.detectedPayerRfc = null;
         }
       }
+    }
+
+    // ── Strict filter for possiblePayrollProviders[] ────────────────────
+    if (Array.isArray(possiblePayrollProviders)) {
+      data.possiblePayrollProviders = possiblePayrollProviders.filter(provider => {
+        const concept = (provider.originalConcept as string | undefined)?.toLowerCase() || '';
+        const payer = (provider.payerName as string | undefined)?.toLowerCase() || '';
+        
+        const isGeneric = ['spei', 'bnet', 'traspaso', 'transferencia', 'transf'].some(k => concept.includes(k) || payer.includes(k));
+        const hasPayrollKeyword = provider.containsPayrollKeyword === true || 
+          ['nómina', 'nomina', 'sueldo', 'remanente', 'asimilados', 'bonos', 'compensacion', 'honorarios'].some(k => concept.includes(k));
+        
+        // Drop generic concepts that lack payroll keywords to avoid false positives
+        if (isGeneric && !hasPayrollKeyword) {
+          return false;
+        }
+        return true;
+      });
     }
 
     // ── Currency normalization for payrollDeposits[] ─────────────────────
