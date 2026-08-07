@@ -23,6 +23,10 @@ const FIXED_KEYWORDS = [
   'NÓMINA',
   'SERVICIO',
   'SIMPLE',
+  'OTRO',
+  'OTROS',
+  'OTHER',
+  'SKY',
 ];
 
 // ── Institution name → category mapping ──────────────────────────────────
@@ -338,7 +342,11 @@ export class LiabilityCalculationService {
     if (
       geminiClass === 'FIXED_PAYMENT' ||
       geminiClass === 'FIXED' ||
-      geminiClass === 'FIXED_INSTALLMENT'
+      geminiClass === 'FIXED_INSTALLMENT' ||
+      geminiClass === 'OTHER' ||
+      geminiClass === 'OTROS' ||
+      geminiClass === 'OTRO' ||
+      geminiClass === 'NON_BANK_SERVICE'
     ) {
       return {
         nature: CreditNature.FIXED,
@@ -534,15 +542,7 @@ export class LiabilityCalculationService {
     }
 
     if (paymentCents === 0) {
-      // Explicit $0 payment — suspicious on active balance
-      if (balanceCents !== null && balanceCents > 0) {
-        return {
-          contribution: null,
-          status: LiabilityStatus.INCOMPLETE,
-          rule: RuleApplied.INCOMPLETE_DATA,
-        };
-      }
-      // balance = 0 or null with $0 payment → fine
+      // Explicit $0 payment — calculated contribution is $0
       return {
         contribution: 0,
         status: LiabilityStatus.CALCULATED,

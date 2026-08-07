@@ -43,7 +43,7 @@ type UiState =
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "validaciones", label: "Validaciones" },
-  { id: "motor", label: "Motor financiero" },
+  { id: "motor", label: "Cálculo financiero" },
   { id: "bancos", label: "Comparativa bancaria" },
 ];
 
@@ -807,7 +807,7 @@ function AnalysisStepper({
 }) {
   const steps = [
     { key: "validaciones", label: "Validaciones" },
-    { key: "motor", label: "Motor financiero" },
+    { key: "motor", label: "Cálculo financiero" },
     { key: "comparativa", label: "Comparativa bancaria" },
   ];
 

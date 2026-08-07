@@ -165,7 +165,7 @@ describe('LiabilityCalculationService', () => {
       expect(credit.classificationReason).toContain('pago > saldo');
     });
 
-    it('balance > 0, explicit $0 payment → null, INCOMPLETE', async () => {
+    it('balance > 0, explicit $0 payment → contribution 0, CALCULATED', async () => {
       const result = await service.calculate('case-1', [
         makeCredit({
           creditType: 'CREDITO AUTO',
@@ -176,8 +176,8 @@ describe('LiabilityCalculationService', () => {
       ]);
 
       const credit = result.credits[0];
-      expect(credit.monthlyDebtContribution).toBeNull();
-      expect(credit.liabilityStatus).toBe(LiabilityStatus.INCOMPLETE);
+      expect(credit.monthlyDebtContribution).toBe(0);
+      expect(credit.liabilityStatus).toBe(LiabilityStatus.CALCULATED);
     });
 
     it('balance > 0, payment null → null, INCOMPLETE', async () => {

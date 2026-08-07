@@ -39,6 +39,9 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
   PERSONAL_LOAN: "Préstamo personal",
   DEPARTMENT_STORE: "Tienda dep.",
   NON_BANK_SERVICE: "Servicio no bancario",
+  OTHER: "Otros",
+  OTROS: "Otros",
+  OTRO: "Otros",
   UNKNOWN: "—",
 };
 
