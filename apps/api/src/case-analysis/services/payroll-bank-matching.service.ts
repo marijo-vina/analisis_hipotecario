@@ -22,7 +22,7 @@
 //      y MatchTrace (regla aplicada, valores comparados).
 // ---------------------------------------------------------------------------
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { normalizeText } from '../normalize';
 import { CONCEPT_CATALOG_KEYWORDS } from '../types/bankarization.types';
 import type {
@@ -132,6 +132,8 @@ export {};
  */
 @Injectable()
 export class PayrollBankMatchingService {
+  private readonly logger = new Logger(PayrollBankMatchingService.name);
+
   /**
    * Ejecuta el matching para todos los recibos contra los depositos disponibles.
    *
@@ -145,6 +147,10 @@ export class PayrollBankMatchingService {
     deposits: PayrollDeposit[],
     isJointAccount: boolean,
   ): PayrollMatchResult[] {
+    this.logger.log(
+      `[Matching] Iniciando conciliación: ${receipts.length} recibo(s) vs ${deposits.length} depósito(s). Cuenta mancomunada: ${isJointAccount}`,
+    );
+
     // Depositos reclamados (bidireccionalidad 1:1).
     const usedDepositIds = new Set<string>();
 
@@ -167,8 +173,15 @@ export class PayrollBankMatchingService {
     const receiptRfc = normalizeRfc(receipt.employerRfc);
     const paymentDate = receipt.resolvedPaymentDate?.resolvedPaymentDate ?? null;
 
+    this.logger.log(
+      `[Recibo #${receipt.index + 1}] RFC=${receiptRfc ?? 'SIN_RFC'}, MontoNeto=$${receipt.netIncome}, FechaPago=${paymentDate} (Fuente: ${receipt.resolvedPaymentDate?.source ?? 'UNKNOWN'})`,
+    );
+
     // Si el recibo no tiene ingreso ni fecha resuelta, no puede matchear.
     if (receipt.netIncome == null || paymentDate == null) {
+      this.logger.warn(
+        `[Recibo #${receipt.index + 1}] OMITIDO: Falta monto neto ($${receipt.netIncome}) o fecha de pago resuelta (${paymentDate}).`,
+      );
       return this.notMatched(receipt.index, null);
     }
 
@@ -179,7 +192,14 @@ export class PayrollBankMatchingService {
       return dd != null && dd <= PREFILTER_DAYS;
     });
 
+    this.logger.log(
+      `[Recibo #${receipt.index + 1}] Depósitos candidatos en ventana ±${PREFILTER_DAYS}d: ${candidates.length} (de ${deposits.length} totales)`,
+    );
+
     if (candidates.length === 0) {
+      this.logger.warn(
+        `[Recibo #${receipt.index + 1}] 0 depósitos dentro de la ventana de ±${PREFILTER_DAYS} días respecto a la fecha ${paymentDate}.`,
+      );
       return this.notMatched(receipt.index, paymentDate);
     }
 
@@ -188,6 +208,10 @@ export class PayrollBankMatchingService {
       const sameRfc = candidates.filter(
         (d) => normalizeRfc(d.detectedPayerRfc) === receiptRfc,
       );
+      this.logger.log(
+        `[Recibo #${receipt.index + 1}] Evaluando coincidencia por RFC (${receiptRfc}). Depósitos con mismo RFC: ${sameRfc.length}`,
+      );
+
       if (sameRfc.length > 0) {
         return this.matchByRfc(receipt, sameRfc, used, receiptRfc, paymentDate, candidates);
       }
@@ -200,6 +224,10 @@ export class PayrollBankMatchingService {
         (d) => normalizeRfc(d.detectedPayerRfc) == null,
       );
 
+      this.logger.log(
+        `[Recibo #${receipt.index + 1}] Sin coincidencia directa de RFC. Candidatos con RFC distinto: ${diffRfc.length}, sin RFC: ${noRfc.length}`,
+      );
+
       // Intentar fallback con depositos SIN RFC primero (caso comun:
       // el estado de cuenta no muestra el RFC del pagador).
       if (noRfc.length > 0) {
@@ -208,6 +236,9 @@ export class PayrollBankMatchingService {
 
       // Todos los depositos tienen RFC diferente → RFC_INCOMPATIBLE.
       if (diffRfc.length > 0) {
+        this.logger.warn(
+          `[Recibo #${receipt.index + 1}] RFC_INCOMPATIBLE: Todos los candidatos disponibles tienen un RFC emisor diferente al recibo (${receiptRfc}).`,
+        );
         return this.rfcIncompatible(receipt, diffRfc, used, receiptRfc, paymentDate);
       }
 
@@ -371,6 +402,10 @@ export class PayrollBankMatchingService {
   ): PayrollMatchResult {
     const discardReasons: DiscardReason[] = [];
 
+    this.logger.log(
+      `[Recibo #${receipt.index + 1}] Evaluando fallback (3 reglas obligatorias) sobre ${candidates.length} depósito(s)...`,
+    );
+
     // Cada candidato debe pasar las 3 reglas obligatorias.
     const scored = candidates
       .map((d) => {
@@ -380,22 +415,33 @@ export class PayrollBankMatchingService {
         const concept = normalizeConcept(d.originalConcept);
         const keyword = matchConceptKeyword(concept);
 
+        const passDate = dd <= DATE_TOLERANCE_DAYS;
+        const passAmount = ad <= AMOUNT_TOLERANCE_PCT;
+        const passConcept = keyword != null;
+
+        this.logger.debug(
+          `  👉 Depósito ${d.id} (${d.date}, $${d.amount}, concepto="${d.originalConcept ?? ''}"):\n` +
+            `     • Regla 1 (Fecha ±${DATE_TOLERANCE_DAYS}d): diff ${dd}d -> ${passDate ? '✓ PASS' : '✗ FAIL'}\n` +
+            `     • Regla 2 (Monto ≤${AMOUNT_TOLERANCE_PCT}%): diff ${round2(ad)}% -> ${passAmount ? '✓ PASS' : '✗ FAIL'}\n` +
+            `     • Regla 3 (Concepto catálogo): "${keyword ?? 'SIN_COINCIDENCIA'}" -> ${passConcept ? '✓ PASS' : '✗ FAIL'}`,
+        );
+
         // Registrar descartes
-        if (dd > DATE_TOLERANCE_DAYS) {
+        if (!passDate) {
           discardReasons.push({
             depositId: d.id,
             reason: 'DATE_OUT_OF_RANGE',
             detail: `Diferencia fecha ${dd}d > tolerancia ${DATE_TOLERANCE_DAYS}d`,
           });
         }
-        if (ad > AMOUNT_TOLERANCE_PCT) {
+        if (!passAmount) {
           discardReasons.push({
             depositId: d.id,
             reason: 'AMOUNT_EXCEEDS_TOLERANCE',
             detail: `Diferencia monto ${round2(ad)}% > tolerancia ${AMOUNT_TOLERANCE_PCT}%`,
           });
         }
-        if (keyword == null && concept !== '') {
+        if (!passConcept && concept !== '') {
           discardReasons.push({
             depositId: d.id,
             reason: 'CONCEPT_NOT_COMPATIBLE',
@@ -403,14 +449,9 @@ export class PayrollBankMatchingService {
           });
         }
 
-        return { d, dd, ad, keyword };
+        return { d, dd, ad, keyword, passDate, passAmount, passConcept };
       })
-      .filter(
-        (c) =>
-          c.dd <= DATE_TOLERANCE_DAYS &&
-          c.ad <= AMOUNT_TOLERANCE_PCT &&
-          c.keyword != null,
-      )
+      .filter((c) => c.passDate && c.passAmount && c.passConcept)
       .map((c) => ({
         ...c,
         score: this.computeScore(c.ad, c.dd, c.keyword != null),
@@ -418,6 +459,9 @@ export class PayrollBankMatchingService {
       .sort((a, b) => b.score - a.score);
 
     if (scored.length === 0) {
+      this.logger.warn(
+        `[Recibo #${receipt.index + 1}] NOT_MATCHED: 0 de ${candidates.length} candidato(s) cumplieron las 3 reglas obligatorias.`,
+      );
       return {
         receiptIndex: receipt.index,
         status: 'NOT_MATCHED',
