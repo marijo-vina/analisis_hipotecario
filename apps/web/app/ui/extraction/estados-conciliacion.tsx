@@ -154,7 +154,7 @@ export default function EstadosConciliacion({
             <Divider />
             <Stat
               label="Conciliados"
-              value={`${results.filter((r) => r.status === "MATCHED" || r.status === "PROVIDER_MIRROR_CONFIRMED").length} de ${payrollReceipts.length}`}
+              value={`${results.filter((r) => r.status === "MATCHED" || r.status === "MATCHED_2_OF_3" || r.status === "PROVIDER_MIRROR_CONFIRMED").length} de ${payrollReceipts.length}`}
             />
             <Divider />
             <Stat label="Depósitos" value={`${allDeposits.length} detectados`} />
@@ -186,13 +186,10 @@ function ReceiptCard({
 }: {
   r: PreviewReceiptResult;
 }) {
-  const [expanded, setExpanded] = useState(() => {
-    // Expanded by default if matched or has result; collapsed if NOT_MATCHED
-    return r.status !== "NOT_MATCHED";
-  });
+  const [expanded, setExpanded] = useState(false);
 
-  const ruleInfo = getRuleInfo(r.status);
-  const hasCriteria = r.status !== "NOT_MATCHED" && r.candidate;
+  const ruleInfo = getRuleInfo(r);
+  const hasCriteria = !!r.candidate;
 
   return (
     <div className="rounded-xl border border-gf-border bg-white p-5 space-y-3.5">
@@ -325,25 +322,46 @@ function CriteriaBreakdown({ r }: { r: PreviewReceiptResult }) {
 
 // ── Rule info helper ─────────────────────────────────────────────────────────
 
-function getRuleInfo(status: PreviewStatus): {
+function getRuleInfo(r: PreviewReceiptResult): {
   icon: string;
   message: string;
   containerClass: string;
 } {
-  switch (status) {
-    case "MATCHED":
-    case "PROVIDER_MIRROR_CONFIRMED":
-      return {
-        icon: "✓",
-        message: "3 de 3 reglas obligatorias cumplidas",
-        containerClass: "bg-green-50 border-green-200 text-green-800",
-      };
-    case "NOT_MATCHED":
-      return {
-        icon: "✗",
-        message: "0 de 3 reglas obligatorias cumplidas",
-        containerClass: "bg-red-50 border-red-200 text-red-800",
-      };
+  if (r.status === "MATCHED" || r.status === "PROVIDER_MIRROR_CONFIRMED") {
+    return {
+      icon: "✓",
+      message: "3 de 3 reglas obligatorias cumplidas",
+      containerClass: "bg-emerald-50 border-emerald-200 text-emerald-800",
+    };
+  }
+
+  if (r.status === "MATCHED_2_OF_3") {
+    return {
+      icon: "✓",
+      message: "2 de 3 reglas obligatorias cumplidas",
+      containerClass: "bg-amber-50 border-amber-200 text-amber-800",
+    };
+  }
+
+  if (r.status === "NOT_MATCHED") {
+    let passCount = 0;
+    if (r.candidate) {
+      const amountMatch = r.amountDiffPct != null && r.amountDiffPct <= TOLERANCE_PCT;
+      const dateDiff = r.usedPaymentDate && r.candidate.date
+        ? Math.abs(Math.round((new Date(r.candidate.date).getTime() - new Date(r.usedPaymentDate).getTime()) / 86400000))
+        : null;
+      const dateMatch = dateDiff != null && dateDiff <= 3;
+      const conceptMatch = !!r.conceptKeyword || r.method === "FALLBACK";
+      passCount = (amountMatch ? 1 : 0) + (dateMatch ? 1 : 0) + (conceptMatch ? 1 : 0);
+    }
+    return {
+      icon: "✗",
+      message: `${passCount} de 3 reglas obligatorias cumplidas`,
+      containerClass: "bg-rose-50 border-rose-200 text-rose-800",
+    };
+  }
+
+  switch (r.status) {
     case "DISCREPANCY":
       return {
         icon: "⚠",
@@ -386,14 +404,15 @@ function getRuleInfo(status: PreviewStatus): {
 // ── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<PreviewStatus, string> = {
-  MATCHED: "bg-green-100 text-green-700",
-  PROVIDER_MIRROR_CONFIRMED: "bg-green-100 text-green-700",
-  DISCREPANCY: "bg-amber-100 text-amber-700",
-  AMBIGUOUS: "bg-amber-100 text-amber-700",
-  MANUAL_REVIEW: "bg-amber-100 text-amber-700",
-  PROVIDER_CANDIDATE: "bg-blue-100 text-blue-700",
-  NOT_MATCHED: "bg-gray-200 text-gray-700",
-  RFC_INCOMPATIBLE: "bg-red-100 text-red-700",
+  MATCHED: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  MATCHED_2_OF_3: "bg-amber-100 text-amber-800 border border-amber-200",
+  PROVIDER_MIRROR_CONFIRMED: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  DISCREPANCY: "bg-amber-100 text-amber-800 border border-amber-200",
+  AMBIGUOUS: "bg-amber-100 text-amber-800 border border-amber-200",
+  MANUAL_REVIEW: "bg-amber-100 text-amber-800 border border-amber-200",
+  PROVIDER_CANDIDATE: "bg-blue-100 text-blue-800 border border-blue-200",
+  NOT_MATCHED: "bg-rose-100 text-rose-800 border border-rose-200",
+  RFC_INCOMPATIBLE: "bg-rose-100 text-rose-800 border border-rose-200",
 };
 
 function StatusBadge({ status }: { status: PreviewStatus }) {

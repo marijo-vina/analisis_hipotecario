@@ -266,7 +266,7 @@ describe('PayrollBankMatchingService', () => {
       expect(results[0].traceability.conceptKeyword).toBe('nomina');
     });
 
-    it('NOT_MATCHED cuando ningun deposito cumple las 3 reglas', () => {
+    it('MATCHED_2_OF_3 cuando cumple 2 de las 3 reglas (ej. falla monto pero fecha y concepto pasan)', () => {
       const results = service.match(
         [
           receipt({
@@ -279,8 +279,33 @@ describe('PayrollBankMatchingService', () => {
           deposit({
             detectedPayerRfc: null,
             amount: 10000, // 33% diff, falla monto
-            date: '2026-07-02',
-            originalConcept: 'PAGO DE NOMINA',
+            date: '2026-07-02', // pasa fecha
+            originalConcept: 'PAGO DE NOMINA', // pasa concepto
+          }),
+        ],
+        false,
+      );
+
+      expect(results[0].status).toBe('MATCHED_2_OF_3');
+      expect(results[0].method).toBe('FALLBACK');
+      expect(results[0].candidateDepositId).toBe('dep-1');
+    });
+
+    it('NOT_MATCHED cuando cumple menos de 2 reglas (falla monto y concepto)', () => {
+      const results = service.match(
+        [
+          receipt({
+            employerRfc: null,
+            netIncome: 15000,
+            paymentDate: '2026-07-01',
+          }),
+        ],
+        [
+          deposit({
+            detectedPayerRfc: null,
+            amount: 10000, // 33% diff, falla monto
+            date: '2026-07-02', // pasa fecha (1/3 PASS)
+            originalConcept: 'COMPRA TIENDA', // falla concepto
           }),
         ],
         false,
@@ -288,8 +313,7 @@ describe('PayrollBankMatchingService', () => {
 
       expect(results[0].status).toBe('NOT_MATCHED');
       expect(results[0].method).toBe('NONE');
-      expect(results[0].candidateDepositId).toBeNull();
-      expect(results[0].score).toBeNull();
+      expect(results[0].candidateDepositId).toBe('dep-1');
     });
 
     it('matchea conceptos con acentos y espacios multiples (normalizacion)', () => {
@@ -317,7 +341,7 @@ describe('PayrollBankMatchingService', () => {
       expect(results[0].traceability.conceptKeyword).toBe('nomina');
     });
 
-    it('NO compatible cuando el concepto no matchea ninguna keyword', () => {
+    it('MATCHED_2_OF_3 cuando el concepto no matchea keyword pero fecha y monto sí pasan (2/3 PASS)', () => {
       const results = service.match(
         [
           receipt({
@@ -337,8 +361,8 @@ describe('PayrollBankMatchingService', () => {
         false,
       );
 
-      expect(results[0].status).toBe('NOT_MATCHED');
-      expect(results[0].method).toBe('NONE');
+      expect(results[0].status).toBe('MATCHED_2_OF_3');
+      expect(results[0].method).toBe('FALLBACK');
     });
 
     it('selecciona el candidato de mayor score entre multiples validos', () => {
@@ -453,7 +477,7 @@ describe('PayrollBankMatchingService', () => {
           receipt({
             index: 0,
             employerRfc: null,
-            netIncome: 50000,
+            netIncome: 50000, // 80% diff, falla monto
             paymentDate: '2026-07-01',
           }),
           receipt({
@@ -468,16 +492,16 @@ describe('PayrollBankMatchingService', () => {
             detectedPayerRfc: null,
             amount: 10000,
             date: '2026-07-01',
-            originalConcept: 'NOMINA',
+            originalConcept: 'COMPRA TIENDA', // falla concepto (1/3 PASS -> NOT_MATCHED)
           }),
         ],
         false,
       );
 
-      // R1 (50000) no cumple la regla de monto (80% diff) → libera el deposito
+      // R1 (50000 + COMPRA) no cumple al menos 2 reglas → no reclama el deposito
       expect(results[0].status).toBe('NOT_MATCHED');
-      // R2 (10000) si cumple → reclama el deposito
-      expect(results[1].status).toBe('MATCHED');
+      // R2 (10000 + COMPRA) cumple 2/3 reglas (fecha y monto pass) → reclama el deposito en MATCHED_2_OF_3
+      expect(results[1].status).toBe('MATCHED_2_OF_3');
       expect(results[1].candidateDepositId).toBe('dep-1');
     });
   });

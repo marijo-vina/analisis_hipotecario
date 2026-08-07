@@ -108,7 +108,7 @@ export default function ExtractionDocumentCard({
 }: ExtractionDocumentCardProps) {
   // Auto-expand when there are alerts (SPEC-5) unless overridden.
   const [expanded, setExpanded] = useState(
-    defaultExpanded ?? alerts.length > 0,
+    defaultExpanded ?? false,
   );
 
   // ── Correction state ────────────────────────────────────────────────
