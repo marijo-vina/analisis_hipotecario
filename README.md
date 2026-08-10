@@ -12,8 +12,7 @@ hasta el dashboard operativo.
 En México, un asesor hipotecario analiza manualmente entre 8 y 15 documentos por
 cliente (buró de crédito, recibos de nómina, estados de cuenta, identificaciones)
 para determinar si califica para un crédito y con qué banco. Cada expediente
-toma horas. Los errores humanos en la extracción de datos —especialmente del
-buró de crédito— pueden llevar a recomendaciones incorrectas.
+toma horas. Los errores humanos en la extracción de datos pueden llevar a recomendaciones incorrectas.
 
 Este sistema automatiza ese proceso: el asesor sube los PDFs, y en minutos obtiene
 un análisis completo con datos extraídos, cálculo de capacidad de pago, y una
@@ -28,7 +27,7 @@ documentos, extracción con OCR + IA, análisis financiero, y dashboard Kanban.
 
 | Componente | Estado |
 |---|---|
-| Pipeline de extracción documental | ✅ Producción |
+| Pipeline de extracción documental | ✅ Funcional |
 | Buró de crédito (Gemini + coordenadas) | ✅ Funcional |
 | Recibos de nómina | ✅ Funcional |
 | Estados de cuenta bancarios | ✅ Funcional |
@@ -167,8 +166,9 @@ ambos aparecen como números en el PDF. Este era el error #1 en producción.
 con una jerarquía de autoridad explícita. Lo determinístico gana sobre lo
 probabilístico. El LLM solo clasifica, no calcula.
 
-**Impacto:** Se eliminó la fuente principal de inconsistencias. Los datos
-financieros son reproducibles — misma entrada, misma salida.
+**Impacto:** La capa determinista elimina la principal fuente de
+inconsistencias en los campos financieros críticos. Para esos campos,
+la misma entrada produce el mismo resultado.
 
 ### Estados auto-calculados, no manuales
 
@@ -323,9 +323,10 @@ Vertex AI) se mockean con respuestas controladas.
   se construyó después como parche. Si empezara de nuevo, lo construiría
   primero como fuente primaria, y Gemini solo como clasificador semántico.
 
-- **Dockerizar antes de tener 800 tests.** La deuda de infraestructura
-  (sin Dockerfiles, sin CI/CD) se acumuló por priorizar funcionalidad.
-  Para la siguiente fase, el deploy sería el primer hito, no el último.
+- **Priorizar infraestructura de despliegue antes.** La funcionalidad tuvo
+  prioridad durante el MVP, por lo que Docker y CI/CD quedaron para la
+  siguiente fase. En una segunda iteración establecería primero el pipeline
+  de despliegue y posteriormente continuaría ampliando funcionalidades.
 
 ### Lo que aprendí
 
@@ -344,8 +345,19 @@ Vertex AI) se mockean con respuestas controladas.
 
 ---
 
+## Versión entregada
+
+**Versión:** v1.0.0  
+**Estado:** Versión funcional del MVP  
+**Perfil soportado:** Persona asalariada
+
+Esta versión corresponde al alcance desarrollado durante el proyecto de
+estadía profesional y constituye la base para futuras extensiones del sistema.
+
+---
+
 ## Contacto
 
-Desarrollado por Marijo Viña como proyecto de estadía profesional.
+Desarrollado por Marijose Vinajera como proyecto de estadía profesional.
 
 [Repositorio en GitHub](https://github.com/marijo-vina/analisis_hipotecario)
