@@ -50,9 +50,15 @@ analisis_hipotecario/
 │           ├── ui/              # Componentes de interfaz
 │           ├── actions/         # Server actions
 │           └── lib/             # Utilidades compartidas
+├── designs/                     # Archivos de diseño (.fig)
+├── docs/                        # Documentación histórica
+│   ├── planning/                # Planes iniciales y specs viejas
+│   └── sdd-archive/             # Ciclos SDD antiguos
 ├── experiments/                 # Pruebas de concepto
-├── specs/                       # Schemas de extracción
-├── openspec/                    # Documentación de cambios (SDD)
+├── openspec/                    # Especificaciones activas (SDD)
+│   ├── specs/                   # Especificaciones por módulo
+│   │   └── ai-extraction/       # Schemas de extracción documental
+│   └── changes/                 # Cambios en curso y archivados
 ├── GCP-SETUP.md                 # Guía de configuración GCP
 └── .env.example                 # Plantilla de variables de entorno
 ```
