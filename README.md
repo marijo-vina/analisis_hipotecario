@@ -212,8 +212,6 @@ analisis_hipotecario/
 │   │       └── case-analysis/   # Análisis de viabilidad bancaria
 │   └── web/                     # Frontend Next.js
 │       └── app/ui/              # Componentes de interfaz (server + client)
-├── designs/                     # Diseños visuales (.fig)
-├── docs/                        # Documentación histórica y planes
 ├── openspec/                    # Especificaciones activas (SDD)
 │   ├── specs/                   # Especificaciones por módulo
 │   └── changes/                 # Cambios en curso y archivados
