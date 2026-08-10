@@ -21,5 +21,11 @@ Thumbs.db
 # POC: credit bureau PDF coordinate extraction
 experiments/buro-pdf-coordinate-poc/samples/
 experiments/buro-pdf-coordinate-poc/output/
+# PDF files (documents with personal data)
+*.pdf
+
+# GCP credentials
+gcp-credentials.json
+
 # Local AI runtime state
 .atl/
