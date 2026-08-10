@@ -34,6 +34,7 @@ documentos, extracción con OCR + IA, análisis financiero, y dashboard Kanban.
 | Identificaciones oficiales | ✅ Funcional |
 | Cálculo de pasivos e ingresos | ✅ Funcional |
 | Comparativa bancaria multi-banco | ✅ Funcional |
+| Administración de políticas bancarias (UI) | ✅ Autoservicio |
 | Dashboard Kanban con estados automáticos | ✅ Funcional |
 
 ---
@@ -59,6 +60,11 @@ documentos, extracción con OCR + IA, análisis financiero, y dashboard Kanban.
 - **Alertas 100% determinísticas.** Las alertas y flags de riesgo las calcula
   el backend contra reglas de negocio, no el LLM. Esto evita alertas falsas o
   inconsistentes entre ejecuciones.
+
+- **Políticas bancarias autoservicio.** Los criterios de viabilidad por banco
+  (edad mínima/máxima, capacidad de pago, scoring, antigüedad laboral) se
+  administran desde la interfaz por la asesora, sin intervención de un
+  desarrollador. Si un banco cambia sus políticas, se actualiza en segundos.
 
 ---
 
