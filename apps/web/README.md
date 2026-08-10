@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend — Análisis Hipotecario
 
-## Getting Started
+Interfaz de usuario del sistema de análisis crediticio hipotecario para
+asesores de Gestión Financiera.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router)
+- Tailwind CSS 4
+- React 19 (Server + Client Components)
+
+## Requisitos
+
+- API corriendo en `http://localhost:3001` (ver [`apps/api/README.md`](../api/README.md))
+
+## Instalación
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+echo 'API_URL=http://localhost:3001' > .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Ejecución
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev     # Desarrollo (puerto 3000)
+npm run build   # Compilar para producción
+npm start       # Producción
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Rutas principales
 
-## Learn More
+| Ruta | Descripción |
+|---|---|
+| `/login` | Acceso de asesores |
+| `/dashboard` | Dashboard Kanban con estados automáticos |
+| `/dashboard/clientes` | Listado y gestión de clientes |
+| `/dashboard/expedientes` | Listado de expedientes |
+| `/dashboard/expedientes/[id]` | Workspace del expediente (documentos, extracción, análisis) |
 
-To learn more about Next.js, take a look at the following resources:
+## Conexión con la API
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+El frontend no contiene lógica de negocio. Todas las operaciones (subida de
+documentos, extracción, análisis) se hacen mediante llamadas a la API en
+`localhost:3001`. La URL se configura en `.env.local` con la variable `API_URL`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Para producción, esta variable debe apuntar a la URL pública de la API.
 
-## Deploy on Vercel
+## Estructura
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/
+├── ui/                     # Componentes de interfaz
+│   ├── dashboard/          # Dashboard Kanban
+│   ├── clientes/           # Listados y formularios de clientes
+│   ├── expedientes/        # Workspace del expediente, análisis
+│   ├── documents/          # Subida y gestión de documentos
+│   ├── extraction/         # Tabs de datos extraídos (buró, nómina, etc.)
+│   └── layout/             # Sidebar, shell de la aplicación
+├── actions/                # Server actions (autenticación, API calls)
+└── lib/                    # Tipos y utilidades compartidas
+```
