@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   Check,
@@ -1025,6 +1025,10 @@ interface BuroTabProps {
 
 export default function BuroTab({ documents, caseId }: BuroTabProps) {
   const [parsed, setParsed] = useState(() => parseBuro(documents));
+
+  useEffect(() => {
+    setParsed(parseBuro(documents));
+  }, [documents]);
 
   function handlePaymentDueUpdate(
     creditIndex: number,

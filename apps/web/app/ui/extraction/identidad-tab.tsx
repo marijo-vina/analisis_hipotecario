@@ -51,6 +51,7 @@ export default function IdentidadTab({ documents }: IdentidadTabProps) {
               category="identidad"
               fields={parsed.fields}
               alerts={parsed.alerts}
+              defaultExpanded={true}
               isExpired={parsed.isExpired}
               onValidate={setDrawerDoc}
               manualCorrections={parsed.manualCorrections}

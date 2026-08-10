@@ -121,15 +121,6 @@ export default function DocumentBrowser({
             );
           })}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setUploadModalOpen(true)}
-          className="p-2.5 rounded-xl bg-gf-red text-white hover:bg-gf-red-dark transition-all shadow-2xs mt-auto"
-          title="Agregar documento"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
       </aside>
     );
   }
