@@ -317,7 +317,6 @@ export const STATUS_LABELS: Record<string, string> = {
 
 export const REASON_LABELS: Record<string, string> = {
   NEGATIVE_CAPACITY: "Capacidad de pago insuficiente",
-  LTV_EXCEEDED: "Aforo excede el máximo permitido",
   MATURITY_AGE_EXCEEDED: "Edad al vencimiento excede el máximo",
   NO_VALID_TERM_AVAILABLE: "Sin plazo válido disponible",
   MINIMUM_AGE_NOT_MET: "Edad mínima no alcanzada",
@@ -339,6 +338,8 @@ export const REASON_LABELS: Record<string, string> = {
   BUREAU_SCORE_UNIVERSAL_REJECTION: "Score de Buró menor a 500 puntos (Rechazo universal)",
   QUITA_QUEBRANTO_REJECTED: "Registro de quita o quebranto en Buró de Crédito",
   FRAUD_IDENTITY_THEFT_REJECTED: "Alerta de riesgo de fraude o robo de identidad",
+  FRAUD_OR_IDENTITY_THEFT_REJECTED: "Alerta por riesgo de fraude o robo de identidad",
+  LEGAL_ACTION_REJECTED: "Proceso o demanda judicial registrado en Buró",
 };
 
 export function getReasonLabel(reason: string): string {
