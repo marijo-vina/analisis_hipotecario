@@ -6,7 +6,7 @@ import type {
   BankResult,
   BankResultStatus,
 } from "@/app/lib/definitions";
-import { STATUS_LABELS, REASON_LABELS, DESTINATION_LABELS } from "@/app/lib/definitions";
+import { STATUS_LABELS, REASON_LABELS, DESTINATION_LABELS, getReasonLabel } from "@/app/lib/definitions";
 import DataTable, { type Column } from "@/app/ui/common/data-table";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -385,7 +385,7 @@ function ProductTable({
       header: "Estado",
       render: (m) => {
         const firstReason =
-          m.reasons.length > 0 ? REASON_LABELS[m.reasons[0]] ?? m.reasons[0] : null;
+          m.reasons.length > 0 ? getReasonLabel(m.reasons[0]) : null;
         const showReason =
           (m.status === "REQUIRES_REVIEW" || m.status === "NOT_COMPATIBLE") &&
           firstReason;
@@ -437,7 +437,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
   const incomeLabel = isNet ? "Neto" : "Bruto";
   const statusLabel = STATUS_LABELS[match.status] ?? match.status;
   const mainReason =
-    reasons.length > 0 ? REASON_LABELS[reasons[0]] ?? reasons[0] : "Sin restricciones detectadas";
+    reasons.length > 0 ? getReasonLabel(reasons[0]) : "Sin restricciones detectadas";
 
   const controlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue", "minimumBureauScore"] as const;
   const controlLabels: Record<string, string> = {
@@ -556,7 +556,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
           <span className="font-medium text-gf-text">Razones: </span>
           {reasons.length === 0
             ? "Sin observaciones adicionales."
-            : reasons.map((r) => REASON_LABELS[r] ?? r).join(" · ")}
+            : reasons.map(getReasonLabel).join(" · ")}
         </div>
 
         {/* Suggested adjustments (CONDITIONED only) */}
