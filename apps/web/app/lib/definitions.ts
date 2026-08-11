@@ -316,7 +316,7 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const REASON_LABELS: Record<string, string> = {
-  NEGATIVE_CAPACITY: "Capacidad negativa",
+  NEGATIVE_CAPACITY: "Capacidad de pago insuficiente",
   LTV_EXCEEDED: "Aforo excede el máximo permitido",
   MATURITY_AGE_EXCEEDED: "Edad al vencimiento excede el máximo",
   NO_VALID_TERM_AVAILABLE: "Sin plazo válido disponible",
@@ -333,7 +333,21 @@ export const REASON_LABELS: Record<string, string> = {
   UNSUPPORTED_DESTINATION: "Destino no soportado",
   MISSING_BIRTH_DATE: "Fecha de nacimiento no disponible",
   MISSING_EMPLOYMENT_DATA: "Datos de empleo no disponibles",
+  INCOME_BELOW_MINIMUM: "Ingreso por debajo del mínimo requerido",
+  PROPERTY_VALUE_BELOW_MINIMUM: "Valor del inmueble por debajo del mínimo requerido",
+  SANTANDER_MOP_KNOCKOUT: "Histórico de morosidad excede la tolerancia del banco",
+  BUREAU_SCORE_UNIVERSAL_REJECTION: "Score de Buró menor a 500 puntos (Rechazo universal)",
+  QUITA_QUEBRANTO_REJECTED: "Registro de quita o quebranto en Buró de Crédito",
+  FRAUD_IDENTITY_THEFT_REJECTED: "Alerta de riesgo de fraude o robo de identidad",
 };
+
+export function getReasonLabel(reason: string): string {
+  if (REASON_LABELS[reason]) return REASON_LABELS[reason];
+  if (reason.endsWith("_SCORE_BELOW_THRESHOLD")) {
+    return "Score de Buró por debajo del mínimo requerido";
+  }
+  return reason;
+}
 
 export const INCOME_CRITERION_LABELS: Record<string, string> = {
   NET: 'Neto',
