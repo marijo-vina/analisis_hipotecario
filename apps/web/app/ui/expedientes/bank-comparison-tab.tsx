@@ -258,13 +258,6 @@ function StatusHeader({
           )}
         </div>
       </div>
-
-      {/* Right */}
-      <div className="text-right space-y-0.5">
-        <p className="text-[11px] text-gf-text-muted">
-          Analizado {formatDate(calculatedAt)}
-        </p>
-      </div>
     </div>
   );
 }
