@@ -192,12 +192,11 @@ function EmptyState({ message }: { message: string }) {
 function StatusHeader({
   bankResults,
   destination,
-  calculatedAt,
 }: {
   bankResults: BankResult[];
   destination: string | null;
-  calculatedAt: string;
-  sourceVersion: string;
+  calculatedAt?: string;
+  sourceVersion?: string;
 }) {
   const counts: Record<BankResultStatus, number> = {
     PRELIMINARY_VIABLE: 0,
@@ -214,49 +213,42 @@ function StatusHeader({
   const destLabel = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
 
   return (
-    <div
-      className="flex items-center justify-between px-5 py-4 rounded-lg border"
-      style={{ backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" }}
-    >
-      {/* Left */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[11px] font-bold"
-            style={{ backgroundColor: "#166534" }}
-          >
-            ✓
-          </span>
-          <span className="text-sm font-semibold text-gf-text">
-            {hasViable
-              ? "Evaluación con opciones viables"
-              : "Sin bancos compatibles"}
-          </span>
-        </div>
-        <p className="text-xs text-gf-text-muted">
-          {total} banco{total !== 1 ? "s" : ""} evaluado
-          {total !== 1 ? "s" : ""} para {destLabel}
-        </p>
-        <div className="flex items-center gap-2 pt-1 flex-wrap">
-          {(
-            [
-              ["PRELIMINARY_VIABLE", "#166534", "Viables"],
-              ["CONDITIONED", "#92400E", "Condicionados"],
-              ["REQUIRES_REVIEW", "#1D4ED8", "Revisión"],
-              ["NOT_COMPATIBLE", "#991B1B", "No compatibles"],
-            ] as const
-          ).map(([status, color, label]) =>
-            counts[status] > 0 ? (
-              <span key={status} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/80 border border-gf-border/40 text-gf-text-muted">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: color }}
-                />
-                <span>{counts[status]} {label}</span>
-              </span>
-            ) : null,
-          )}
-        </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-md bg-emerald-50/80 border border-emerald-200/80 text-xs">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-bold shrink-0">
+          ✓
+        </span>
+        <span className="font-semibold text-emerald-900">
+          {hasViable ? "Evaluación con opciones viables" : "Sin bancos compatibles"}
+        </span>
+        <span className="text-gf-text-muted hidden sm:inline">•</span>
+        <span className="text-gf-text-muted font-normal">
+          {total} banco{total !== 1 ? "s" : ""} para {destLabel}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {(
+          [
+            ["PRELIMINARY_VIABLE", "#166534", "Viables"],
+            ["CONDITIONED", "#92400E", "Condicionados"],
+            ["REQUIRES_REVIEW", "#1D4ED8", "Revisión"],
+            ["NOT_COMPATIBLE", "#991B1B", "No compatibles"],
+          ] as const
+        ).map(([status, color, label]) =>
+          counts[status] > 0 ? (
+            <span
+              key={status}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white border border-gf-border/40 text-gf-text"
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: color }}
+              />
+              <span>{counts[status]} {label}</span>
+            </span>
+          ) : null,
+        )}
       </div>
     </div>
   );
