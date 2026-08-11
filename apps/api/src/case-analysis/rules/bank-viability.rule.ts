@@ -297,55 +297,107 @@ export class BankViabilityRule implements AnalysisRule {
   // ── Bureau Data Extraction (from documents array) ────────────────────
 
   private extractBureauData(documents: Record<string, unknown>[]): BureauData | null {
+    let score: number | null = null;
+    let hasQuita = false;
+    let hasQuebranto = false;
+    let hasFraud = false;
+    let hasIdentityTheft = false;
+    let hasLegalAction = false;
+    let pastDueMonths: number | null = null;
+    let pastDueTotalAmount: number | null = null;
+    let foundAnyBureauDoc = false;
+
     for (const doc of documents) {
       const ed = doc.extractedData as Record<string, unknown> | null;
       const pr = doc.processingResults as Record<string, unknown> | null;
+
+      // Extract score if not found yet
+      if (score === null) {
+        const candidateScore =
+          ed?.score ??
+          pr?.score ??
+          (ed?.creditData as Record<string, unknown> | null)?.score ??
+          (pr?.creditData as Record<string, unknown> | null)?.score ??
+          (ed?.bureauData as Record<string, unknown> | null)?.score ??
+          (ed?.creditData as Record<string, unknown> | null)?.bureauScore ??
+          (ed?.creditData as Record<string, unknown> | null)?.bcScore ??
+          (ed?.report as Record<string, unknown> | null)?.publicScore ??
+          (pr?.report as Record<string, unknown> | null)?.publicScore ??
+          (ed?.scoreData as Record<string, unknown> | null)?.score ??
+          (ed?.scoreData as Record<string, unknown> | null)?.bureauScore;
+
+        if (candidateScore != null) {
+          const numScore = Number(candidateScore);
+          if (!isNaN(numScore) && numScore > 0) {
+            score = numScore;
+          }
+        }
+      }
 
       // Check for credit bureau document type — creditData can be in extractedData or processingResults
       const creditData = (ed?.creditData ?? ed?.bureauData ?? pr?.creditData) as Record<string, unknown> | null;
       const riskSummary = (ed?.riskSummary ?? pr?.riskSummary) as Record<string, unknown> | null;
       const credits = (ed?.credits ?? pr?.credits) as Record<string, unknown>[] | undefined;
 
-      if (creditData || riskSummary || credits) {
-        const rawScore = (creditData?.score ?? creditData?.bureauScore ?? creditData?.bcScore) as number | null | undefined;
-        const hasFraud = !!(
-          riskSummary?.hasFraudFlag ??
-          credits?.some((c) => c.hasFraudFlag === true)
-        );
-        const hasIdentityTheft = !!(
-          riskSummary?.hasIdentityTheft ??
-          credits?.some((c) => c.hasIdentityTheft === true)
-        );
-        const hasLegalAction = !!(
-          riskSummary?.hasLegalAction ??
-          credits?.some((c) => c.hasLegalAction === true)
-        );
-        const hasQuita = !!(
-          creditData?.hasQuita ??
-          creditData?.hasSettlement ??
-          riskSummary?.hasSettlementOrDiscount ??
-          credits?.some((c) => c.hasSettlementOrDiscount === true)
-        );
-        const hasQuebranto = !!(
-          creditData?.hasQuebranto ??
-          creditData?.hasWriteOff ??
-          riskSummary?.hasWriteOff ??
-          credits?.some((c) => c.hasWriteOff === true)
-        );
-
-        return {
-          score: rawScore != null ? Number(rawScore) : null,
-          hasQuita,
-          hasQuebranto,
-          hasFraud,
-          hasIdentityTheft,
-          hasLegalAction,
-          pastDueMonths: (creditData?.pastDueMonths ?? creditData?.mopCount) as number | null,
-          pastDueTotalAmount: (creditData?.pastDueTotalAmount ?? creditData?.pastDueAmount) as number | null,
-        };
+      if (creditData || riskSummary || credits || ed?.score != null || pr?.score != null) {
+        foundAnyBureauDoc = true;
+        if (!hasFraud) {
+          hasFraud = !!(
+            riskSummary?.hasFraudFlag ??
+            credits?.some((c) => c.hasFraudFlag === true)
+          );
+        }
+        if (!hasIdentityTheft) {
+          hasIdentityTheft = !!(
+            riskSummary?.hasIdentityTheft ??
+            credits?.some((c) => c.hasIdentityTheft === true)
+          );
+        }
+        if (!hasLegalAction) {
+          hasLegalAction = !!(
+            riskSummary?.hasLegalAction ??
+            credits?.some((c) => c.hasLegalAction === true)
+          );
+        }
+        if (!hasQuita) {
+          hasQuita = !!(
+            creditData?.hasQuita ??
+            creditData?.hasSettlement ??
+            riskSummary?.hasSettlementOrDiscount ??
+            credits?.some((c) => c.hasSettlementOrDiscount === true)
+          );
+        }
+        if (!hasQuebranto) {
+          hasQuebranto = !!(
+            creditData?.hasQuebranto ??
+            creditData?.hasWriteOff ??
+            riskSummary?.hasWriteOff ??
+            credits?.some((c) => c.hasWriteOff === true)
+          );
+        }
+        if (pastDueMonths === null) {
+          pastDueMonths = (creditData?.pastDueMonths ?? creditData?.mopCount) as number | null;
+        }
+        if (pastDueTotalAmount === null) {
+          pastDueTotalAmount = (creditData?.pastDueTotalAmount ?? creditData?.pastDueAmount) as number | null;
+        }
       }
     }
-    return null;
+
+    if (!foundAnyBureauDoc && score === null) {
+      return null;
+    }
+
+    return {
+      score,
+      hasQuita,
+      hasQuebranto,
+      hasFraud,
+      hasIdentityTheft,
+      hasLegalAction,
+      pastDueMonths,
+      pastDueTotalAmount,
+    };
   }
 
   // ── Birth Date Derivation (from documents array) ───────────────────
@@ -573,9 +625,9 @@ export class BankViabilityRule implements AnalysisRule {
         }
       } else {
         checks.minimumBureauScore = {
-          status: 'REQUIRES_REVIEW',
+          status: 'NOT_APPLICABLE',
+          actual: null,
           required: minScore,
-          reason: 'MISSING_BUREAU_SCORE',
         };
       }
     } else {
