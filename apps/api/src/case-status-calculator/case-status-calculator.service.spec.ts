@@ -87,14 +87,12 @@ describe('CaseStatusCalculatorService', () => {
     // ── Path 1: PENDING_DOCUMENTS ──────────────────────────────────────
 
     it('should return PENDING_DOCUMENTS when a required document type is missing', async () => {
-      // Only 5 of 6 required types present — missing PROOF_OF_ADDRESS
+      // Only 3 of 4 required types present — missing INE
       // Initial status is DOCUMENTS_PROCESSED (different) so the update IS triggered
       const mortgageCase = buildCaseWithDocs([
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
       ], statusIds.DOCUMENTS_PROCESSED);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -131,9 +129,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'UPLOADED' }, // NOT processed
+        { documentTypeCode: 'INE', documentStatusCode: 'UPLOADED' }, // NOT processed
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -153,9 +149,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'ERROR' }, // ERROR
+        { documentTypeCode: 'INE', documentStatusCode: 'ERROR' }, // ERROR
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -175,9 +169,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'PROCESSING' },
+        { documentTypeCode: 'INE', documentStatusCode: 'PROCESSING' },
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -199,9 +191,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'PROCESSED' },
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -224,9 +214,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'PROCESSED' },
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
@@ -253,9 +241,7 @@ describe('CaseStatusCalculatorService', () => {
           { id: 'doc-0', documentType: { code: 'PAYROLL_RECEIPT' }, documentStatus: { code: 'PROCESSED' } },
           { id: 'doc-1', documentType: { code: 'BANK_STATEMENT' }, documentStatus: { code: 'PROCESSED' } },
           { id: 'doc-2', documentType: { code: 'CREDIT_BUREAU_REPORT' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-3', documentType: { code: 'CREDIT_SCORE' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-4', documentType: { code: 'INE' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-5', documentType: { code: 'PROOF_OF_ADDRESS' }, documentStatus: { code: 'PROCESSED' } },
+          { id: 'doc-3', documentType: { code: 'INE' }, documentStatus: { code: 'PROCESSED' } },
         ],
       };
 
@@ -270,7 +256,7 @@ describe('CaseStatusCalculatorService', () => {
     });
 
     it('should ignore non-required document types when evaluating', async () => {
-      // Has an extra non-required doc type + only 5 required types
+      // Has an extra non-required doc type + only 3 required types
       const mortgageCase = {
         id: caseId,
         statusId: statusIds.DOCUMENTS_UPLOADED, // Different from PENDING_DOCUMENTS so update IS triggered
@@ -278,10 +264,8 @@ describe('CaseStatusCalculatorService', () => {
           { id: 'doc-0', documentType: { code: 'PAYROLL_RECEIPT' }, documentStatus: { code: 'PROCESSED' } },
           { id: 'doc-1', documentType: { code: 'BANK_STATEMENT' }, documentStatus: { code: 'PROCESSED' } },
           { id: 'doc-2', documentType: { code: 'CREDIT_BUREAU_REPORT' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-3', documentType: { code: 'CREDIT_SCORE' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-4', documentType: { code: 'INE' }, documentStatus: { code: 'PROCESSED' } },
-          // Missing PROOF_OF_ADDRESS, but has an extra type
-          { id: 'doc-5', documentType: { code: 'SOME_OTHER_TYPE' }, documentStatus: { code: 'PROCESSED' } },
+          // Missing INE, but has an extra type
+          { id: 'doc-3', documentType: { code: 'SOME_OTHER_TYPE' }, documentStatus: { code: 'PROCESSED' } },
         ],
       };
 
@@ -290,7 +274,7 @@ describe('CaseStatusCalculatorService', () => {
 
       await service.recalculate(caseId);
 
-      // Still PENDING_DOCUMENTS because PROOF_OF_ADDRESS is missing
+      // Still PENDING_DOCUMENTS because INE is missing
       expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { statusId: statusIds.PENDING_DOCUMENTS },
@@ -307,9 +291,7 @@ describe('CaseStatusCalculatorService', () => {
           { id: 'doc-1', documentType: { code: 'PAYROLL_RECEIPT' }, documentStatus: { code: 'UPLOADED' } }, // 2nd payroll, not processed
           { id: 'doc-2', documentType: { code: 'BANK_STATEMENT' }, documentStatus: { code: 'PROCESSED' } },
           { id: 'doc-3', documentType: { code: 'CREDIT_BUREAU_REPORT' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-4', documentType: { code: 'CREDIT_SCORE' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-5', documentType: { code: 'INE' }, documentStatus: { code: 'PROCESSED' } },
-          { id: 'doc-6', documentType: { code: 'PROOF_OF_ADDRESS' }, documentStatus: { code: 'PROCESSED' } },
+          { id: 'doc-4', documentType: { code: 'INE' }, documentStatus: { code: 'PROCESSED' } },
         ],
       };
 
@@ -331,9 +313,7 @@ describe('CaseStatusCalculatorService', () => {
         { documentTypeCode: 'PAYROLL_RECEIPT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'CREDIT_SCORE', documentStatusCode: 'PROCESSED' },
         { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
-        { documentTypeCode: 'PROOF_OF_ADDRESS', documentStatusCode: 'PROCESSED' },
       ]);
 
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
