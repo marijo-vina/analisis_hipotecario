@@ -337,7 +337,6 @@ export const REASON_LABELS: Record<string, string> = {
   SANTANDER_MOP_KNOCKOUT: "Histórico de morosidad excede la tolerancia del banco",
   BUREAU_SCORE_UNIVERSAL_REJECTION: "Score de Buró menor a 500 puntos (Rechazo universal)",
   QUITA_QUEBRANTO_REJECTED: "Registro de quita o quebranto en Buró de Crédito",
-  FRAUD_IDENTITY_THEFT_REJECTED: "Alerta de riesgo de fraude o robo de identidad",
   FRAUD_OR_IDENTITY_THEFT_REJECTED: "Alerta por riesgo de fraude o robo de identidad",
   LEGAL_ACTION_REJECTED: "Proceso o demanda judicial registrado en Buró",
 };
