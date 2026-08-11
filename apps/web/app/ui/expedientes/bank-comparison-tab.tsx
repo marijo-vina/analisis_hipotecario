@@ -439,7 +439,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
   const mainReason =
     reasons.length > 0 ? REASON_LABELS[reasons[0]] ?? reasons[0] : "Sin restricciones detectadas";
 
-  const controlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue"] as const;
+  const controlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue", "minimumBureauScore"] as const;
   const controlLabels: Record<string, string> = {
     capacity: "Capacidad de pago",
     minimumApplicantAge: "Edad mínima solicitante",
@@ -447,6 +447,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
     employmentTenure: "Antigüedad laboral",
     minimumIncome: "Ingreso mínimo",
     minimumPropertyValue: "Valor mínimo inmueble",
+    minimumBureauScore: "Score mínimo de Buró",
   };
   const resultBadge: Record<string, { color: string; label: string }> = { PASS: { color: "#166534", label: "Cumple" }, FAIL: { color: "#991B1B", label: "No cumple" }, NOT_APPLICABLE: { color: "#6B7280", label: "No aplica" }, REQUIRES_REVIEW: { color: "#1D4ED8", label: "Requiere revisión" } };
 
@@ -456,6 +457,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
     const minTenure = snap.minimumEmploymentTenureMonths as number | null | undefined;
     const minInc = snap.minimumIncome as string | null | undefined;
     const minProp = snap.minimumPropertyValue as string | null | undefined;
+    const minScore = snap.minimumBureauScore as number | null | undefined;
     switch (key) {
       case "capacity": return "Debe ser mayor que $0.00";
       case "minimumApplicantAge": return minAge ? `Mín. ${formatAge(minAge)}` : "—";
@@ -463,6 +465,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
       case "employmentTenure": return minTenure ? `Mín. ${formatAge(minTenure)}` : "—";
       case "minimumIncome": return minInc ? `Mín. ${formatCurrency(minInc)}` : "—";
       case "minimumPropertyValue": return minProp ? `Mín. ${formatCurrency(minProp)}` : "—";
+      case "minimumBureauScore": return minScore ? `Mín. ${minScore} pts` : "No especificado";
       default: return "—";
     }
   }
@@ -475,6 +478,10 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
       case "employmentTenure": return formatAge(calculation.employmentTenureMonths);
       case "minimumIncome": return formatCurrency(calculation.incomeUsed);
       case "minimumPropertyValue": return formatCurrency((match.checks?.minimumPropertyValue?.actual as string) ?? (inputs?.propertyValue ?? null));
+      case "minimumBureauScore": {
+        const actual = match.checks?.minimumBureauScore?.actual;
+        return actual != null ? `${actual} pts` : "—";
+      }
       default: return "—";
     }
   }

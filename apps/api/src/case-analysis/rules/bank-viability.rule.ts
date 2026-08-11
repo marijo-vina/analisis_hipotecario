@@ -553,10 +553,36 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Bureau Score Check (bank-specific) ────────────────────────────
-    if (bureauData && bureauData.score !== null && policy.bank.minimumBureauScore !== null) {
-      if (bureauData.score <= policy.bank.minimumBureauScore) {
-        reasons.push(`${policy.bank.code}_SCORE_BELOW_THRESHOLD`);
+    if (policy.bank.minimumBureauScore != null) {
+      const minScore = policy.bank.minimumBureauScore;
+      const actualScore = bureauData?.score ?? null;
+      if (actualScore !== null) {
+        if (actualScore <= minScore) {
+          checks.minimumBureauScore = {
+            status: 'FAIL',
+            actual: actualScore,
+            required: minScore,
+          };
+          reasons.push(`${policy.bank.code}_SCORE_BELOW_THRESHOLD`);
+        } else {
+          checks.minimumBureauScore = {
+            status: 'PASS',
+            actual: actualScore,
+            required: minScore,
+          };
+        }
+      } else {
+        checks.minimumBureauScore = {
+          status: 'REQUIRES_REVIEW',
+          required: minScore,
+          reason: 'MISSING_BUREAU_SCORE',
+        };
       }
+    } else {
+      checks.minimumBureauScore = {
+        status: 'NOT_APPLICABLE',
+        actual: bureauData?.score ?? null,
+      };
     }
 
     // ── Santander MOP Check ───────────────────────────────────────────
@@ -649,6 +675,7 @@ export class BankViabilityRule implements AnalysisRule {
       maximumApplicationAgeMonths: policy.maximumApplicationAgeMonths,
       minimumIncome: policy.minimumIncome ? policy.minimumIncome.toString() : null,
       minimumPropertyValue: policy.minimumPropertyValue ? policy.minimumPropertyValue.toString() : null,
+      minimumBureauScore: policy.bank.minimumBureauScore ?? null,
     };
 
     return {

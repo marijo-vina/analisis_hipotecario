@@ -75,6 +75,7 @@ function makeBank(overrides: Record<string, unknown> = {}) {
     name: 'Banorte',
     debtCommitmentFactor: { toString: () => '0.60' },
     incomeCriterion: 'NET',
+    minimumBureauScore: null,
     isActive: true,
     sourceVersion: SOURCE_VERSION,
     ...overrides,

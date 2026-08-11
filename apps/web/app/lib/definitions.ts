@@ -278,6 +278,7 @@ export interface BankPolicySnapshot {
   maximumApplicationAgeMonths: number | null;
   minimumIncome: string | null;
   minimumPropertyValue: string | null;
+  minimumBureauScore?: number | null;
 }
 
 /** @deprecated Use BankPolicySnapshot instead. Kept for backward compat. */
