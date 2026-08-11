@@ -39,6 +39,34 @@ const STATUS_BADGE_COLORS: Record<string, string> = {
   NOT_COMPATIBLE: "#991B1B",
 };
 
+const BANK_BRANDS: Record<string, { bg: string; text: string; initials: string }> = {
+  SCOTIABANK: { bg: "#EC111A", text: "#FFFFFF", initials: "SCO" },
+  BBVA: { bg: "#004481", text: "#FFFFFF", initials: "BBVA" },
+  CITIBANAMEX: { bg: "#002D72", text: "#FFFFFF", initials: "BNMX" },
+  BANORTE: { bg: "#EB1C24", text: "#FFFFFF", initials: "BTE" },
+  SANTANDER: { bg: "#EC0000", text: "#FFFFFF", initials: "SAN" },
+  HSBC: { bg: "#DB0011", text: "#FFFFFF", initials: "HSBC" },
+  BANREGIO: { bg: "#FF6600", text: "#FFFFFF", initials: "BRG" },
+  MIFEL: { bg: "#003B70", text: "#FFFFFF", initials: "MIF" },
+};
+
+function BankBadge({ code, name }: { code: string; name: string }) {
+  const brand = BANK_BRANDS[code.toUpperCase()] ?? {
+    bg: "#374151",
+    text: "#FFFFFF",
+    initials: name.substring(0, 3).toUpperCase(),
+  };
+
+  return (
+    <span
+      className="inline-flex items-center justify-center w-7 h-5 rounded text-[10px] font-bold tracking-tight shrink-0 shadow-sm"
+      style={{ backgroundColor: brand.bg, color: brand.text }}
+    >
+      {brand.initials}
+    </span>
+  );
+}
+
 const INSUFFICIENT_REASONS = new Set([
   "MISSING_INCOME_CALCULATION",
   "MISSING_LIABILITY_SNAPSHOT",
@@ -165,7 +193,6 @@ function StatusHeader({
   bankResults,
   destination,
   calculatedAt,
-  sourceVersion,
 }: {
   bankResults: BankResult[];
   destination: string | null;
@@ -210,24 +237,22 @@ function StatusHeader({
           {total} banco{total !== 1 ? "s" : ""} evaluado
           {total !== 1 ? "s" : ""} para {destLabel}
         </p>
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
           {(
             [
-              ["PRELIMINARY_VIABLE", "#166534"],
-              ["CONDITIONED", "#92400E"],
-              ["REQUIRES_REVIEW", "#1D4ED8"],
-              ["NOT_COMPATIBLE", "#991B1B"],
+              ["PRELIMINARY_VIABLE", "#166534", "Viables"],
+              ["CONDITIONED", "#92400E", "Condicionados"],
+              ["REQUIRES_REVIEW", "#1D4ED8", "Revisión"],
+              ["NOT_COMPATIBLE", "#991B1B", "No compatibles"],
             ] as const
-          ).map(([status, color]) =>
+          ).map(([status, color, label]) =>
             counts[status] > 0 ? (
-              <span key={status} className="inline-flex items-center gap-1">
+              <span key={status} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/80 border border-gf-border/40 text-gf-text-muted">
                 <span
-                  className="w-2 h-2 rounded-full"
+                  className="w-2 h-2 rounded-full shrink-0"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-[11px] text-gf-text-muted">
-                  {counts[status]}
-                </span>
+                <span>{counts[status]} {label}</span>
               </span>
             ) : null,
           )}
@@ -238,9 +263,6 @@ function StatusHeader({
       <div className="text-right space-y-0.5">
         <p className="text-[11px] text-gf-text-muted">
           Analizado {formatDate(calculatedAt)}
-        </p>
-        <p className="text-[11px] text-gf-text-muted">
-          Anaquel {sourceVersion}
         </p>
       </div>
     </div>
@@ -321,6 +343,7 @@ function ProductTable({
             <span className="text-sm text-gf-text-muted" style={{ minWidth: "14px" }}>
               {isExpanded ? "▲" : "▼"}
             </span>
+            <BankBadge code={m.bankCode} name={name} />
             <span className="text-xs font-semibold text-gf-text">{name}</span>
             <span className="text-[10px] text-gf-text-muted">
               {isExpanded ? "Ocultar" : "Ver detalle"}
@@ -363,9 +386,9 @@ function ProductTable({
     },
     {
       key: "capacity",
-      header: "Cap. disponible",
+      header: "Capacidad de pago",
       render: (m) => (
-        <span className="text-xs font-semibold text-emerald-700">
+        <span className="text-xs font-bold text-emerald-700">
           {m.calculation.availableCapacity != null
             ? formatCurrency(m.calculation.availableCapacity)
             : "—"}
@@ -471,11 +494,14 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
     }
   }
 
+  const borderAccentColor = STATUS_BADGE_COLORS[match.status] ?? "#6B7280";
+
   return (
-    <div className="border-t-0 rounded-b-lg" style={{ backgroundColor: "#F8F9FA", borderLeft: "3px solid #DC2626" }}>
+    <div className="border-t-0 rounded-b-lg" style={{ backgroundColor: "#F8F9FA", borderLeft: `4px solid ${borderAccentColor}` }}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <BankBadge code={match.bankCode} name={bankName} />
           <span className="text-sm font-semibold text-gf-text truncate">{bankName}</span>
           <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap" style={{ backgroundColor: STATUS_BADGE_COLORS[match.status] ?? "#6B7280" }}>{statusLabel}</span>
         </div>
