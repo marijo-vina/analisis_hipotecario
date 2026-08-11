@@ -9,6 +9,7 @@ import {
   type IncomeReceiptResult,
 } from "@/app/actions/income";
 
+import { Check, X } from "lucide-react";
 import Card from "@/app/ui/common/card";
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -48,6 +49,43 @@ function formatDate(dateStr: string | null): string {
   } catch {
     return dateStr;
   }
+}
+
+/**
+ * Renders a visual badge with checkmark (✓) for matched conciliation (3/3 or 2/3 matched)
+ * or cross mark (✗) for unconciliated receipts.
+ */
+function ConciliationStatusBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return <span className="text-gf-text-soft">—</span>;
+  }
+
+  const isMatched =
+    status === "MATCHED" ||
+    status === "MATCHED_2_OF_3" ||
+    status === "PROVIDER_MIRROR_CONFIRMED";
+
+  if (isMatched) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+        title={status === "MATCHED_2_OF_3" ? "Conciliado (2/3)" : "Conciliado (3/3)"}
+      >
+        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+        <span>Conciliado</span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200"
+      title={status}
+    >
+      <X className="h-3.5 w-3.5 stroke-[2.5]" />
+      <span>No conciliado</span>
+    </span>
+  );
 }
 
 // ── Currency input helper ────────────────────────────────────────────────────
@@ -284,11 +322,7 @@ export default function IncomeCalculationSection({
                         {formatMXN(receipt.netIncome)}
                       </td>
                       <td className="px-4 py-3">
-                        {receipt.conciliationStatus ? (
-                          <span className="text-xs text-gf-text-muted">{receipt.conciliationStatus}</span>
-                        ) : (
-                          <span className="text-gf-text-soft">—</span>
-                        )}
+                        <ConciliationStatusBadge status={receipt.conciliationStatus} />
                       </td>
                     </tr>
                   ))}
