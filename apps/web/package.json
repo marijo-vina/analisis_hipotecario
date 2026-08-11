@@ -1,7 +1,9 @@
 {
   "name": "web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "Frontend del sistema de análisis crediticio hipotecario",
+  "author": "Marijose Vinajera",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build",
