@@ -122,6 +122,7 @@ export default function BankComparisonTab({
           rows={sorted}
           expandedIndex={expandedIndex}
           onToggle={(i) => setExpandedIndex(expandedIndex === i ? null : i)}
+          inputs={bankViability.inputs}
         />
         <WarningLegend legend={bankViability.warningLegend} />
       </div>
@@ -144,7 +145,7 @@ export default function BankComparisonTab({
 
   // 5. No products — supported destination but no matches
   return (
-    <EmptyState message="Sin productos activos para el destino y perfil" />
+    <EmptyState message="Sin bancos activos para el destino y perfil" />
   );
 }
 
@@ -202,11 +203,11 @@ function StatusHeader({
           <span className="text-sm font-semibold text-gf-text">
             {hasViable
               ? "Evaluación con opciones viables"
-              : "Sin productos compatibles"}
+              : "Sin bancos compatibles"}
           </span>
         </div>
         <p className="text-xs text-gf-text-muted">
-          {total} producto{total !== 1 ? "s" : ""} evaluado
+          {total} banco{total !== 1 ? "s" : ""} evaluado
           {total !== 1 ? "s" : ""} para {destLabel}
         </p>
         <div className="flex items-center gap-3 pt-1">
@@ -277,7 +278,7 @@ function FinancialSummary({
       {fields.map((f, i) => (
         <div
           key={f.label}
-          className="flex-1 px-3 py-3 flex flex-col justify-center"
+          className="flex-1 px-3 py-3 flex flex-col justify-center relative"
         >
           {i > 0 && (
             <div className="absolute left-0 top-2 bottom-2 w-px bg-gf-border/40" />
@@ -300,10 +301,12 @@ function ProductTable({
   rows,
   expandedIndex,
   onToggle,
+  inputs,
 }: {
   rows: BankResult[];
   expandedIndex: number | null;
   onToggle: (index: number) => void;
+  inputs?: BankViabilitySnapshot["inputs"];
 }) {
   const columns: Column<BankResult>[] = [
     {
@@ -318,20 +321,13 @@ function ProductTable({
             <span className="text-sm text-gf-text-muted" style={{ minWidth: "14px" }}>
               {isExpanded ? "▲" : "▼"}
             </span>
-            <span className="text-xs font-medium text-gf-text">{name}</span>
+            <span className="text-xs font-semibold text-gf-text">{name}</span>
             <span className="text-[10px] text-gf-text-muted">
-              {isExpanded ? "Ocultar" : "Ver"}
+              {isExpanded ? "Ocultar" : "Ver detalle"}
             </span>
           </span>
         );
       },
-    },
-    {
-      key: "productCode",
-      header: "Producto",
-      render: (m) => (
-        <span className="text-xs text-gf-text">{m.productCode}</span>
-      ),
     },
     {
       key: "income",
@@ -369,7 +365,7 @@ function ProductTable({
       key: "capacity",
       header: "Cap. disponible",
       render: (m) => (
-        <span className="text-xs text-gf-text">
+        <span className="text-xs font-semibold text-emerald-700">
           {m.calculation.availableCapacity != null
             ? formatCurrency(m.calculation.availableCapacity)
             : "—"}
@@ -409,13 +405,13 @@ function ProductTable({
       <DataTable<BankResult>
         columns={columns}
         rows={rows}
-        emptyMessage="Sin productos evaluados"
+        emptyMessage="Sin bancos evaluados"
         onRowClick={(_, i) => onToggle(i)}
         selectedIndex={expandedIndex}
       />
       {/* Expanded detail panels — rendered below the table */}
       {expandedIndex != null && expandedIndex < rows.length && (
-        <ProductDetail match={rows[expandedIndex]} />
+        <ProductDetail match={rows[expandedIndex]} inputs={inputs} />
       )}
     </div>
   );
@@ -423,11 +419,10 @@ function ProductTable({
 
 // ── Product Detail (expandable) ──────────────────────────────────────────────
 
-function ProductDetail({ match }: { match: BankResult }) {
+function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViabilitySnapshot["inputs"] }) {
   const { calculation, checks, reasons, policySnapshot } = match;
   const snap = policySnapshot as unknown as Record<string, unknown>;
   const bankName = (snap.bankName as string) || match.bankCode;
-  const productName = match.productCode;
 
   const criterion = policySnapshot.incomeCriterion;
   const isNet = String(criterion).toUpperCase().includes("NET");
@@ -471,7 +466,7 @@ function ProductDetail({ match }: { match: BankResult }) {
       case "maximumApplicationAge": return formatAge(calculation.currentAgeMonths);
       case "employmentTenure": return formatAge(calculation.employmentTenureMonths);
       case "minimumIncome": return formatCurrency(calculation.incomeUsed);
-      case "minimumPropertyValue": return formatCurrency((match.checks?.minimumPropertyValue?.actual as string) ?? null);
+      case "minimumPropertyValue": return formatCurrency((match.checks?.minimumPropertyValue?.actual as string) ?? (inputs?.propertyValue ?? null));
       default: return "—";
     }
   }
@@ -481,7 +476,7 @@ function ProductDetail({ match }: { match: BankResult }) {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-semibold text-gf-text truncate">{bankName} · {productName}</span>
+          <span className="text-sm font-semibold text-gf-text truncate">{bankName}</span>
           <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap" style={{ backgroundColor: STATUS_BADGE_COLORS[match.status] ?? "#6B7280" }}>{statusLabel}</span>
         </div>
         <span className="text-[11px] text-gf-text-muted">{mainReason}</span>

@@ -579,8 +579,18 @@ export class BankViabilityRule implements AnalysisRule {
         };
         reasons.push('INCOME_BELOW_MINIMUM');
       } else {
-        checks.minimumIncome = { status: 'PASS' };
+        checks.minimumIncome = {
+          status: 'PASS',
+          actual: d2(incomeUsed),
+          required: d2(minIncome),
+        };
       }
+    } else if (policy.minimumIncome !== null) {
+      checks.minimumIncome = {
+        status: 'REQUIRES_REVIEW',
+        required: d2(new Prisma.Decimal(policy.minimumIncome.toString())),
+        reason: 'UNCONFIRMED_INCOME',
+      };
     }
 
     // ── Minimum Property Value CMA Check ──────────────────────────────
@@ -595,8 +605,18 @@ export class BankViabilityRule implements AnalysisRule {
         };
         reasons.push('PROPERTY_VALUE_BELOW_MINIMUM');
       } else {
-        checks.minimumPropertyValue = { status: 'PASS' };
+        checks.minimumPropertyValue = {
+          status: 'PASS',
+          actual: d2(propValue),
+          required: d2(minProp),
+        };
       }
+    } else if (policy.minimumPropertyValue !== null) {
+      checks.minimumPropertyValue = {
+        status: 'REQUIRES_REVIEW',
+        required: d2(new Prisma.Decimal(policy.minimumPropertyValue.toString())),
+        reason: 'MISSING_PROPERTY_VALUE',
+      };
     }
 
     // ── Status Precedence ────────────────────────────────────────────
