@@ -19,8 +19,8 @@ export class CreateMortgageCaseDto {
   creditTypeId!: number;
 
   @IsOptional()
-  @IsIn(['SALARIED'])
-  personType?: 'SALARIED';
+  @IsIn(['SALARIED', 'PFAE'])
+  personType?: 'SALARIED' | 'PFAE';
 
   @IsOptional()
   @IsString()

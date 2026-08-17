@@ -59,9 +59,11 @@ describe('CaseStatusCalculatorService', () => {
         documentStatusCode: string;
       }>,
       initialStatusId: number = statusIds.PENDING_DOCUMENTS,
+      personType: string = 'SALARIED',
     ) {
       return {
         id: caseId,
+        personType,
         statusId: initialStatusId,
         documents: docs.map((d, i) => ({
           id: `doc-${i}`,
@@ -324,6 +326,58 @@ describe('CaseStatusCalculatorService', () => {
       await service.recalculate(caseId);
 
       // DOCUMENTS_PROCESSED (no COMPLETED run)
+      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { statusId: statusIds.DOCUMENTS_PROCESSED },
+        }),
+      );
+    });
+
+    // ── PFAE Profile Tests ─────────────────────────────────────────────
+
+    it('should return PENDING_DOCUMENTS for PFAE case when CSF or TAX_RETURN is missing', async () => {
+      const mortgageCase = buildCaseWithDocs(
+        [
+          { documentTypeCode: 'CSF', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED' },
+        ],
+        statusIds.DOCUMENTS_PROCESSED,
+        'PFAE',
+      );
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
+      mockStatusIds();
+
+      await service.recalculate(caseId);
+
+      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { statusId: statusIds.PENDING_DOCUMENTS },
+        }),
+      );
+    });
+
+    it('should return DOCUMENTS_PROCESSED for PFAE case with all required docs (CSF, TAX_RETURN, BANK_STATEMENT, CREDIT_BUREAU_REPORT, PASSPORT)', async () => {
+      const mortgageCase = buildCaseWithDocs(
+        [
+          { documentTypeCode: 'CSF', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'TAX_RETURN', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED' },
+          { documentTypeCode: 'PASSPORT', documentStatusCode: 'PROCESSED' },
+        ],
+        statusIds.PENDING_DOCUMENTS,
+        'PFAE',
+      );
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
+      mockPrismaService.analysisRun.findFirst.mockResolvedValue(null);
+      mockStatusIds();
+
+      await service.recalculate(caseId);
+
       expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { statusId: statusIds.DOCUMENTS_PROCESSED },

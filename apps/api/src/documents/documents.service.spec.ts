@@ -712,17 +712,18 @@ describe('DocumentsService', () => {
       expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException when document status is not UPLOADED', async () => {
+    it('should throw BadRequestException when document status is PROCESSING', async () => {
+      mockGcsService.deleteFile.mockResolvedValue(undefined);
       mockPrismaService.document.findUnique.mockResolvedValue({
         ...mockDocument,
-        documentStatus: { id: 2, code: 'VALIDATED', name: 'Validado', order: 3 },
+        documentStatus: { id: 3, code: 'PROCESSING', name: 'En procesamiento', order: 3 },
       });
 
       await expect(service.delete(caseId, documentId)).rejects.toThrow(
         BadRequestException,
       );
       await expect(service.delete(caseId, documentId)).rejects.toThrow(
-        'Solo se pueden eliminar documentos no procesados',
+        'No se puede eliminar un documento mientras está en procesamiento',
       );
       expect(mockGcsService.deleteFile).not.toHaveBeenCalled();
       expect(mockPrismaService.document.delete).not.toHaveBeenCalled();
