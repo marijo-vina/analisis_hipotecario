@@ -91,6 +91,7 @@ export default function CaseDetailWorkspace({
           documentTypes={documentTypes}
           isCollapsed={isDocsCollapsed}
           onToggleCollapse={() => setIsDocsCollapsed(!isDocsCollapsed)}
+          personType={caseData.personType}
         />
 
         {/* ── Right Main Content Area ─────────────────────────────────── */}

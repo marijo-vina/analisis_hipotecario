@@ -10,6 +10,7 @@ interface DocumentUploadProps {
   documentTypes: DocumentType[];
   onSuccess: () => void;
   defaultDocumentTypeId?: string;
+  personType?: string;
 }
 
 export default function DocumentUpload({
@@ -17,14 +18,22 @@ export default function DocumentUpload({
   documentTypes,
   onSuccess,
   defaultDocumentTypeId,
+  personType,
 }: DocumentUploadProps) {
   const availableDocumentTypes = useMemo<DocumentType[]>(() => {
     // 1. Exclude PROOF_OF_ADDRESS
-    const filtered = documentTypes.filter(
+    let filtered = documentTypes.filter(
       (dt: DocumentType) => dt.code !== "PROOF_OF_ADDRESS",
     );
 
-    // 2. Ensure PASSPORT is present in the list
+    // 2. Filter by personType
+    if (personType === "PFAE") {
+      filtered = filtered.filter((dt) => dt.code !== "PAYROLL_RECEIPT");
+    } else {
+      filtered = filtered.filter((dt) => dt.code !== "CSF" && dt.code !== "TAX_RETURN");
+    }
+
+    // 3. Ensure PASSPORT is present in the list
     const hasPassport = filtered.some((dt: DocumentType) => dt.code === "PASSPORT");
     if (!hasPassport) {
       const maxId = Math.max(0, ...filtered.map((dt: DocumentType) => Number(dt.id) || 0));
@@ -37,7 +46,7 @@ export default function DocumentUpload({
     }
 
     return filtered;
-  }, [documentTypes]);
+  }, [documentTypes, personType]);
 
   const [files, setFiles] = useState<File[]>([]);
   const [documentTypeId, setDocumentTypeId] = useState<string>(

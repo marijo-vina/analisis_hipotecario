@@ -12,6 +12,8 @@ const DOCUMENT_TYPES = [
   { code: 'CREDIT_SCORE', name: 'Mi Score', isActive: true },
   { code: 'INE', name: 'INE', isActive: true },
   { code: 'PASSPORT', name: 'Pasaporte', isActive: true },
+  { code: 'CSF', name: 'Constancia de Situación Fiscal', isActive: true },
+  { code: 'TAX_RETURN', name: 'Declaración anual', isActive: true },
   { code: 'PROOF_OF_ADDRESS', name: 'Comprobante de domicilio', isActive: false },
 ];
 

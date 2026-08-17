@@ -116,6 +116,7 @@ model IncomeCalculation {
 
 enum PersonType {
   SALARIED
+  PFAE
 }
 
 model Document {

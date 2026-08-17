@@ -47,7 +47,7 @@ export class CaseStatusCalculatorService {
     const documents = mortgageCase.documents;
 
     // 2. Walk the decision tree (sync part)
-    const syncResult = this.evaluateSync(documents);
+    const syncResult = this.evaluateSync(mortgageCase.personType, documents);
 
     // 3. If still DOCUMENTS_PROCESSED from sync evaluation, check analysis
     let finalStatusCode: string;
@@ -87,31 +87,48 @@ export class CaseStatusCalculatorService {
    * are all processed (caller must still check for analysis runs).
    */
   private evaluateSync(
+    personType: string,
     documents: Array<{
       documentType: { code: string };
       documentStatus: { code: string };
     }>,
   ): string {
-    // Step 1: Check all required document types are present
-    for (const requiredCode of REQUIRED_DOCUMENT_TYPE_CODES) {
-      const hasDoc = documents.some(
-        (d) => d.documentType.code === requiredCode,
+    const isPFAE = personType === 'PFAE';
+
+    if (isPFAE) {
+      const requiredCodes = ['CSF', 'TAX_RETURN', 'BANK_STATEMENT', 'CREDIT_BUREAU_REPORT'];
+      for (const requiredCode of requiredCodes) {
+        const hasDoc = documents.some((d) => d.documentType.code === requiredCode);
+        if (!hasDoc) return 'PENDING_DOCUMENTS';
+      }
+      const hasIdentity = documents.some(
+        (d) => d.documentType.code === 'INE' || d.documentType.code === 'PASSPORT',
       );
-      if (!hasDoc) return 'PENDING_DOCUMENTS';
+      if (!hasIdentity) return 'PENDING_DOCUMENTS';
+
+      for (const requiredCode of requiredCodes) {
+        const typeDocs = documents.filter((d) => d.documentType.code === requiredCode);
+        const allProcessed = typeDocs.every((d) => d.documentStatus.code === 'PROCESSED');
+        if (!allProcessed) return 'DOCUMENTS_UPLOADED';
+      }
+      const identityDocs = documents.filter(
+        (d) => d.documentType.code === 'INE' || d.documentType.code === 'PASSPORT',
+      );
+      const allIdentityProcessed = identityDocs.every((d) => d.documentStatus.code === 'PROCESSED');
+      if (!allIdentityProcessed) return 'DOCUMENTS_UPLOADED';
+    } else {
+      for (const requiredCode of REQUIRED_DOCUMENT_TYPE_CODES) {
+        const hasDoc = documents.some((d) => d.documentType.code === requiredCode);
+        if (!hasDoc) return 'PENDING_DOCUMENTS';
+      }
+
+      for (const requiredCode of REQUIRED_DOCUMENT_TYPE_CODES) {
+        const typeDocs = documents.filter((d) => d.documentType.code === requiredCode);
+        const allProcessed = typeDocs.every((d) => d.documentStatus.code === 'PROCESSED');
+        if (!allProcessed) return 'DOCUMENTS_UPLOADED';
+      }
     }
 
-    // Step 2: Check all required-type documents are PROCESSED
-    for (const requiredCode of REQUIRED_DOCUMENT_TYPE_CODES) {
-      const typeDocs = documents.filter(
-        (d) => d.documentType.code === requiredCode,
-      );
-      const allProcessed = typeDocs.every(
-        (d) => d.documentStatus.code === 'PROCESSED',
-      );
-      if (!allProcessed) return 'DOCUMENTS_UPLOADED';
-    }
-
-    // Documents are all processed — caller must check for analysis run
     return 'DOCUMENTS_PROCESSED';
   }
 }
