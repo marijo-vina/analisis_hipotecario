@@ -12,6 +12,8 @@ import { BankStatementExtractionService } from './bank-statement-extraction.serv
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { CsfExtractionService } from './csf-extraction.service';
+import { TaxReturnExtractionService } from './tax-return-extraction.service';
 import { GcsService } from './gcs.service';
 
 describe('DocumentsController', () => {
@@ -44,6 +46,14 @@ describe('DocumentsController', () => {
   };
 
   const mockCreditScoreExtractionService = {
+    extract: jest.fn(),
+  };
+
+  const mockCsfExtractionService = {
+    extract: jest.fn(),
+  };
+
+  const mockTaxReturnExtractionService = {
     extract: jest.fn(),
   };
 
@@ -84,6 +94,14 @@ describe('DocumentsController', () => {
         {
           provide: CreditScoreExtractionService,
           useValue: mockCreditScoreExtractionService,
+        },
+        {
+          provide: CsfExtractionService,
+          useValue: mockCsfExtractionService,
+        },
+        {
+          provide: TaxReturnExtractionService,
+          useValue: mockTaxReturnExtractionService,
         },
         {
           provide: CoordinateExtractionService,
@@ -607,6 +625,50 @@ describe('DocumentsController', () => {
       expect(
         mockBankStatementExtractionService.extract,
       ).toHaveBeenCalledWith(caseId, 'nonexistent');
+    });
+  });
+
+  describe('extractCsf', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-csf-uuid-1';
+
+    const successfulExtraction = {
+      documentType: 'CSF',
+      taxpayer: { rfc: 'PEGJ800101AB1', fullName: 'JUAN PEREZ' },
+      activityStartDate: '2003-10-01',
+      hasSalariedRegime: true,
+      hasIndependentRegime: true,
+      alerts: [],
+    };
+
+    it('should return 200 with CSF extraction result in data envelope', async () => {
+      mockCsfExtractionService.extract.mockResolvedValue(successfulExtraction);
+
+      const result = await controller.extractCsf(caseId, documentId);
+
+      expect(mockCsfExtractionService.extract).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
+    });
+  });
+
+  describe('extractTaxReturn', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-tax-uuid-1';
+
+    const successfulExtraction = {
+      documentType: 'TAX_RETURN',
+      satReceipt: { rfc: 'PEGJ800101AB1', taxYear: 2025 },
+      fiscalResult: { accumulableIncomeTotal: 120000, fiscalProfit: 120000 },
+      alerts: [],
+    };
+
+    it('should return 200 with Tax Return extraction result in data envelope', async () => {
+      mockTaxReturnExtractionService.extract.mockResolvedValue(successfulExtraction);
+
+      const result = await controller.extractTaxReturn(caseId, documentId);
+
+      expect(mockTaxReturnExtractionService.extract).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
     });
   });
 });
