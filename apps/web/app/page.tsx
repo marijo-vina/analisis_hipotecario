@@ -1,7 +1,8 @@
 import { getSession } from "@/app/lib/session";
 import { redirect } from "next/navigation";
-import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
+import Image from "next/image";
+import { ShieldCheck } from "lucide-react";
 
 export default async function Home() {
   const token = await getSession();
@@ -11,27 +12,48 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gf-bg">
-      <Card className="max-w-xl text-center">
-        <h1 className="text-3xl font-bold text-gf-text">
-          Gestión Financiera
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-gf-bg">
+      {/* Card container */}
+      <div className="w-full max-w-[440px] bg-white rounded-[16px] border border-gf-border shadow-[0px_4px_16px_rgba(0,0,0,0.04)] p-8 text-center">
+        {/* Logo */}
+        <div className="mb-4 flex items-center justify-center w-full">
+          <Image
+            src="/logo.png"
+            alt="Gestión Financiera"
+            width={340}
+            height={136}
+            priority
+            className="w-full max-w-[300px] h-auto object-contain"
+          />
+        </div>
+
+        <h1 className="text-2xl font-bold text-gf-text tracking-tight mb-2">
+          Operaciones Hipotecarias
         </h1>
 
-        <p className="mt-4 text-gf-text-muted">
+        <p className="text-sm text-gf-text-muted leading-relaxed mb-6">
           Plataforma interna de asistencia para análisis y precalificación
           hipotecaria.
         </p>
 
-        <p className="mt-2 text-sm text-gf-text-soft">
-          Uso exclusivo interno
-        </p>
-
-        <div className="mt-6 flex justify-center">
+        {/* Buttons */}
+        <div className="space-y-3">
           <Button variant="primary" href="/login">
             Iniciar sesión
           </Button>
+          <Button variant="secondary" href="/register">
+            Crear cuenta
+          </Button>
         </div>
-      </Card>
+      </div>
+
+      {/* Security Footer */}
+      <div className="mt-8 text-center">
+        <p className="text-xs text-gf-text-muted flex items-center justify-center gap-1.5">
+          <ShieldCheck className="w-4 h-4 text-gf-text-muted" strokeWidth={2} />
+          Uso exclusivo interno
+        </p>
+      </div>
     </main>
   );
 }

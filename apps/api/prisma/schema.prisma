@@ -11,15 +11,26 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  passwordHash String
-  name         String
-  role         Role           @default(ADVISOR)
-  cases        MortgageCase[]
-  documents    Document[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  email           String         @unique
+  passwordHash    String
+  name            String
+  role            Role           @default(ADVISOR)
+  isEmailVerified Boolean        @default(false)
+  cases           MortgageCase[]
+  documents       Document[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }
 
 enum Role {
@@ -116,6 +127,7 @@ model IncomeCalculation {
 
 enum PersonType {
   SALARIED
+  PFAE
 }
 
 model Document {
