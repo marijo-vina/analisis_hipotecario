@@ -27,6 +27,8 @@ import { BankStatementExtractionService } from './bank-statement-extraction.serv
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { CsfExtractionService } from './csf-extraction.service';
+import { TaxReturnExtractionService } from './tax-return-extraction.service';
 import { GcsService } from './gcs.service';
 
 @UseGuards(JwtAuthGuard)
@@ -39,6 +41,8 @@ export class DocumentsController {
     private readonly bankStatementExtractionService: BankStatementExtractionService,
     private readonly creditBureauExtractionService: CreditBureauExtractionService,
     private readonly creditScoreExtractionService: CreditScoreExtractionService,
+    private readonly csfExtractionService: CsfExtractionService,
+    private readonly taxReturnExtractionService: TaxReturnExtractionService,
     private readonly coordinateExtractionService: CoordinateExtractionService,
     private readonly gcsService: GcsService,
   ) {}
@@ -247,6 +251,26 @@ export class DocumentsController {
       caseId,
       documentId,
     );
+    return { data };
+  }
+
+  @Post(':documentId/extract-csf')
+  @HttpCode(200)
+  async extractCsf(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.csfExtractionService.extract(caseId, documentId);
+    return { data };
+  }
+
+  @Post(':documentId/extract-tax-return')
+  @HttpCode(200)
+  async extractTaxReturn(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.taxReturnExtractionService.extract(caseId, documentId);
     return { data };
   }
 
