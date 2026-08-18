@@ -350,10 +350,6 @@ export type DocumentTypeUpdateOneRequiredWithoutDocumentsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.DocumentTypeUpdateToOneWithWhereWithoutDocumentsInput, Prisma.DocumentTypeUpdateWithoutDocumentsInput>, Prisma.DocumentTypeUncheckedUpdateWithoutDocumentsInput>
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type DocumentTypeCreateWithoutDocumentsInput = {
   code: string
   name: string

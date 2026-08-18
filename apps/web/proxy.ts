@@ -20,8 +20,8 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.nextUrl), 307);
   }
 
-  // Rule 2: already authenticated users on /login go to dashboard
-  if (pathname === "/login" && token) {
+  // Rule 2: already authenticated users on /login or /register go to dashboard
+  if ((pathname === "/login" || pathname === "/register") && token) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl), 307);
   }
 
@@ -30,5 +30,5 @@ export default async function proxy(req: NextRequest) {
 
 /** Only run the proxy on the routes listed below. */
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/login", "/register"],
 };

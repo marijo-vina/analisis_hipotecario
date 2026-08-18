@@ -149,12 +149,14 @@ async function main() {
         name: 'Admin Sistema',
         passwordHash: passwordHash,
         role: 'ADMIN',
+        isEmailVerified: true,
       },
       create: {
         email: 'admin@gestion.com',
         name: 'Admin Sistema',
         passwordHash: passwordHash,
         role: 'ADMIN',
+        isEmailVerified: true,
       },
     });
 

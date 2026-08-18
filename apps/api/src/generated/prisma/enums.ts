@@ -46,7 +46,8 @@ export type ReviewDecisionAction = (typeof ReviewDecisionAction)[keyof typeof Re
 
 
 export const PersonType = {
-  SALARIED: 'SALARIED'
+  SALARIED: 'SALARIED',
+  PFAE: 'PFAE'
 } as const
 
 export type PersonType = (typeof PersonType)[keyof typeof PersonType]

@@ -6,6 +6,7 @@ import type { ActionState } from "@/app/lib/definitions";
 import FormField from "@/app/ui/common/form-field";
 import Button from "@/app/ui/common/button";
 import { Mail, Lock, AlertCircle } from "lucide-react";
+import Link from "next/link";
 
 const initialState: ActionState = { errors: {} };
 
@@ -41,9 +42,10 @@ export default function LoginForm() {
             name="email"
             type="email"
             required
+            maxLength={100}
             autoComplete="email"
             className="block w-full h-[44px] pl-10 pr-3 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text placeholder-gf-text-muted focus:border-gf-red focus:outline-none focus:ring-2 focus:ring-gf-red/20 transition-all"
-            placeholder="asesor@gestionfinanciera.com"
+            placeholder="hipotecario@gestionfinanciera.com"
           />
         </div>
       </FormField>
@@ -64,6 +66,7 @@ export default function LoginForm() {
             name="password"
             type="password"
             required
+            maxLength={64}
             autoComplete="current-password"
             className="block w-full h-[44px] pl-10 pr-3 rounded-[10px] border border-gf-border bg-white text-sm text-gf-text placeholder-gf-text-muted focus:border-gf-red focus:outline-none focus:ring-2 focus:ring-gf-red/20 transition-all"
             placeholder="••••••••"
@@ -71,16 +74,7 @@ export default function LoginForm() {
         </div>
       </FormField>
 
-      {/* Forgot Password option */}
-      <div className="flex justify-end pt-1">
-        <a 
-          href="#" 
-          className="text-xs text-gf-red hover:underline font-medium transition-colors"
-          onClick={(e) => e.preventDefault()}
-        >
-          ¿Olvidaste tu contraseña?
-        </a>
-      </div>
+
 
       {/* Submit button */}
       <div className="pt-2">
@@ -92,6 +86,18 @@ export default function LoginForm() {
         >
           Iniciar sesión
         </Button>
+      </div>
+
+      <div className="text-center pt-2">
+        <p className="text-xs text-gf-text-muted">
+          ¿No tienes una cuenta?{" "}
+          <Link
+            href="/register"
+            className="text-gf-red font-semibold hover:underline"
+          >
+            Regístrate aquí
+          </Link>
+        </p>
       </div>
     </form>
   );
