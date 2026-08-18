@@ -76,11 +76,19 @@ GCS_BUCKET_NAME=<nombre del bucket del paso 3>
 GCLOUD_PROCESSOR_ID=<Processor ID del paso 4>
 GEMINI_PROJECT_ID=<Project ID del paso 1>
 GOOGLE_APPLICATION_CREDENTIALS=./gcp-credentials.json
+
+# --- Correo y Confirmación (SMTP) ---
+APP_URL=https://tu-dominio-frontend.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu-correo@gmail.com
+SMTP_PASS=tu-contrasena-de-aplicacion
+MAIL_FROM="Operaciones Hipotecarias <no-reply@gestionfinanciera.com>"
 ```
 
 ---
 
-## 7. Verificar que funciona
+## 7. Verificar y preparar el despliegue
 
 ```bash
 # Desde la raíz del proyecto
@@ -89,14 +97,14 @@ cd apps/api
 # Instalar dependencias
 npm install
 
-# Aplicar migraciones de base de datos
-npx prisma migrate dev
+# Aplicar actualización de base de datos (crear tablas User, VerificationToken, etc.)
+npx prisma db push --config ./prisma.config.ts
 
 # Arrancar la API
 npm run start:dev
 ```
 
-Si arranca sin errores de autenticación GCP, el setup está completo.
+Si arranca sin errores de autenticación GCP ni de base de datos, el setup está completo.
 
 ---
 
