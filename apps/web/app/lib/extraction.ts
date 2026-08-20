@@ -15,10 +15,18 @@ export interface ExtractionAlert {
   message: string;
 }
 
-export type ExtractionCategory = "identidad" | "nomina" | "estados" | "buro";
+export type ExtractionCategory =
+  | "identidad"
+  | "csf"
+  | "declaracion"
+  | "nomina"
+  | "estados"
+  | "buro";
 
 export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
   identidad: "Identidad",
+  csf: "Constancia fiscal (CSF)",
+  declaracion: "Declaración anual",
   nomina: "Recibos de nómina",
   estados: "Estados de cuenta",
   buro: "Buró de crédito",
@@ -53,6 +61,10 @@ export function docCategory(
     case "INE":
     case "PASSPORT":
       return "identidad";
+    case "CSF":
+      return "csf";
+    case "TAX_RETURN":
+      return "declaracion";
     case "PAYROLL_RECEIPT":
       return "nomina";
     case "BANK_STATEMENT":
@@ -1576,3 +1588,255 @@ export interface LiabilityCalculationResult {
   grossCurrentMonthlyDebt: number;
   totalCurrentBalance: number;
 }
+
+// ── CSF extraction parsing ──────────────────────────────────────────────────
+
+export interface ParsedCsf {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+  taxpayer: {
+    rfc: string | null;
+    curp: string | null;
+    fullName: string | null;
+    operationsStartDate: string | null;
+    statusInPadron: string | null;
+    commercialName: string | null;
+  };
+  issuance: {
+    issuanceDate: string | null;
+    issuanceDateRaw: string | null;
+    issuanceLocation: string | null;
+    idCIF: string | null;
+    isOlderThan3Months: boolean;
+  };
+  fiscalAddress: {
+    postalCode: string | null;
+    street: string | null;
+    neighborhood: string | null;
+    municipality: string | null;
+    state: string | null;
+  };
+  activities: Array<{
+    order?: number | null;
+    description: string;
+    percentage: number | null;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  regimes: Array<{
+    description: string;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  activityStartDate: string | null;
+  tenureMonths: number | null;
+  hasSalariedRegime: boolean;
+  hasIndependentRegime: boolean;
+  isSolelySalaried: boolean;
+  alerts: ExtractionAlert[];
+}
+
+export function parseCsf(doc: Document): ParsedCsf | null {
+  if (!doc) return null;
+  const ed = doc.extractedData as Record<string, unknown> | null;
+  if (!ed || typeof ed !== "object") {
+    return {
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: false,
+      taxpayer: { rfc: null, curp: null, fullName: null, operationsStartDate: null, statusInPadron: null, commercialName: null },
+      issuance: { issuanceDate: null, issuanceDateRaw: null, issuanceLocation: null, idCIF: null, isOlderThan3Months: false },
+      fiscalAddress: { postalCode: null, street: null, neighborhood: null, municipality: null, state: null },
+      activities: [],
+      regimes: [],
+      activityStartDate: null,
+      tenureMonths: null,
+      hasSalariedRegime: false,
+      hasIndependentRegime: false,
+      isSolelySalaried: false,
+      alerts: [],
+    };
+  }
+
+  const taxpayer = (ed.taxpayer as Record<string, unknown>) ?? {};
+  const issuance = (ed.issuance as Record<string, unknown>) ?? {};
+  const fa = (ed.fiscalAddress as Record<string, unknown>) ?? {};
+  const activities = Array.isArray(ed.activities) ? (ed.activities as ParsedCsf["activities"]) : [];
+  const regimes = Array.isArray(ed.regimes) ? (ed.regimes as ParsedCsf["regimes"]) : [];
+  const alerts = filterAlerts(ed.alerts);
+
+  const street = [fa.streetType, fa.streetName, fa.exteriorNumber, fa.interiorNumber].filter(Boolean).join(" ").trim() || null;
+
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: true,
+    taxpayer: {
+      rfc: (taxpayer.rfc as string) ?? null,
+      curp: (taxpayer.curp as string) ?? null,
+      fullName: (taxpayer.fullName as string) ?? null,
+      operationsStartDate: (taxpayer.operationsStartDate as string) ?? null,
+      statusInPadron: (taxpayer.statusInPadron as string) ?? null,
+      commercialName: (taxpayer.commercialName as string) ?? null,
+    },
+    issuance: {
+      issuanceDate: (issuance.issuanceDate as string) ?? null,
+      issuanceDateRaw: (issuance.issuanceDateRaw as string) ?? null,
+      issuanceLocation: (issuance.issuanceLocation as string) ?? null,
+      idCIF: (issuance.idCIF as string) ?? null,
+      isOlderThan3Months: issuance.isOlderThan3Months === true,
+    },
+    fiscalAddress: {
+      postalCode: (fa.postalCode as string) ?? null,
+      street,
+      neighborhood: (fa.neighborhood as string) ?? null,
+      municipality: (fa.municipality as string) ?? null,
+      state: (fa.state as string) ?? null,
+    },
+    activities,
+    regimes,
+    activityStartDate: (ed.activityStartDate as string) ?? null,
+    tenureMonths: (ed.tenureMonths as number) ?? null,
+    hasSalariedRegime: ed.hasSalariedRegime === true,
+    hasIndependentRegime: ed.hasIndependentRegime === true,
+    isSolelySalaried: ed.isSolelySalaried === true,
+    alerts,
+  };
+}
+
+// ── Tax Return extraction parsing ──────────────────────────────────────────
+
+export interface ParsedTaxReturn {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+  satReceipt: {
+    rfc: string | null;
+    taxpayerName: string | null;
+    declarationType: string | null;
+    taxYear: number | null;
+    presentationDate: string | null;
+    operationNumber: string | null;
+  };
+  taxPayment?: {
+    paymentConcept: string | null;
+    amountInFavor: number | null;
+    amountDue: number | null;
+    amountToPay: number | null;
+  };
+  declaredRegimes: string[];
+  salariedIncome?: {
+    annualGrossIncome: number | null;
+    exemptIncome: number | null;
+    employmentSubsidy: number | null;
+    taxWithheld: number | null;
+    retainers?: Array<{
+      rfc: string | null;
+      legalName: string | null;
+      annualIncome: number | null;
+      taxWithheld: number | null;
+    }>;
+  };
+  businessOrProfessionalIncome?: {
+    totalIncome: number | null;
+    detailedIncome?: Array<{
+      concept: string;
+      amount: number;
+    }>;
+    taxWithheld: number | null;
+    authorizedDeductions: number | null;
+  };
+  resicoIncome?: {
+    totalEffectiveIncome: number | null;
+    totalActivityIncome: number | null;
+    taxWithheld: number | null;
+  };
+  fiscalResult: {
+    accumulableIncomeTotal: number | null;
+    fiscalProfit: number | null;
+    fiscalLoss: number | null;
+    taxResult: number | null;
+  };
+  isValidTaxYear: boolean;
+  hasTaxLoss: boolean;
+  isMixedDeclaration: boolean;
+  hasOfficialReceipt: boolean;
+  alerts: ExtractionAlert[];
+}
+
+export function parseTaxReturn(doc: Document): ParsedTaxReturn | null {
+  if (!doc) return null;
+  const ed = doc.extractedData as Record<string, unknown> | null;
+  if (!ed || typeof ed !== "object") {
+    return {
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: false,
+      satReceipt: { rfc: null, taxpayerName: null, declarationType: null, taxYear: null, presentationDate: null, operationNumber: null },
+      declaredRegimes: [],
+      fiscalResult: { accumulableIncomeTotal: null, fiscalProfit: null, fiscalLoss: null, taxResult: null },
+      isValidTaxYear: false,
+      hasTaxLoss: false,
+      isMixedDeclaration: false,
+      hasOfficialReceipt: false,
+      alerts: [],
+    };
+  }
+
+  const satReceipt = (ed.satReceipt as Record<string, unknown>) ?? {};
+  const taxPayment = (ed.taxPayment as Record<string, unknown>) ?? {};
+  const fiscalResult = (ed.fiscalResult as Record<string, unknown>) ?? {};
+  const salariedIncome = (ed.salariedIncome as Record<string, unknown>) ?? undefined;
+  const businessOrProfessionalIncome = (ed.businessOrProfessionalIncome as Record<string, unknown>) ?? undefined;
+  const resicoIncome = (ed.resicoIncome as Record<string, unknown>) ?? undefined;
+  const declaredRegimes = Array.isArray(ed.declaredRegimes) ? (ed.declaredRegimes as string[]) : [];
+  const alerts = filterAlerts(ed.alerts);
+
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: true,
+    satReceipt: {
+      rfc: (satReceipt.rfc as string) ?? null,
+      taxpayerName: (satReceipt.taxpayerName as string) ?? null,
+      declarationType: (satReceipt.declarationType as string) ?? null,
+      taxYear: (satReceipt.taxYear as number) ?? null,
+      presentationDate: (satReceipt.presentationDate as string) ?? null,
+      operationNumber: (satReceipt.operationNumber as string) ?? null,
+    },
+    taxPayment: {
+      paymentConcept: (taxPayment.paymentConcept as string) ?? null,
+      amountInFavor: (taxPayment.amountInFavor as number) ?? null,
+      amountDue: (taxPayment.amountDue as number) ?? null,
+      amountToPay: (taxPayment.amountToPay as number) ?? null,
+    },
+    declaredRegimes,
+    salariedIncome: salariedIncome as ParsedTaxReturn["salariedIncome"],
+    businessOrProfessionalIncome: businessOrProfessionalIncome as ParsedTaxReturn["businessOrProfessionalIncome"],
+    resicoIncome: resicoIncome as ParsedTaxReturn["resicoIncome"],
+    fiscalResult: {
+      accumulableIncomeTotal: (fiscalResult.accumulableIncomeTotal as number) ?? null,
+      fiscalProfit: (fiscalResult.fiscalProfit as number) ?? null,
+      fiscalLoss: (fiscalResult.fiscalLoss as number) ?? null,
+      taxResult: (fiscalResult.taxResult as number) ?? null,
+    },
+    isValidTaxYear: ed.isValidTaxYear === true,
+    hasTaxLoss: ed.hasTaxLoss === true,
+    isMixedDeclaration: ed.isMixedDeclaration === true,
+    hasOfficialReceipt: ed.hasOfficialReceipt === true,
+    alerts,
+  };
+}

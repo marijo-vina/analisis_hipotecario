@@ -3,7 +3,18 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Document } from "@/app/lib/definitions";
-import { getDocumentViewUrl, deleteDocument, processDocument, extractOfficialId, extractPayrollReceipt, extractBankStatement, extractCreditBureau, extractCreditScore } from "@/app/actions/documents";
+import {
+  getDocumentViewUrl,
+  deleteDocument,
+  processDocument,
+  extractOfficialId,
+  extractPayrollReceipt,
+  extractBankStatement,
+  extractCreditBureau,
+  extractCreditScore,
+  extractCsf,
+  extractTaxReturn,
+} from "@/app/actions/documents";
 import { Eye, RotateCw, Play, Trash2, Loader2 } from "lucide-react";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
 import DocumentPreviewDialog from "@/app/ui/common/document-preview-dialog";
@@ -147,6 +158,26 @@ export default function DocumentActions({
         } catch {
           setProcessError(
             "OCR completado, pero la extracción del Mi Score falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "CSF") {
+        try {
+          await extractCsf(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción de la Constancia de Situación Fiscal falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (document.documentType.code === "TAX_RETURN") {
+        try {
+          await extractTaxReturn(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción de la Declaración Anual falló. Puede intentar reprocesar.",
           );
         }
       }

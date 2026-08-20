@@ -195,7 +195,11 @@ export default function CaseDetailWorkspace({
           </section>
 
           {/* ── Extracted Data Section ─────────────────────────────── */}
-          <ExtractionSection documents={documents} caseId={caseId} />
+          <ExtractionSection
+            documents={documents}
+            caseId={caseId}
+            personType={caseData.personType}
+          />
 
           {/* ── Analysis Section (Sprint 3) ────────────────────────── */}
           <AnalysisSection caseId={caseId} statusCode={statusCode} documents={documents} />

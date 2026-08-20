@@ -5,12 +5,16 @@ import { CATEGORY_LABELS } from "@/app/lib/extraction";
 
 interface ExtractionCategoryTabsProps {
   activeTab: ExtractionCategory;
+  /** Custom list of categories to display (e.g. filtered by personType). */
+  tabs?: ExtractionCategory[];
   /** Called with the new category when the user clicks a tab. */
   onChange: (tab: ExtractionCategory) => void;
 }
 
-const TAB_ORDER: ExtractionCategory[] = [
+const DEFAULT_TAB_ORDER: ExtractionCategory[] = [
   "identidad",
+  "csf",
+  "declaracion",
   "nomina",
   "estados",
   "buro",
@@ -18,6 +22,7 @@ const TAB_ORDER: ExtractionCategory[] = [
 
 export default function ExtractionCategoryTabs({
   activeTab,
+  tabs = DEFAULT_TAB_ORDER,
   onChange,
 }: ExtractionCategoryTabsProps) {
   return (
@@ -27,7 +32,7 @@ export default function ExtractionCategoryTabs({
       className="border-b border-gf-border mb-6 w-full"
     >
       <nav className="flex w-full overflow-x-auto">
-        {TAB_ORDER.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = tab === activeTab;
           return (
             <button
