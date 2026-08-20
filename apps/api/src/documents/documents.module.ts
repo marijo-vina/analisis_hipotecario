@@ -16,6 +16,7 @@ import { LayoutFinancialExtractorService } from './layout-financial-extractor.se
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 
 @Module({
   imports: [PrismaModule, CaseStatusCalculatorModule],
@@ -29,6 +30,7 @@ import { TaxReturnExtractionService } from './tax-return-extraction.service';
     OfficialIdExtractionService,
     PayrollExtractionService,
     BankStatementExtractionService,
+    BankStatementCleanerService,
     CreditBureauExtractionService,
     CreditScoreExtractionService,
     LayoutFinancialExtractorService,
@@ -36,6 +38,12 @@ import { TaxReturnExtractionService } from './tax-return-extraction.service';
     CsfExtractionService,
     TaxReturnExtractionService,
   ],
-  exports: [DocumentsService, StoragePathService, CsfExtractionService, TaxReturnExtractionService],
+  exports: [
+    DocumentsService,
+    StoragePathService,
+    CsfExtractionService,
+    TaxReturnExtractionService,
+    BankStatementCleanerService,
+  ],
 })
 export class DocumentsModule {}

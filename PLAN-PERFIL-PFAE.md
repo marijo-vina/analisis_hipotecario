@@ -212,22 +212,32 @@ pipelines; solo ramificar los puntos de variación.
 - **Criterios de aceptación**: procesar una CSF y una Declaración reales produce
   `extractedData` con los campos listados y las alertas correspondientes.
 
-#### HU-17 — Extracción de estados de cuenta (nivel transacción) + depuración
+#### HU-17 — Extracción de estados de cuenta (nivel transacción) + depuración determinística
 - **Objetivo**: extraer el detalle de movimientos de los estados de cuenta y
-  clasificar depósitos válidos vs basura.
+  clasificar depósitos válidos vs basura financiera mediante un motor híbrido
+  (extracción fiel vía Gemini + depuración y validación determinística en TypeScript).
 - **Incluye**:
-  - Extender `bank-statement-extraction.service.ts` para extraer transacciones
-    (fecha, concepto, monto, tipo) además del resumen.
-  - Clasificador por reglas de depósitos (auto-detectar basura: disposición
-    créditos, TDC/TC, traspasos propios, devoluciones, familiares, inversiones,
-    préstamos, enganche, venta acciones).
-  - Modelo de datos para la clasificación (válido/basura + motivo + flag de
-    confianza) + desglose auditable + override opcional (no bloqueante).
+  - Extender `bank-statement-extraction.service.ts` para extraer todas las transacciones
+    (fecha, concepto original, monto, tipo abono/cargo, emisor/ordenante, RFC emisor si disponible)
+    además del resumen de carátula (`totalDepositsAmount`, `totalDepositsCount`, `averageBalance`, `endingBalance`).
+  - Motor de depuración determinística (`bank-statement-cleaner.service.ts`):
+    - **Conciliación matemática**: valida suma de transacciones extraídas vs total de abonos reportado por el banco (`MATCHED`, `MINOR_DIFFERENCE`, `CRITICAL_DISCREPANCY`).
+    - **Enriquecimiento con contexto CSF previo**: obtiene RFC, nombre fiscal, régimen de Arrendamiento (606) y actividad económica / sector del solicitante si la CSF ya fue procesada en el expediente.
+    - **Regla Cero (Traspasos propios)**: descarte automático de transferencias del mismo titular/RFC o entre cuentas propias del expediente.
+    - **Lista Negra Determinística**: descarte de créditos/préstamos, devoluciones SAT, baja de inversiones, depósitos informales/familiares, ahorro para enganche.
+    - **Lista Blanca Determinística**: liquidaciones TPV (Clip, MercadoPago, Stripe, terminales), cobros de facturas, honorarios y efectivo recurrente.
+    - **Regla de Arrendamiento condicional**: valida conceptos de renta solo si la CSF cuenta con régimen de arrendamiento activo; de lo contrario se descartan o marcan para revisión.
+    - **Diccionarios especializados por rubro/sector**: sector médico/salud (incluyendo aseguradoras GMM: GNP, AXA, MetLife, etc.), servicios profesionales, restaurantes/alimentos, etc.
+    - **Detección de atípicos/outliers**: alerta de depósitos individuales no recurrentes que concentren ≥25% del ingreso mensual o montos desproporcionados sin emisor comercial.
+    - **Resumen financiero depurado**: `totalGrossDeposits`, `totalTrashDeposits`, `totalValidIncome`, con desglose auditable por categoría de descarte y estado de integridad.
 - **No incluye**: el promedio suavizado (HU-18), la UI de revisión (HU-21).
-- **Dependencias**: HU-15.
-- **Criterios de aceptación**: un estado de cuenta real produce la lista de
-  movimientos clasificada automáticamente (válido/basura con motivo y confianza),
-  con desglose auditable y override opcional disponible.
+- **Dependencias**: HU-15, HU-16 (para enriquecimiento óptimo con CSF).
+- **Criterios de aceptación**:
+  1. Extraer transacciones completas y resumen de carátula de estados de cuenta reales.
+  2. Depurar automáticamente y con precisión determinística los depósitos (válido/basura/revisión) con motivo y confianza.
+  3. Aplicar validación condicional de arrendamiento y diccionarios de rubro si existe CSF.
+  4. Realizar la conciliación matemática con alerta clara si hay discrepancias graves.
+  5. Entregar resumen numérico (`totalGrossDeposits`, `totalTrashDeposits`, `totalValidIncome`) y pruebas unitarias exhaustivas.
 
 ### FASE C — Motor de cálculo
 
