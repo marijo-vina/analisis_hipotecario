@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import type { Document } from "@/app/lib/definitions";
-import { parseCsf } from "@/app/lib/extraction";
+import { parseCsf, formatDateDisplay } from "@/app/lib/extraction";
 import Card from "@/app/ui/common/card";
 import FieldGrid from "@/app/ui/common/field-grid";
 import CopyButton from "@/app/ui/common/copy-button";
@@ -24,6 +24,19 @@ import DocumentConsultationDrawer from "@/app/ui/documents/document-consultation
 interface CsfTabProps {
   /** CSF documents. */
   documents: Document[];
+}
+
+function formatTenure(months: number | null): string {
+  if (months == null) return "No calculado";
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years > 0 && remMonths > 0) {
+    return `${years} años y ${remMonths} meses`;
+  }
+  if (years > 0) {
+    return `${years} ${years === 1 ? "año" : "años"}`;
+  }
+  return `${remMonths} ${remMonths === 1 ? "mes" : "meses"}`;
 }
 
 export default function CsfTab({ documents }: CsfTabProps) {
@@ -148,7 +161,7 @@ export default function CsfTab({ documents }: CsfTabProps) {
                     },
                     {
                       label: "Inicio de operaciones general",
-                      value: taxpayer.operationsStartDate ?? undefined,
+                      value: formatDateDisplay(taxpayer.operationsStartDate) ?? undefined,
                       missing: !taxpayer.operationsStartDate,
                     },
                   ]}
@@ -174,7 +187,7 @@ export default function CsfTab({ documents }: CsfTabProps) {
                         Fecha de emisión de la constancia
                       </p>
                       <p className="text-sm font-bold text-gf-text mt-0.5">
-                        {issuance.issuanceDate ?? issuance.issuanceDateRaw ?? "No detectada"}
+                        {formatDateDisplay(issuance.issuanceDate) ?? issuance.issuanceDateRaw ?? "No detectada"}
                       </p>
                       {issuance.issuanceLocation && (
                         <p className="text-[11px] text-gf-text-muted mt-0.5">{issuance.issuanceLocation}</p>
@@ -201,13 +214,11 @@ export default function CsfTab({ documents }: CsfTabProps) {
                         Arraigo en la actividad independiente
                       </p>
                       <p className="text-sm font-bold text-gf-text mt-0.5">
-                        {tenureMonths != null
-                          ? `${tenureMonths} meses (${Math.floor(tenureMonths / 12)} años y ${tenureMonths % 12} meses)`
-                          : "No calculado"}
+                        {formatTenure(tenureMonths)}
                       </p>
                       {activityStartDate && (
                         <p className="text-[11px] text-gf-text-muted mt-0.5">
-                          Inicio de actividad: <span className="font-semibold">{activityStartDate}</span>
+                          Inicio de actividad: <span className="font-semibold">{formatDateDisplay(activityStartDate)}</span>
                         </p>
                       )}
                     </div>
@@ -229,40 +240,6 @@ export default function CsfTab({ documents }: CsfTabProps) {
                         </span>
                       )}
                     </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Domicilio Fiscal */}
-              <Card className="lg:col-span-2">
-                <div className="flex items-center gap-2 border-b border-gf-border/50 pb-3 mb-4">
-                  <div className="p-2 rounded-lg bg-gf-surface-dim text-gf-text">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-gf-text">Domicilio Fiscal Registrado</h4>
-                    <p className="text-[11px] text-gf-text-muted">Ubicación oficial del contribuyente</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Código Postal</p>
-                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.postalCode ?? "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Vialidad y Número</p>
-                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.street ?? "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Colonia / Fraccionamiento</p>
-                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.neighborhood ?? "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Municipio y Estado</p>
-                    <p className="text-xs font-semibold text-gf-text mt-0.5">
-                      {[fiscalAddress.municipality, fiscalAddress.state].filter(Boolean).join(", ") || "—"}
-                    </p>
                   </div>
                 </div>
               </Card>
@@ -296,8 +273,8 @@ export default function CsfTab({ documents }: CsfTabProps) {
                     >
                       <p className="text-xs font-bold text-gf-text leading-snug">{r.description}</p>
                       <div className="flex items-center justify-between text-[11px] text-gf-text-muted">
-                        <span>Inicio: {r.startDate ?? "—"}</span>
-                        <span>{r.endDate ? `Fin: ${r.endDate}` : "Activo"}</span>
+                        <span>Inicio: {formatDateDisplay(r.startDate) ?? "—"}</span>
+                        <span>{r.endDate ? `Fin: ${formatDateDisplay(r.endDate)}` : "Activo"}</span>
                       </div>
                     </div>
                   ))}
@@ -328,7 +305,7 @@ export default function CsfTab({ documents }: CsfTabProps) {
                       <div className="space-y-1">
                         <p className="text-xs font-bold text-gf-text leading-snug">{a.description}</p>
                         <p className="text-[11px] text-gf-text-muted">
-                          Inicio: <span className="font-semibold">{a.startDate ?? "—"}</span>
+                          Inicio: <span className="font-semibold">{formatDateDisplay(a.startDate) ?? "—"}</span>
                         </p>
                       </div>
                       {a.percentage != null && (
@@ -341,6 +318,40 @@ export default function CsfTab({ documents }: CsfTabProps) {
                   {activities.length === 0 && (
                     <p className="text-xs text-gf-text-muted italic">No se detectaron actividades económicas.</p>
                   )}
+                </div>
+              </Card>
+
+              {/* Domicilio Fiscal (Ubicado al final) */}
+              <Card className="lg:col-span-2">
+                <div className="flex items-center gap-2 border-b border-gf-border/50 pb-3 mb-4">
+                  <div className="p-2 rounded-lg bg-gf-surface-dim text-gf-text">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gf-text">Domicilio Fiscal Registrado</h4>
+                    <p className="text-[11px] text-gf-text-muted">Ubicación oficial del contribuyente</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Código Postal</p>
+                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.postalCode ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Vialidad y Número</p>
+                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.street ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Colonia / Fraccionamiento</p>
+                    <p className="text-xs font-semibold text-gf-text mt-0.5">{fiscalAddress.neighborhood ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">Municipio y Estado</p>
+                    <p className="text-xs font-semibold text-gf-text mt-0.5">
+                      {[fiscalAddress.municipality, fiscalAddress.state].filter(Boolean).join(", ") || "—"}
+                    </p>
+                  </div>
                 </div>
               </Card>
             </div>

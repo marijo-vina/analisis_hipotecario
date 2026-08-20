@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import type { Document } from "@/app/lib/definitions";
-import { parseTaxReturn } from "@/app/lib/extraction";
+import { parseTaxReturn, formatDateDisplay } from "@/app/lib/extraction";
 import Card from "@/app/ui/common/card";
 import FieldGrid from "@/app/ui/common/field-grid";
 import CopyButton from "@/app/ui/common/copy-button";
@@ -196,7 +196,7 @@ export default function DeclaracionTab({ documents }: DeclaracionTabProps) {
                     },
                     {
                       label: "Fecha de presentación",
-                      value: satReceipt.presentationDate ?? undefined,
+                      value: formatDateDisplay(satReceipt.presentationDate) ?? undefined,
                       missing: !satReceipt.presentationDate,
                     },
                   ]}
