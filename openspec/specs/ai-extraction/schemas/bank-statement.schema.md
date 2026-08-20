@@ -10,7 +10,7 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
 
 ```json
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "documentType": "BANK_STATEMENT",
   "extractionMetadata": {
     "sourceDocumentId": null,
@@ -44,6 +44,14 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     "cutoffDate": "YYYY-MM-DD | null",
     "isClosedMonth": "boolean | null",
     "isCurrentIncompleteMonth": "boolean | null",
+    "averageBalance": "number | null",
+    "endingBalance": "number | null"
+  },
+  "statementSummary": {
+    "totalDepositsAmount": "number | null",
+    "totalDepositsCount": "number | null",
+    "totalWithdrawalsAmount": "number | null",
+    "totalWithdrawalsCount": "number | null",
     "averageBalance": "number | null",
     "endingBalance": "number | null"
   },
@@ -81,20 +89,52 @@ Los estados de cuenta sirven para corroborar la bancarización. No sustituyen al
     }
   ],
   "otherRelevantMovements": [
-  {
-    "date": "YYYY-MM-DD | null",
-    "amount": "number | null",
-    "movementType": "DEPOSIT | WITHDRAWAL | TRANSFER | CHARGE | UNKNOWN",
-    "originalConcept": "string | null",
-    "trashDepositAnalysis": {
-      "isDiscardableTrashDeposit": "boolean | null",
-      "confidence": "number | null",
-      "reason": "string | null",
-      "evidenceText": "string | null"
-    },
-    "relevanceReason": "string | null"
-  }
+    {
+      "date": "YYYY-MM-DD | null",
+      "amount": "number | null",
+      "movementType": "DEPOSIT | WITHDRAWAL | TRANSFER | CHARGE | UNKNOWN",
+      "originalConcept": "string | null",
+      "trashDepositAnalysis": {
+        "isDiscardableTrashDeposit": "boolean | null",
+        "confidence": "number | null",
+        "reason": "string | null",
+        "evidenceText": "string | null"
+      },
+      "relevanceReason": "string | null"
+    }
   ],
+  "allTransactions": [
+    {
+      "date": "YYYY-MM-DD | null",
+      "amount": "number | null",
+      "currency": "MXN | USD | OTHER",
+      "movementType": "DEPOSIT | WITHDRAWAL | TRANSFER | CHARGE | UNKNOWN",
+      "originalConcept": "string | null",
+      "payerOrBeneficiaryName": "string | null",
+      "payerRfc": "string | null",
+      "referenceNumber": "string | null"
+    }
+  ],
+  "financialDepuration": {
+    "integrityCheck": {
+      "bankReportedTotal": "number | null",
+      "calculatedDepositsTotal": 0.0,
+      "discrepancy": 0.0,
+      "status": "MATCHED | MINOR_DIFFERENCE | CRITICAL_DISCREPANCY",
+      "message": "string"
+    },
+    "depurationSummary": {
+      "totalGrossDeposits": 0.0,
+      "totalTrashDeposits": 0.0,
+      "totalValidIncome": 0.0,
+      "trashDepositsCount": 0,
+      "validDepositsCount": 0,
+      "needsReviewCount": 0,
+      "detectedSector": "HEALTH_MEDICAL | PROFESSIONAL_SERVICES | FOOD_RESTAURANT | RENTAL | CONSTRUCTION_TRADE | GENERAL_COMMERCE"
+    },
+    "cleanedDeposits": [],
+    "highImpactExceptions": []
+  },
   "bankarizationValidationPreparation": {
     "purpose": "MATCH_PAYROLL_NET_INCOME_WITH_BANK_DEPOSIT",
     "requiresPayrollReceiptComparison": true,

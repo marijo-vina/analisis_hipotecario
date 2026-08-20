@@ -5,6 +5,7 @@ import {
   BankStatementExtractionService,
   BankStatementExtractionResult,
 } from './bank-statement-extraction.service';
+import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 
 // ---------------------------------------------------------------------------
 // Helpers — mock document builder
@@ -49,7 +50,7 @@ const makeDocument = (
 const createMockExtractionResult = (
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
-  schemaVersion: '1.1',
+  schemaVersion: '1.2',
   documentType: 'BANK_STATEMENT',
   extractionMetadata: {
     sourceDocumentId: 'doc-bank-1',
@@ -78,6 +79,25 @@ const createMockExtractionResult = (
     averageBalance: 25000,
     endingBalance: 32000,
   },
+  statementSummary: {
+    totalDepositsAmount: 15500,
+    totalDepositsCount: 1,
+    totalWithdrawalsAmount: 0,
+    totalWithdrawalsCount: 0,
+    averageBalance: 25000,
+    endingBalance: 32000,
+  },
+  allTransactions: [
+    {
+      date: '2026-05-15',
+      amount: 15500,
+      currency: 'MXN',
+      movementType: 'DEPOSIT',
+      originalConcept: 'NOMINA MAYO',
+      payerOrBeneficiaryName: 'EMPRESA SA',
+      payerRfc: 'ESA123456XYZ',
+    },
+  ],
   payrollDeposits: [
     {
       date: '2026-05-15',
@@ -141,14 +161,18 @@ const geminiFailure = (code = GeminiErrorCode.GEMINI_TIMEOUT) => ({
 describe('BankStatementExtractionService', () => {
   let service: BankStatementExtractionService;
   let mockPrisma: {
-    document: { findUnique: jest.Mock; update: jest.Mock };
+    document: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
     documentStatus: { findUnique: jest.Mock };
   };
   let mockGemini: { extractStructuredData: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
-      document: { findUnique: jest.fn(), update: jest.fn() },
+      document: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
       documentStatus: {
         findUnique: jest.fn().mockImplementation(
           (args: { where: { code: string } }) => {
@@ -174,6 +198,7 @@ describe('BankStatementExtractionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BankStatementExtractionService,
+        BankStatementCleanerService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GeminiService, useValue: mockGemini },
       ],
@@ -1477,6 +1502,96 @@ describe('BankStatementExtractionService', () => {
 
       const result = await service.extract('case-1', 'doc-bank-1');
       expect(result.success).toBe(true);
+    });
+  });
+
+  // ── Financial Depuration & CSF Enrichment Integration ─────────────────
+  describe('Financial Depuration and CSF Enrichment Integration', () => {
+    it('should query CSF context, enrich depuration and compute financial totals', () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.findFirst.mockResolvedValue({
+        id: 'doc-csf-1',
+        extractedData: {
+          rfc: 'PEAJ800101XYZ',
+          fullName: 'JUAN CARLOS PEREZ ALVAREZ',
+          regimes: [{ code: '606', description: 'Régimen de Arrendamiento' }],
+          economicActivities: ['Consultorios de medicina especializada'],
+        },
+      });
+
+      const extractionData = createMockExtractionResult({
+        statementSummary: {
+          totalDepositsAmount: 85000,
+        },
+        allTransactions: [
+          {
+            date: '2026-05-02',
+            amount: 25000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'TRASPASO ENTRE CUENTAS PROPIAS',
+          },
+          {
+            date: '2026-05-05',
+            amount: 20000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'PAGO RENTA DEPTO 4B',
+          },
+          {
+            date: '2026-05-10',
+            amount: 40000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'HONORARIOS MEDICOS CIRUGIA',
+          },
+        ],
+      });
+
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(extractionData),
+      );
+
+      return service.extract('case-1', 'doc-bank-1').then((result) => {
+        expect(result.success).toBe(true);
+        const depuration = result.extractedData
+          ?.financialDepuration as Record<string, any>;
+        expect(depuration).toBeDefined();
+        expect(depuration.depurationSummary.detectedSector).toBe(
+          'HEALTH_MEDICAL',
+        );
+        expect(depuration.depurationSummary.totalGrossDeposits).toBe(85000);
+        expect(depuration.depurationSummary.totalTrashDeposits).toBe(25000);
+        expect(depuration.depurationSummary.totalValidIncome).toBe(60000); // 20k renta + 40k médica
+        expect(depuration.integrityCheck.status).toBe('MATCHED');
+      });
+    });
+
+    it('should generate critical discrepancy alert when math difference is huge', () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      const extractionData = createMockExtractionResult({
+        statementSummary: {
+          totalDepositsAmount: 200000, // Bank says 200k
+        },
+        allTransactions: [
+          {
+            date: '2026-05-02',
+            amount: 50000, // Only 50k extracted
+            movementType: 'DEPOSIT',
+            originalConcept: 'VENTA',
+          },
+        ],
+      });
+
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(extractionData),
+      );
+
+      return service.extract('case-1', 'doc-bank-1').then((result) => {
+        expect(result.success).toBe(true);
+        const criticalAlert = result.alerts.find(
+          (a) => a.code === 'STATEMENT_MATHEMATICAL_DISCREPANCY_CRITICAL',
+        );
+        expect(criticalAlert).toBeDefined();
+        expect(criticalAlert?.severity).toBe('CRITICAL');
+      });
     });
   });
 });
