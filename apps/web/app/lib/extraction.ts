@@ -78,14 +78,23 @@ export function docCategory(
 }
 
 /**
- * Converts an ISO `YYYY-MM-DD` date to the Mexican display format `DD-MM-YYYY`.
+ * Converts an ISO `YYYY-MM-DD` (or other date strings) to the Mexican display format `DD-MM-YYYY`.
  * Non-matching strings pass through unchanged.
  */
-export function formatDateDisplay(iso: string | undefined): string | undefined {
+export function formatDateDisplay(iso: string | null | undefined): string | undefined {
   if (!iso) return undefined;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
-  if (!m) return iso;
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  const trimmed = iso.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (m) {
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  const m2 = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/.exec(trimmed);
+  if (m2) {
+    const d = m2[1].padStart(2, "0");
+    const mo = m2[2].padStart(2, "0");
+    return `${d}-${mo}-${m2[3]}`;
+  }
+  return trimmed;
 }
 
 /**
