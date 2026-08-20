@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
+import {
+  BankStatementCleanerService,
+  ClientFiscalContext,
+  RawTransaction,
+  StatementSummary,
+} from './bank-statement-cleaner.service';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger bank-statement extraction
@@ -49,6 +55,25 @@ const BANK_STATEMENT_INSTRUCTIONS = [
   '  isCurrentIncompleteMonth: true si corresponde al mes en curso que aún no cierra.',
   '  averageBalance: saldo promedio del periodo. Número decimal sin $ ni comas.',
   '  endingBalance: saldo final al cierre del periodo. Número decimal sin $ ni comas.',
+  '',
+  '─── Resumen de carátula (statementSummary) ───',
+  '  totalDepositsAmount: total de abonos / depósitos en dinero reportado por el banco en la carátula o resumen.',
+  '  totalDepositsCount: número de abonos o depósitos reportados.',
+  '  totalWithdrawalsAmount: total de cargos / retiros en dinero reportado por el banco.',
+  '  totalWithdrawalsCount: número de cargos o retiros reportados.',
+  '  averageBalance: saldo promedio mensual reportado.',
+  '  endingBalance: saldo final al corte reportado.',
+  '',
+  '─── Todas las Transacciones (allTransactions[]) ───',
+  '  Extraé exhaustivamente TODOS los movimientos de abono / depósito y transacciones listadas:',
+  '    date: YYYY-MM-DD.',
+  '    amount: monto decimal positivo.',
+  '    currency: "MXN", "USD", u "OTHER".',
+  '    movementType: "DEPOSIT", "WITHDRAWAL", "TRANSFER", "CHARGE", "UNKNOWN".',
+  '    originalConcept: texto original del concepto o descripción.',
+  '    payerOrBeneficiaryName: nombre del ordenante o beneficiario si se menciona en el concepto.',
+  '    payerRfc: RFC detectado del emisor si aparece en el concepto.',
+  '    referenceNumber: número de referencia, rastreo o autorización si aparece.',
   '',
   '─── Depósitos de nómina (payrollDeposits[]) ───',
   '  Extraé TODOS los depósitos que parezcan de nómina, pagos quincenales o mensuales del empleador.',
@@ -168,10 +193,10 @@ interface ExtractionAlert {
 }
 
 // ---------------------------------------------------------------------------
-// Schema — output contract Gemini must fulfill (bank-statement.schema.md v1.1)
+// Schema — output contract Gemini must fulfill (bank-statement.schema.md v1.2)
 // ---------------------------------------------------------------------------
 const BANK_STATEMENT_SCHEMA = {
-  schemaVersion: '1.1',
+  schemaVersion: '1.2',
   documentType: 'BANK_STATEMENT',
   extractionMetadata: {
     sourceDocumentId: null,
@@ -208,6 +233,26 @@ const BANK_STATEMENT_SCHEMA = {
     averageBalance: 'number | null',
     endingBalance: 'number | null',
   },
+  statementSummary: {
+    totalDepositsAmount: 'number | null',
+    totalDepositsCount: 'number | null',
+    totalWithdrawalsAmount: 'number | null',
+    totalWithdrawalsCount: 'number | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+  allTransactions: [
+    {
+      date: 'YYYY-MM-DD | null',
+      amount: 'number | null',
+      currency: 'MXN | USD | OTHER',
+      movementType: 'DEPOSIT | WITHDRAWAL | TRANSFER | CHARGE | UNKNOWN',
+      originalConcept: 'string | null',
+      payerOrBeneficiaryName: 'string | null',
+      payerRfc: 'string | null',
+      referenceNumber: 'string | null',
+    },
+  ],
   payrollDeposits: [
     {
       date: 'YYYY-MM-DD | null',
@@ -256,6 +301,26 @@ const BANK_STATEMENT_SCHEMA = {
       relevanceReason: 'string | null',
     },
   ],
+  financialDepuration: {
+    integrityCheck: {
+      bankReportedTotal: null,
+      calculatedDepositsTotal: 0.0,
+      discrepancy: 0.0,
+      status: 'MATCHED | MINOR_DIFFERENCE | CRITICAL_DISCREPANCY',
+      message: 'string',
+    },
+    depurationSummary: {
+      totalGrossDeposits: 0.0,
+      totalTrashDeposits: 0.0,
+      totalValidIncome: 0.0,
+      trashDepositsCount: 0,
+      validDepositsCount: 0,
+      needsReviewCount: 0,
+      detectedSector: 'HEALTH_MEDICAL | PROFESSIONAL_SERVICES | FOOD_RESTAURANT | RENTAL | CONSTRUCTION_TRADE | GENERAL_COMMERCE',
+    },
+    cleanedDeposits: [],
+    highImpactExceptions: [],
+  },
   bankarizationValidationPreparation: {
     purpose: 'MATCH_PAYROLL_NET_INCOME_WITH_BANK_DEPOSIT',
     requiresPayrollReceiptComparison: true,
@@ -288,6 +353,7 @@ export class BankStatementExtractionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
+    private readonly cleanerService: BankStatementCleanerService,
   ) {}
 
   static isBankStatementDocument(documentTypeCode: string): boolean {
@@ -366,7 +432,23 @@ export class BankStatementExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Call Gemini with specialized instructions ────────────────────
+    // ── 6. Query CSF (TAX_SITUATION_PROOF) context if available ─────────
+    const csfDoc = await this.prisma.document.findFirst({
+      where: {
+        mortgageCaseId: caseId,
+        documentType: { code: 'TAX_SITUATION_PROOF' },
+        documentStatus: { code: 'PROCESSED' },
+      },
+    });
+    const csfData = csfDoc?.extractedData as Record<string, any> | null;
+    const clientContext: ClientFiscalContext = {
+      clientRfc: csfData?.rfc || null,
+      clientFullName: csfData?.fullName || null,
+      regimes: csfData?.regimes || [],
+      economicActivities: csfData?.economicActivities || [],
+    };
+
+    // ── 7. Call Gemini with specialized instructions ────────────────────
     const geminiResult = await this.geminiService.extractStructuredData(
       document.ocrText,
       document.documentType.code,
@@ -408,14 +490,28 @@ export class BankStatementExtractionService {
 
     const data = geminiResult.extractedData as Record<string, unknown>;
 
-    // ── 7. Normalize bank-statement fields ───────────────────────────────
+    // ── 8. Normalize bank-statement fields ───────────────────────────────
     this.normalizeBankStatement(data);
 
-    // ── 8. Compute alerts from normalized data ───────────────────────────
+    // ── 9. Execute Deterministic Financial Depuration ────────────────────
+    const rawTransactions = this.collectTransactions(data);
+    const statementSummary = (data.statementSummary ||
+      data.statementPeriod ||
+      {}) as StatementSummary;
+
+    const depurationResult = this.cleanerService.clean(
+      rawTransactions,
+      statementSummary,
+      clientContext,
+    );
+    data.financialDepuration = depurationResult;
+
+    // ── 10. Compute alerts from normalized data & depuration ─────────────
     const alerts = this.computeAlerts(data);
+    this.appendDepurationAlerts(alerts, depurationResult);
     const missingFields = this.computeMissingFields(data);
 
-    // ── 9. Merge + dedup + filter contradictions ────────────────────────
+    // ── 11. Merge + dedup + filter contradictions ───────────────────────
     this.normalizeGeminiAlertCodes(data);
 
     const existingCodes = new Set<string>();
@@ -445,7 +541,7 @@ export class BankStatementExtractionService {
       (data.alerts as ExtractionAlert[]) ?? [],
     );
 
-    // ── 10. Persist extractedData + status atomically ──────────────────
+    // ── 12. Persist extractedData + status atomically ────────────────────
 
     await this.prisma.document.update({
       where: { id: documentId },
@@ -927,6 +1023,111 @@ export class BankStatementExtractionService {
       if (a.code && codeMap[a.code]) {
         a.code = codeMap[a.code];
       }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: collect all transactions from extractedData
+  // -----------------------------------------------------------------------
+  private collectTransactions(
+    data: Record<string, unknown>,
+  ): RawTransaction[] {
+    const transactions: RawTransaction[] = [];
+
+    // 1. Check allTransactions array
+    if (Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
+      for (const t of data.allTransactions as Record<string, any>[]) {
+        transactions.push({
+          date: t.date || null,
+          amount: typeof t.amount === 'number' ? t.amount : null,
+          currency: t.currency || 'MXN',
+          movementType: t.movementType || 'DEPOSIT',
+          originalConcept: t.originalConcept || '',
+          payerOrBeneficiaryName: t.payerOrBeneficiaryName || null,
+          payerRfc: t.payerRfc || null,
+          referenceNumber: t.referenceNumber || null,
+        });
+      }
+      return transactions;
+    }
+
+    // 2. Fallback: consolidate from payrollDeposits & otherRelevantMovements
+    if (Array.isArray(data.payrollDeposits)) {
+      for (const p of data.payrollDeposits as Record<string, any>[]) {
+        transactions.push({
+          date: p.date || null,
+          amount: typeof p.amount === 'number' ? p.amount : null,
+          currency: p.currency || 'MXN',
+          movementType: 'DEPOSIT',
+          originalConcept: p.originalConcept || '',
+          payerOrBeneficiaryName: p.detectedEmployerOrPayerName || null,
+          payerRfc: p.detectedPayerRfc || null,
+        });
+      }
+    }
+
+    if (Array.isArray(data.otherRelevantMovements)) {
+      for (const o of data.otherRelevantMovements as Record<string, any>[]) {
+        transactions.push({
+          date: o.date || null,
+          amount: typeof o.amount === 'number' ? o.amount : null,
+          currency: 'MXN',
+          movementType: o.movementType || 'DEPOSIT',
+          originalConcept: o.originalConcept || '',
+        });
+      }
+    }
+
+    return transactions;
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: append depuration alerts
+  // -----------------------------------------------------------------------
+  private appendDepurationAlerts(
+    alerts: ExtractionAlert[],
+    depurationResult: any,
+  ): void {
+    if (!depurationResult) return;
+
+    // Critical mathematical discrepancy
+    if (
+      depurationResult.integrityCheck?.status === 'CRITICAL_DISCREPANCY'
+    ) {
+      alerts.push({
+        code: 'STATEMENT_MATHEMATICAL_DISCREPANCY_CRITICAL',
+        severity: 'CRITICAL',
+        category: 'BANK_STATEMENT',
+        message: depurationResult.integrityCheck.message,
+        field: 'statementSummary.totalDepositsAmount',
+        requiresManualReview: true,
+      });
+    } else if (
+      depurationResult.integrityCheck?.status === 'MINOR_DIFFERENCE'
+    ) {
+      alerts.push({
+        code: 'STATEMENT_MATHEMATICAL_DISCREPANCY_MINOR',
+        severity: 'INFO',
+        category: 'BANK_STATEMENT',
+        message: depurationResult.integrityCheck.message,
+        field: 'statementSummary.totalDepositsAmount',
+        requiresManualReview: false,
+      });
+    }
+
+    // High impact outliers
+    if (
+      Array.isArray(depurationResult.highImpactExceptions) &&
+      depurationResult.highImpactExceptions.length > 0
+    ) {
+      alerts.push({
+        code: 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+        severity: 'WARNING',
+        category: 'INCOME',
+        message: `Se detectaron ${depurationResult.highImpactExceptions.length} depósito(s) atípico(s) de alto impacto que requieren confirmación rápida.`,
+        field: 'financialDepuration.highImpactExceptions',
+        requiresManualReview: true,
+      });
     }
   }
 }
