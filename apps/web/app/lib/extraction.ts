@@ -620,6 +620,29 @@ export interface ParsedBankStatement {
   averageBalance: number | null;
   endingBalance: number | null;
 
+  // Financial Depuration (PFAE & v1.2)
+  financialDepuration?: {
+    depurationSummary: {
+      totalGrossDeposits: number;
+      totalTrashDeposits: number;
+      totalValidIncome: number;
+      trashDepositsCount: number;
+      validDepositsCount: number;
+      needsReviewCount: number;
+      detectedSector: string;
+    };
+    integrityCheck: {
+      status: 'MATCHED' | 'MINOR_DIFFERENCE' | 'CRITICAL_DISCREPANCY' | 'NO_COVER_DATA';
+      bankReportedTotal: number | null;
+      extractedSum: number;
+      difference: number;
+      differencePercent: number;
+      message: string;
+    };
+    cleanedDeposits: Array<any>;
+    highImpactExceptions: Array<any>;
+  } | null;
+
   // Payroll deposits
   deposits: ParsedBankStatementDeposit[];
 
@@ -649,6 +672,10 @@ export interface ParsedBankStatements {
     totalDeposits: number;
     totalCriticalAlerts: number;
     totalWarningAlerts: number;
+    isPfae?: boolean;
+    totalValidIncome?: number;
+    totalGrossDeposits?: number;
+    totalTrashDeposits?: number;
   } | null;
   statements: ParsedBankStatement[];
 
@@ -917,6 +944,9 @@ export function parseBankStatements(
     }
     allAlerts.push(...alerts);
 
+    const financialDepuration =
+      (ed.financialDepuration as ParsedBankStatement["financialDepuration"]) ?? null;
+
     statements.push({
       documentId: doc.id,
       originalName: doc.originalName,
@@ -936,6 +966,7 @@ export function parseBankStatements(
       isCurrentIncompleteMonth,
       averageBalance,
       endingBalance,
+      financialDepuration,
       deposits,
       providers,
       otherMovements,
@@ -959,6 +990,24 @@ export function parseBankStatements(
     aggregatedContext.coveredMonths = Array.from(coveredMonths).sort();
   }
 
+  // ── PFAE Aggregates ────────────────────────────────────────────────────
+  const pfaeStatements = statements.filter((s) => s.financialDepuration != null);
+  const isPfae = pfaeStatements.length > 0;
+  let totalGrossDeposits = 0;
+  let totalTrashDeposits = 0;
+  let totalValidIncome = 0;
+
+  if (isPfae) {
+    for (const s of pfaeStatements) {
+      const dep = s.financialDepuration?.depurationSummary;
+      if (dep) {
+        totalGrossDeposits += dep.totalGrossDeposits || 0;
+        totalTrashDeposits += dep.totalTrashDeposits || 0;
+        totalValidIncome += dep.totalValidIncome || 0;
+      }
+    }
+  }
+
   // ── Summary ────────────────────────────────────────────────────────────
   const summary = {
     totalStatements,
@@ -967,9 +1016,20 @@ export function parseBankStatements(
     banks: Array.from(banks).sort(),
     periodStart,
     periodEnd,
-    totalDeposits: allDeposits.length,
+    totalDeposits: isPfae
+      ? pfaeStatements.reduce(
+          (sum, s) =>
+            sum +
+            (s.financialDepuration?.depurationSummary?.validDepositsCount || 0),
+          0,
+        )
+      : allDeposits.length,
     totalCriticalAlerts,
     totalWarningAlerts,
+    isPfae,
+    totalGrossDeposits,
+    totalTrashDeposits,
+    totalValidIncome,
   };
 
   return {
