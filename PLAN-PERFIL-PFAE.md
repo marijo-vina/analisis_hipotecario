@@ -212,7 +212,7 @@ pipelines; solo ramificar los puntos de variación.
 - **Criterios de aceptación**: procesar una CSF y una Declaración reales produce
   `extractedData` con los campos listados y las alertas correspondientes.
 
-#### HU-17 — Extracción de estados de cuenta (nivel transacción) + depuración determinística
+#### HU-17 — Extracción de estados de cuenta (nivel transacción) + depuración determinística `[COMPLETADA]`
 - **Objetivo**: extraer el detalle de movimientos de los estados de cuenta y
   clasificar depósitos válidos vs basura financiera mediante un motor híbrido
   (extracción fiel vía Gemini + depuración y validación determinística en TypeScript).
