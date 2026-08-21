@@ -137,6 +137,11 @@ export class BankStatementGridExtractor {
     depositCells.sort((a, b) => a.top - b.top);
 
     // 4. Associate concept block and date for each deposit
+    //    Strategy: for each deposit amount, scan BACKWARD through left-column
+    //    lines to find the nearest date line (DD MMM pattern). This eliminates
+    //    withdrawal concepts that sit between consecutive deposits.
+    const dateLinePattern = /^\d{1,2}\s+(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/i;
+
     const pageTransactions: RawTransaction[] = [];
     let lastKnownDate: string | null = null;
 
@@ -144,17 +149,34 @@ export class BankStatementGridExtractor {
       const current = depositCells[i];
       const prev = i > 0 ? depositCells[i - 1] : null;
 
-      // Vertical block range: from previous deposit bottom (or table top) down to current deposit bottom
-      const blockTop = prev ? prev.bottom : tableTop;
+      // Safe floor: previous deposit bottom or table top
+      const safeFloor = prev ? prev.bottom : tableTop;
       const blockBottom = current.bottom + 15;
 
-      const blockLines = lines.filter((l) => {
+      // Collect ALL left-column candidate lines in the full Y range
+      const candidateLines = lines.filter((l) => {
         const b = l.boundingBox;
         const isLeftOfAmounts = b.right < (withdrawalHeader ? withdrawalHeader.left : depLeft);
-        return isLeftOfAmounts && b.top >= blockTop && b.bottom <= blockBottom && b.top > tableTop;
+        return isLeftOfAmounts && b.top >= safeFloor && b.bottom <= blockBottom && b.top > tableTop;
       });
+      candidateLines.sort((a, b) => a.boundingBox.top - b.boundingBox.top);
 
-      blockLines.sort((a, b) => a.boundingBox.top - b.boundingBox.top);
+      // Find the deposit's own date line by scanning BACKWARD from the amount
+      // position. The first date line found going upward is the start of this
+      // deposit's concept block; everything above belongs to withdrawals.
+      let dateLineIndex = -1;
+      for (let j = candidateLines.length - 1; j >= 0; j--) {
+        if (dateLinePattern.test(candidateLines[j].text.trim())) {
+          dateLineIndex = j;
+          break;
+        }
+      }
+
+      // Use only lines from the deposit's date line to the end;
+      // fallback to all candidates if no date line found (rare edge case).
+      const blockLines = dateLineIndex >= 0
+        ? candidateLines.slice(dateLineIndex)
+        : candidateLines;
       const rawConcept = blockLines.map((l) => l.text.trim()).join(' ');
 
       // Parse date
