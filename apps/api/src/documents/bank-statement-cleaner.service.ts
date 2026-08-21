@@ -16,6 +16,8 @@ export type TrashCategory =
   | 'LOAN_OR_CREDIT'
   | 'INVESTMENT_WITHDRAWAL'
   | 'REFUND_OR_REVERSAL'
+  | 'PERSONAL_ASSET_SALE'
+  | 'GAMBLING_OR_BETTING'
   | 'INFORMAL_FAMILY'
   | 'DOWN_PAYMENT_SAVING'
   | 'RENT_WITHOUT_CSF_REGIME'
@@ -27,6 +29,7 @@ export type ValidCategory =
   | 'RECURRENT_CASH'
   | 'RENTAL_WITH_REGIME'
   | 'SECTOR_SPECIFIC_INCOME'
+  | 'CONFIRMED_BY_ANALYST'
   | 'GENERAL_INCOME';
 
 export type TransactionClassification = 'VALID' | 'TRASH' | 'NEEDS_REVIEW';
@@ -133,9 +136,21 @@ const TRASH_PATTERNS: Array<{
     reason: 'Devolución, cancelación o reembolso tributario/bancario',
   },
   {
+    category: 'PERSONAL_ASSET_SALE',
+    regex:
+      /\b(VENTA\s+(DE\s+)?(AUTO|CARRO|COCHE|MOTO|CAMIONETA|VEHICULO|TERRENO|CASA|DEPTO|LAPTOP)|ABONO\s+(A\s+|DE\s+|POR\s+)?(MI\s+)?(AUTO|CARRO|COCHE|MOTO|CAMIONETA|VEHICULO|TERRENO)|(MI|EL)\s+(AUTO|COCHE|CARRO|MOTO|CAMIONETA)|PAGO\s+(DE\s+|POR\s+)?(AUTO|COCHE|CARRO|MOTO|CAMIONETA)|LIQUIDACION\s+(AUTO|COCHE|CARRO|VEHICULO))\b/i,
+    reason: 'Venta o abono por activo personal (vehículo / bien) no computable',
+  },
+  {
+    category: 'GAMBLING_OR_BETTING',
+    regex:
+      /\b(CALIENTE(\s+MX|\s+CASINO)?|BET365|PLAYDOIT|CODERE|STAKE|1XBET|CASINO|LOTERIA|PRONOSTICOS|APUESTAS|GANANCIA\s+JUEGO)\b/i,
+    reason: 'Ingreso por apuestas, juegos de azar o casino no computable',
+  },
+  {
     category: 'INFORMAL_FAMILY',
     regex:
-      /\b(PAPA|MAMA|HERMANO|FAMILIAR|CHELAS|FIESTA|CANDY|PADRINO|TANDA|REGALO|VAQUITA|APOYO\s+FAMILIAR|PRESTAME|PRESTAMO\s+AMIGO|PAGO\s+COMIDA|CUMPLE)\b/i,
+      /\b(PAPA|MAMA|HERMANO|HERMANA|PRIMO|PRIMA|TIA|TIO|SOBRINO|FAMILIAR|CHELAS|FIESTA|CANDY|PADRINO|TANDA|REGALO|VAQUITA|APOYO\s+FAMILIAR|PRESTAME|PRESTAMO\s+AMIGO|PAGO\s+COMIDA|CUMPLE|CUMPLEAÑOS|COOPERACION)\b/i,
     reason: 'Transferencia informal de carácter familiar o recreativo',
   },
   {

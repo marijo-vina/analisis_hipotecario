@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import {
   ChevronDown,
   CheckCircle2,
@@ -13,8 +14,11 @@ import {
   Clock,
   ShieldCheck,
   Check,
+  X,
+  Loader2,
 } from "lucide-react";
 import type { ParsedBankStatement } from "@/app/lib/extraction";
+import { updateBankDepositClassification } from "@/app/actions/documents";
 
 interface EstadosStatementCardProps {
   statement: ParsedBankStatement;
@@ -30,6 +34,17 @@ export default function EstadosStatementCard({
   isExpanded,
   onToggle,
 }: EstadosStatementCardProps) {
+  const params = useParams();
+  const caseId = (params?.id as string) || (statement as any).mortgageCaseId || "";
+
+  const [deposits, setDeposits] = useState<any[]>(
+    statement.financialDepuration?.cleanedDeposits || [],
+  );
+  const [summary, setSummary] = useState(
+    statement.financialDepuration?.depurationSummary,
+  );
+  const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
+
   const visibleAlerts = statement.alerts.filter(
     (a) => a.code !== "BANK_FEWER_MONTHS_THAN_REQUIRED",
   );
@@ -40,6 +55,78 @@ export default function EstadosStatementCard({
   const [internalExpanded, setInternalExpanded] = useState<boolean>(false);
   const expanded = isExpanded !== undefined ? isExpanded : internalExpanded;
   const handleToggle = onToggle ?? (() => setInternalExpanded((prev) => !prev));
+
+  async function handleClassification(
+    index: number,
+    classification: "VALID" | "TRASH",
+  ) {
+    if (loadingIndex !== null || !caseId || !statement.documentId) return;
+    setLoadingIndex(index);
+
+    const prevDeposits = [...deposits];
+    const updated = [...deposits];
+    const dep = { ...updated[index] };
+    dep.classification = classification;
+    dep.isHighImpactOutlier = false;
+    if (classification === "VALID") {
+      dep.validCategory = "CONFIRMED_BY_ANALYST";
+      dep.trashCategory = undefined;
+      dep.reason = "Aprobado manualmente por la asesora";
+    } else {
+      dep.trashCategory = "OTHER_NON_BUSINESS";
+      dep.validCategory = undefined;
+      dep.reason = "Descartado manualmente por la asesora";
+    }
+    updated[index] = dep;
+    setDeposits(updated);
+
+    // Recalcular métricas en memoria al instante
+    let validTotal = 0;
+    let trashTotal = 0;
+    let validCount = 0;
+    let trashCount = 0;
+    let reviewCount = 0;
+
+    for (const d of updated) {
+      if (d.classification === "VALID") {
+        validTotal += d.amount || 0;
+        validCount++;
+      } else if (d.classification === "TRASH") {
+        trashTotal += d.amount || 0;
+        trashCount++;
+      } else {
+        reviewCount++;
+      }
+    }
+
+    setSummary((prev: any) =>
+      prev
+        ? {
+            ...prev,
+            totalValidIncome: Math.round(validTotal * 100) / 100,
+            totalTrashDeposits: Math.round(trashTotal * 100) / 100,
+            validDepositsCount: validCount,
+            trashDepositsCount: trashCount,
+            needsReviewCount: reviewCount,
+          }
+        : prev,
+    );
+
+    try {
+      await updateBankDepositClassification(
+        caseId,
+        statement.documentId,
+        index,
+        classification,
+      );
+    } catch (err) {
+      // Revertir en caso de error
+      setDeposits(prevDeposits);
+      console.error("Error al actualizar clasificación:", err);
+    } finally {
+      setLoadingIndex(null);
+    }
+  }
 
   const bankInitial = statement.bankName?.charAt(0).toUpperCase() ?? "?";
 
@@ -207,7 +294,9 @@ export default function EstadosStatementCard({
             <MetricCell
               label={statement.financialDepuration ? "Ingreso válido" : "Depósitos nómina"}
               value={
-                statement.financialDepuration?.depurationSummary
+                summary
+                  ? fmtCurrency(summary.totalValidIncome)
+                  : statement.financialDepuration?.depurationSummary
                   ? fmtCurrency(
                       statement.financialDepuration.depurationSummary
                         .totalValidIncome,
@@ -215,14 +304,18 @@ export default function EstadosStatementCard({
                   : String(statement.deposits.length)
               }
               sub={
-                statement.financialDepuration?.depurationSummary
+                summary
+                  ? `${summary.validDepositsCount} depósitos`
+                  : statement.financialDepuration?.depurationSummary
                   ? `${statement.financialDepuration.depurationSummary.validDepositsCount} depósitos`
                   : "detectados"
               }
               accent={
                 statement.financialDepuration
-                  ? (statement.financialDepuration.depurationSummary
-                      ?.validDepositsCount ?? 0) > 0
+                  ? (summary?.validDepositsCount ??
+                      statement.financialDepuration.depurationSummary
+                        ?.validDepositsCount ??
+                      0) > 0
                   : statement.deposits.length > 0
               }
             />
@@ -248,35 +341,30 @@ export default function EstadosStatementCard({
               Datos de la cuenta
             </h4>
             <div className="bg-gf-surface p-4 rounded-xl border border-gf-border/60 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <FieldCell label="Titular">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FieldCell label="Titular de la cuenta">
                   {statement.accountHolder ?? "—"}
                 </FieldCell>
-                <FieldCell label="RFC" mono>
+                <FieldCell label="RFC del titular">
                   {statement.accountHolderRfc ?? "—"}
                 </FieldCell>
-                <FieldCell label="No. de cuenta" mono>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gf-border/40">
+                <FieldCell label="Número de cuenta">
                   {statement.accountNumber
-                    ? `**** ${statement.accountNumber}`
+                    ? `**** ${statement.accountNumber.slice(-4)}`
                     : "—"}
                 </FieldCell>
-                <FieldCell label="CLABE" mono>
+                <FieldCell label="CLABE interbancaria">
                   {statement.clabe ? maskClabe(statement.clabe) : "—"}
                 </FieldCell>
                 <FieldCell label="Tipo de cuenta">
-                  {statement.isJointAccount != null ? (
-                    <span
-                      className={
-                        statement.isJointAccount
-                          ? "inline-flex items-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold"
-                          : "inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold"
-                      }
-                    >
-                      {statement.isJointAccount ? "Mancomunada" : "Individual"}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
+                  {statement.isJointAccount === true
+                    ? "Mancomunada"
+                    : statement.isJointAccount === false
+                      ? "Individual"
+                      : "—"}
                 </FieldCell>
               </div>
 
@@ -305,8 +393,7 @@ export default function EstadosStatementCard({
           </div>
 
           {/* 3. Depuración Financiera / Depósitos Válidos (PFAE & v1.2) */}
-          {statement.financialDepuration?.cleanedDeposits &&
-          statement.financialDepuration.cleanedDeposits.length > 0 ? (
+          {deposits && deposits.length > 0 ? (
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
@@ -315,41 +402,39 @@ export default function EstadosStatementCard({
                 </h4>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
-                    {statement.financialDepuration.depurationSummary?.validDepositsCount ?? 0} válidos
+                    {summary?.validDepositsCount ?? 0} válidos
                   </span>
-                  {(statement.financialDepuration.depurationSummary?.needsReviewCount ?? 0) > 0 && (
+                  {(summary?.needsReviewCount ?? 0) > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
                       <AlertTriangle className="h-3 w-3 text-amber-600" />
-                      {statement.financialDepuration.depurationSummary.needsReviewCount} atípico{statement.financialDepuration.depurationSummary.needsReviewCount !== 1 ? "s" : ""}
+                      {summary?.needsReviewCount} atípico{summary?.needsReviewCount !== 1 ? "s" : ""}
                     </span>
                   )}
-                  {(statement.financialDepuration.depurationSummary?.trashDepositsCount ?? 0) > 0 && (
+                  {(summary?.trashDepositsCount ?? 0) > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold">
-                      {statement.financialDepuration.depurationSummary.trashDepositsCount} descartados
+                      {summary?.trashDepositsCount} descartados
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Banner explicativo si hay depósitos atípicos de alto impacto */}
-              {statement.financialDepuration.highImpactExceptions &&
-                statement.financialDepuration.highImpactExceptions.length > 0 && (
-                  <div className="mb-3.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="font-bold text-amber-950">
-                        Se detectaron {statement.financialDepuration.highImpactExceptions.length} depósito(s) atípico(s) de alto impacto
-                      </p>
-                      <p className="text-[11px] text-amber-800 leading-relaxed">
-                        Representan una alta concentración del mes o montos extraordinarios.
-                        <strong> Acción recomendada:</strong> Asegúrate de respaldar estos movimientos con su factura (CFDI) o contrato para que el banco los tome al 100% como ingreso computable.
-                      </p>
-                    </div>
+              {(summary?.needsReviewCount ?? 0) > 0 && (
+                <div className="mb-3.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-amber-950">
+                      Se detectaron {summary?.needsReviewCount} depósito(s) atípico(s) de alto impacto
+                    </p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      Representan una alta concentración del mes o montos extraordinarios. Puedes usar los botones de acción rápida <strong>Aprobar</strong> o <strong>Descartar</strong> en cada renglón.
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
               <div className="space-y-2.5">
-                {statement.financialDepuration.cleanedDeposits.map((dep: any, i: number) => {
+                {deposits.map((dep: any, i: number) => {
                   const dateParts = dep.date ? parseDateParts(dep.date) : null;
                   const isReview = dep.classification === 'NEEDS_REVIEW' || dep.isHighImpactOutlier === true;
                   const isTrash = dep.classification === 'TRASH';
@@ -360,7 +445,7 @@ export default function EstadosStatementCard({
                       key={i}
                       className={`rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border transition-all ${
                         isReview
-                          ? "bg-amber-50/40 border-amber-300 hover:border-amber-400"
+                          ? "bg-amber-50/40 border-amber-300 hover:border-amber-400 shadow-2xs"
                           : isValid
                           ? "bg-gf-surface border-emerald-200/80 hover:border-emerald-300"
                           : "bg-gf-surface border-gf-border/60 hover:border-gf-border opacity-80"
@@ -410,24 +495,87 @@ export default function EstadosStatementCard({
                               Motivo de descarte: {dep.reason}
                             </span>
                           )}
+                          {isValid && dep.validCategory === 'CONFIRMED_BY_ANALYST' && (
+                            <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                              ✓ {dep.reason || "Aprobado manualmente por la asesora"}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         {isReview ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-bold shadow-2xs">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                            Atípico (Por Confirmar)
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={loadingIndex === i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClassification(i, "VALID");
+                              }}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                              title="Aprobar e incluir en el ingreso válido computable"
+                            >
+                              {loadingIndex === i ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                              Aprobar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={loadingIndex === i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClassification(i, "TRASH");
+                              }}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-200 text-slate-700 hover:bg-rose-100 hover:text-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                              title="Descartar del ingreso computable"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Descartar
+                            </button>
+                          </div>
                         ) : isValid ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
-                            <Check className="h-3.5 w-3.5 text-emerald-600" />
-                            Ingreso Válido
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                              {dep.validCategory === "CONFIRMED_BY_ANALYST"
+                                ? "Aprobado (Manual)"
+                                : "Ingreso Válido"}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={loadingIndex === i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClassification(i, "TRASH");
+                              }}
+                              className="text-[11px] font-medium text-slate-400 hover:text-rose-600 hover:underline px-1 py-0.5 rounded cursor-pointer disabled:opacity-50 transition-colors"
+                              title="Cambiar a descartado"
+                            >
+                              Descartar
+                            </button>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
-                            Descartado ({dep.trashCategory ?? "No clasificado"})
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
+                              Descartado ({dep.trashCategory ?? "No clasificado"})
+                            </span>
+                            <button
+                              type="button"
+                              disabled={loadingIndex === i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClassification(i, "VALID");
+                              }}
+                              className="text-[11px] font-medium text-slate-400 hover:text-emerald-700 hover:underline px-1 py-0.5 rounded cursor-pointer disabled:opacity-50 transition-colors"
+                              title="Cambiar a ingreso válido"
+                            >
+                              Aprobar
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

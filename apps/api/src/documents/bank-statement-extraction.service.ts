@@ -1225,4 +1225,109 @@ export class BankStatementExtractionService {
       });
     }
   }
+
+  /**
+   * Allows an analyst to manually approve (VALID) or discard (TRASH)
+   * a single deposit transaction within financialDepuration, recalculating totals instantly.
+   */
+  async updateDepositClassification(
+    documentId: string,
+    depositIndex: number,
+    body: {
+      classification: 'VALID' | 'TRASH';
+      reason?: string;
+      trashCategory?: string;
+    },
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new Error(`Document ${documentId} not found`);
+    }
+
+    const data = (document.extractedData || {}) as Record<string, any>;
+    const depuration = data.financialDepuration;
+
+    if (!depuration || !Array.isArray(depuration.cleanedDeposits)) {
+      throw new Error('No financial depuration data found on document');
+    }
+
+    if (depositIndex < 0 || depositIndex >= depuration.cleanedDeposits.length) {
+      throw new Error(`Deposit index ${depositIndex} out of range`);
+    }
+
+    const dep = depuration.cleanedDeposits[depositIndex];
+    dep.classification = body.classification;
+    dep.isHighImpactOutlier = false;
+
+    if (body.classification === 'VALID') {
+      dep.validCategory = 'CONFIRMED_BY_ANALYST';
+      dep.trashCategory = undefined;
+      dep.reason = body.reason || 'Aprobado manualmente por la asesora';
+    } else {
+      dep.trashCategory = (body.trashCategory as any) || 'OTHER_NON_BUSINESS';
+      dep.validCategory = undefined;
+      dep.reason = body.reason || 'Descartado manualmente por la asesora';
+    }
+
+    // Recalculate totals
+    let totalTrash = 0;
+    let totalValid = 0;
+    let trashCount = 0;
+    let validCount = 0;
+    let needsReviewCount = 0;
+    const remainingExceptions: any[] = [];
+
+    for (const d of depuration.cleanedDeposits) {
+      if (d.classification === 'TRASH') {
+        totalTrash += d.amount || 0;
+        trashCount++;
+      } else if (d.classification === 'VALID') {
+        totalValid += d.amount || 0;
+        validCount++;
+      } else {
+        needsReviewCount++;
+      }
+
+      if (d.classification === 'NEEDS_REVIEW' || d.isHighImpactOutlier) {
+        remainingExceptions.push(d);
+      }
+    }
+
+    depuration.depurationSummary = {
+      ...depuration.depurationSummary,
+      totalTrashDeposits: Math.round(totalTrash * 100) / 100,
+      totalValidIncome: Math.round(totalValid * 100) / 100,
+      trashDepositsCount: trashCount,
+      validDepositsCount: validCount,
+      needsReviewCount,
+    };
+    depuration.highImpactExceptions = remainingExceptions;
+
+    // Update alerts: remove or update STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED
+    if (Array.isArray(data.alerts)) {
+      data.alerts = data.alerts.filter(
+        (a: any) => a.code !== 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+      );
+      if (remainingExceptions.length > 0) {
+        data.alerts.push({
+          code: 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+          severity: 'WARNING',
+          category: 'INCOME',
+          message: `Se detectaron ${remainingExceptions.length} depósito(s) atípico(s) de alto impacto que requieren confirmación rápida.`,
+          field: 'financialDepuration.highImpactExceptions',
+          requiresManualReview: true,
+        });
+      }
+    }
+
+    const updated = await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data },
+    });
+
+    return updated.extractedData;
+  }
 }
