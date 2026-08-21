@@ -205,10 +205,26 @@ export default function EstadosStatementCard({
               danger={balanceIsNegative}
             />
             <MetricCell
-              label="Depósitos nómina"
-              value={String(statement.deposits.length)}
-              sub="detectados"
-              accent={statement.deposits.length > 0}
+              label={statement.financialDepuration ? "Ingreso válido" : "Depósitos nómina"}
+              value={
+                statement.financialDepuration?.depurationSummary
+                  ? fmtCurrency(
+                      statement.financialDepuration.depurationSummary
+                        .totalValidIncome,
+                    )
+                  : String(statement.deposits.length)
+              }
+              sub={
+                statement.financialDepuration?.depurationSummary
+                  ? `${statement.financialDepuration.depurationSummary.validDepositsCount} depósitos`
+                  : "detectados"
+              }
+              accent={
+                statement.financialDepuration
+                  ? (statement.financialDepuration.depurationSummary
+                      ?.validDepositsCount ?? 0) > 0
+                  : statement.deposits.length > 0
+              }
             />
             <MetricCell
               label="Alertas"

@@ -222,12 +222,23 @@ export class BankStatementCleanerService {
     // 1. Detect economic sector from CSF
     const detectedSector = this.detectSector(clientContext.economicActivities || []);
 
-    // 2. Filter raw transactions to deposits only
+    // 2. Filter raw transactions to deposits only (strictly exclude withdrawals/charges)
     const deposits = (transactions || []).filter((t) => {
+      const type = (t.movementType || '').toUpperCase().trim();
+      const isExplicitWithdrawal =
+        type === 'WITHDRAWAL' ||
+        type === 'CHARGE' ||
+        type === 'RETIRO' ||
+        type === 'CARGO' ||
+        type === 'EGRESO';
+      if (isExplicitWithdrawal) return false;
+
       const isDepositType =
-        !t.movementType ||
-        t.movementType === 'DEPOSIT' ||
-        t.movementType === 'TRANSFER';
+        type === 'DEPOSIT' ||
+        type === 'ABONO' ||
+        type === 'CREDIT' ||
+        type === 'INGRESO' ||
+        !type;
       const isPositiveAmount = typeof t.amount === 'number' && t.amount > 0;
       return isDepositType && isPositiveAmount;
     });

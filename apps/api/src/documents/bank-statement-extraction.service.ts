@@ -65,14 +65,15 @@ const BANK_STATEMENT_INSTRUCTIONS = [
   '  endingBalance: saldo final al corte reportado.',
   '',
   '─── Todas las Transacciones (allTransactions[]) ───',
-  '  Extraé exhaustivamente TODOS los movimientos de abono / depósito y transacciones listadas:',
+  '  Extraé exhaustivamente ÚNICAMENTE los movimientos de ABONO / DEPÓSITO (dinero que ENTRA a la cuenta).',
+  '  NO incluyas movimientos de la columna de RETIROS / CARGOS / SALIDAS (dinero que sale, compras, pagos de servicios o transferencias enviadas a terceros).',
   '    date: YYYY-MM-DD.',
-  '    amount: monto decimal positivo.',
+  '    amount: monto decimal positivo del depósito.',
   '    currency: "MXN", "USD", u "OTHER".',
-  '    movementType: "DEPOSIT", "WITHDRAWAL", "TRANSFER", "CHARGE", "UNKNOWN".',
-  '    originalConcept: texto original del concepto o descripción.',
-  '    payerOrBeneficiaryName: nombre del ordenante o beneficiario si se menciona en el concepto.',
-  '    payerRfc: RFC detectado del emisor si aparece en el concepto.',
+  '    movementType: "DEPOSIT".',
+  '    originalConcept: concepto o descripción textual exacta del movimiento.',
+  '    payerOrBeneficiaryName: nombre de quien deposita o transfiere si aparece.',
+  '    payerRfc: RFC de quien deposita si aparece en el concepto o referencia.',
   '    referenceNumber: número de referencia, rastreo o autorización si aparece.',
   '',
   '─── Depósitos de nómina (payrollDeposits[]) ───',
@@ -364,10 +365,14 @@ export class BankStatementExtractionService {
     caseId: string,
     documentId: string,
   ): Promise<BankStatementExtractionResult> {
-    // ── 1. Fetch document with type + status ───────────────────────────
+    // ── 1. Fetch document with type + status + case ────────────────────
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
-      include: { documentType: true, documentStatus: true },
+      include: {
+        documentType: true,
+        documentStatus: true,
+        mortgageCase: true,
+      },
     });
     if (!document || document.mortgageCaseId !== caseId) {
       throw new Error('Document not found');
@@ -506,8 +511,14 @@ export class BankStatementExtractionService {
     );
     data.financialDepuration = depurationResult;
 
+    const isPfaeCase =
+      (document as any)?.mortgageCase?.personType === 'PFAE' ||
+      (clientContext.economicActivities &&
+        clientContext.economicActivities.length > 0) ||
+      (clientContext.regimes && clientContext.regimes.length > 0);
+
     // ── 10. Compute alerts from normalized data & depuration ─────────────
-    const alerts = this.computeAlerts(data);
+    const alerts = this.computeAlerts(data, isPfaeCase);
     this.appendDepurationAlerts(alerts, depurationResult);
     const missingFields = this.computeMissingFields(data);
 
@@ -540,6 +551,15 @@ export class BankStatementExtractionService {
     data.alerts = this.normalizeAlerts(
       (data.alerts as ExtractionAlert[]) ?? [],
     );
+
+    // If PFAE profile / CSF active, suppress salaried payroll alerts
+    if (isPfaeCase && Array.isArray(data.alerts)) {
+      data.alerts = (data.alerts as ExtractionAlert[]).filter(
+        (a) =>
+          a.code !== 'BANK_NO_PAYROLL_DEPOSITS' &&
+          a.code !== 'BANK_PAYROLL_MISMATCH',
+      );
+    }
 
     // ── 12. Persist extractedData + status atomically ────────────────────
 
@@ -668,7 +688,10 @@ export class BankStatementExtractionService {
   // Private: alert computation (post-normalization) — 10 BANK_ codes
   // -----------------------------------------------------------------------
 
-  private computeAlerts(data: Record<string, unknown>): ExtractionAlert[] {
+  private computeAlerts(
+    data: Record<string, unknown>,
+    isPfaeCase = false,
+  ): ExtractionAlert[] {
     const alerts: ExtractionAlert[] = [];
 
     const payrollDeposits = data.payrollDeposits as
@@ -682,10 +705,10 @@ export class BankStatementExtractionService {
     const documentRequirementContext = (data.documentRequirementContext ??
       {}) as Record<string, unknown>;
 
-    // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty ────────────────
+    // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty (salaried only) ────
     const hasPayrollDeposits =
       Array.isArray(payrollDeposits) && payrollDeposits.length > 0;
-    if (!hasPayrollDeposits) {
+    if (!hasPayrollDeposits && !isPfaeCase) {
       alerts.push({
         code: 'BANK_NO_PAYROLL_DEPOSITS',
         severity: 'WARNING',

@@ -100,21 +100,25 @@ export default function EstadosSummaryBar({
 
         <div className="hidden sm:block h-8 w-px bg-gf-border" />
 
-        {/* Payroll deposits */}
+        {/* Payroll deposits or PFAE Valid Income */}
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600">
             <CheckCircle2 className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-              Depósitos nómina
+              {summary.isPfae ? "Ingreso Válido (Depurado)" : "Depósitos nómina"}
             </span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base font-bold text-emerald-700">
-                {totalDeposits}
+                {summary.isPfae && summary.totalValidIncome != null
+                  ? `$${Math.round(summary.totalValidIncome).toLocaleString("es-MX")}`
+                  : totalDeposits}
               </span>
               <span className="text-xs font-semibold text-emerald-700">
-                detectado{totalDeposits !== 1 ? "s" : ""}
+                {summary.isPfae
+                  ? `(${totalDeposits} válido${totalDeposits !== 1 ? "s" : ""})`
+                  : `detectado${totalDeposits !== 1 ? "s" : ""}`}
               </span>
             </div>
           </div>
