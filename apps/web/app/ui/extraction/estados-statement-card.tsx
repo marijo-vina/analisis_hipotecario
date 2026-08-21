@@ -308,34 +308,62 @@ export default function EstadosStatementCard({
           {statement.financialDepuration?.cleanedDeposits &&
           statement.financialDepuration.cleanedDeposits.length > 0 ? (
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                   Movimientos y Depósitos Depurados
                 </h4>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
                     {statement.financialDepuration.depurationSummary?.validDepositsCount ?? 0} válidos
                   </span>
+                  {(statement.financialDepuration.depurationSummary?.needsReviewCount ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
+                      <AlertTriangle className="h-3 w-3 text-amber-600" />
+                      {statement.financialDepuration.depurationSummary.needsReviewCount} atípico{statement.financialDepuration.depurationSummary.needsReviewCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
                   {(statement.financialDepuration.depurationSummary?.trashDepositsCount ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold">
                       {statement.financialDepuration.depurationSummary.trashDepositsCount} descartados
                     </span>
                   )}
                 </div>
               </div>
 
+              {/* Banner explicativo si hay depósitos atípicos de alto impacto */}
+              {statement.financialDepuration.highImpactExceptions &&
+                statement.financialDepuration.highImpactExceptions.length > 0 && (
+                  <div className="mb-3.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-amber-950">
+                        Se detectaron {statement.financialDepuration.highImpactExceptions.length} depósito(s) atípico(s) de alto impacto
+                      </p>
+                      <p className="text-[11px] text-amber-800 leading-relaxed">
+                        Representan una alta concentración del mes o montos extraordinarios.
+                        <strong> Acción recomendada:</strong> Asegúrate de respaldar estos movimientos con su factura (CFDI) o contrato para que el banco los tome al 100% como ingreso computable.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
               <div className="space-y-2.5">
                 {statement.financialDepuration.cleanedDeposits.map((dep: any, i: number) => {
                   const dateParts = dep.date ? parseDateParts(dep.date) : null;
-                  const isValid = dep.classification === 'VALID' || dep.classification === 'NEEDS_REVIEW';
+                  const isReview = dep.classification === 'NEEDS_REVIEW' || dep.isHighImpactOutlier === true;
+                  const isTrash = dep.classification === 'TRASH';
+                  const isValid = dep.classification === 'VALID' && !dep.isHighImpactOutlier;
+
                   return (
                     <div
                       key={i}
-                      className={`bg-gf-surface rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border transition-colors ${
-                        isValid
-                          ? "border-emerald-200/80 hover:border-emerald-300"
-                          : "border-gf-border/60 hover:border-gf-border opacity-85"
+                      className={`rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border transition-all ${
+                        isReview
+                          ? "bg-amber-50/40 border-amber-300 hover:border-amber-400"
+                          : isValid
+                          ? "bg-gf-surface border-emerald-200/80 hover:border-emerald-300"
+                          : "bg-gf-surface border-gf-border/60 hover:border-gf-border opacity-80"
                       }`}
                     >
                       <div className="flex items-center gap-3.5">
@@ -355,7 +383,11 @@ export default function EstadosStatementCard({
                         <div className="flex flex-col gap-0.5">
                           <span
                             className={`text-sm font-bold ${
-                              isValid ? "text-emerald-700" : "text-gf-text-muted line-through"
+                              isReview
+                                ? "text-amber-800 font-extrabold"
+                                : isValid
+                                ? "text-emerald-700"
+                                : "text-gf-text-muted line-through"
                             }`}
                           >
                             {dep.amount != null ? `${fmtCurrency(dep.amount)} MXN` : "—"}
@@ -368,8 +400,13 @@ export default function EstadosStatementCard({
                               Concepto: {dep.originalConcept}
                             </span>
                           )}
-                          {!isValid && dep.reason && (
-                            <span className="text-[11px] text-amber-700 font-medium">
+                          {isReview && dep.reason && (
+                            <span className="text-[11px] text-amber-800 font-semibold flex items-center gap-1">
+                              ⚠️ {dep.reason}
+                            </span>
+                          )}
+                          {isTrash && dep.reason && (
+                            <span className="text-[11px] text-slate-500 font-medium">
                               Motivo de descarte: {dep.reason}
                             </span>
                           )}
@@ -377,13 +414,18 @@ export default function EstadosStatementCard({
                       </div>
 
                       <div className="shrink-0">
-                        {isValid ? (
+                        {isReview ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-bold shadow-2xs">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                            Atípico (Por Confirmar)
+                          </span>
+                        ) : isValid ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
                             <Check className="h-3.5 w-3.5 text-emerald-600" />
                             Ingreso Válido
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
                             Descartado ({dep.trashCategory ?? "No clasificado"})
                           </span>
                         )}
