@@ -35,11 +35,15 @@ export class DocumentAiService {
    * Process a document already in GCS and return its plain OCR text.
    * Backward-compatible single-string extractor — unchanged by the
    * layout-aware extraction work (Phase 2).
+   *
+   * Uses `imagelessMode: true` to raise the synchronous Document AI limit
+   * from 15 pages to 30 pages.
    */
   async extractText(gcsUri: string, mimeType: string): Promise<string> {
     const [result] = await this.client.processDocument({
       name: this.processorName,
       gcsDocument: { gcsUri, mimeType },
+      imagelessMode: true,
     });
 
     return result.document?.text ?? '';
@@ -55,8 +59,8 @@ export class DocumentAiService {
    * is configured. Only the compact layout structures are built from the raw
    * response; the full raw Document AI object is NOT retained.
    *
-   * `extractText()` remains unchanged and is the backward-compatible path for
-   * callers that only need text.
+   * Uses `imagelessMode: true` to raise the synchronous Document AI limit
+   * from 15 pages to 30 pages.
    */
   async extractTextWithLayout(
     gcsUri: string,
@@ -65,6 +69,7 @@ export class DocumentAiService {
     const [result] = await this.client.processDocument({
       name: this.processorName,
       gcsDocument: { gcsUri, mimeType },
+      imagelessMode: true,
     });
 
     const document: RawDocument | undefined = result.document;
