@@ -222,6 +222,28 @@ export class DocumentsController {
   }
 
   /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/bank-deposits/:depositIndex/classification
+   *
+   * Allows an analyst to manually approve (VALID) or discard (TRASH)
+   * a single deposit in a bank statement's financial depuration.
+   */
+  @Patch(':documentId/bank-deposits/:depositIndex/classification')
+  @HttpCode(200)
+  async updateBankDepositClassification(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Param('depositIndex', ParseIntPipe) depositIndex: number,
+    @Body() body: { classification: 'VALID' | 'TRASH'; reason?: string; trashCategory?: string },
+  ) {
+    const data = await this.bankStatementExtractionService.updateDepositClassification(
+      documentId,
+      depositIndex,
+      body,
+    );
+    return { data };
+  }
+
+  /**
    * PATCH /mortgage-cases/:caseId/documents/:documentId/inquiries
    *
    * Allows an analyst to manually set or confirm the "Consultas 24 meses"

@@ -494,3 +494,39 @@ export async function extractTaxReturn(
   return { success: true, extractedData: result.data.data };
 }
 
+/**
+ * Actualiza la clasificación de un depósito en la depuración financiera de un estado de cuenta.
+ *
+ * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/bank-deposits/:depositIndex/classification`
+ */
+export async function updateBankDepositClassification(
+  caseId: string,
+  documentId: string,
+  depositIndex: number,
+  classification: "VALID" | "TRASH",
+  reason?: string,
+): Promise<{ success: boolean; extractedData: Record<string, unknown> }> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/bank-deposits/${depositIndex}/classification`,
+    {
+      method: "PATCH",
+      body: { classification, reason },
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al actualizar la clasificación del depósito",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+
+  return {
+    success: true,
+    extractedData: result.data.data,
+  };
+}
+
