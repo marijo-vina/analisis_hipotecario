@@ -175,6 +175,39 @@ interface ExtractionAlert {
 }
 
 // ---------------------------------------------------------------------------
+// Fast cover-only schema for ultra-fast Gemini metadata extraction (~1.2s)
+// ---------------------------------------------------------------------------
+const FAST_BANK_STATEMENT_COVER_SCHEMA = {
+  accountHolder: {
+    fullName: 'string | null',
+    rfc: 'string | null',
+    isJointAccount: 'boolean | null',
+  },
+  bank: {
+    institutionName: 'string | null',
+    accountNumber: 'string | null',
+    clabe: 'string | null',
+  },
+  statementPeriod: {
+    periodStartDate: 'YYYY-MM-DD | null',
+    periodEndDate: 'YYYY-MM-DD | null',
+    cutoffDate: 'YYYY-MM-DD | null',
+    isClosedMonth: 'boolean | null',
+    isCurrentIncompleteMonth: 'boolean | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+  statementSummary: {
+    totalDepositsAmount: 'number | null',
+    totalDepositsCount: 'number | null',
+    totalWithdrawalsAmount: 'number | null',
+    totalWithdrawalsCount: 'number | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Schema — output contract Gemini must fulfill (bank-statement.schema.md v1.2)
 // ---------------------------------------------------------------------------
 const BANK_STATEMENT_SCHEMA = {
@@ -418,20 +451,26 @@ export class BankStatementExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Query CSF (TAX_SITUATION_PROOF) context if available ─────────
+    // ── 6. Query CSF context if available ──────────────────────────────
     const csfDoc = await this.prisma.document.findFirst({
       where: {
         mortgageCaseId: caseId,
-        documentType: { code: 'TAX_SITUATION_PROOF' },
+        documentType: { code: { in: ['CSF', 'TAX_SITUATION_PROOF'] } },
         documentStatus: { code: 'PROCESSED' },
       },
     });
     const csfData = csfDoc?.extractedData as Record<string, any> | null;
     const clientContext: ClientFiscalContext = {
-      clientRfc: csfData?.rfc || null,
-      clientFullName: csfData?.fullName || null,
-      regimes: csfData?.regimes || [],
-      economicActivities: csfData?.economicActivities || [],
+      clientRfc: csfData?.taxpayer?.rfc || csfData?.rfc || null,
+      clientFullName: csfData?.taxpayer?.fullName || csfData?.fullName || null,
+      regimes: (csfData?.regimes || []).map((r: any) =>
+        typeof r === 'string' ? r : r.description || '',
+      ),
+      economicActivities: (
+        csfData?.activities ||
+        csfData?.economicActivities ||
+        []
+      ).map((a: any) => (typeof a === 'string' ? a : a.description || '')),
     };
 
     // ── 7. Call Gemini with specialized instructions (Fast cover page extraction) ────
@@ -453,7 +492,7 @@ export class BankStatementExtractionService {
     const geminiResult = await this.geminiService.extractStructuredData(
       textForGemini,
       document.documentType.code,
-      { ...BANK_STATEMENT_SCHEMA },
+      { ...FAST_BANK_STATEMENT_COVER_SCHEMA },
       BANK_STATEMENT_INSTRUCTIONS,
     );
 
@@ -489,7 +528,23 @@ export class BankStatementExtractionService {
       };
     }
 
-    const data = geminiResult.extractedData as Record<string, unknown>;
+    const data = geminiResult.extractedData as Record<string, any>;
+    data.schemaVersion = '1.2';
+    data.documentType = 'BANK_STATEMENT';
+    data.payrollDeposits = data.payrollDeposits || [];
+    data.possiblePayrollProviders = data.possiblePayrollProviders || [];
+    data.otherRelevantMovements = data.otherRelevantMovements || [];
+
+    // Fallback RFC from CSF if bank statement has generic XAXX... or null
+    if (
+      (!data.accountHolder?.rfc || data.accountHolder.rfc.startsWith('XAXX')) &&
+      clientContext.clientRfc
+    ) {
+      if (!data.accountHolder) {
+        data.accountHolder = { fullName: null, rfc: null, isJointAccount: null };
+      }
+      data.accountHolder.rfc = clientContext.clientRfc;
+    }
 
     // ── 8. Normalize bank-statement fields ───────────────────────────────
     this.normalizeBankStatement(data);

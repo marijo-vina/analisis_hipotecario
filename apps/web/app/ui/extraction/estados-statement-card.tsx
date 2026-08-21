@@ -304,8 +304,96 @@ export default function EstadosStatementCard({
             </div>
           </div>
 
-          {/* 3. Depósitos de nómina detectados */}
-          {statement.deposits.length > 0 && (
+          {/* 3. Depuración Financiera / Depósitos Válidos (PFAE & v1.2) */}
+          {statement.financialDepuration?.cleanedDeposits &&
+          statement.financialDepuration.cleanedDeposits.length > 0 ? (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Movimientos y Depósitos Depurados
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
+                    {statement.financialDepuration.depurationSummary?.validDepositsCount ?? 0} válidos
+                  </span>
+                  {(statement.financialDepuration.depurationSummary?.trashDepositsCount ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+                      {statement.financialDepuration.depurationSummary.trashDepositsCount} descartados
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {statement.financialDepuration.cleanedDeposits.map((dep: any, i: number) => {
+                  const dateParts = dep.date ? parseDateParts(dep.date) : null;
+                  const isValid = dep.isValidIncome === true;
+                  return (
+                    <div
+                      key={i}
+                      className={`bg-gf-surface rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border transition-colors ${
+                        isValid
+                          ? "border-emerald-200/80 hover:border-emerald-300"
+                          : "border-gf-border/60 hover:border-gf-border opacity-85"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5">
+                        {/* Date badge */}
+                        <div className="flex flex-col items-center justify-center w-11 text-center bg-white p-1.5 rounded-lg border border-gf-border/60 shrink-0">
+                          <span className="text-[10px] font-bold text-gf-red uppercase">
+                            {dateParts?.monthAbbr ?? "—"}
+                          </span>
+                          <span className="text-sm font-bold text-gf-text leading-tight">
+                            {dateParts?.day ?? "—"}
+                          </span>
+                          <span className="text-[8px] text-gf-text-muted">
+                            {dateParts?.year ?? "—"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5">
+                          <span
+                            className={`text-sm font-bold ${
+                              isValid ? "text-emerald-700" : "text-gf-text-muted line-through"
+                            }`}
+                          >
+                            {dep.amount != null ? `${fmtCurrency(dep.amount)} MXN` : "—"}
+                          </span>
+                          <span className="text-xs font-semibold text-gf-text uppercase line-clamp-1">
+                            {dep.payerOrBeneficiaryName ?? dep.originalConcept ?? "—"}
+                          </span>
+                          {dep.originalConcept && (
+                            <span className="text-[11px] text-gf-text-muted line-clamp-1">
+                              Concepto: {dep.originalConcept}
+                            </span>
+                          )}
+                          {!isValid && dep.reason && (
+                            <span className="text-[11px] text-amber-700 font-medium">
+                              Motivo de descarte: {dep.reason}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isValid ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            Ingreso Válido
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
+                            Descartado ({dep.category ?? "No computable"})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : statement.deposits.length > 0 ? (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
@@ -367,7 +455,7 @@ export default function EstadosStatementCard({
                 })}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* 4. Alertas del estado de cuenta */}
           {visibleAlerts.length > 0 && (

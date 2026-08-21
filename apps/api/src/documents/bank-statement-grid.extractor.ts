@@ -78,7 +78,7 @@ export class BankStatementGridExtractor {
       const text = line.text.trim().toUpperCase();
       const box = line.boundingBox;
       // Headers typically reside in the upper 45% of the page
-      if (box.top > (page.height * 0.45)) continue;
+      if (box.top > page.height * 0.45) continue;
 
       if (depositPatterns.some((p) => p.test(text))) {
         depositHeader = box;
@@ -109,8 +109,6 @@ export class BankStatementGridExtractor {
       amount: number;
       top: number;
       bottom: number;
-      left: number;
-      right: number;
     }
 
     const depositCells: DepositCell[] = [];
@@ -129,8 +127,6 @@ export class BankStatementGridExtractor {
               amount: amt,
               top: box.top,
               bottom: box.bottom,
-              left: box.left,
-              right: box.right,
             });
           }
         }
@@ -140,47 +136,32 @@ export class BankStatementGridExtractor {
     // Sort deposits top-to-bottom
     depositCells.sort((a, b) => a.top - b.top);
 
-    // 4. Associate concept and date for each deposit
+    // 4. Associate concept block and date for each deposit
     const pageTransactions: RawTransaction[] = [];
+    let lastKnownDate: string | null = null;
 
     for (let i = 0; i < depositCells.length; i++) {
       const current = depositCells[i];
-      const previous = i > 0 ? depositCells[i - 1] : null;
+      const prev = i > 0 ? depositCells[i - 1] : null;
 
-      // Vertical range for this transaction's concept lines
-      const minY = previous ? previous.bottom - 10 : tableTop;
-      const maxY = current.bottom + 30;
+      // Vertical block range: from previous deposit bottom (or table top) down to current deposit bottom
+      const blockTop = prev ? prev.bottom : tableTop;
+      const blockBottom = current.bottom + 15;
 
-      // Find lines that belong to the concept (left of withdrawal column)
-      const candidateLines = lines.filter((l) => {
+      const blockLines = lines.filter((l) => {
         const b = l.boundingBox;
         const isLeftOfAmounts = b.right < (withdrawalHeader ? withdrawalHeader.left : depLeft);
-        const isInYRange = b.top >= minY && b.bottom <= maxY;
-        return isLeftOfAmounts && isInYRange && b.top > tableTop;
+        return isLeftOfAmounts && b.top >= blockTop && b.bottom <= blockBottom && b.top > tableTop;
       });
 
-      candidateLines.sort((a, b) => a.boundingBox.top - b.boundingBox.top);
+      blockLines.sort((a, b) => a.boundingBox.top - b.boundingBox.top);
+      const rawConcept = blockLines.map((l) => l.text.trim()).join(' ');
 
-      // Anchor to the nearest preceding date marker for this transaction
-      let startIndex = 0;
-      for (let j = candidateLines.length - 1; j >= 0; j--) {
-        const text = candidateLines[j].text;
-        if (
-          /\b(\d{1,2})\s+(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/i.test(text) ||
-          /\b\d{2}[\/\-]\d{2}(?:[\/\-]\d{2,4})?\b/.test(text)
-        ) {
-          if (candidateLines[j].boundingBox.top <= current.bottom + 10) {
-            startIndex = j;
-            break;
-          }
-        }
+      // Parse date
+      const date = this.extractDate(rawConcept, yearStr) || lastKnownDate;
+      if (date) {
+        lastKnownDate = date;
       }
-
-      const relevantLines = candidateLines.slice(startIndex);
-      const rawConcept = relevantLines.map((l) => l.text.trim()).join(' ');
-
-      // Parse date (e.g. "05 FEB", "15/02/2025", "2025-02-15")
-      const date = this.extractDate(rawConcept, yearStr);
 
       // Clean up concept (remove leading date and technical markers)
       const cleanedConcept = this.cleanConceptText(rawConcept);
@@ -209,11 +190,14 @@ export class BankStatementGridExtractor {
   }
 
   private static extractDate(text: string, defaultYear: string): string | null {
-    // 1. Check "DD MMM" format (e.g. "05 FEB", "28 FEB")
-    const ddMmm = /\b(\d{1,2})\s+(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/i.exec(text);
-    if (ddMmm) {
-      const day = ddMmm[1].padStart(2, '0');
-      const month = MONTH_MAP[ddMmm[2].toUpperCase()] || '01';
+    // 1. Check all "DD MMM" occurrences and pick the LAST one in the block
+    const ddMmmMatches = Array.from(
+      text.matchAll(/\b(\d{1,2})\s+(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/gi),
+    );
+    if (ddMmmMatches.length > 0) {
+      const lastMatch = ddMmmMatches[ddMmmMatches.length - 1];
+      const day = lastMatch[1].padStart(2, '0');
+      const month = MONTH_MAP[lastMatch[2].toUpperCase()] || '01';
       return `${defaultYear}-${month}-${day}`;
     }
 
@@ -246,12 +230,12 @@ export class BankStatementGridExtractor {
     let payerRfc: string | null = null;
 
     // Look for "POR ORDEN DE <NAME>"
-    const ordenMatch = /POR ORDEN DE\s+([A-ZÑ\s.,]+?)(?:\s+CTA\.ORDENANTE|\s+REF\.|\s+SUC\.|$)/i.exec(concept);
+    const ordenMatch = /POR ORDEN DE\s+([A-ZÑ\s.,]+?)(?:\s+CTA\.ORDENANTE|\s+REF\.|\s+SUC\.|\s+SU REF|$)/i.exec(concept);
     if (ordenMatch) {
       payerName = ordenMatch[1].trim();
     } else {
       // Look for "PAGO RECIBIDO DE <NAME>"
-      const pagoMatch = /PAGO RECIBIDO DE\s+([A-ZÑ\s.,\/]+?)(?:\s+SU REF|\s+CTA\.|\s+REF\.|$)/i.exec(concept);
+      const pagoMatch = /PAGO RECIBIDO DE\s+([A-ZÑ\s.,\/]+?)(?:\s+SU REF|\s+CTA\.|\s+REF\.|\s+POR ORDEN|$)/i.exec(concept);
       if (pagoMatch) {
         payerName = pagoMatch[1].replace(/[,/]/g, ' ').trim();
       }

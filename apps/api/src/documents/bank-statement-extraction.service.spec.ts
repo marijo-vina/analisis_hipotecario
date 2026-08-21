@@ -1515,7 +1515,10 @@ describe('BankStatementExtractionService', () => {
           rfc: 'PEAJ800101XYZ',
           fullName: 'JUAN CARLOS PEREZ ALVAREZ',
           regimes: [{ code: '606', description: 'Régimen de Arrendamiento' }],
-          economicActivities: ['Consultorios de medicina especializada'],
+          economicActivities: [
+            'Consultorios de medicina especializada',
+            'Arrendamiento de bienes inmuebles',
+          ],
         },
       });
 

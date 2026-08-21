@@ -521,14 +521,18 @@ export class BankStatementCleanerService {
    * Checks if the client has active Regime 606 (Arrendamiento).
    */
   private hasArrendamientoRegime(
-    regimes?: Array<{ code?: string | null; description?: string | null }>,
+    regimes?: Array<{ code?: string | null; description?: string | null } | string>,
   ): boolean {
     if (!regimes || !Array.isArray(regimes)) return false;
-    return regimes.some(
-      (r) =>
+    return regimes.some((r) => {
+      if (typeof r === 'string') {
+        return r.includes('606') || /arrendamiento/i.test(r) || /alquiler/i.test(r);
+      }
+      return (
         r.code === '606' ||
-        (r.description && /arrendamiento/i.test(r.description)),
-    );
+        (Boolean(r.description) && /arrendamiento/i.test(r.description!))
+      );
+    });
   }
 
   /**
