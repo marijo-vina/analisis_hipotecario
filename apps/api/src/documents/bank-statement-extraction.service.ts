@@ -7,6 +7,8 @@ import {
   RawTransaction,
   StatementSummary,
 } from './bank-statement-cleaner.service';
+import { BankStatementGridExtractor } from './bank-statement-grid.extractor';
+import { OcrLayout } from './document-ai.types';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger bank-statement extraction
@@ -19,83 +21,45 @@ const BANK_STATEMENT_DOC_TYPES = ['BANK_STATEMENT'];
 const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
 
 // ---------------------------------------------------------------------------
-// Specialized instructions for bank-statement extraction
+// Specialized instructions for bank-statement extraction (Fast cover extraction)
 // ---------------------------------------------------------------------------
 const BANK_STATEMENT_INSTRUCTIONS = [
   'Estado de cuenta bancario mexicano para análisis hipotecario.',
-  '',
-  'El documento puede tener CUALQUIER formato, layout, nombres de campos o posiciones.',
-  'NO asumas que todos los estados de cuenta usan los mismos nombres. Analizá TODO el texto OCR.',
+  'Extraé los metadatos de la carátula y el resumen de la cuenta.',
   '',
   '─── REGLA DE ORO ───',
   'NO inventes datos. Ante cualquier duda, usá null.',
-  'Extraé ÚNICAMENTE de la información presente en el OCR.',
+  'Extraé ÚNICAMENTE de la información presente en el texto de la carátula.',
   '',
   '─── Titular (accountHolder) ───',
-  '  fullName: nombre completo del titular de la cuenta. Buscar: TITULAR, NOMBRE DEL TITULAR,',
-  '    NOMBRE, Cuenta de. Normalizar a MAYÚSCULAS.',
-  '  rfc: RFC del titular de la cuenta (12-13 caracteres). Buscar: RFC, RFC TITULAR,',
-  '    RFC CUENTAHABIENTE, RFC CLIENTE. Puede aparecer en el encabezado o junto al nombre.',
-  '    Pista de regex RFC: [A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}. Si no hay match claro, usar null.',
-  '  isJointAccount: true si el estado de cuenta muestra dos o más titulares, "cuenta mancomunada",',
-  '    "cuenta conjunta", o múltiples nombres con "Y" entre ellos. false si hay un solo titular claro.',
-  '    null si no es evidente.',
+  '  fullName: nombre completo del titular de la cuenta en MAYÚSCULAS.',
+  '  rfc: RFC del titular de la cuenta (12-13 caracteres). Si no hay match claro, usar null.',
+  '  isJointAccount: true si es cuenta mancomunada / dos titulares, false si es individual, null si no es evidente.',
   '',
   '─── Banco (bank) ───',
-  '  institutionName: nombre del banco. Buscar: BANCO, INSTITUCIÓN, NOMBRE DEL BANCO.',
-  '    Ejemplos: BBVA, BANORTE, SANTANDER, BANCOMER, HSBC, CITIBANAMEX, BANREGIO, etc.',
-  '  accountNumber: número de cuenta (NO la CLABE). Suele tener 10-12 dígitos.',
-  '  clabe: CLABE interbancaria (18 dígitos). Buscar: CLABE, CLABE INTERBANCARIA.',
+  '  institutionName: nombre del banco (ej. BBVA, BANORTE, SANTANDER, CITIBANAMEX, HSBC, etc.).',
+  '  accountNumber: número de cuenta (10-12 dígitos).',
+  '  clabe: CLABE interbancaria (18 dígitos).',
   '',
   '─── Periodo del estado de cuenta (statementPeriod) ───',
-  '  periodStartDate: fecha de inicio del periodo YYYY-MM-DD. Buscar: PERIODO, DESDE, FECHA INICIO.',
-  '  periodEndDate: fecha de fin del periodo YYYY-MM-DD. Buscar: HASTA, FECHA FIN, FECHA DE CORTE.',
-  '  cutoffDate: fecha de corte YYYY-MM-DD. Puede coincidir con periodEndDate.',
-  '  isClosedMonth: true si corresponde a un mes cerrado (ej. mayo 2026 con fecha de corte 31/05).',
-  '  isCurrentIncompleteMonth: true si corresponde al mes en curso que aún no cierra.',
-  '  averageBalance: saldo promedio del periodo. Número decimal sin $ ni comas.',
-  '  endingBalance: saldo final al cierre del periodo. Número decimal sin $ ni comas.',
+  '  periodStartDate: fecha de inicio del periodo YYYY-MM-DD.',
+  '  periodEndDate: fecha de fin del periodo YYYY-MM-DD.',
+  '  cutoffDate: fecha de corte YYYY-MM-DD.',
+  '  isClosedMonth: true si corresponde a un mes cerrado, false si es mes en curso.',
+  '  isCurrentIncompleteMonth: true si el mes aún no cierra.',
+  '  averageBalance: saldo promedio del periodo (número decimal sin $ ni comas).',
+  '  endingBalance: saldo final al cierre del periodo (número decimal sin $ ni comas).',
   '',
   '─── Resumen de carátula (statementSummary) ───',
-  '  totalDepositsAmount: total de abonos / depósitos en dinero reportado por el banco en la carátula o resumen.',
+  '  totalDepositsAmount: total de abonos / depósitos en dinero reportado por el banco en la carátula.',
   '  totalDepositsCount: número de abonos o depósitos reportados.',
   '  totalWithdrawalsAmount: total de cargos / retiros en dinero reportado por el banco.',
   '  totalWithdrawalsCount: número de cargos o retiros reportados.',
   '  averageBalance: saldo promedio mensual reportado.',
   '  endingBalance: saldo final al corte reportado.',
   '',
-  '─── REGLA DE INTEGRIDAD MATEMÁTICA Y ALINEACIÓN DE COLUMNAS (CRÍTICO) ───',
-  '  1. En los estados de cuenta bancarios (ej. Citibanamex, BBVA, Santander, Banorte), la tabla de operaciones tiene columnas separadas:',
-  '     FECHA | CONCEPTO | RETIROS (Cargos) | DEPOSITOS (Abonos) | SALDO',
-  '  2. En el texto OCR lineal, los números de RETIROS, DEPOSITOS y SALDO a veces aparecen apilados.',
-  '     DEBES ASIGNAR CUIDADOSAMENTE CADA NÚMERO A SU COLUMNA CORRECTA:',
-  '     - RETIROS: compras con tarjeta, comisiones, pagos de servicios, cargos, retiros en cajero.',
-  '     - DEPOSITOS: depósitos en efectivo, transferencias recibidas, pagos recibidos, liquidaciones TPV (EVOPAY, CLIP, etc.).',
-  '     - SALDO: saldo acumulado tras la operación (NUNCA lo tomes como depósito).',
-  '  3. TOTAL DE DEPÓSITOS EN CARÁTULA:',
-  '     En la carátula o resumen inicial del estado de cuenta, el banco declara explícitamente el resumen de la cuenta:',
-  '     - totalDepositsCount (ej. "25 Depósitos")',
-  '     - totalDepositsAmount (ej. "$163,878.00")',
-  '  4. REGLA DE AUTO-VERIFICACIÓN:',
-  '     El número de elementos en allTransactions[] y la suma matemática de sus montos (allTransactions[].amount)',
-  '     DEBE COINCIDIR EXACTAMENTE con los totales declarados por el banco en la carátula.',
-  '     Si tu suma de allTransactions[] da más o menos que totalDepositsAmount, corrige la lista porque estás tomando montos de la columna RETIROS o SALDO por error.',
-  '',
-  '─── Todas las Transacciones (allTransactions[]) ───',
-  '  Extraé exhaustivamente ÚNICAMENTE los movimientos de la columna de ABONO / DEPÓSITO (dinero que ENTRA a la cuenta).',
-  '  NO incluyas movimientos de la columna de RETIROS / CARGOS / SALIDAS ni saldos acumulados.',
-  '    date: YYYY-MM-DD.',
-  '    amount: monto decimal positivo exacto del depósito.',
-  '    currency: "MXN", "USD", u "OTHER".',
-  '    movementType: "DEPOSIT".',
-  '    originalConcept: concepto o descripción textual exacta del movimiento.',
-  '    payerOrBeneficiaryName: nombre de quien deposita o transfiere si aparece.',
-  '    payerRfc: RFC de quien deposita si aparece en el concepto o referencia.',
-  '    referenceNumber: número de referencia, rastreo o autorización si aparece.',
-  '',
   '─── Depósitos de nómina (payrollDeposits[]) ───',
-  '  Extraé TODOS los depósitos que parezcan de nómina, pagos quincenales o mensuales del empleador.',
-  '  Para cada depósito:',
+  '  Si en la carátula se listan depósitos evidentes de nómina o abonos recurrentes, extraelos; si no, dejar arreglo vacío [].',
   '    date: YYYY-MM-DD.',
   '    amount: monto del depósito. Número decimal sin $ ni comas.',
   '    currency: "MXN", "USD", u "OTHER". Default "MXN" si no se especifica.',
@@ -470,9 +434,24 @@ export class BankStatementExtractionService {
       economicActivities: csfData?.economicActivities || [],
     };
 
-    // ── 7. Call Gemini with specialized instructions ────────────────────
+    // ── 7. Call Gemini with specialized instructions (Fast cover page extraction) ────
+    // Send only cover page(s) to Gemini to extract metadata & summary in ~1.5s
+    let textForGemini = document.ocrText;
+    const layout = (document as any).ocrLayout as OcrLayout | undefined;
+    if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
+      // Cover page text (pages 1 and 2 for summary)
+      const coverLines = layout.pages
+        .slice(0, 2)
+        .flatMap((p) => p.lines || [])
+        .map((l) => l.text.trim())
+        .filter(Boolean);
+      if (coverLines.length > 0) {
+        textForGemini = coverLines.join('\n');
+      }
+    }
+
     const geminiResult = await this.geminiService.extractStructuredData(
-      document.ocrText,
+      textForGemini,
       document.documentType.code,
       { ...BANK_STATEMENT_SCHEMA },
       BANK_STATEMENT_INSTRUCTIONS,
@@ -515,8 +494,29 @@ export class BankStatementExtractionService {
     // ── 8. Normalize bank-statement fields ───────────────────────────────
     this.normalizeBankStatement(data);
 
-    // ── 9. Execute Deterministic Financial Depuration ────────────────────
-    const rawTransactions = this.collectTransactions(data);
+    // ── 9. Extract Transactions via Spatial Grid (Deterministic fallback to Gemini) ──
+    const statementPeriod = (data.statementPeriod ?? {}) as Record<string, unknown>;
+    const periodStart = statementPeriod.periodStartDate as string | undefined;
+    const yearMatch = periodStart ? /^(\d{4})/.exec(periodStart) : null;
+    const statementYear = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
+
+    let rawTransactions: RawTransaction[] = [];
+    if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
+      const gridTransactions = BankStatementGridExtractor.extractTransactions(
+        layout,
+        statementYear,
+      );
+      if (gridTransactions.length > 0) {
+        rawTransactions = gridTransactions;
+        data.allTransactions = gridTransactions;
+      }
+    }
+
+    // Fallback: if grid did not extract transactions, collect from Gemini output
+    if (rawTransactions.length === 0) {
+      rawTransactions = this.collectTransactions(data);
+    }
+
     const statementSummary = (data.statementSummary ||
       data.statementPeriod ||
       {}) as StatementSummary;
