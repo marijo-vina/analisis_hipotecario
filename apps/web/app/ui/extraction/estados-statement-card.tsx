@@ -328,7 +328,7 @@ export default function EstadosStatementCard({
               <div className="space-y-2.5">
                 {statement.financialDepuration.cleanedDeposits.map((dep: any, i: number) => {
                   const dateParts = dep.date ? parseDateParts(dep.date) : null;
-                  const isValid = dep.isValidIncome === true;
+                  const isValid = dep.classification === 'VALID' || dep.classification === 'NEEDS_REVIEW';
                   return (
                     <div
                       key={i}
@@ -384,7 +384,7 @@ export default function EstadosStatementCard({
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
-                            Descartado ({dep.category ?? "No computable"})
+                            Descartado ({dep.trashCategory ?? "No clasificado"})
                           </span>
                         )}
                       </div>
