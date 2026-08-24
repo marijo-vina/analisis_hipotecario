@@ -7,7 +7,10 @@ import {
   RawTransaction,
   StatementSummary,
 } from './bank-statement-cleaner.service';
-import { BankStatementGridExtractor } from './bank-statement-grid.extractor';
+import {
+  BankStatementGridExtractor,
+  GridDiagnostics,
+} from './bank-statement-grid.extractor';
 import { OcrLayout } from './document-ai.types';
 
 // ---------------------------------------------------------------------------
@@ -19,6 +22,8 @@ const BANK_STATEMENT_DOC_TYPES = ['BANK_STATEMENT'];
 // RFC validation regex — post-Gemini deterministic cleanup
 // ---------------------------------------------------------------------------
 const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+const RFC_GENERIC_NORMALIZE_REGEX = /[^A-Z0-9]/g;
+const RFC_GENERIC_PLACEHOLDER_REGEX = /^X[AE]X{1,2}010101000$/;
 
 // ---------------------------------------------------------------------------
 // Specialized instructions for bank-statement extraction (Fast cover extraction)
@@ -347,6 +352,61 @@ const BANK_STATEMENT_SCHEMA = {
 };
 
 // ---------------------------------------------------------------------------
+// Observability: per-stage timings and source-of-truth traces
+// ---------------------------------------------------------------------------
+
+/** Wall-clock duration of each pipeline stage, in milliseconds. */
+export interface BankStatementStageTimings {
+  coverTextPrepMs: number;
+  geminiMs: number;
+  gridMs: number;
+  cleanerMs: number;
+  persistMs: number;
+  totalMs: number;
+}
+
+/**
+ * Full diagnostics for one extraction run. Populated only when
+ * `collectDiagnostics` is requested (benchmark path). Never alters the
+ * extraction result itself.
+ */
+export interface BankStatementDiagnostics {
+  documentId: string;
+  timings: BankStatementStageTimings;
+  gemini: {
+    success: boolean;
+    durationMs: number | null;
+    attempts: number | null;
+    finishReason: string | null;
+    promptChars: number | null;
+    responseChars: number | null;
+    errorCode: string | null;
+  };
+  rfc: {
+    rawFromGemini: string | null;
+    valueBeforeValidation: string | null;
+    final: string | null;
+    rejectedByRegex: boolean;
+    usedCsfFallback: boolean;
+  };
+  grid: GridDiagnostics | null;
+  transactions: {
+    source: 'grid' | 'gemini-fallback' | 'none';
+    count: number;
+  };
+  coverTextChars: number;
+  coverPagesUsed: number;
+}
+
+/** Options controlling side effects and observability of `extract`. */
+export interface BankStatementExtractOptions {
+  /** When false, skip all DB writes (status transitions + final persist). Default true. */
+  persist?: boolean;
+  /** When true, collect and return per-run diagnostics. Default false. */
+  collectDiagnostics?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Extraction result envelope
 // ---------------------------------------------------------------------------
 export interface BankStatementExtractionResult {
@@ -355,6 +415,7 @@ export interface BankStatementExtractionResult {
   extractedData: Record<string, unknown> | null;
   alerts: ExtractionAlert[];
   missingFields: string[];
+  diagnostics?: BankStatementDiagnostics;
   error?: { code: string; message: string };
 }
 
@@ -378,7 +439,22 @@ export class BankStatementExtractionService {
   async extract(
     caseId: string,
     documentId: string,
+    options: BankStatementExtractOptions = {},
   ): Promise<BankStatementExtractionResult> {
+    const persist = options.persist ?? true;
+    const collectDiagnostics = options.collectDiagnostics ?? false;
+
+    // Stage timing accumulators (ms). Populated as the pipeline advances.
+    const startedAt = Date.now();
+    const timings: BankStatementStageTimings = {
+      coverTextPrepMs: 0,
+      geminiMs: 0,
+      gridMs: 0,
+      cleanerMs: 0,
+      persistMs: 0,
+      totalMs: 0,
+    };
+
     // ── 1. Fetch document with type + status + case ────────────────────
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -475,12 +551,15 @@ export class BankStatementExtractionService {
 
     // ── 7. Call Gemini with specialized instructions (Fast cover page extraction) ────
     // Send only cover page(s) to Gemini to extract metadata & summary in ~1.5s
+    const coverPrepStart = Date.now();
     let textForGemini = document.ocrText;
+    let coverPagesUsed = 0;
     const layout = (document as any).ocrLayout as OcrLayout | undefined;
     if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
       // Cover page text (pages 1 and 2 for summary)
-      const coverLines = layout.pages
-        .slice(0, 2)
+      const coverPages = layout.pages.slice(0, 2);
+      coverPagesUsed = coverPages.length;
+      const coverLines = coverPages
         .flatMap((p) => p.lines || [])
         .map((l) => l.text.trim())
         .filter(Boolean);
@@ -488,13 +567,17 @@ export class BankStatementExtractionService {
         textForGemini = coverLines.join('\n');
       }
     }
+    timings.coverTextPrepMs = Date.now() - coverPrepStart;
+    const coverTextChars = textForGemini.length;
 
+    const geminiStart = Date.now();
     const geminiResult = await this.geminiService.extractStructuredData(
       textForGemini,
       document.documentType.code,
       { ...FAST_BANK_STATEMENT_COVER_SCHEMA },
       BANK_STATEMENT_INSTRUCTIONS,
     );
+    timings.geminiMs = Date.now() - geminiStart;
 
     if (!geminiResult.success) {
       this.logger.warn(
@@ -502,16 +585,45 @@ export class BankStatementExtractionService {
       );
 
       // Transition to EXTRACTION_ERROR so the UI can show the real state
-      try {
-        await this.prisma.document.update({
-          where: { id: documentId },
-          data: { documentStatusId: extractionErrorStatus.id },
-        });
-      } catch (dbError) {
-        this.logger.error(
-          `[BankStatement] Failed to set EXTRACTION_ERROR status for doc ${documentId}: ${(dbError as Error).message}`,
-        );
+      if (persist) {
+        try {
+          await this.prisma.document.update({
+            where: { id: documentId },
+            data: { documentStatusId: extractionErrorStatus.id },
+          });
+        } catch (dbError) {
+          this.logger.error(
+            `[BankStatement] Failed to set EXTRACTION_ERROR status for doc ${documentId}: ${(dbError as Error).message}`,
+          );
+        }
       }
+
+      timings.totalMs = Date.now() - startedAt;
+      const failureDiagnostics: BankStatementDiagnostics = {
+        documentId,
+        timings,
+        gemini: {
+          success: false,
+          durationMs: geminiResult.timings?.durationMs ?? null,
+          attempts: geminiResult.timings?.attempts ?? null,
+          finishReason: geminiResult.timings?.finishReason ?? null,
+          promptChars: geminiResult.timings?.promptChars ?? null,
+          responseChars: geminiResult.timings?.responseChars ?? null,
+          errorCode: geminiResult.error?.code ?? 'UNKNOWN',
+        },
+        rfc: {
+          rawFromGemini: null,
+          valueBeforeValidation: null,
+          final: null,
+          rejectedByRegex: false,
+          usedCsfFallback: false,
+        },
+        grid: null,
+        transactions: { source: 'none', count: 0 },
+        coverTextChars,
+        coverPagesUsed,
+      };
+      this.logDiagnostics(failureDiagnostics);
 
       return {
         success: false,
@@ -519,6 +631,7 @@ export class BankStatementExtractionService {
         extractedData: geminiResult.extractedData,
         alerts: [],
         missingFields: [],
+        diagnostics: collectDiagnostics ? failureDiagnostics : undefined,
         error: geminiResult.error
           ? {
               code: geminiResult.error.code,
@@ -535,19 +648,39 @@ export class BankStatementExtractionService {
     data.possiblePayrollProviders = data.possiblePayrollProviders || [];
     data.otherRelevantMovements = data.otherRelevantMovements || [];
 
-    // Fallback RFC from CSF if bank statement has generic XAXX... or null
-    if (
-      (!data.accountHolder?.rfc || data.accountHolder.rfc.startsWith('XAXX')) &&
-      clientContext.clientRfc
-    ) {
+    // RFC trace: raw value as returned by Gemini (before any fallback/validation)
+    const rfcRawFromGemini: string | null = data.accountHolder?.rfc ?? null;
+    let rfcUsedCsfFallback = false;
+
+    // Replace SAT generic placeholders from Gemini with the client's CSF RFC.
+    // Gemini occasionally corrupts XAXX010101000 into XAX010101000; both are
+    // placeholders and should never persist as the titular RFC.
+    const shouldUseCsfRfcFallback =
+      !data.accountHolder?.rfc ||
+      this.isGenericPlaceholderRfc(data.accountHolder.rfc);
+    if (shouldUseCsfRfcFallback && clientContext.clientRfc) {
       if (!data.accountHolder) {
         data.accountHolder = { fullName: null, rfc: null, isJointAccount: null };
       }
       data.accountHolder.rfc = clientContext.clientRfc;
+      rfcUsedCsfFallback = true;
+    } else if (data.accountHolder?.rfc && shouldUseCsfRfcFallback) {
+      data.accountHolder.rfc = null;
     }
+
+    // RFC trace: value entering validateRfc (after fallback, before regex cleanup)
+    const rfcValueBeforeValidation: string | null =
+      data.accountHolder?.rfc ?? null;
 
     // ── 8. Normalize bank-statement fields ───────────────────────────────
     this.normalizeBankStatement(data);
+
+    // RFC trace: final value after validateRfc regex enforcement
+    const rfcFinal: string | null = data.accountHolder?.rfc ?? null;
+    const rfcRejectedByRegex =
+      !!rfcValueBeforeValidation &&
+      rfcValueBeforeValidation.trim() !== '' &&
+      rfcFinal == null;
 
     // ── 9. Extract Transactions via Spatial Grid (Deterministic fallback to Gemini) ──
     const statementPeriod = (data.statementPeriod ?? {}) as Record<string, unknown>;
@@ -556,31 +689,42 @@ export class BankStatementExtractionService {
     const statementYear = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
 
     let rawTransactions: RawTransaction[] = [];
+    let gridDiagnostics: GridDiagnostics | null = null;
+    let transactionSource: 'grid' | 'gemini-fallback' | 'none' = 'none';
+    const gridStart = Date.now();
     if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
-      const gridTransactions = BankStatementGridExtractor.extractTransactions(
+      const gridOutput = BankStatementGridExtractor.extractWithDiagnostics(
         layout,
         statementYear,
       );
-      if (gridTransactions.length > 0) {
-        rawTransactions = gridTransactions;
-        data.allTransactions = gridTransactions;
+      gridDiagnostics = gridOutput.diagnostics;
+      if (gridOutput.transactions.length > 0) {
+        rawTransactions = gridOutput.transactions;
+        data.allTransactions = gridOutput.transactions;
+        transactionSource = 'grid';
       }
     }
+    timings.gridMs = Date.now() - gridStart;
 
     // Fallback: if grid did not extract transactions, collect from Gemini output
     if (rawTransactions.length === 0) {
       rawTransactions = this.collectTransactions(data);
+      if (rawTransactions.length > 0) {
+        transactionSource = 'gemini-fallback';
+      }
     }
 
     const statementSummary = (data.statementSummary ||
       data.statementPeriod ||
       {}) as StatementSummary;
 
+    const cleanerStart = Date.now();
     const depurationResult = this.cleanerService.clean(
       rawTransactions,
       statementSummary,
       clientContext,
     );
+    timings.cleanerMs = Date.now() - cleanerStart;
     data.financialDepuration = depurationResult;
 
     const isPfaeCase =
@@ -635,13 +779,47 @@ export class BankStatementExtractionService {
 
     // ── 12. Persist extractedData + status atomically ────────────────────
 
-    await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        extractedData: data as any,
-        documentStatusId: processedStatus.id,
+    const persistStart = Date.now();
+    if (persist) {
+      await this.prisma.document.update({
+        where: { id: documentId },
+        data: {
+          extractedData: data as any,
+          documentStatusId: processedStatus.id,
+        },
+      });
+    }
+    timings.persistMs = Date.now() - persistStart;
+    timings.totalMs = Date.now() - startedAt;
+
+    const diagnostics: BankStatementDiagnostics = {
+      documentId,
+      timings,
+      gemini: {
+        success: true,
+        durationMs: geminiResult.timings?.durationMs ?? null,
+        attempts: geminiResult.timings?.attempts ?? null,
+        finishReason: geminiResult.timings?.finishReason ?? null,
+        promptChars: geminiResult.timings?.promptChars ?? null,
+        responseChars: geminiResult.timings?.responseChars ?? null,
+        errorCode: null,
       },
-    });
+      rfc: {
+        rawFromGemini: rfcRawFromGemini,
+        valueBeforeValidation: rfcValueBeforeValidation,
+        final: rfcFinal,
+        rejectedByRegex: rfcRejectedByRegex,
+        usedCsfFallback: rfcUsedCsfFallback,
+      },
+      grid: gridDiagnostics,
+      transactions: {
+        source: transactionSource,
+        count: rawTransactions.length,
+      },
+      coverTextChars,
+      coverPagesUsed,
+    };
+    this.logDiagnostics(diagnostics);
 
     return {
       success: true,
@@ -649,6 +827,140 @@ export class BankStatementExtractionService {
       extractedData: data,
       alerts: data.alerts as ExtractionAlert[],
       missingFields,
+      diagnostics: collectDiagnostics ? diagnostics : undefined,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: structured diagnostics logging (one compact JSON line per run)
+  // -----------------------------------------------------------------------
+  private logDiagnostics(d: BankStatementDiagnostics): void {
+    this.logger.log(
+      `[BankStatementDiag] ${JSON.stringify({
+        documentId: d.documentId,
+        totalMs: d.timings.totalMs,
+        geminiMs: d.timings.geminiMs,
+        gridMs: d.timings.gridMs,
+        cleanerMs: d.timings.cleanerMs,
+        gemini: {
+          ok: d.gemini.success,
+          attempts: d.gemini.attempts,
+          finishReason: d.gemini.finishReason,
+          promptChars: d.gemini.promptChars,
+          responseChars: d.gemini.responseChars,
+          errorCode: d.gemini.errorCode,
+        },
+        rfc: {
+          raw: d.rfc.rawFromGemini,
+          final: d.rfc.final,
+          rejectedByRegex: d.rfc.rejectedByRegex,
+          usedCsfFallback: d.rfc.usedCsfFallback,
+        },
+        tx: {
+          source: d.transactions.source,
+          count: d.transactions.count,
+          pagesWithHeader: d.grid?.pagesWithDepositHeader ?? null,
+          headerAccentPages: d.grid
+            ? d.grid.pages.filter((p) => p.depositHeaderHadAccent).length
+            : null,
+        },
+      })}`,
+    );
+  }
+
+  /**
+   * Runs `extract` N times WITHOUT persisting, aggregating timing and
+   * detection-rate statistics. DEV-only observability helper used to
+   * quantify latency variance and non-determinism before optimizing.
+   */
+  async benchmark(
+    caseId: string,
+    documentId: string,
+    runs: number,
+  ): Promise<Record<string, unknown>> {
+    const clampedRuns = Math.max(1, Math.min(20, Math.floor(runs) || 1));
+    const runResults: BankStatementDiagnostics[] = [];
+
+    for (let i = 0; i < clampedRuns; i++) {
+      const result = await this.extract(caseId, documentId, {
+        persist: false,
+        collectDiagnostics: true,
+      });
+      if (result.diagnostics) {
+        runResults.push(result.diagnostics);
+      }
+    }
+
+    if (runResults.length === 0) {
+      return {
+        documentId,
+        runs: clampedRuns,
+        error: 'No diagnostics collected (all runs failed before diagnostics).',
+      };
+    }
+
+    const totalMs = runResults.map((r) => r.timings.totalMs);
+    const geminiMs = runResults.map((r) => r.timings.geminiMs);
+    const gridMs = runResults.map((r) => r.timings.gridMs);
+    const txCounts = runResults.map((r) => r.transactions.count);
+    const rfcFinals = runResults.map((r) => r.rfc.final);
+
+    const rfcDetected = rfcFinals.filter((v) => !!v).length;
+    const rfcRejected = runResults.filter(
+      (r) => r.rfc.rejectedByRegex,
+    ).length;
+    const csfFallbackUsed = runResults.filter(
+      (r) => r.rfc.usedCsfFallback,
+    ).length;
+    const gridSource = runResults.filter(
+      (r) => r.transactions.source === 'grid',
+    ).length;
+    const distinctTxCounts = [...new Set(txCounts)];
+
+    return {
+      documentId,
+      runs: clampedRuns,
+      timingsMs: {
+        total: this.summarize(totalMs),
+        gemini: this.summarize(geminiMs),
+        grid: this.summarize(gridMs),
+      },
+      geminiAttempts: this.summarize(
+        runResults.map((r) => r.gemini.attempts ?? 0),
+      ),
+      rfc: {
+        detectionRate: `${rfcDetected}/${clampedRuns}`,
+        rejectedByRegexCount: rfcRejected,
+        csfFallbackCount: csfFallbackUsed,
+        distinctValues: [...new Set(rfcFinals)],
+      },
+      transactions: {
+        gridSourceRate: `${gridSource}/${clampedRuns}`,
+        counts: txCounts,
+        distinctCounts: distinctTxCounts,
+        nonDeterministic: distinctTxCounts.length > 1,
+        min: Math.min(...txCounts),
+        max: Math.max(...txCounts),
+      },
+      perRun: runResults,
+    };
+  }
+
+  /** Computes min/max/mean/p50/p95 for a numeric series. */
+  private summarize(values: number[]): Record<string, number> {
+    if (values.length === 0) {
+      return { min: 0, max: 0, mean: 0, p50: 0, p95: 0 };
+    }
+    const sorted = [...values].sort((a, b) => a - b);
+    const pct = (p: number) =>
+      sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    return {
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      mean: Math.round(sum / sorted.length),
+      p50: pct(50),
+      p95: pct(95),
     };
   }
 
@@ -754,6 +1066,19 @@ export class BankStatementExtractionService {
       return trimmed;
     }
     return null;
+  }
+
+  /**
+   * Detects SAT generic placeholder RFCs, including the corrupted variant
+   * observed from Gemini (`XAX010101000` missing one X).
+   */
+  private isGenericPlaceholderRfc(rfc: string | null | undefined): boolean {
+    if (!rfc) return false;
+    const normalized = String(rfc)
+      .trim()
+      .toUpperCase()
+      .replace(RFC_GENERIC_NORMALIZE_REGEX, '');
+    return RFC_GENERIC_PLACEHOLDER_REGEX.test(normalized);
   }
 
   // -----------------------------------------------------------------------

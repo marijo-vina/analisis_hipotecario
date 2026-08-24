@@ -184,6 +184,33 @@ export class DocumentsController {
     return { data };
   }
 
+  /**
+   * DEV-ONLY: Benchmark bank-statement extraction.
+   *
+   * Re-runs extraction `runs` times WITHOUT persisting, reusing the stored
+   * OCR layout, and returns aggregated timing (p50/p95) plus RFC/grid
+   * detection-rate and non-determinism statistics. Used to gather evidence
+   * before optimizing. Disabled in production.
+   */
+  @Post(':documentId/bank-statement-benchmark')
+  @HttpCode(200)
+  async benchmarkBankStatement(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Query('runs') runs?: string,
+  ) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('Benchmark endpoint is disabled in production.');
+    }
+    const parsedRuns = parseInt(runs || '5', 10);
+    const data = await this.bankStatementExtractionService.benchmark(
+      caseId,
+      documentId,
+      Number.isNaN(parsedRuns) ? 5 : parsedRuns,
+    );
+    return { data };
+  }
+
   @Post(':documentId/extract-bureau')
   @HttpCode(200)
   async extractCreditBureau(
