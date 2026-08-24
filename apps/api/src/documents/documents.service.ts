@@ -247,11 +247,21 @@ export class DocumentsService {
     // is enabled, and is stored additively alongside ocrText.
     let ocrText: string;
     let ocrLayout: OcrLayout;
+    const ocrStart = Date.now();
     try {
       ({ ocrText, ocrLayout } = await this.documentAiService.extractTextWithLayout(
         document.fileUrl,
         document.mimeType,
       ));
+      this.logger.log(
+        `[OcrTiming] ${JSON.stringify({
+          documentId,
+          documentType: document.documentType?.code ?? null,
+          ocrMs: Date.now() - ocrStart,
+          pageCount: ocrLayout?.pages?.length ?? 0,
+          ocrTextChars: ocrText?.length ?? 0,
+        })}`,
+      );
     } catch (aiError) {
       this.logger.error(
         `Document AI processing failed for document ${documentId}: ${(aiError as Error).message}`,

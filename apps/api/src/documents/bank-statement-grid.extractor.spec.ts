@@ -50,6 +50,103 @@ describe('BankStatementGridExtractor', () => {
     expect(transactions[1].payerOrBeneficiaryName).toBe('GESEME GRUPO');
   });
 
+  it('reuses previous column bounds when a transaction table continues on a page without headers', () => {
+    const headerPage: OcrPage = {
+      pageNumber: 2,
+      width: 1600,
+      height: 2400,
+      lines: [
+        { text: 'FECHA', boundingBox: { top: 300, bottom: 320, left: 50, right: 120 }, confidence: 0.99 },
+        { text: 'CONCEPTO', boundingBox: { top: 300, bottom: 320, left: 300, right: 500 }, confidence: 0.99 },
+        { text: 'RETIROS', boundingBox: { top: 300, bottom: 320, left: 800, right: 900 }, confidence: 0.99 },
+        { text: 'DEPOSITOS', boundingBox: { top: 300, bottom: 320, left: 1050, right: 1180 }, confidence: 0.99 },
+        { text: 'SALDO', boundingBox: { top: 300, bottom: 320, left: 1300, right: 1400 }, confidence: 0.99 },
+        { text: '05 FEB DEPOSITO EN PAGINA CON HEADER', boundingBox: { top: 500, bottom: 520, left: 50, right: 600 }, confidence: 0.98 },
+        { text: '6,200.00', boundingBox: { top: 500, bottom: 520, left: 1070, right: 1160 }, confidence: 0.99 },
+      ],
+      tokens: [],
+    };
+
+    const continuationPage: OcrPage = {
+      pageNumber: 3,
+      width: 1600,
+      height: 2400,
+      lines: [
+        { text: '06 FEB DEPOSITO EN PAGINA SIN HEADER', boundingBox: { top: 150, bottom: 170, left: 50, right: 600 }, confidence: 0.98 },
+        { text: '8,500.00', boundingBox: { top: 150, bottom: 170, left: 1070, right: 1160 }, confidence: 0.99 },
+        { text: '620,000.00', boundingBox: { top: 150, bottom: 170, left: 1310, right: 1410 }, confidence: 0.95 },
+      ],
+      tokens: [],
+    };
+
+    const output = BankStatementGridExtractor.extractWithDiagnostics(
+      { pages: [headerPage, continuationPage] },
+      2025,
+    );
+
+    expect(output.transactions).toHaveLength(2);
+    expect(output.transactions[1]).toEqual(
+      expect.objectContaining({
+        date: '2025-02-06',
+        amount: 8500,
+        originalConcept: expect.stringContaining('PAGINA SIN HEADER'),
+      }),
+    );
+    expect(output.diagnostics.pages[1]).toEqual(
+      expect.objectContaining({
+        depositHeaderFound: false,
+        depositHeaderInherited: true,
+        transactionCount: 1,
+      }),
+    );
+  });
+
+  it('extracts BBVA-style continuation deposits from combined headers and multi-amount OCR lines', () => {
+    const headerPage: OcrPage = {
+      pageNumber: 2,
+      width: 1800,
+      height: 2200,
+      lines: [
+        { text: 'FECHA', boundingBox: { top: 1492, bottom: 1515, left: 114, right: 192 }, confidence: 0.99 },
+        { text: 'SALDO', boundingBox: { top: 1493, bottom: 1515, left: 1487, right: 1574 }, confidence: 0.99 },
+        { text: 'REFERENCIA CARGOS ABONOS OPERACION', boundingBox: { top: 1520, bottom: 1542, left: 924, right: 1472 }, confidence: 0.99 },
+      ],
+      tokens: [],
+    };
+
+    const continuationPage: OcrPage = {
+      pageNumber: 3,
+      width: 1800,
+      height: 2200,
+      lines: [
+        { text: '26/JUL 26/JUL', boundingBox: { top: 1031, bottom: 1052, left: 49, right: 266 }, confidence: 0.98 },
+        { text: 'PAGO DE NOMINA', boundingBox: { top: 1032, bottom: 1053, left: 309, right: 547 }, confidence: 0.98 },
+        { text: '46,577.00 296,172.74', boundingBox: { top: 1032, bottom: 1053, left: 1202, right: 1471 }, confidence: 0.99 },
+        { text: '293,640.24', boundingBox: { top: 1033, bottom: 1054, left: 1580, right: 1708 }, confidence: 0.99 },
+        { text: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL', boundingBox: { top: 1066, bottom: 1088, left: 307, right: 837 }, confidence: 0.98 },
+      ],
+      tokens: [],
+    };
+
+    const output = BankStatementGridExtractor.extractWithDiagnostics(
+      { pages: [headerPage, continuationPage] },
+      2025,
+    );
+
+    expect(output.transactions).toHaveLength(1);
+    expect(output.transactions[0]).toEqual(
+      expect.objectContaining({
+        date: '2025-07-26',
+        amount: 46577,
+        originalConcept: expect.stringContaining('PAGO DE NOMINA'),
+      }),
+    );
+    expect(output.diagnostics.pages[0].depositHeaderText).toBe(
+      'REFERENCIA CARGOS ABONOS OPERACION',
+    );
+    expect(output.diagnostics.pages[1].depositHeaderInherited).toBe(true);
+  });
+
   it('ignores pages without deposit headers (e.g. cover page)', () => {
     const coverPage: OcrPage = {
       pageNumber: 1,

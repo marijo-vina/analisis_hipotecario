@@ -1244,6 +1244,76 @@ describe('BankStatementExtractionService', () => {
   });
 
   // ── 5.3 RFC post-validation tests ────────────────────────────────────
+  describe('extract — titular RFC fallback from CSF', () => {
+    const setupTitularRfc = (
+      titularRfc: string | null,
+      csfRfc: string | null = null,
+    ) => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.findFirst.mockResolvedValue(
+        csfRfc
+          ? {
+              id: 'doc-csf-1',
+              extractedData: {
+                taxpayer: {
+                  rfc: csfRfc,
+                  fullName: 'MARIA PEREZ',
+                },
+              },
+            }
+          : null,
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            accountHolder: {
+              fullName: 'MARIA PEREZ',
+              rfc: titularRfc,
+              isJointAccount: false,
+            },
+          }),
+        ),
+      );
+    };
+
+    it('replaces XAXX010101000 with the client RFC from CSF', async () => {
+      setupTitularRfc('XAXX010101000', 'PEGJ800101AB1');
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const accountHolder = ed.accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+    });
+
+    it('replaces corrupted generic RFC XAX010101000 with the client RFC from CSF', async () => {
+      setupTitularRfc('XAX010101000', 'PEGJ800101AB1');
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const accountHolder = ed.accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+    });
+
+    it('nulls a generic placeholder RFC when no CSF fallback exists', async () => {
+      setupTitularRfc('XAX010101000');
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const accountHolder = ed.accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBeNull();
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'BANK_NO_TITULAR_RFC' }),
+        ]),
+      );
+    });
+
+    it('does not override a valid non-placeholder RFC from Gemini', async () => {
+      setupTitularRfc('PEGJ800101AB1', 'PEMJ900101ABC');
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const ed = result.extractedData as Record<string, unknown>;
+      const accountHolder = ed.accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+    });
+  });
+
   describe('normalizeBankStatement — RFC post-validation (spec RFC scenarios)', () => {
     const setupRfc = (
       payrollDeposits: Record<string, unknown>[],
