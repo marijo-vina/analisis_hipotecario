@@ -561,7 +561,7 @@ export default function EstadosStatementCard({
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold shadow-2xs">
-                              Descartado ({dep.trashCategory ?? "No clasificado"})
+                              Descartado ({getTrashCategoryLabel(dep.trashCategory)})
                             </span>
                             <button
                               type="button"
@@ -792,3 +792,22 @@ function maskClabe(clabe: string): string {
   if (clabe.length <= 8) return clabe;
   return clabe.slice(0, 4) + " **** " + clabe.slice(-4);
 }
+
+const TRASH_CATEGORY_LABELS: Record<string, string> = {
+  OWN_TRANSFER: "Traspaso propio",
+  LOAN_OR_CREDIT: "Préstamo / Crédito",
+  INVESTMENT_WITHDRAWAL: "Inversión / Pagaré",
+  REFUND_OR_REVERSAL: "Devolución / Reembolso",
+  PERSONAL_ASSET_SALE: "Venta de activo personal",
+  GAMBLING_OR_BETTING: "Apuestas / Casino",
+  INFORMAL_FAMILY: "Concepto informal / Familiar",
+  DOWN_PAYMENT_SAVING: "Ahorro / Enganche",
+  RENT_WITHOUT_CSF_REGIME: "Renta sin régimen fiscal",
+  OTHER_NON_BUSINESS: "No operativo / Eventual",
+};
+
+function getTrashCategoryLabel(category?: string | null): string {
+  if (!category) return "No clasificado";
+  return TRASH_CATEGORY_LABELS[category] || category;
+}
+
