@@ -48,9 +48,11 @@ export default function EstadosStatementCard({
   const visibleAlerts = statement.alerts.filter(
     (a) => a.code !== "BANK_FEWER_MONTHS_THAN_REQUIRED",
   );
-  const visibleHasCritical = visibleAlerts.some(
+  const criticalAlertCount = visibleAlerts.filter(
     (a) => a.severity === "CRITICAL",
-  );
+  ).length;
+  const warningAlertCount = visibleAlerts.length - criticalAlertCount;
+  const visibleHasCritical = criticalAlertCount > 0;
 
   const [internalExpanded, setInternalExpanded] = useState<boolean>(false);
   const expanded = isExpanded !== undefined ? isExpanded : internalExpanded;
@@ -128,19 +130,8 @@ export default function EstadosStatementCard({
     }
   }
 
-  const bankInitial = statement.bankName?.charAt(0).toUpperCase() ?? "?";
-
-  const bankColors: Record<string, string> = {
-    BBVA: "bg-[#004481]",
-    Santander: "bg-[#EC0000]",
-    Banorte: "bg-[#D92534]",
-    HSBC: "bg-[#DB0011]",
-    Citibanamex: "bg-[#003B71]",
-    Scotiabank: "bg-[#EE3124]",
-    Azteca: "bg-[#1A1A1A]",
-    Inbursa: "bg-[#003C71]",
-  };
-  const bankBg = bankColors[statement.bankName ?? ""] ?? "bg-gf-red";
+  const bankBadge = getBankBadge(statement.bankName);
+  const bankBg = bankBadge.bg;
 
   const periodLabel =
     statement.periodStart && statement.periodEnd
@@ -224,9 +215,10 @@ export default function EstadosStatementCard({
       >
         <div className="flex items-center gap-4 min-w-0">
           <div
-            className={`w-10 h-10 rounded-xl ${bankBg} text-white flex items-center justify-center font-bold text-base shrink-0 shadow-2xs`}
+            className={`min-w-10 h-10 px-1.5 rounded-xl ${bankBg} text-white flex items-center justify-center font-bold text-[10px] tracking-tight shrink-0 shadow-2xs`}
+            title={statement.bankName ?? "Banco"}
           >
-            {bankInitial}
+            {bankBadge.initials}
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-gf-text truncate">
@@ -240,6 +232,19 @@ export default function EstadosStatementCard({
 
         <div className="flex items-center gap-3 shrink-0">
           <div className="hidden sm:flex items-center gap-2">
+            {criticalAlertCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold">
+                <AlertCircle className="h-3 w-3 text-red-600" />
+                {criticalAlertCount} crítica{criticalAlertCount !== 1 ? "s" : ""}
+              </span>
+            )}
+            {warningAlertCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+                <AlertTriangle className="h-3 w-3 text-amber-600" />
+                {warningAlertCount} advertencia
+                {warningAlertCount !== 1 ? "s" : ""}
+              </span>
+            )}
             {statement.deposits.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
                 <CheckCircle2 className="h-3 w-3 text-emerald-600" />
@@ -266,6 +271,32 @@ export default function EstadosStatementCard({
           </div>
         </div>
       </div>
+
+      {/* Alertas visibles antes de expandir el desglose */}
+      {!expanded && visibleAlerts.length > 0 && (
+        <div className="px-5 py-3 border-b border-gf-border/50 space-y-2 bg-gf-surface/40">
+          {visibleAlerts.map((alert) => {
+            const isCrit = alert.severity === "CRITICAL";
+            return (
+              <div
+                key={alert.code}
+                className={
+                  isCrit
+                    ? "rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-800 flex items-start gap-2"
+                    : "rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 flex items-start gap-2"
+                }
+              >
+                {isCrit ? (
+                  <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                )}
+                <p className="leading-relaxed">{alert.message}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Expanded Detail (Stitch Layout) ─────────────────────────── */}
       {expanded && (
@@ -392,18 +423,59 @@ export default function EstadosStatementCard({
             </div>
           </div>
 
-          {/* 3. Depuración Financiera / Depósitos Válidos (PFAE & v1.2) */}
-          {deposits && deposits.length > 0 ? (
+          {/* 3. Alertas del estado de cuenta (antes del desglose) */}
+          {visibleAlerts.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted mb-3 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Alertas del estado de cuenta
+              </h4>
+              <div className="space-y-2">
+                {visibleAlerts.map((alert) => {
+                  const isCrit = alert.severity === "CRITICAL";
+                  return (
+                    <div
+                      key={alert.code}
+                      className={
+                        isCrit
+                          ? "rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-800 flex items-start gap-2.5"
+                          : "rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 flex items-start gap-2.5"
+                      }
+                    >
+                      {isCrit ? (
+                        <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-bold">{alert.severity}</p>
+                        <p className="mt-0.5 leading-relaxed">{alert.message}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 4. Depuración: solo atípicos / advertencias y rechazados */}
+          {(() => {
+            const hasFlagged =
+              deposits?.some(
+                (dep: any) =>
+                  dep.classification === "NEEDS_REVIEW" ||
+                  dep.isHighImpactOutlier === true ||
+                  dep.classification === "TRASH",
+              ) ?? false;
+            if (!hasFlagged) return null;
+            return (
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                   Movimientos y Depósitos Depurados
                 </h4>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-semibold">
-                    {summary?.validDepositsCount ?? 0} válidos
-                  </span>
                   {(summary?.needsReviewCount ?? 0) > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
                       <AlertTriangle className="h-3 w-3 text-amber-600" />
@@ -439,6 +511,9 @@ export default function EstadosStatementCard({
                   const isReview = dep.classification === 'NEEDS_REVIEW' || dep.isHighImpactOutlier === true;
                   const isTrash = dep.classification === 'TRASH';
                   const isValid = dep.classification === 'VALID' && !dep.isHighImpactOutlier;
+
+                  // Solo mostrar advertencias/atípicos y rechazados
+                  if (!isReview && !isTrash) return null;
 
                   return (
                     <div
@@ -583,7 +658,10 @@ export default function EstadosStatementCard({
                 })}
               </div>
             </div>
-          ) : statement.deposits.length > 0 ? (
+            );
+          })()}
+
+          {!statement.financialDepuration && statement.deposits.length > 0 ? (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
@@ -646,41 +724,6 @@ export default function EstadosStatementCard({
               </div>
             </div>
           ) : null}
-
-          {/* 4. Alertas del estado de cuenta */}
-          {visibleAlerts.length > 0 && (
-            <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted mb-3 flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                Alertas del estado de cuenta
-              </h4>
-              <div className="space-y-2">
-                {visibleAlerts.map((alert) => {
-                  const isCrit = alert.severity === "CRITICAL";
-                  return (
-                    <div
-                      key={alert.code}
-                      className={
-                        isCrit
-                          ? "rounded-xl bg-red-50 border border-red-200 p-3.5 text-xs text-red-800 flex items-start gap-2.5"
-                          : "rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-800 flex items-start gap-2.5"
-                      }
-                    >
-                      {isCrit ? (
-                        <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                      )}
-                      <div>
-                        <p className="font-bold">{alert.severity}</p>
-                        <p className="mt-0.5 leading-relaxed">{alert.message}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -809,5 +852,35 @@ const TRASH_CATEGORY_LABELS: Record<string, string> = {
 function getTrashCategoryLabel(category?: string | null): string {
   if (!category) return "No clasificado";
   return TRASH_CATEGORY_LABELS[category] || category;
+}
+
+/** Bank badge: recognizable initials (not a single first letter). */
+function getBankBadge(bankName: string | null | undefined): {
+  initials: string;
+  bg: string;
+} {
+  const brands: Record<string, { initials: string; bg: string }> = {
+    BBVA: { initials: "BBVA", bg: "bg-[#004481]" },
+    Citibanamex: { initials: "BNMX", bg: "bg-[#003B71]" },
+    Santander: { initials: "SAN", bg: "bg-[#EC0000]" },
+    Banorte: { initials: "BTE", bg: "bg-[#D92534]" },
+    HSBC: { initials: "HSBC", bg: "bg-[#DB0011]" },
+    Scotiabank: { initials: "SCO", bg: "bg-[#EE3124]" },
+    Azteca: { initials: "AZT", bg: "bg-[#1A1A1A]" },
+    Inbursa: { initials: "INB", bg: "bg-[#003C71]" },
+    Mifel: { initials: "MIF", bg: "bg-[#003B70]" },
+    Banregio: { initials: "BRG", bg: "bg-[#FF6600]" },
+    BanBajío: { initials: "BAJ", bg: "bg-[#00A651]" },
+  };
+
+  if (bankName && brands[bankName]) return brands[bankName];
+
+  const fallback =
+    (bankName ?? "?")
+      .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "")
+      .slice(0, 3)
+      .toUpperCase() || "?";
+
+  return { initials: fallback, bg: "bg-gf-red" };
 }
 

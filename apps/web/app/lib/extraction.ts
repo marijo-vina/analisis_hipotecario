@@ -694,6 +694,32 @@ export interface ParsedBankStatements {
   allAlerts: ExtractionAlert[];
 }
 
+/**
+ * Collapse Gemini/OCR bank name variants into a stable display key
+ * so "Bancos detectados" counts unique institutions (e.g. BBVA México → BBVA).
+ */
+function canonicalizeBankInstitutionName(name: string): string {
+  const key = name
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^A-Z0-9]/g, "");
+
+  if (key.includes("BBVA")) return "BBVA";
+  if (key.includes("BANAMEX") || key.includes("CITIBANAMEX")) return "Citibanamex";
+  if (key.includes("SANTANDER")) return "Santander";
+  if (key.includes("BANORTE")) return "Banorte";
+  if (key.includes("HSBC")) return "HSBC";
+  if (key.includes("SCOTIABANK") || key.includes("SCOTIA")) return "Scotiabank";
+  if (key.includes("AZTECA")) return "Azteca";
+  if (key.includes("INBURSA")) return "Inbursa";
+  if (key.includes("MIFEL")) return "Mifel";
+  if (key.includes("BANREGIO")) return "Banregio";
+  if (key.includes("BANBAJIO") || key.includes("BAJIO")) return "BanBajío";
+
+  return name.trim().replace(/\s+/g, " ");
+}
+
 function emptyStatement(doc: Document): ParsedBankStatement {
   return {
     documentId: doc.id,
@@ -796,7 +822,10 @@ export function parseBankStatements(
 
     // ── Bank & account ──────────────────────────────────────────────────
     const bank = (ed.bank as Record<string, unknown>) ?? {};
-    const bankName = (bank.institutionName as string) ?? null;
+    const rawBankName = (bank.institutionName as string) ?? null;
+    const bankName = rawBankName
+      ? canonicalizeBankInstitutionName(rawBankName)
+      : null;
     const accountNumber = (bank.accountNumber as string) ?? null;
     const clabe = (bank.clabe as string) ?? null;
 
@@ -986,8 +1015,19 @@ export function parseBankStatements(
   });
 
   // ── Aggregated context ─────────────────────────────────────────────────
+  // Always surface covered months from statement periods, even when Gemini
+  // omitted documentRequirementContext (common after cover-prompt trim).
+  const sortedCoveredMonths = Array.from(coveredMonths).sort();
   if (aggregatedContext) {
-    aggregatedContext.coveredMonths = Array.from(coveredMonths).sort();
+    aggregatedContext.coveredMonths = sortedCoveredMonths;
+  } else if (sortedCoveredMonths.length > 0) {
+    aggregatedContext = {
+      incomeBehavior: null,
+      requiredMonths: null,
+      detectedMonths: sortedCoveredMonths.length,
+      isRequirementSatisfied: null,
+      coveredMonths: sortedCoveredMonths,
+    };
   }
 
   // ── PFAE Aggregates ────────────────────────────────────────────────────
@@ -1908,4 +1948,4 @@ export function parseTaxReturn(doc: Document): ParsedTaxReturn | null {
     hasOfficialReceipt: ed.hasOfficialReceipt === true,
     alerts,
   };
-}
+}
