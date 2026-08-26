@@ -59,6 +59,14 @@ const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_LOCATION = 'us-central1';
 const DEFAULT_TIMEOUT_MS = 60000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
+/** Structured JSON extraction should be deterministic. */
+const DEFAULT_TEMPERATURE = 0;
+
+/** Optional per-call overrides for extractStructuredData. */
+export interface GeminiExtractOptions {
+  maxOutputTokens?: number;
+  temperature?: number;
+}
 
 /** HTTP status codes that indicate a temporary server-side overload. */
 const RETRYABLE_STATUSES = new Set([429, 503]);
@@ -110,12 +118,12 @@ export class GeminiService {
    * This ensures generationConfig is set correctly each time (Vertex AI SDK
    * does not support per-request generationConfig overrides).
    */
-  private getModel(maxTokens: number) {
+  private getModel(maxTokens: number, temperature: number = DEFAULT_TEMPERATURE) {
     return this.vertexAI.getGenerativeModel({
       model: this.modelName,
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature,
         maxOutputTokens: maxTokens,
       },
       safetySettings: [
@@ -292,6 +300,7 @@ export class GeminiService {
     documentType: string,
     schema: Record<string, unknown>,
     extraInstructions?: string,
+    options?: GeminiExtractOptions,
   ): Promise<ExtractionResult> {
     if (!ocrText || ocrText.trim() === '') {
       return {
@@ -325,7 +334,9 @@ export class GeminiService {
     );
     const promptChars = prompt.length;
 
-    const model = this.getModel(this.maxOutputTokens);
+    const maxTokens = options?.maxOutputTokens ?? this.maxOutputTokens;
+    const temperature = options?.temperature ?? DEFAULT_TEMPERATURE;
+    const model = this.getModel(maxTokens, temperature);
 
     // ---- Retry loop for transient errors ----
     let lastError: unknown;

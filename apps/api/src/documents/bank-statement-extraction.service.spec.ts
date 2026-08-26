@@ -356,6 +356,7 @@ describe('BankStatementExtractionService', () => {
         'BANK_STATEMENT',
         expect.any(Object),
         expect.any(String),
+        expect.objectContaining({ maxOutputTokens: 4096, temperature: 0 }),
       );
     });
 

@@ -348,7 +348,7 @@ describe('GeminiService', () => {
       );
     });
 
-    it('sets responseMimeType application/json and temperature 0.1 via getGenerativeModel', async () => {
+    it('sets responseMimeType application/json and temperature 0 via getGenerativeModel', async () => {
       mockGenerateContent.mockResolvedValue(
         vertexResponse('{"name":"x"}'),
       );
@@ -360,7 +360,27 @@ describe('GeminiService', () => {
         expect.objectContaining({
           generationConfig: expect.objectContaining({
             responseMimeType: 'application/json',
-            temperature: 0.1,
+            temperature: 0,
+          }),
+        }),
+      );
+    });
+
+    it('honors per-call maxOutputTokens and temperature overrides', async () => {
+      mockGenerateContent.mockResolvedValue(
+        vertexResponse('{"name":"x"}'),
+      );
+
+      await service.extractStructuredData(ocrText, 'BANK_STATEMENT', schema, 'cover', {
+        maxOutputTokens: 4096,
+        temperature: 0,
+      });
+
+      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          generationConfig: expect.objectContaining({
+            maxOutputTokens: 4096,
+            temperature: 0,
           }),
         }),
       );
