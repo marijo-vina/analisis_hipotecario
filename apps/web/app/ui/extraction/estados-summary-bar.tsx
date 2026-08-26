@@ -3,8 +3,6 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
 } from "lucide-react";
 import type { ParsedBankStatements } from "@/app/lib/extraction";
 
@@ -24,8 +22,6 @@ export default function EstadosSummaryBar({
     periodStart,
     periodEnd,
     totalDeposits,
-    totalCriticalAlerts,
-    totalWarningAlerts,
     statementsWithData,
   } = summary;
 
@@ -107,7 +103,7 @@ export default function EstadosSummaryBar({
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-              {summary.isPfae ? "Ingreso Válido (Depurado)" : "Depósitos nómina"}
+              {summary.isPfae ? "Ingreso válido total depurado" : "Depósitos nómina"}
             </span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base font-bold text-emerald-700">
@@ -124,24 +120,6 @@ export default function EstadosSummaryBar({
           </div>
         </div>
       </div>
-
-      {/* Alert chips */}
-      {(totalCriticalAlerts > 0 || totalWarningAlerts > 0) && (
-        <div className="flex items-center gap-2">
-          {totalCriticalAlerts > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold">
-              <AlertCircle className="h-3 w-3 text-red-600" />
-              {totalCriticalAlerts} críticas
-            </span>
-          )}
-          {totalWarningAlerts > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
-              <AlertTriangle className="h-3 w-3 text-amber-600" />
-              {totalWarningAlerts} advertencias
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
