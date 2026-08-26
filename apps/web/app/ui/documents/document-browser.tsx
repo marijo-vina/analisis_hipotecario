@@ -16,6 +16,7 @@ import type { Document, DocumentType } from "@/app/lib/definitions";
 import StatusBadge from "@/app/ui/common/badge";
 import DocumentActions from "@/app/ui/documents/document-actions";
 import DocumentUpload from "@/app/ui/documents/document-upload";
+import BankStatementBatchActions from "@/app/ui/documents/bank-statement-batch-actions";
 
 interface CategoryDef {
   key: string;
@@ -213,6 +214,13 @@ export default function DocumentBrowser({
           {selectedCategory?.label} ({selectedCategory?.documents.length ?? 0})
         </h3>
 
+        {selectedCategoryKey === "estados-cuenta" && selectedCategory && (
+          <BankStatementBatchActions
+            caseId={caseId}
+            documents={selectedCategory.documents}
+          />
+        )}
+
         {selectedCategory && selectedCategory.documents.length > 0 ? (
           selectedCategory.documents.map((doc) => (
             <div
@@ -302,4 +310,4 @@ export default function DocumentBrowser({
       )}
     </aside>
   );
-}
+}
