@@ -83,4 +83,4 @@ No migration. Additive `detail.sources[]` keys; historical `AnalysisRun` records
 
 ## Open Questions
 
-- [ ] `proposal.md` success criterion says tax-return RFC mismatch yields WARNING; the spec delta and the closed decision say FAIL. Design encodes FAIL — proposal line should be corrected.
+None — resolved at archive: tax-return RFC mismatch severity is FAIL/ERROR per spec, design, implementation, and tests. The prior open question about `proposal.md` vs spec was stale documentation debt (proposal already stated FAIL in assumptions and success criteria).

@@ -405,7 +405,7 @@ HU-19 original se parte: identidad es independiente del motor; los gates de CSF 
 
 Nombre de change: `pfae-hu-19a-identity-match`
 
-**Estado SDD:** apply + verify + QA manual OK. Rama: `feature/pfae-hu-19a-identity-match` (incluye HU-17). Archive en curso. Sin merge a `perfil-pfae` hasta aprobación de asesora.
+**Estado SDD:** ciclo cerrado (apply + verify + QA manual + archive). Rama: `feature/pfae-hu-19a-identity-match` (incluye HU-17). Artefactos en `openspec/changes/archive/2026-08-28-pfae-hu-19a-identity-match/`. Sin merge a `perfil-pfae` hasta aprobación de asesora.
 
 - Exploración: [`openspec/changes/pfae-hu-19a-identity-match/exploration.md`](openspec/changes/pfae-hu-19a-identity-match/exploration.md)
 - Propuesta: [`openspec/changes/pfae-hu-19a-identity-match/proposal.md`](openspec/changes/pfae-hu-19a-identity-match/proposal.md)
