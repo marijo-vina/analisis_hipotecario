@@ -17,6 +17,7 @@ import { CaseStatusCalculatorService } from '../case-status-calculator/case-stat
 interface LoadedMortgageCase {
   id: string;
   client: Record<string, unknown>;
+  personType?: string | null;
   documents: {
     extractedData: unknown;
     documentType: { code: string };
@@ -51,19 +52,28 @@ export interface AnalysisResultPayload {
  */
 @Injectable()
 export class CaseAnalysisService {
-  private readonly phaseARules: AnalysisRule[];
-
   constructor(
     private readonly prisma: PrismaService,
-    identityMatchRule: IdentityMatchRule,
-    bankarizationValidationRule: BankarizationValidationRule,
+    private readonly identityMatchRule: IdentityMatchRule,
+    private readonly bankarizationValidationRule: BankarizationValidationRule,
     private readonly bankViabilityRule: BankViabilityRule,
     private readonly incomeCalcService: IncomeCalculationService,
     private readonly liabilityCalcService: LiabilityCalculationService,
     private readonly caseStatusCalculator: CaseStatusCalculatorService,
-  ) {
-    // Phase A rules — pure evaluation, no side-effect-producing services.
-    this.phaseARules = [identityMatchRule, bankarizationValidationRule];
+  ) {}
+
+  /**
+   * Resolves the Phase A rule set per request based on `personType`.
+   * PFAE skips `BankarizationValidationRule` entirely (explicit orchestrator
+   * decision, not an implicit empty-PASS side effect) — there is no payroll
+   * to reconcile for a PFAE case. SALARIED (or absent/unrecognized
+   * `personType`) runs both rules, matching prior behavior.
+   */
+  private resolvePhaseARules(personType?: string | null): AnalysisRule[] {
+    if (personType === 'PFAE') {
+      return [this.identityMatchRule];
+    }
+    return [this.identityMatchRule, this.bankarizationValidationRule];
   }
 
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
@@ -79,12 +89,14 @@ export class CaseAnalysisService {
     const context = {
       ...mortgageCase.client,
       caseId,
+      personType: mortgageCase.personType,
     } as Record<string, unknown>;
     const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
 
     // ── Phase A: Document validation rules ──────────────────────────────
+    const phaseARules = this.resolvePhaseARules(mortgageCase.personType);
     const ruleResults: RuleResult[] = [];
-    for (const rule of this.phaseARules) {
+    for (const rule of phaseARules) {
       const result = await rule.execute(context, docs);
       ruleResults.push(result);
     }

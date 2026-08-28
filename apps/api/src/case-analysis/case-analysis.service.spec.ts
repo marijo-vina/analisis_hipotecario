@@ -326,6 +326,55 @@ describe('CaseAnalysisService', () => {
     });
   });
 
+  describe('personType-aware phaseARules (HU-19a)', () => {
+    it('PFAE case: does not invoke BankarizationValidationRule.execute', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
+    });
+
+    it('SALARIED case: invokes both IdentityMatchRule and BankarizationValidationRule (regression)', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'SALARIED' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).toHaveBeenCalled();
+    });
+
+    it('rule context includes personType sourced from mortgageCase.personType', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ personType: 'PFAE' }),
+        expect.any(Array),
+      );
+    });
+  });
+
   describe('getLatest', () => {
     it('returns the most recent AnalysisRun for the case', async () => {
       const run = { id: 'run-2', outcome: 'PASS', executionStatus: 'COMPLETED', detail: {} };

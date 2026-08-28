@@ -202,7 +202,12 @@ export default function CaseDetailWorkspace({
           />
 
           {/* ── Analysis Section (Sprint 3) ────────────────────────── */}
-          <AnalysisSection caseId={caseId} statusCode={statusCode} documents={documents} />
+          <AnalysisSection
+            caseId={caseId}
+            statusCode={statusCode}
+            documents={documents}
+            personType={caseData.personType}
+          />
         </div>
       </div>
 

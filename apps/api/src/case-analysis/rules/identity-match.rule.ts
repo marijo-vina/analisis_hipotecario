@@ -14,6 +14,13 @@ export interface PrismaClientLike {
   fullName?: string | null;
   rfc?: string | null;
   curp?: string | null;
+  /**
+   * Sourced from `mortgageCase.personType` by the orchestrator (see
+   * `CaseAnalysisService.run()`). Not a `Client` PII field — travels through
+   * the same context object as `caseId` (precedent for orchestration
+   * metadata riding on this loosely-typed record).
+   */
+  personType?: string | null;
   [k: string]: unknown;
 }
 
@@ -31,11 +38,24 @@ type IdentityField = (typeof IDENTITY_FIELDS)[number];
 const SEVERITY_RANK: Record<Severity, number> = { INFO: 0, WARNING: 1, ERROR: 2 };
 const OUTCOME_RANK: Record<AnalysisOutcome, number> = { PASS: 0, PARTIAL: 1, FAIL: 2 };
 
+/** `personType` values the identity-match source matrix branches on. */
+type PersonTypeScope = 'SALARIED' | 'PFAE';
+
 interface SourceDefinition {
   /** Spec-facing source key used in `detail.sources`. */
   sourceKey: string;
   /** Prisma DocumentType.code that maps to this source. Undefined for the Client record. */
   documentTypeCode?: string;
+  /** Which `personType`(s) this source participates for. */
+  appliesTo: PersonTypeScope[];
+  /** Absent value ⇒ omitted from comparison, never a mismatch (documentation flag). */
+  optional?: boolean;
+  /**
+   * Operational reference source (the canonical Client record): excluded
+   * from document-vs-document comparison, compared against document
+   * consensus instead. Exactly one active definition should set this.
+   */
+  reference?: boolean;
   /** Per-field extractor returning the raw value or null when structurally absent. */
   extract: {
     fullName: (data: Record<string, unknown> | null) => string | null;
@@ -53,16 +73,25 @@ const get = (obj: unknown, path: string[]): string | null => {
   return cur == null ? null : String(cur);
 };
 
+const SALARIED_ONLY: PersonTypeScope[] = ['SALARIED'];
+const PFAE_ONLY: PersonTypeScope[] = ['PFAE'];
+const BOTH_PERSON_TYPES: PersonTypeScope[] = ['SALARIED', 'PFAE'];
+
 /**
  * Registry of identity sources. Bank Statement structurally lacks `curp`
  * but carries `rfc` via accountHolder (schema v1.1+). The identity-match
  * rule compares fullName + rfc + curp across all document sources and the
  * Client record per the identity-match-validation spec.
+ *
+ * Each source declares which `personType`(s) it applies to (`appliesTo`);
+ * `execute()` resolves the active subset once per request. `payroll` is
+ * SALARIED-only; `csf`/`tax-return` are PFAE-only; the rest are shared.
  */
 const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'official-id',
     documentTypeCode: 'INE',
+    appliesTo: BOTH_PERSON_TYPES,
     extract: {
       // The spec's identity source matrix lists Official ID as carrying rfc,
       // fullName, and curp. The current INE extraction service does not yet
@@ -76,6 +105,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'payroll',
     documentTypeCode: 'PAYROLL_RECEIPT',
+    appliesTo: SALARIED_ONLY,
     extract: {
       fullName: (d) => get(d, ['employee', 'fullName']),
       rfc: (d) => get(d, ['employee', 'rfc']),
@@ -83,8 +113,30 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
     },
   },
   {
+    sourceKey: 'csf',
+    documentTypeCode: 'CSF',
+    appliesTo: PFAE_ONLY,
+    extract: {
+      fullName: (d) => get(d, ['taxpayer', 'fullName']),
+      rfc: (d) => get(d, ['taxpayer', 'rfc']),
+      curp: (d) => get(d, ['taxpayer', 'curp']),
+    },
+  },
+  {
+    sourceKey: 'tax-return',
+    documentTypeCode: 'TAX_RETURN',
+    appliesTo: PFAE_ONLY,
+    optional: true,
+    extract: {
+      fullName: (d) => get(d, ['satReceipt', 'taxpayerName']),
+      rfc: (d) => get(d, ['satReceipt', 'rfc']),
+      curp: () => null, // No CURP field exists on the SAT acuse.
+    },
+  },
+  {
     sourceKey: 'bank-statement',
     documentTypeCode: 'BANK_STATEMENT',
+    appliesTo: BOTH_PERSON_TYPES,
     extract: {
       fullName: (d) => get(d, ['accountHolder', 'fullName']),
       rfc: (d) => get(d, ['accountHolder', 'rfc']),
@@ -94,10 +146,24 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'credit-bureau',
     documentTypeCode: 'CREDIT_BUREAU_REPORT',
+    appliesTo: BOTH_PERSON_TYPES,
     extract: {
       fullName: (d) => get(d, ['borrower', 'fullName']),
       rfc: (d) => get(d, ['borrower', 'rfc']),
       curp: () => null, // Credit bureau report has no CURP.
+    },
+  },
+  {
+    sourceKey: 'client',
+    appliesTo: BOTH_PERSON_TYPES,
+    optional: true,
+    reference: true,
+    extract: {
+      // Client is not a document — collectFieldValues() reads its fields
+      // directly off the `client` parameter, not through this extractor.
+      fullName: () => null,
+      rfc: () => null,
+      curp: () => null,
     },
   },
 ];
@@ -135,8 +201,15 @@ export class IdentityMatchRule implements AnalysisRule {
     const typedClient = client as PrismaClientLike;
     const typedDocs = documents as unknown as PrismaDocumentLike[];
 
-    // Map documents to their source definitions (by DocumentType code).
-    const docsBySource = this.indexDocsBySource(typedDocs);
+    // Resolve the active source set once per request. Unknown/absent
+    // personType falls back to SALARIED (today's fixed behavior).
+    const personType: PersonTypeScope = typedClient.personType === 'PFAE' ? 'PFAE' : 'SALARIED';
+    const activeDefs = SOURCE_DEFINITIONS.filter((def) => def.appliesTo.includes(personType));
+    const referenceDef = activeDefs.find((def) => def.reference);
+    const referenceKey = referenceDef?.sourceKey ?? 'client';
+
+    // Map documents to their active source definitions (by DocumentType code).
+    const docsBySource = this.indexDocsBySource(typedDocs, activeDefs);
 
     // Gather per-field per-source values.
     const fields: FieldComparison[] = [];
@@ -146,9 +219,14 @@ export class IdentityMatchRule implements AnalysisRule {
     let worstSeverity: Severity = 'INFO';
 
     for (const fieldName of IDENTITY_FIELDS) {
-      const sourceValues = this.collectFieldValues(fieldName as IdentityField, typedClient, docsBySource);
+      const sourceValues = this.collectFieldValues(
+        fieldName as IdentityField,
+        typedClient,
+        docsBySource,
+        activeDefs,
+      );
 
-      const comparison = this.compareField(fieldName as IdentityField, sourceValues);
+      const comparison = this.compareField(fieldName as IdentityField, sourceValues, referenceKey);
 
       fields.push(comparison.field);
       alerts.push(...comparison.alerts);
@@ -164,7 +242,7 @@ export class IdentityMatchRule implements AnalysisRule {
     const sources = Array.from(
       new Set([
         ...docsBySource.keys(),
-        'client', // Client is always a participating reference.
+        ...(referenceDef ? [referenceDef.sourceKey] : []), // Client is always a participating reference.
       ]),
     );
 
@@ -177,14 +255,15 @@ export class IdentityMatchRule implements AnalysisRule {
     };
   }
 
-  /** Index uploaded documents by their mapped source key. */
+  /** Index uploaded documents by their mapped source key, restricted to the active definitions. */
   private indexDocsBySource(
     docs: PrismaDocumentLike[],
+    activeDefs: SourceDefinition[],
   ): Map<string, PrismaDocumentLike> {
     const map = new Map<string, PrismaDocumentLike>();
     for (const d of docs) {
       const code = d.documentType?.code;
-      const def = SOURCE_DEFINITIONS.find((s) => s.documentTypeCode === code);
+      const def = activeDefs.find((s) => s.documentTypeCode === code);
       if (def) {
         map.set(def.sourceKey, d);
       }
@@ -204,12 +283,14 @@ export class IdentityMatchRule implements AnalysisRule {
     fieldName: IdentityField,
     client: PrismaClientLike,
     docsBySource: Map<string, PrismaDocumentLike>,
+    activeDefs: SourceDefinition[],
   ): SourceFieldValue[] {
     const mode: NormalizeMode = fieldName === 'fullName' ? 'name' : 'identifier';
     const values: SourceFieldValue[] = [];
 
-    // Document sources carrying the field.
-    for (const def of SOURCE_DEFINITIONS) {
+    // Document sources carrying the field (the reference source is handled below).
+    for (const def of activeDefs) {
+      if (def.reference) continue;
       const doc = docsBySource.get(def.sourceKey);
       if (!doc) continue; // source not present on this case
       const raw = def.extract[fieldName](doc.extractedData);
@@ -220,18 +301,22 @@ export class IdentityMatchRule implements AnalysisRule {
       });
     }
 
-    // Client: only include if the field HAS a value (RFC/CURP are optional).
-    const clientRaw = (client as Record<string, unknown>)[fieldName] as string | null | undefined;
-    const hasClientValue = clientRaw != null && String(clientRaw).trim() !== '';
+    // Reference source (Client record): only include if the field HAS a
+    // value (RFC/CURP are optional).
+    const referenceDef = activeDefs.find((def) => def.reference);
+    if (referenceDef) {
+      const clientRaw = (client as Record<string, unknown>)[fieldName] as string | null | undefined;
+      const hasClientValue = clientRaw != null && String(clientRaw).trim() !== '';
 
-    if (fieldName === 'fullName' || hasClientValue) {
-      // Always include client entry in originalValue/normalizedValue maps
-      // so the frontend can show "No capturado" for empty optional fields.
-      values.push({
-        sourceKey: 'client',
-        raw: clientRaw == null ? null : String(clientRaw),
-        normalized: hasClientValue ? normalizeText(clientRaw, mode) : null,
-      });
+      if (fieldName === 'fullName' || hasClientValue) {
+        // Always include client entry in originalValue/normalizedValue maps
+        // so the frontend can show "No capturado" for empty optional fields.
+        values.push({
+          sourceKey: referenceDef.sourceKey,
+          raw: clientRaw == null ? null : String(clientRaw),
+          normalized: hasClientValue ? normalizeText(clientRaw, mode) : null,
+        });
+      }
     }
 
     return values;
@@ -258,6 +343,7 @@ export class IdentityMatchRule implements AnalysisRule {
   private compareField(
     fieldName: IdentityField,
     sourceValues: SourceFieldValue[],
+    referenceKey: string,
   ): { field: FieldComparison; alerts: RuleAlert[]; outcome: AnalysisOutcome; outcomeSeverity: Severity } {
     const present = sourceValues.filter((v) => v.normalized !== null);
 
@@ -277,7 +363,7 @@ export class IdentityMatchRule implements AnalysisRule {
     let outcome: AnalysisOutcome = 'PASS';
     let outcomeSeverity: Severity = 'INFO';
 
-    const clientValue = present.find((v) => v.sourceKey === 'client');
+    const clientValue = present.find((v) => v.sourceKey === referenceKey);
 
     if (present.length < 2) {
       // Cannot compare with <2 sources. Exception: if a single document
@@ -309,10 +395,10 @@ export class IdentityMatchRule implements AnalysisRule {
     }
 
     const distinctDocValues = new Set(
-      present.filter((v) => v.sourceKey !== 'client').map((v) => v.normalized),
+      present.filter((v) => v.sourceKey !== referenceKey).map((v) => v.normalized),
     );
     // For fullName: token-set comparison tolerates INE's "lastname firstname" ordering.
-    const docValues = present.filter((v) => v.sourceKey !== 'client');
+    const docValues = present.filter((v) => v.sourceKey !== referenceKey);
 
     /** Check whether all document values are pairwise-equal for this field. */
     const allDocsMatch = (): boolean => {
