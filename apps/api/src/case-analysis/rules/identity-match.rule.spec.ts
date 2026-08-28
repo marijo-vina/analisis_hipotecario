@@ -328,4 +328,124 @@ describe('IdentityMatchRule', () => {
       }
     });
   });
+
+  // ── PFAE personType-aware sources (HU-19a) ──────────────────────────────
+  describe('PFAE personType', () => {
+    const pfaeClient = (over: Partial<PrismaClientLike> = {}): PrismaClientLike => ({
+      fullName: 'JOSE PEREZ GARCIA',
+      rfc: 'PELJ900101ABC',
+      curp: 'PEJ900315HYNRLN08',
+      personType: 'PFAE',
+      ...over,
+    });
+
+    it('produces a csf source and matches rfc when CSF document is present', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      expect(result.detail.sources).toEqual(expect.arrayContaining(['csf', 'client']));
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).toBe('MATCH');
+    });
+
+    it('csf missing curp does not cause FAIL', async () => {
+      const docs = [
+        doc('CSF', { taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: null } }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      const curpField = result.detail.fields.find((f) => f.fieldName === 'curp');
+      expect(curpField?.status).toBe('NOT_AVAILABLE');
+      expect(result.outcome).not.toBe('FAIL');
+    });
+
+    it('excludes payroll and never produces a payroll source for PFAE, even with a stray PAYROLL_RECEIPT document', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'SOMEONE ELSE', rfc: 'XAXX010101000', curp: 'XXXX000101HXXXXX00' },
+        }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      expect(result.detail.sources).not.toContain('payroll');
+      expect(result.outcome).not.toBe('FAIL');
+    });
+
+    it('PFAE detail never includes csf/tax-return for a SALARIED case (regression)', async () => {
+      const docs = [doc('INE', { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } })];
+      const result = await rule.execute(client(), docs);
+
+      expect(result.detail.sources).not.toContain('csf');
+      expect(result.detail.sources).not.toContain('tax-return');
+      expect(result.detail.sources).toEqual(expect.arrayContaining(['official-id', 'client']));
+    });
+
+    it('tax-return RFC mismatch causes FAIL/ERROR — same severity as any document RFC mismatch', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('TAX_RETURN', { satReceipt: { taxpayerName: 'JOSE PEREZ GARCIA', rfc: 'XAXX010101000' } }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      expect(result.outcome).toBe('FAIL');
+      expect(result.severity).toBe('ERROR');
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).toBe('MISMATCH');
+      expect(rfcField?.severity).toBe('ERROR');
+      expect(rfcField?.alerts).toContain('DOCUMENT_CONFLICT');
+    });
+
+    it('tax-return name-only mismatch (RFC matches) causes PARTIAL/WARNING, not FAIL', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('TAX_RETURN', { satReceipt: { taxpayerName: 'JUAN PEREZ GARCIA', rfc: 'PELJ900101ABC' } }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      expect(result.outcome).toBe('PARTIAL');
+      const nameField = result.detail.fields.find((f) => f.fieldName === 'fullName');
+      expect(nameField?.status).toBe('MISMATCH');
+      expect(nameField?.alerts).toContain('NAME_MISMATCH');
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).toBe('MATCH');
+    });
+
+    it('missing tax-return document yields NOT_AVAILABLE and does not cause FAIL', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      expect(result.detail.sources).not.toContain('tax-return');
+      expect(result.outcome).not.toBe('FAIL');
+      const rfcField = result.detail.fields.find((f) => f.fieldName === 'rfc');
+      expect(rfcField?.status).not.toBe('MISMATCH');
+    });
+
+    it('tax-return curp is always NOT_AVAILABLE — no curp field exists for this source', async () => {
+      const docs = [
+        doc('CSF', {
+          taxpayer: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('TAX_RETURN', { satReceipt: { taxpayerName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC' } }),
+      ];
+      const result = await rule.execute(pfaeClient(), docs);
+
+      const curpField = result.detail.fields.find((f) => f.fieldName === 'curp');
+      expect(curpField?.originalValue['tax-return']).toBeNull();
+    });
+  });
 });
