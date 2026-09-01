@@ -120,7 +120,7 @@ extiende**, no se recalibra.
 Guardada íntegra en Engram (ver §8). Resumen:
 
 **CE por banco**: Banorte 0.6, HSBC 0.5, Santander 0.5, Scotiabank 0.55,
-Citibanamex 0.5, BX+ 0.5, **Mifel 0.42**, Banregio 0.5, Afirme 0.6.
+Citibanamex 0.5, BX+ 0.5, **Mifel 0.50** (Excel decía 0.42; asesora confirma seed), Banregio 0.5, Afirme 0.6.
 
 **Factor flat (aplica a todos los giros del banco)**:
 - Banorte = 0.6 (único flat; no usa matriz por giro).
@@ -287,7 +287,7 @@ pipelines; solo ramificar los puntos de variación.
   - Branch por `personType` en `BankViabilityRule` (origen del ingreso).
   - Aplicar factor por giro al camino de estados de cuenta; declaración sin
     factor (neto/bruto).
-  - Actualizar CE: **Mifel 0.42** (verificar §7.2).
+  - CE Mifel: **0.50** (cerrado; no bajar a 0.42).
   - Cálculo por banco: `ingresoAdmisible`, `máximo = ×CE`, `capacidad = −deuda`.
 - **No incluye**: UI (HU-21).
 - **Dependencias**: HU-17, HU-18 + **catálogo canónico definido (§7.1)**.
@@ -320,10 +320,8 @@ pipelines; solo ramificar los puntos de variación.
 - Es trabajo de datos/normalización; se hace con la asesora antes/durante HU-20.
 
 ### 7.2 Discrepancias de datos a confirmar
-- **Mifel CE = 0.42** en el Excel vs **0.5** en el seed actual → confirmar cuál
-  manda (asumo Excel).
-- **Mifel "Establecimientos y PI de Salud → 1.5"** (factor >100%) → confirmar si
-  es intencional o typo.
+- ~~**Mifel CE = 0.42**~~ → **cerrado: 0.50** (seed; Excel descartado).
+- ~~**Mifel "Establecimientos y PI de Salud → 1.5"**~~ → **cerrado: intencional**.
 - **Banorte factor flat 0.6** y **HSBC sin factor** → tomados como válidos del
   Excel.
 

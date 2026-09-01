@@ -46,7 +46,7 @@ Rama base: `feature/perfil-pfae`.
 | CMA (ingreso, inmueble, edad, destinos, CE, NET/GROSS, score) | **Iguales para asalariado y PFAE.** No se duplica la grilla por perfil. |
 | Módulo Bancos — qué se agrega | (1) columna de antigüedad PFAE junto a la asalariada; (2) tabla de factores por giro, cuando lleguen los datos. Nada más. |
 | Factores por giro | Los tiene la asesora; se cargan al empezar el módulo Bancos. No bloquean identidad ni el motor. |
-| CE / NET-GROSS | No se recalibran. Mifel CE seed **0.42** (Excel manda). |
+| CE / NET-GROSS | Compartido en tarjeta banco. Mifel CE **0.50** (confirmado; Excel 0.42 descartado). |
 | Factor salud Mifel 1.5 | Se siembra como está en el Excel; editable en Bancos. Confirmar con asesora en HU-20 si es typo. |
 | Condicionado vs rechazado | Se reutilizan PASS/PARTIAL/FAIL y PRELIMINARY_VIABLE / CONDITIONED / REQUIRES_REVIEW / NOT_COMPATIBLE. |
 
