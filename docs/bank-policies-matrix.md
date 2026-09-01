@@ -40,7 +40,7 @@ Ingesta de fuentes: **completa** (9 bancos).
 
 | Campo | Hoy en seed | De la captura | Acción |
 |-------|-------------|---------------|--------|
-| CE | 0.50 | no aparece | Excel PFAE dice **0.42** — confirmar |
+| CE | 0.50 | no aparece | Excel decía 0.42; **asesora confirma 0.50** — seed OK |
 | Ingreso | GROSS | no aparece | sin cambio |
 | Score mín. | null | no aparece | sin cambio |
 | Edad mín. | 21 años (252 m) | 21 años (FPT 25) | seed OK; FPT fuera de alcance |
@@ -150,32 +150,56 @@ en comparativa.
 
 ## Santander
 
-Fuentes: chuleta Riesgos **marzo 2026** (CMA, destinos, score) + 2 capturas de
-cálculo no asalariado (factores y suavizado). Taller 2024: casi sin texto
-extraíble; solo confirma edad máx. 80 años 6 meses (la chuleta 2026 dice 80).
+Fuentes previas: chuleta Riesgos **marzo 2026** + capturas cálculo no
+asalariado. **Nueva entrega (sep-2026):** 6 capturas CMA general + score/
+reglas limitativas + mixto/PM + cálculo asalariado + factor de afectación +
+cálculo no asalariado. No se versionan los PDFs/capturas.
+
+### Comparación rápida (nueva entrega vs matriz previa)
+
+| Tema | Antes | Nueva captura | Acción |
+|------|-------|---------------|--------|
+| Edad mín. | 21 | ≥ 21 | OK |
+| Edad + plazo | 80 (960 m) / taller 80a6m | **&lt; 80 años 6 meses** | **subir máx. a 966 m** |
+| Score | seed 541; matriz pedía 542 | **542** (corte) | **seed → 542** |
+| Ingreso asalariado / PFAE | $7.5k / $15k; construcción $20k / $67k | igual | OK |
+| Inmueble / terreno / obra | $250k; terreno máx $20M; obra $700k | igual (+ terreno ≥25% del proyecto en construcción) | anotar 25% |
+| Endeudamiento entrada | ≤ 50% | ≤ 50% | OK |
+| Arraigo PFAE | 24 m | 2 años actividad actual | OK |
+| Arraigo asalariado | 6 m (con matices) | &lt;6 m empleo actual → declina; &lt;12 m total con laguna &gt;2 m → declina | OK / refinar nota |
+| Knockouts giro | construcción + compraventa | igual | OK |
+| Factores (manda) | castigos PI 90 / serv-com 50 | **factor de afectación** PI 80%, médico 100%, PFAE serv/com **60%**, arrend 80%, inv 90% | **usar afectación** (asesora) |
+| Mixto / persona moral | fuera MVP | reglas nuevas | Engram futuro |
+| Códigos bloqueo TDC, monto mín., cashout, Frontera USA | parcial / no | detalle nuevo | notas; fuera de CMA grid |
 
 ### Capa 1 — Banco
 
-| Campo | Hoy en seed | De la chuleta mar-2026 | Acción |
-|-------|-------------|------------------------|--------|
-| CE | 0.50 | DTI no asalariado 30–60% según nivel de riesgo | seed 0.50 se queda; el cubo DTI/LTV por riesgo es producto, no CMA de perfilamiento |
-| Ingreso | NET | coincide (chuleta habla de ingreso neto) | sin cambio |
-| Score mín. | **541** | **542** (si score < 542 → declina) | corregir seed a 542 |
-| Edad mín. | 21 (252 m) | 21 | OK |
-| Edad máx. | 80 al término (960 m) | 80 (chuleta); taller 2024 dice 80a6m | manda chuleta 2026 → 80 |
+| Campo | Hoy en seed | De las capturas | Acción |
+|-------|-------------|-----------------|--------|
+| CE | 0.50 | DTI no asalariado 30–60% por nivel de riesgo (R1–R5) | seed 0.50; cubo DTI/LTV = producto |
+| Ingreso | NET | ingreso neto | OK |
+| Score mín. | **542** | **542** (si &lt; 542 → declina) | OK |
+| Edad mín. | 21 (252 m) | ≥ 21 | OK |
+| Edad + plazo máx. | **966 m** (80a6m) | **&lt; 80a6m** | OK |
 
-Knockouts extra (no caben en la grilla CMA; reglas de comparativa):
+Rangos de score (informativos; no son umbral único): R1 400–550, R2 551–578,
+R3 579–601, R4 602–623, R5 624–700. El corte duro es **542**.
 
-- Ocupación ama de casa / estudiante / desempleado → declina.
-- No asalariado con actividad **construcción** si el destino es Construcción, Terreno o Remodelación.
-- Actividad **compraventa de inmuebles** en cualquier destino.
-- ≥2 PV actual > 500 UDIS, o ≥3 PV cualquier monto.
-- Impago Santander TDC/auto/hipotecario/efectivo/nómina > 500 UDIS.
+Knockouts / reglas limitativas (comparativa, no grilla CMA):
+
+- Impago Santander (TDC/auto/hipotecario/efectivo/nómina) **&gt; 500 UDIS**.
+- Códigos de bloqueo TDC Santander: **10, 11, 13, 32, 57**.
+- Buró: ≥2 PV actual &gt; 500 UDIS, o ≥3 PV cualquier monto.
+- Castigo interno neto fallido &gt; 500 UDIS **o** antigüedad del castigo &lt; 6 meses; reestructura local → rechazo.
+- Actividad **compraventa de inmuebles** (cualquier destino).
+- Actividad **construcción de vivienda** si el destino es Construcción, Remodelación o Adq. Terreno.
+- Sustitución / mejora: ≥ **6 meses** de antigüedad + impecabilidad de pago **12 meses**.
+- Monto mínimo aprobado: **$100,000** (construcción **$700,000**) — producto.
+- Dinero adicional / cashout y Frontera (buró USA score &lt; 700, atraso &gt; 0): fuera de MVP perfilamiento.
 
 ### Capa 2 — CMA por destino
 
-El ingreso mínimo **sí cambia por perfil** (igual que la edad en Banamex).
-No se duplica la grilla: columna extra `ingresoMinPfae` cuando haga falta.
+Ingreso mínimo **sí cambia por perfil**. Columna `ingresoMinPfae` cuando se siembre.
 
 | Destino | Activo | Ingreso mín. asalariado | Ingreso mín. PFAE | Inmueble mín. | Meses asalariado | Meses PFAE |
 |---------|--------|-------------------------|-------------------|---------------|------------------|------------|
@@ -183,25 +207,25 @@ No se duplica la grilla: columna extra `ingresoMinPfae` cuando haga falta.
 | Sustitución | sí | $7,500 | **$15,000** | (vacío en seed) | 6 * | **24** |
 | Liquidez | sí | $7,500 | **$15,000** | — | 6 * | **24** |
 | Terreno | sí | $7,500 | **$15,000** | terreno $250k (máx. $20M) | 6 * | **24** |
-| Construcción | sí | **$20,000** | **$67,000** | terreno $250k + obra $700k | 6 * | **24** |
+| Construcción | sí | **$20,000** | **$67,000** | terreno $250k + obra $700k; terreno ≥ **25%** del proyecto | 6 * | **24** |
 | Remodelación | sí | $7,500 | **$15,000** | — | 6 * | **24** |
 
 FRONTERA (no es destino nuestro): asalariado $35,000 / no asalariado $67,000.
 Hipoteca Integral: $6,500 ambos — fuera de alcance.
 
-\* Asalariado en chuleta: empleo actual ≥ 6 meses **o** 12 meses entre actual +
-anterior, laguna ≤ 60 días, y el actual puede ser desde 1 mes. El seed guarda
-6. Suficiente para perfilamiento. PFAE: **2 años en la actividad actual**.
+\* Asalariado: empleo actual ≥ 6 meses; si no, total actual+anterior ≥ 12 meses
+con laguna ≤ 2 meses (captura dice &gt; 2 meses → declina). Seed con 6 = piso
+del empleo actual. PFAE: **2 años en la actividad actual**.
 
 Endeudamiento de entrada ≤ 50% (titular + cotitulares que comprueban).
 
-### Capa 3 — Factores y cómo se calcula el ingreso
+### Capa 3 — Factores y cómo se calcula el ingreso (no asalariado)
 
-Santander aplica factor de giro **también a la declaración**. Eso contradice
-la regla general del plan PFAE (“declaración sin factor”). Es excepción de
-este banco: `ingresoAdmisible = (base/12 o suavizado) × factor`.
+Santander aplica factor de giro **también a la declaración**. Excepción vs
+regla general PFAE (“declaración sin factor”):
+`ingresoAdmisible = (base/12 o suavizado) × factor`.
 
-**Estados de cuenta** (captura “Cálculo de ingresos”):
+**Estados de cuenta** (slide “Cálculo de Ingresos — No Asalariados”):
 
 | Perfil | Meses | ¿Quita max/min? | Extra |
 |--------|-------|-----------------|-------|
@@ -209,28 +233,63 @@ este banco: `ingresoAdmisible = (base/12 o suavizado) × factor`.
 | Actividades primarias | 12 | **no** (promedio simple) | × factor |
 | Socio / dueño de empresa | 6 | sí | × factor × % acciones; mín. 5 depósitos al mes |
 
-Nuestro motor PFAE ya suaviza 6→4. Primarias en Santander: 12 meses **sin**
-suavizar — hay que ramificar esa excepción, no el global.
+Hasta **6 cuentas** distintas; excluir traspasos entre las cuentas presentadas.
 
-**Declaración:** `(ingreso anual / 12) × factor`. Dueño con dividendos a título
-personal: factor **90%** sobre el apartado de dividendos.
+**Declaración:** `(ingreso anual / 12) × factor`. Dueño: × % acciones.
 
-**Factores (etiquetas Santander):**
+**Factor de afectación (manda — confirmado asesora sep-2026):**
 
-| Etiqueta | Factor | vs Excel previo |
-|----------|--------|-----------------|
-| Profesionistas (chequera **personal** / transaccionalidad) | **0.90** | igual (0.9 “con transaccionalidad”) |
-| Profesionistas (chequera **empresarial**) | **0.50** | no estaba partido así |
-| Servicios | **0.50** | igual |
-| Comercio | **0.50** | Excel tenía **0.30** “comercio y otras” — manda la captura |
-| Actividad primaria | **0.30** | Excel lo metía en “otras” a 0.30 |
-| Gasolineras | **0.10** | igual |
+Aplica a flujos de estados / base no asalariada (y a declaración en
+Santander). No aplica a nómina asalariada pura.
 
-La chequera personal vs empresarial es un dato que hoy **no** extraemos.
-Mientras no esté: usar 0.90 para profesionista (caso favorable / política
-“con transaccionalidad”) y dejar nota de revisión. No inventar 0.50.
+| Actividad | Factor | Notas |
+|-----------|--------|-------|
+| PI (profesionista independiente) | **0.80** | |
+| PI sector médico | **1.00** | |
+| Consultorías TOP | **1.00** | sin haircut |
+| PFAE Servicio | **0.60** | |
+| PFAE Comercio | **0.60** | |
+| Arrendamiento | **0.80** | |
+| Inversiones | **0.90** | sobre rendimiento neto |
+| Persona moral Servicio / Comercio | 0.20 / 0.15 | futuro (no MVP PF) |
 
-Socio accionista / persona moral: fuera de MVP (hace falta % de acciones).
+**Slide “Castigos” (90 / 50 / 30 / 10) — descartada** para originación;
+queda solo como histórico de la misma entrega. Actividad primaria /
+gasolineras no aparecen en afectación: si llega un caso, flag manual hasta
+definir mapeo.
+
+**Asalariado:** los factores de giro **no cambian** el perfil nómina. Ver
+§abajo (impacto CMA compartido vs cálculo).
+
+### Impacto en perfil asalariado (misma entrega)
+
+| Tema | ¿Cambia vs seed/motor actual? |
+|------|-------------------------------|
+| Score 542, edad+plazo 966 m | **Sí** — ya aplicado (compartido todos los perfiles) |
+| Ingreso mín. $7.5k / construcción $20k | No — igual |
+| Arraigo empleo ≥6 m (+ total 12 m / laguna ≤2 m) | No — ya documentado; seed sigue en 6 m piso |
+| Endeudamiento ≤50%, buró/MOP, knockouts | No material — mismo espíritu |
+| Factor de afectación / giro | **No aplica** a asalariado puro (solo no asalariado / mixtos) |
+| Fórmulas nómina (prima/aguinaldo, pagadoras ±30%, bonos, fondo ahorro) | Detalle nuevo en capturas — **no es CMA de grilla**; refinar motor HU-12 si hace falta (Engram) |
+| Frontera / Hipoteca Integral | Fuera de destinos del producto |
+
+Conclusión: para **asalariado** el único cambio de producto ya sembrado es el
+compartido (542 + 80a6m). El resto de CMA asalariado confirma lo existente;
+las fórmulas finas de comprobación quedan para un pase del motor de ingreso
+si la asesora quiere alinearlas literalmente.
+
+### Referencia futura (Engram; no MVP PFAE persona física)
+
+- **Ingresos mixtos:** el participante se trata como asalariado o no asalariado
+  según el ingreso **mayor**; el menor no necesita cumplir la regla de
+  comprobación, pero sí se puede sumar. Considerar todas las actividades
+  verificables en CSF + recibos de nómina.
+- **Persona moral:** factor sobre ventas anuales (servicio 20% / comercio 15%);
+  utilidad neta positiva; socio: estados 6→4 × factor × % acciones (≥5
+  depósitos/mes) o declaración `/12 × factor × %`.
+- **Asalariado — fórmulas nómina/estados/declaración** (prima/aguinaldo,
+  pagadoras ±30%, fondos, bonos): ver Engram `config/santander-future-profiles`
+  cuando se refine el motor asalariado.
 
 ---
 
@@ -535,8 +594,10 @@ destinos — sin tasas ni productos).
 | Edad + plazo | (usa máx. admisión) | anaquel: **≤ 80 años** | regla aparte 960 m si hace falta |
 | Inmueble mín. | $350,000 | anaquel: **$350,000** | OK |
 
-Sin matriz por giro. Factor de ingreso PFAE es **flat** y depende de si es
-cliente Banorte:
+Sin matriz por giro. El factor sobre el **promedio suavizado de estados**
+(6 meses → quitar max/min → promedio de 4) aplica solo a **PFAE / RIF / RESICO**
+y depende de si es **cliente Banorte**. **No** aplica al camino asalariado
+por recibos de nómina.
 
 | Perfil / camino | Factor |
 |-----------------|--------|
@@ -544,10 +605,20 @@ cliente Banorte:
 | PFAE / RIF / RESICO — estados (no cliente) | **0.60** |
 | Honorarios (facturas + estados, 6 meses) | **0.85** |
 | Arrendamiento (contrato + estados, 6 meses) | **0.85** |
+| Asalariado (nómina CFDI) | no usa este factor |
 
 El Excel tenía flat **0.60** para todos. El PDF distingue 70% cliente / 60%
-resto. MVP: default **0.60** (no cliente) + flag editable “cliente Banorte →
-0.70”, o dos valores en la tarjeta del banco.
+resto. Cerrado (asesora):
+
+- **Hecho del expediente**, no de la tarjeta del banco. La tarjeta guarda
+  `factorClienteBanorte = 0.70` y `factorNoCliente = 0.60`.
+- **Híbrido:** si hay al menos un estado con `institutionName` Banorte →
+  premarcar “Es cliente Banorte” (70%). Si no hay → default **no cliente**
+  (60%). La asesora **siempre puede** cambiar el checkbox.
+- **Aviso en UI** cuando el expediente es PFAE/RIF/RESICO y aún no se ha
+  confirmado el flag (o cuando la inferencia y el checkbox divergen): banner
+  visible junto al checkbox para que no se olvide revisar antes de analizar /
+  enviar a comparativa.
 
 ### Capa 2 — CMA por destino
 
@@ -575,13 +646,15 @@ prevalece para originaciones desde esa fecha. Validar en CSF.
 
 ### Capa 3 — Cálculo de ingreso PFAE (estados)
 
-Metodología (PDF cálculo 2024) — **igual a nuestro motor suavizado**:
+Metodología (PDF cálculo 2024) — **igual a nuestro motor suavizado**. Solo
+PFAE / RIF / RESICO (no asalariado por nómina):
 
 1. CSF + 6 meses de estados (uno o más bancos).
 2. Solo depósitos de la actividad (mismo peinado: sin créditos, TDC, traspasos
    propios, devoluciones, depósitos familiares).
 3. Quitar mes más alto y más bajo; promedio de los 4 restantes.
-4. × 0.70 (cliente Banorte) o × 0.60 (resto).
+4. × **0.70** si checkbox “cliente Banorte” (premarcado si hay estado Banorte),
+   o × **0.60** si no.
 
 Declaración anual PF/PFAE: permitida para actividad empresarial o mixto
 asalariado+empresarial; **no** si solo trae sueldos y salarios; no pagos
@@ -704,19 +777,18 @@ nota en comparativa de que HSBC autoriza con Visor, no con nuestro peinado.
 4. Suavizado 6→4: Banorte y Santander lo documentan explícito. HSBC PFAE
    autoriza con **Visor Financiero**, no con peinado; el motor igual puede
    mostrar base × 1.0 como aproximación.
-5. Banorte cliente vs no cliente cambia el factor (70 vs 60). Modelar en
-   tarjeta del banco o flag de expediente.
+5. Banorte 70/60 solo **PFAE/RIF/RESICO** (estados). Señal cerrada: híbrido
+   (inferir por estado Banorte + checkbox override + aviso UI). Asalariado
+   no usa este factor.
 6. Confirmado HSBC (asesora): liquidez solo asalariado; edad máx. **70a11m**;
-   ingreso seed **vacío**. Pendiente resto de bancos:
+   ingreso seed **vacío**. Confirmado Mifel CE **0.50**. Pendiente resto:
    - ¿Factores Banamex = columna Nuevo?
    - ¿Mifel comercio 0.35 vs Excel 0.20?
-   - ¿Mifel CE 0.42?
    - ¿Edad mín. Banamex PFAE = 28?
-   - ¿Santander score 542 vs 541?
+   - ¿Santander score 542 vs 541? → **cerrado: 542**; edad+plazo **966 m** (80a6m); factores = **afectación** (no castigos)
    - ¿Afirme 60% o 65%?
    - ¿BX+ NET o GROSS?
    - ¿Scotiabank edad+plazo 80 vs seed 74?
-   - ¿Banorte default 0.60 (no cliente) y 0.70 si es cliente Banorte?
 7. Fuera de MVP: persona moral, economía americana, Infonavit/aforos del
    anaquel, tasas/productos, directorio comercial, flujo E-Visor de Leones.
 

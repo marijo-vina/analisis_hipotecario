@@ -38,10 +38,10 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
       expect(banorte!.minimumBureauScore).toBeNull();
     });
 
-    it('should have Santander with minimumBureauScore=541', () => {
+    it('should have Santander with minimumBureauScore=542', () => {
       const santander = BANKS.find((b) => b.code === 'SANTANDER');
       expect(santander).toBeDefined();
-      expect(santander!.minimumBureauScore).toBe(541);
+      expect(santander!.minimumBureauScore).toBe(542);
       expect(santander!.incomeCriterion).toBe('NET');
       expect(santander!.debtCommitmentFactor).toBe(0.5);
     });
@@ -237,9 +237,9 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
         expect(liq!.minimumPropertyValue).toBeNull();
       });
 
-      it('should have age range 252-960', () => {
+      it('should have age range 252-966', () => {
         expect(policies.every((p) => p.minimumApplicantAgeMonths === 252)).toBe(true);
-        expect(policies.every((p) => p.maximumApplicationAgeMonths === 960)).toBe(true);
+        expect(policies.every((p) => p.maximumApplicationAgeMonths === 966)).toBe(true);
       });
 
       it('should use code format SANTANDER_{shortDest}', () => {

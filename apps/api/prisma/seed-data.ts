@@ -23,7 +23,7 @@ export const CREDIT_TYPES = [
 export const BANKS = [
   { code: 'BANORTE', name: 'Banorte', debtCommitmentFactor: 0.6, incomeCriterion: 'NET' as const, minimumBureauScore: null as number | null },
   { code: 'SCOTIABANK', name: 'Scotiabank', debtCommitmentFactor: 0.55, incomeCriterion: 'GROSS' as const, minimumBureauScore: null as number | null },
-  { code: 'SANTANDER', name: 'Santander', debtCommitmentFactor: 0.5, incomeCriterion: 'NET' as const, minimumBureauScore: 541 },
+  { code: 'SANTANDER', name: 'Santander', debtCommitmentFactor: 0.5, incomeCriterion: 'NET' as const, minimumBureauScore: 542 },
   { code: 'HSBC', name: 'HSBC', debtCommitmentFactor: 0.5, incomeCriterion: 'NET' as const, minimumBureauScore: null as number | null },
   { code: 'CITIBANAMEX', name: 'Citibanamex', debtCommitmentFactor: 0.5, incomeCriterion: 'GROSS' as const, minimumBureauScore: null as number | null },
   { code: 'BXPLUS', name: 'BX+', debtCommitmentFactor: 0.5, incomeCriterion: 'GROSS' as const, minimumBureauScore: null as number | null },
@@ -71,13 +71,13 @@ export const BANK_POLICIES: BankPolicySeed[] = [
   { bankCode: 'SCOTIABANK', code: 'SCOTIABANK_CNS', name: 'Construcción', destination: 'CONSTRUCCION', minimumIncome: 10000, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 300, maximumApplicationAgeMonths: 888, isActive: true },
   { bankCode: 'SCOTIABANK', code: 'SCOTIABANK_REM', name: 'Remodelación', destination: 'REMODELACION', minimumIncome: 10000, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 300, maximumApplicationAgeMonths: 888, isActive: true },
 
-  // ── SANTANDER (NET, 0.50, minBureauScore=541) — 6 active ──────────────────
-  { bankCode: 'SANTANDER', code: 'SANTANDER_ADQ', name: 'Adquisición', destination: 'ACQUISITION', minimumIncome: 7500, minimumPropertyValue: 250000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
-  { bankCode: 'SANTANDER', code: 'SANTANDER_LIQ', name: 'Liquidez', destination: 'LIQUIDITY', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
-  { bankCode: 'SANTANDER', code: 'SANTANDER_SUST', name: 'Sustitución de Hipoteca', destination: 'MORTGAGE_REPLACEMENT', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
-  { bankCode: 'SANTANDER', code: 'SANTANDER_TER', name: 'Terreno', destination: 'TERRENO', minimumIncome: 7500, minimumPropertyValue: 250000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
-  { bankCode: 'SANTANDER', code: 'SANTANDER_CNS', name: 'Construcción', destination: 'CONSTRUCCION', minimumIncome: 20000, minimumPropertyValue: 700000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
-  { bankCode: 'SANTANDER', code: 'SANTANDER_REM', name: 'Remodelación', destination: 'REMODELACION', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 960, isActive: true },
+  // ── SANTANDER (NET, 0.50, minBureauScore=542) — 6 active ──────────────────
+  { bankCode: 'SANTANDER', code: 'SANTANDER_ADQ', name: 'Adquisición', destination: 'ACQUISITION', minimumIncome: 7500, minimumPropertyValue: 250000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
+  { bankCode: 'SANTANDER', code: 'SANTANDER_LIQ', name: 'Liquidez', destination: 'LIQUIDITY', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
+  { bankCode: 'SANTANDER', code: 'SANTANDER_SUST', name: 'Sustitución de Hipoteca', destination: 'MORTGAGE_REPLACEMENT', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
+  { bankCode: 'SANTANDER', code: 'SANTANDER_TER', name: 'Terreno', destination: 'TERRENO', minimumIncome: 7500, minimumPropertyValue: 250000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
+  { bankCode: 'SANTANDER', code: 'SANTANDER_CNS', name: 'Construcción', destination: 'CONSTRUCCION', minimumIncome: 20000, minimumPropertyValue: 700000, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
+  { bankCode: 'SANTANDER', code: 'SANTANDER_REM', name: 'Remodelación', destination: 'REMODELACION', minimumIncome: 7500, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 252, maximumApplicationAgeMonths: 966, isActive: true },
 
   // ── HSBC (NET, 0.50) — only ACQUISITION active ────────────────────────────
   { bankCode: 'HSBC', code: 'HSBC_ADQ', name: 'Adquisición', destination: 'ACQUISITION', minimumIncome: null, minimumPropertyValue: null, minimumEmploymentTenureMonths: 6, minimumApplicantAgeMonths: 300, maximumApplicationAgeMonths: 839, isActive: true },
