@@ -1643,6 +1643,8 @@ export const IncomeCalculationScalarFieldEnum = {
   confirmedBy: 'confirmedBy',
   confirmedAt: 'confirmedAt',
   observations: 'observations',
+  source: 'source',
+  bases: 'bases',
   calculatedAt: 'calculatedAt'
 } as const
 

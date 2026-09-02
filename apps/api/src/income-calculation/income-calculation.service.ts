@@ -7,10 +7,27 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import {
   IncomeCalculationStatus,
+  type BankIncomeBase,
+  type IncomeBase,
   type IncomeCalculationResult,
   type IncomeReceiptResult,
+  type IncomeSource,
+  type PfaeIncomeBases,
 } from './income-calculation.types';
 import type { SaveConciliationDto } from './dto/save-conciliation.dto';
+import {
+  assembleMonths,
+  chooseSource,
+  resolveActivity,
+  smooth,
+  taxMonthly,
+  type BankStatementExtract,
+  type CsfActivityInput,
+  type TaxReturnExtract,
+} from './pfae-income.helpers';
+
+const PFAE_DOCUMENT_CODES = ['CSF', 'BANK_STATEMENT', 'TAX_RETURN'] as const;
+const ZERO = new Prisma.Decimal(0);
 
 // ── Pure helpers ──────────────────────────────────────────────────────────
 
@@ -76,6 +93,40 @@ export function computeAverages(receipts: IncomeReceiptResult[]): Averages {
   };
 }
 
+function projectChosenBase(
+  bank: BankIncomeBase,
+  tax: IncomeBase,
+): {
+  source: IncomeSource;
+  gross: Prisma.Decimal;
+  net: Prisma.Decimal;
+  status: IncomeCalculationStatus;
+} {
+  const chosen = chooseSource(bank, tax);
+  if (chosen === 'BANK_STATEMENTS') {
+    return {
+      source: chosen,
+      gross: new Prisma.Decimal(bank.monthlyGross ?? 0),
+      net: new Prisma.Decimal(bank.monthlyNet ?? 0),
+      status: IncomeCalculationStatus.CALCULATED,
+    };
+  }
+  if (chosen === 'TAX_RETURN') {
+    return {
+      source: chosen,
+      gross: new Prisma.Decimal(tax.monthlyGross ?? 0),
+      net: new Prisma.Decimal(tax.monthlyNet ?? 0),
+      status: IncomeCalculationStatus.CALCULATED,
+    };
+  }
+  return {
+    source: 'BANK_STATEMENTS',
+    gross: ZERO,
+    net: ZERO,
+    status: IncomeCalculationStatus.REQUIRES_REVIEW,
+  };
+}
+
 // ── Service ────────────────────────────────────────────────────────────────
 
 /**
@@ -92,15 +143,33 @@ export class IncomeCalculationService {
   // ── Public API ───────────────────────────────────────────────────────
 
   /**
-   * Build a fresh income-calculation snapshot from PAYROLL_RECEIPT
-   * documents on the case. By default every receipt is `included: true`;
-   * callers can pass a list of `excludedDocumentIds` to deselect receipts
-   * before the initial computation. Throws 404 if no payroll docs exist,
-   * 400 if every receipt is excluded.
+   * Build a fresh income-calculation snapshot for the case.
+   * SALARIED (or absent personType) uses payroll receipts.
+   * PFAE skips payroll and computes independent bank/tax bases.
    */
   async calculate(
     caseId: string,
     excludedDocumentIds: string[] = [],
+  ): Promise<IncomeCalculationResult> {
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      select: { personType: true },
+    });
+
+    if (mortgageCase?.personType === 'PFAE') {
+      return this.calculatePfae(caseId);
+    }
+
+    return this.calculateFromPayroll(caseId, excludedDocumentIds);
+  }
+
+  /**
+   * SALARIED (or absent personType) path — payroll receipts only.
+   * Behavior matches the pre-HU-18 `calculate()` implementation.
+   */
+  private async calculateFromPayroll(
+    caseId: string,
+    excludedDocumentIds: string[],
   ): Promise<IncomeCalculationResult> {
     const docs = await this.prisma.document.findMany({
       where: {
@@ -139,6 +208,63 @@ export class IncomeCalculationService {
         averageGrossIncome: gross.toFixed(2),
         averageNetIncome: net.toFixed(2),
         status: IncomeCalculationStatus.CALCULATED,
+        source: 'PAYROLL',
+      },
+    });
+
+    return this.snapshotToResult(snapshot, caseId);
+  }
+
+  /**
+   * PFAE path — skip payroll. Build independent bank and tax bases,
+   * pick a default source, and project the chosen figures into the
+   * existing average columns. Both invalid ⇒ REQUIRES_REVIEW, no throw.
+   */
+  private async calculatePfae(
+    caseId: string,
+  ): Promise<IncomeCalculationResult> {
+    const docs = await this.prisma.document.findMany({
+      where: {
+        mortgageCaseId: caseId,
+        documentType: { code: { in: [...PFAE_DOCUMENT_CODES] } },
+      },
+      include: { documentType: true },
+    });
+
+    const csfDoc = docs.find((doc) => doc.documentType.code === 'CSF');
+    const bankDocs = docs.filter(
+      (doc) => doc.documentType.code === 'BANK_STATEMENT',
+    );
+    const taxDoc = docs.find((doc) => doc.documentType.code === 'TAX_RETURN');
+
+    const csfData = (csfDoc?.extractedData ?? {}) as {
+      activities?: CsfActivityInput[];
+    };
+    const activity = resolveActivity(csfData.activities ?? []);
+    const months = assembleMonths(
+      bankDocs.map(
+        (doc) => (doc.extractedData ?? {}) as BankStatementExtract,
+      ),
+    );
+    const bank = smooth(months, activity.windowMonths);
+    const tax = taxMonthly((taxDoc?.extractedData ?? {}) as TaxReturnExtract);
+    const projected = projectChosenBase(bank, tax);
+
+    const bases: PfaeIncomeBases = {
+      bank,
+      taxReturn: tax,
+      activity,
+    };
+
+    const snapshot = await this.prisma.incomeCalculation.create({
+      data: {
+        mortgageCaseId: caseId,
+        receiptResults: [] as unknown as never,
+        averageGrossIncome: projected.gross.toFixed(2),
+        averageNetIncome: projected.net.toFixed(2),
+        status: projected.status,
+        source: projected.source,
+        bases: bases as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -281,6 +407,8 @@ export class IncomeCalculationService {
       confirmedBy: (snapshot.confirmedBy as string | null) ?? null,
       confirmedAt,
       observations: (snapshot.observations as string | null) ?? null,
+      source: (snapshot.source as IncomeSource | undefined) ?? 'PAYROLL',
+      bases: (snapshot.bases as PfaeIncomeBases | null) ?? null,
     };
   }
 }

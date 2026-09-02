@@ -5,6 +5,7 @@ import { IncomeCalculationService } from './income-calculation.service';
 import {
   IncomeCalculationStatus,
   type IncomeReceiptResult,
+  type PfaeIncomeBases,
 } from './income-calculation.types';
 
 // ── Test helpers ──────────────────────────────────────────────────────────
@@ -96,6 +97,9 @@ function makeSnapshot(
 /** Minimal Prisma mock — document.findMany + incomeCalculation.create/findFirst. */
 function makeMockPrisma() {
   return {
+    mortgageCase: {
+      findUnique: jest.fn().mockResolvedValue({ personType: 'SALARIED' }),
+    },
     document: {
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -115,6 +119,145 @@ function makeMockPrisma() {
           }),
         ),
       findFirst: jest.fn().mockResolvedValue(null),
+    },
+  };
+}
+
+type DocTypeCode = 'PAYROLL_RECEIPT' | 'CSF' | 'BANK_STATEMENT' | 'TAX_RETURN';
+
+function makeTypedDoc(
+  code: DocTypeCode,
+  extractedData: Record<string, unknown>,
+  id = `doc-${code.toLowerCase()}`,
+): Record<string, unknown> {
+  return {
+    id,
+    mortgageCaseId: 'case-1',
+    createdAt: new Date('2025-05-10'),
+    documentType: { code },
+    extractedData,
+    processingResults: null,
+  };
+}
+
+function makeCsfDoc(
+  activities: Array<{
+    description: string;
+    percentage?: number | null;
+    order?: number | null;
+    endDate?: string | null;
+  }>,
+) {
+  return makeTypedDoc('CSF', { activities }, 'doc-csf');
+}
+
+function makeBankDoc(month: string, totalValidIncome: number, id?: string) {
+  return makeTypedDoc(
+    'BANK_STATEMENT',
+    {
+      statementPeriod: {
+        periodStartDate: `${month}-01`,
+        periodEndDate: `${month}-28`,
+        isCurrentIncompleteMonth: false,
+      },
+      financialDepuration: {
+        depurationSummary: { totalValidIncome },
+      },
+    },
+    id ?? `doc-bank-${month}`,
+  );
+}
+
+function makeTaxDoc(opts: {
+  fiscalProfit?: number | null;
+  accumulableIncomeTotal?: number | null;
+  hasTaxLoss?: boolean;
+}) {
+  return makeTypedDoc(
+    'TAX_RETURN',
+    {
+      fiscalResult: {
+        fiscalProfit: opts.fiscalProfit ?? null,
+        accumulableIncomeTotal: opts.accumulableIncomeTotal ?? null,
+      },
+      hasTaxLoss: opts.hasTaxLoss ?? false,
+    },
+    'doc-tax',
+  );
+}
+
+const SIX_MONTH_BANK = [
+  makeBankDoc('2024-01', 10),
+  makeBankDoc('2024-02', 12),
+  makeBankDoc('2024-03', 14),
+  makeBankDoc('2024-04', 16),
+  makeBankDoc('2024-05', 18),
+  makeBankDoc('2024-06', 100),
+];
+
+const GENERIC_CSF = makeCsfDoc([
+  {
+    description: 'Consultoría profesional',
+    percentage: 100,
+    order: 1,
+    endDate: null,
+  },
+]);
+
+const VALID_TAX = makeTaxDoc({
+  fiscalProfit: 120000,
+  accumulableIncomeTotal: 240000,
+});
+
+function stubDocumentsByType(
+  mockPrisma: ReturnType<typeof makeMockPrisma>,
+  docs: Array<Record<string, unknown>>,
+) {
+  mockPrisma.document.findMany.mockImplementation(
+    (args: {
+      where?: { documentType?: { code?: string | { in?: string[] } } };
+    }) => {
+      const code = args?.where?.documentType?.code;
+      let filtered = docs;
+      if (typeof code === 'string') {
+        filtered = docs.filter(
+          (d) => (d.documentType as { code: string }).code === code,
+        );
+      } else if (code && typeof code === 'object' && Array.isArray(code.in)) {
+        const allowed = new Set(code.in);
+        filtered = docs.filter((d) =>
+          allowed.has((d.documentType as { code: string }).code),
+        );
+      }
+      return Promise.resolve(filtered);
+    },
+  );
+}
+
+function samplePfaeBases(): PfaeIncomeBases {
+  return {
+    bank: {
+      valid: true,
+      invalidReason: null,
+      monthlyGross: 15,
+      monthlyNet: 15,
+      windowMonths: 6,
+      monthsUsed: ['2024-02', '2024-03', '2024-04', '2024-05'],
+      droppedMax: '2024-06',
+      droppedMin: '2024-01',
+    },
+    taxReturn: {
+      valid: true,
+      invalidReason: null,
+      monthlyGross: 20000,
+      monthlyNet: 10000,
+    },
+    activity: {
+      description: 'Consultoría profesional',
+      percentage: 100,
+      order: 1,
+      matchedKeyword: null,
+      windowMonths: 6,
     },
   };
 }
@@ -502,6 +645,219 @@ describe('IncomeCalculationService', () => {
       };
       expect(createArg.data.mortgageCaseId).toBe('case-1');
       expect(createArg.data.status).toBe(IncomeCalculationStatus.CALCULATED);
+    });
+  });
+
+  // ── PFAE dual-base calculate() (HU-18 Unit 2) ────────────────────────
+
+  describe('PFAE calculate()', () => {
+    beforeEach(() => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({
+        personType: 'PFAE',
+      });
+    });
+
+    it('default source projection: both valid → BANK_STATEMENTS and averages equal bank figures', async () => {
+      stubDocumentsByType(mockPrisma, [
+        GENERIC_CSF,
+        ...SIX_MONTH_BANK,
+        VALID_TAX,
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(15);
+      expect(result.averageNetIncome).toBe(15);
+      expect(result.status).toBe(IncomeCalculationStatus.CALCULATED);
+      expect(result.bases?.bank.valid).toBe(true);
+      expect(result.bases?.bank.monthlyNet).toBe(15);
+      expect(result.bases?.taxReturn.valid).toBe(true);
+      expect(result.bases?.taxReturn.monthlyGross).toBe(20000);
+      expect(result.bases?.taxReturn.monthlyNet).toBe(10000);
+    });
+
+    it('tax source when bank invalid: TAX_RETURN and averages equal tax figures', async () => {
+      stubDocumentsByType(mockPrisma, [
+        GENERIC_CSF,
+        makeBankDoc('2024-01', 10),
+        makeBankDoc('2024-02', 12),
+        makeBankDoc('2024-03', 14),
+        makeBankDoc('2024-04', 16),
+        makeBankDoc('2024-05', 18),
+        VALID_TAX,
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.source).toBe('TAX_RETURN');
+      expect(result.averageGrossIncome).toBe(20000);
+      expect(result.averageNetIncome).toBe(10000);
+      expect(result.bases?.bank.valid).toBe(false);
+      expect(result.bases?.bank.invalidReason).toBe('INSUFFICIENT_MONTHS');
+      expect(result.bases?.taxReturn.valid).toBe(true);
+    });
+
+    it('fiscal loss knocks out tax only: tax INVALID, source BANK_STATEMENTS', async () => {
+      stubDocumentsByType(mockPrisma, [
+        GENERIC_CSF,
+        ...SIX_MONTH_BANK,
+        makeTaxDoc({
+          fiscalProfit: 0,
+          accumulableIncomeTotal: 240000,
+          hasTaxLoss: true,
+        }),
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(15);
+      expect(result.averageNetIncome).toBe(15);
+      expect(result.bases?.bank.valid).toBe(true);
+      expect(result.bases?.taxReturn.valid).toBe(false);
+      expect(result.bases?.taxReturn.invalidReason).toBe('TAX_LOSS');
+    });
+
+    it('both invalid → REQUIRES_REVIEW, averages 0, no throw, GET latest succeeds', async () => {
+      stubDocumentsByType(mockPrisma, [
+        GENERIC_CSF,
+        makeBankDoc('2024-01', 10),
+        makeBankDoc('2024-02', 12),
+        makeBankDoc('2024-03', 14),
+        makeBankDoc('2024-04', 16),
+        makeBankDoc('2024-05', 18),
+        makeTaxDoc({ hasTaxLoss: true }),
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.status).toBe(IncomeCalculationStatus.REQUIRES_REVIEW);
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(0);
+      expect(result.averageNetIncome).toBe(0);
+      expect(result.bases?.bank.valid).toBe(false);
+      expect(result.bases?.taxReturn.valid).toBe(false);
+
+      const persisted = await mockPrisma.incomeCalculation.create.mock
+        .results[0].value;
+      mockPrisma.incomeCalculation.findFirst.mockResolvedValue(persisted);
+
+      await expect(service.getLatest('case-1')).resolves.toMatchObject({
+        status: IncomeCalculationStatus.REQUIRES_REVIEW,
+        source: 'BANK_STATEMENTS',
+        averageGrossIncome: 0,
+        averageNetIncome: 0,
+        id: result.id,
+      });
+    });
+
+    it('PFAE analyze without payroll MUST NOT 404 and both bases are computed', async () => {
+      stubDocumentsByType(mockPrisma, [
+        GENERIC_CSF,
+        ...SIX_MONTH_BANK,
+        VALID_TAX,
+      ]);
+
+      await expect(service.calculate('case-1')).resolves.toMatchObject({
+        source: 'BANK_STATEMENTS',
+        bases: expect.objectContaining({
+          bank: expect.objectContaining({ valid: true }),
+          taxReturn: expect.objectContaining({ valid: true }),
+        }),
+      });
+    });
+
+    it('triangulates 12-month restaurantero window: [1..11,100] → 6.5 not 13.83', async () => {
+      const twelveMonths = [
+        makeBankDoc('2024-01', 1),
+        makeBankDoc('2024-02', 2),
+        makeBankDoc('2024-03', 3),
+        makeBankDoc('2024-04', 4),
+        makeBankDoc('2024-05', 5),
+        makeBankDoc('2024-06', 6),
+        makeBankDoc('2024-07', 7),
+        makeBankDoc('2024-08', 8),
+        makeBankDoc('2024-09', 9),
+        makeBankDoc('2024-10', 10),
+        makeBankDoc('2024-11', 11),
+        makeBankDoc('2024-12', 100),
+      ];
+      stubDocumentsByType(mockPrisma, [
+        makeCsfDoc([
+          {
+            description: 'Servicios de restaurantero',
+            percentage: 100,
+            order: 1,
+            endDate: null,
+          },
+        ]),
+        ...twelveMonths,
+        VALID_TAX,
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(6.5);
+      expect(result.averageNetIncome).toBe(6.5);
+      expect(result.averageNetIncome).not.toBeCloseTo(13.83, 1);
+      expect(result.bases?.activity.windowMonths).toBe(12);
+      expect(result.bases?.activity.matchedKeyword).toBe('restaurantero');
+    });
+  });
+
+  describe('SALARIED regression (HU-18)', () => {
+    it('payroll [15000.50, 14999.50] → averageGrossIncome 15000.00 and source PAYROLL', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        makePayrollDoc({
+          id: 'doc-1',
+          extractedData: {
+            income: { grossIncome: 15000.5, netIncome: 12000.33 },
+            payrollPeriod: {},
+            employer: {},
+          },
+        }),
+        makePayrollDoc({
+          id: 'doc-2',
+          extractedData: {
+            income: { grossIncome: 14999.5, netIncome: 11999.67 },
+            payrollPeriod: {},
+            employer: {},
+          },
+        }),
+      ]);
+
+      const result = await service.calculate('case-1');
+
+      expect(result.averageGrossIncome).toBe(15000);
+      expect(result.averageNetIncome).toBe(12000);
+      expect(result.source).toBe('PAYROLL');
+      expect(result.bases ?? null).toBeNull();
+    });
+  });
+
+  describe('GET latest source/bases contract', () => {
+    it('exposes source and bases JSON from the persisted snapshot', async () => {
+      const bases = samplePfaeBases();
+      mockPrisma.incomeCalculation.findFirst.mockResolvedValue(
+        makeSnapshot({
+          id: 'inc-pfae',
+          source: 'BANK_STATEMENTS',
+          bases,
+        }),
+      );
+
+      const result = await service.getLatest('case-1');
+
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.bases).toEqual(bases);
+      expect(result.bases?.bank.monthsUsed).toEqual([
+        '2024-02',
+        '2024-03',
+        '2024-04',
+        '2024-05',
+      ]);
     });
   });
 });

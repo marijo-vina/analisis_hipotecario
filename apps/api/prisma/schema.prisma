@@ -111,6 +111,8 @@ model IncomeCalculation {
   confirmedBy          String?
   confirmedAt          DateTime?
   observations         String?
+  source               String   @default("PAYROLL")
+  bases                Json?
   calculatedAt         DateTime @default(now())
 }
 

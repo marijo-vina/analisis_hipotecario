@@ -95,6 +95,9 @@ export interface OverrideCreditDto {
   reason?: string;
 }
 
+const SALARIED_REVOLVING_FACTOR = 0.06;
+const PFAE_REVOLVING_FACTOR = 0.07;
+
 /**
  * Calculates monthly liability debt from bureau-extracted credits (HU-11).
  *
@@ -105,9 +108,30 @@ export interface OverrideCreditDto {
 @Injectable()
 export class LiabilityCalculationService {
   private readonly rulesVersion = '2024.1';
-  private readonly defaultFactor = 0.06;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Default revolving factor from `personType` when the caller omits `factorUsed`.
+   * PFAE → 0.07; SALARIED or absent → 0.06.
+   */
+  private async resolveFactor(
+    caseId: string,
+    factorUsed?: number,
+  ): Promise<number> {
+    if (factorUsed !== undefined) {
+      return factorUsed;
+    }
+
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      select: { personType: true },
+    });
+
+    return mortgageCase?.personType === 'PFAE'
+      ? PFAE_REVOLVING_FACTOR
+      : SALARIED_REVOLVING_FACTOR;
+  }
 
   // ── Public API ─────────────────────────────────────────────────────────
 
@@ -120,7 +144,7 @@ export class LiabilityCalculationService {
     credits: LiabilityCreditInput[],
     factorUsed?: number,
   ): Promise<LiabilityCalculationResult> {
-    const factor = factorUsed ?? this.defaultFactor;
+    const factor = await this.resolveFactor(caseId, factorUsed);
 
     const results = credits.map((c) => this.processCredit(c, factor));
 
@@ -463,6 +487,7 @@ export class LiabilityCalculationService {
         return this.calculateUnknown(
           currentBalance,
           paymentDueAmountEffective,
+          factor,
         );
       default:
         return {
@@ -589,12 +614,13 @@ export class LiabilityCalculationService {
   }
 
   /**
-   * UNKNOWN: conservative MAX(saldo × 0.06, pago) + REQUIRES_REVIEW.
-   * Factor hardcoded at 0.06 (not the parametrized factor).
+   * UNKNOWN: conservative MAX(saldo × factor, pago) + REQUIRES_REVIEW.
+   * Uses the same personType factor as revolving (PFAE 0.07, else 0.06).
    */
   private calculateUnknown(
     balance: number | null,
     payment: number | null,
+    factor: number,
   ): {
     contribution: number | null;
     status: LiabilityStatus;
@@ -604,7 +630,7 @@ export class LiabilityCalculationService {
     const paymentCents = payment !== null ? pesosToCents(payment) : null;
 
     if (balanceCents !== null && paymentCents !== null) {
-      const provisionalCents = applyFactorCents(balanceCents, 0.06);
+      const provisionalCents = applyFactorCents(balanceCents, factor);
       const maxCents = Math.max(provisionalCents, paymentCents);
       return {
         contribution: centsToPesos(maxCents),
@@ -614,7 +640,7 @@ export class LiabilityCalculationService {
     }
 
     if (balanceCents !== null && paymentCents === null) {
-      const provisionalCents = applyFactorCents(balanceCents, 0.06);
+      const provisionalCents = applyFactorCents(balanceCents, factor);
       return {
         contribution: centsToPesos(provisionalCents),
         status: LiabilityStatus.REQUIRES_REVIEW,
