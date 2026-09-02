@@ -373,6 +373,80 @@ describe('CaseAnalysisService', () => {
         expect.any(Array),
       );
     });
+
+    it('PFAE Phase B persists an income snapshot without payroll and does not fail', async () => {
+      const pfaeCase = buildCase({
+        personType: 'PFAE',
+        documents: [
+          {
+            id: 'doc-1',
+            extractedData: { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } },
+            documentType: { code: 'INE' },
+          },
+          {
+            id: 'doc-csf',
+            extractedData: { activities: [] },
+            documentType: { code: 'CSF' },
+          },
+        ],
+      });
+      const incomeSnapshot = {
+        id: 'income-snap-pfae-1',
+        caseId: 'case-1',
+        source: 'BANK_STATEMENTS',
+        status: 'CALCULATED',
+        averageGrossIncome: 15000,
+        averageNetIncome: 15000,
+      };
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(pfaeCase);
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue(incomeSnapshot);
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(
+        pfaeCase.documents.some(
+          (d: { documentType: { code: string } }) => d.documentType.code === 'PAYROLL_RECEIPT',
+        ),
+      ).toBe(false);
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledTimes(1);
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledWith('case-1', []);
+      await expect(mockIncomeCalcService.calculate.mock.results[0].value).resolves.toEqual(
+        incomeSnapshot,
+      );
+      expect(result.executionStatus).toBe('COMPLETED');
+      expect(mockPrismaService.analysisRun.create).toHaveBeenCalled();
+    });
+
+    it('PFAE Phase B still calculates liability when there is no payroll', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({
+          personType: 'PFAE',
+          documents: [
+            {
+              id: 'doc-1',
+              extractedData: { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } },
+              documentType: { code: 'INE' },
+            },
+          ],
+        }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({
+        id: 'income-snap-pfae-2',
+        source: 'TAX_RETURN',
+      });
+      mockLiabilityCalcService.calculate.mockResolvedValue({ id: 'liability-snap-1' });
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledWith('case-1', []);
+      expect(mockLiabilityCalcService.calculate).toHaveBeenCalledWith('case-1', []);
+      expect(result.executionStatus).toBe('COMPLETED');
+    });
   });
 
   describe('getLatest', () => {
