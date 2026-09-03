@@ -6,6 +6,7 @@ import type {
 } from './analysis-rule.interface';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -44,7 +45,8 @@ export interface AnalysisResultPayload {
  * Orchestrates cross-document analysis for a mortgage case.
  *
  * 3-phase execution:
- *  Phase A: identity-match + bankarization-validation rules
+ *  Phase A: identity-match + personType-specific validation rules
+ *    (SALARIED: bankarization-validation; PFAE: pfae-validation)
  *  Phase B: income calculation + liability calculation (services)
  *  Phase C: bank-viability rule (reads income/liability from DB)
  *
@@ -56,6 +58,7 @@ export class CaseAnalysisService {
     private readonly prisma: PrismaService,
     private readonly identityMatchRule: IdentityMatchRule,
     private readonly bankarizationValidationRule: BankarizationValidationRule,
+    private readonly pfaeValidationRule: PfaeValidationRule,
     private readonly bankViabilityRule: BankViabilityRule,
     private readonly incomeCalcService: IncomeCalculationService,
     private readonly liabilityCalcService: LiabilityCalculationService,
@@ -64,14 +67,13 @@ export class CaseAnalysisService {
 
   /**
    * Resolves the Phase A rule set per request based on `personType`.
-   * PFAE skips `BankarizationValidationRule` entirely (explicit orchestrator
-   * decision, not an implicit empty-PASS side effect) — there is no payroll
-   * to reconcile for a PFAE case. SALARIED (or absent/unrecognized
-   * `personType`) runs both rules, matching prior behavior.
+   * PFAE runs `identity-match` + `pfae-validation` (CSF/bank gates).
+   * SALARIED (or absent/unrecognized `personType`) runs `identity-match` +
+   * `bankarization-validation`, matching prior behavior.
    */
   private resolvePhaseARules(personType?: string | null): AnalysisRule[] {
     if (personType === 'PFAE') {
-      return [this.identityMatchRule];
+      return [this.identityMatchRule, this.pfaeValidationRule];
     }
     return [this.identityMatchRule, this.bankarizationValidationRule];
   }
