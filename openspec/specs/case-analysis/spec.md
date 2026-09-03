@@ -57,8 +57,8 @@ The system SHALL define an `AnalysisRule` interface that each rule implements. T
 
 ### Requirement: Phased Orchestration
 
-The system SHALL execute `CaseAnalysisService.run()` in three phases: (A) document-level rules (identity match, bankarization validation), (B) financial calculations (income + liability via injected services), (C) bank viability rule. Phase A results SHALL be passed to Phase C as typed `BankarizationFlags` to avoid stale DB reads. Phase B SHALL inject `IncomeCalculationService` and `LiabilityCalculationService`. Phase C SHALL execute after Phase B completes so that income and liability snapshots are available. The Phase A rule set (`phaseARules`) SHALL be resolved per-request based on `mortgageCase.personType`, not fixed at construction time. For `personType` = PFAE, `BankarizationValidationRule` SHALL be excluded from execution entirely (an explicit orchestrator decision, not an implicit empty-PASS side effect); `IdentityMatchRule` SHALL still execute. For `personType` = SALARIED (or absent/unrecognized), both `IdentityMatchRule` and `BankarizationValidationRule` SHALL execute, unchanged. The context object (`client`) spread into every Phase A rule SHALL include `personType` sourced from `mortgageCase.personType`. For `personType` = PFAE, Phase B MUST persist an income snapshot; missing payroll MUST NOT fail Phase B.
-(Previously: PFAE Phase B treated missing payroll as a swallowed 404 and did not persist an income snapshot.)
+The system SHALL execute `CaseAnalysisService.run()` in three phases: (A) document-level rules (identity match, bankarization validation, PFAE validation), (B) financial calculations (income + liability via injected services), (C) bank viability rule. Phase A results SHALL be passed to Phase C as typed `BankarizationFlags` to avoid stale DB reads. Phase B SHALL inject `IncomeCalculationService` and `LiabilityCalculationService`. Phase C SHALL execute after Phase B completes so that income and liability snapshots are available. The Phase A rule set (`phaseARules`) SHALL be resolved per-request based on `mortgageCase.personType`, not fixed at construction time. For `personType` = PFAE, `BankarizationValidationRule` SHALL be excluded from execution entirely (an explicit orchestrator decision, not an implicit empty-PASS side effect); Phase A SHALL execute `IdentityMatchRule` AND `PfaeValidationRule`. For `personType` = SALARIED (or absent/unrecognized), both `IdentityMatchRule` and `BankarizationValidationRule` SHALL execute, unchanged; `PfaeValidationRule` MUST NOT execute. The context object (`client`) spread into every Phase A rule SHALL include `personType` sourced from `mortgageCase.personType`. For `personType` = PFAE, Phase B MUST persist an income snapshot; missing payroll MUST NOT fail Phase B. Phase A FAIL from any rule MUST NOT block Phase B or Phase C.
+(Previously: PFAE Phase A executed only `IdentityMatchRule`; bankarization was excluded but pfae-validation was not registered.)
 
 #### Scenario: Three-phase execution completes in order
 
@@ -82,13 +82,22 @@ The system SHALL execute `CaseAnalysisService.run()` in three phases: (A) docume
 
 - GIVEN a mortgage case with `personType: "PFAE"`
 - WHEN `run()` resolves `phaseARules` for this request
-- THEN only `IdentityMatchRule` executes in Phase A; `BankarizationValidationRule.execute()` is never invoked
+- THEN `IdentityMatchRule` and `PfaeValidationRule` execute in Phase A
+- AND `BankarizationValidationRule.execute()` is never invoked
+
+#### Scenario: PFAE Phase A runs identity and pfae-validation
+
+- GIVEN a mortgage case with `personType: "PFAE"`
+- WHEN `run()` executes Phase A
+- THEN both `IdentityMatchRule` and `PfaeValidationRule` execute sequentially
+- AND bankarization validation remains excluded from Phase A
 
 #### Scenario: SALARIED case runs both Phase A rules (regression)
 
 - GIVEN a mortgage case with `personType: "SALARIED"`
 - WHEN `run()` resolves `phaseARules` for this request
 - THEN both `IdentityMatchRule` and `BankarizationValidationRule` execute, matching prior behavior
+- AND `PfaeValidationRule` is not invoked
 
 #### Scenario: Rule context includes personType
 

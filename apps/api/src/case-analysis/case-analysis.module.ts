@@ -4,6 +4,7 @@ import { CaseStatusCalculatorModule } from '../case-status-calculator/case-statu
 import { CaseAnalysisService } from './case-analysis.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { PayrollBankMatchingService } from './services/payroll-bank-matching.service';
 import { PagadoraDetectionService } from './services/pagadora-detection.service';
@@ -16,6 +17,7 @@ import { LiabilityModule } from '../liability/liability.module';
     CaseAnalysisService,
     IdentityMatchRule,
     BankarizationValidationRule,
+    PfaeValidationRule,
     BankViabilityRule,
     PayrollBankMatchingService,
     PagadoraDetectionService,

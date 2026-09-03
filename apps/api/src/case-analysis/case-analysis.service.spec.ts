@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -45,6 +46,11 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockPfaeValidationRule = {
+    ruleId: 'pfae-validation',
+    execute: jest.fn(),
+  };
+
   const mockBankViabilityRule = {
     ruleId: 'bank-viability',
     execute: jest.fn(),
@@ -67,6 +73,14 @@ describe('CaseAnalysisService', () => {
     outcome: 'PASS',
     severity: 'INFO',
     detail: { sources: ['payroll', 'bank-statement', 'client'], fields: [] },
+    alerts: [],
+  };
+
+  const mockPfaeValidationPassResult: RuleResult = {
+    ruleId: 'pfae-validation',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: ['csf'], fields: [], pfaeValidation: {} },
     alerts: [],
   };
 
@@ -111,6 +125,7 @@ describe('CaseAnalysisService', () => {
     // La bancarizacion (HU-10) tambien se ejecuta; default PASS para que el
     // agregado reciba un RuleResult valido sin que cada test lo configure.
     mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
+    mockPfaeValidationRule.execute.mockResolvedValue(mockPfaeValidationPassResult);
     mockBankViabilityRule.execute.mockResolvedValue(mockBankViabilityPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -118,6 +133,7 @@ describe('CaseAnalysisService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
+        { provide: PfaeValidationRule, useValue: mockPfaeValidationRule },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
         { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
@@ -326,8 +342,8 @@ describe('CaseAnalysisService', () => {
     });
   });
 
-  describe('personType-aware phaseARules (HU-19a)', () => {
-    it('PFAE case: does not invoke BankarizationValidationRule.execute', async () => {
+  describe('personType-aware phaseARules (HU-19a / HU-19b)', () => {
+    it('PFAE case: invokes PfaeValidationRule and skips BankarizationValidationRule', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
         buildCase({ personType: 'PFAE' }),
       );
@@ -339,10 +355,11 @@ describe('CaseAnalysisService', () => {
       await service.run('case-1', 'advisor-1');
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
     });
 
-    it('SALARIED case: invokes both IdentityMatchRule and BankarizationValidationRule (regression)', async () => {
+    it('SALARIED case: invokes IdentityMatchRule and BankarizationValidationRule, not PfaeValidationRule (regression)', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
         buildCase({ personType: 'SALARIED' }),
       );
@@ -355,6 +372,29 @@ describe('CaseAnalysisService', () => {
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockBankarizationRule.execute).toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+    });
+
+    it('PFAE Phase A runs identity-match then pfae-validation in order', async () => {
+      const callOrder: string[] = [];
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockImplementation(async () => {
+        callOrder.push('identity-match');
+        return mockPassRuleResult;
+      });
+      mockPfaeValidationRule.execute.mockImplementation(async () => {
+        callOrder.push('pfae-validation');
+        return mockPfaeValidationPassResult;
+      });
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(callOrder).toEqual(['identity-match', 'pfae-validation']);
     });
 
     it('rule context includes personType sourced from mortgageCase.personType', async () => {
@@ -446,6 +486,108 @@ describe('CaseAnalysisService', () => {
       expect(mockIncomeCalcService.calculate).toHaveBeenCalledWith('case-1', []);
       expect(mockLiabilityCalcService.calculate).toHaveBeenCalledWith('case-1', []);
       expect(result.executionStatus).toBe('COMPLETED');
+    });
+
+    it('PFAE pfae-validation FAIL does not block Phase B or Phase C', async () => {
+      const pfaeFail: RuleResult = {
+        ruleId: 'pfae-validation',
+        outcome: 'FAIL',
+        severity: 'ERROR',
+        detail: {
+          sources: ['csf'],
+          fields: [],
+          pfaeValidation: { regime: { isSolelySalaried: true, outcome: 'FAIL' } },
+        },
+        alerts: [
+          {
+            ruleCode: 'REGIMEN_EXCLUSIVAMENTE_ASALARIADO',
+            severity: 'ERROR',
+            field: 'regime',
+            message: 'solo sueldos',
+          },
+        ],
+      };
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockPfaeValidationRule.execute.mockResolvedValue(pfaeFail);
+      mockIncomeCalcService.calculate.mockResolvedValue({ id: 'income-1' });
+      mockLiabilityCalcService.calculate.mockResolvedValue({ id: 'liability-1' });
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledTimes(1);
+      expect(mockLiabilityCalcService.calculate).toHaveBeenCalledTimes(1);
+      expect(mockBankViabilityRule.execute).toHaveBeenCalledTimes(1);
+      expect(result.executionStatus).toBe('COMPLETED');
+      expect(result.outcome).toBe('FAIL');
+    });
+
+    it('persists pfae-validation gate alerts on AnalysisRun.alerts.create', async () => {
+      const pfaeResult: RuleResult = {
+        ruleId: 'pfae-validation',
+        outcome: 'FAIL',
+        severity: 'ERROR',
+        detail: { sources: ['csf'], fields: [], pfaeValidation: {} },
+        alerts: [
+          {
+            ruleCode: 'REGIMEN_EXCLUSIVAMENTE_ASALARIADO',
+            severity: 'ERROR',
+            field: 'regime',
+            message: 'solo sueldos',
+          },
+          {
+            ruleCode: 'VIGENCIA_MAYOR_3_MESES',
+            severity: 'WARNING',
+            field: 'vigencia',
+            message: 'csf vieja',
+          },
+          {
+            ruleCode: 'PFAE_ACTIVITY_TENURE',
+            severity: 'INFO',
+            field: 'tenure',
+            message: '12 meses',
+          },
+        ],
+      };
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockPfaeValidationRule.execute.mockResolvedValue(pfaeResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(mockPrismaService.analysisRun.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            alerts: {
+              create: expect.arrayContaining([
+                expect.objectContaining({
+                  ruleCode: 'REGIMEN_EXCLUSIVAMENTE_ASALARIADO',
+                  severity: 'ERROR',
+                  field: 'regime',
+                }),
+                expect.objectContaining({
+                  ruleCode: 'VIGENCIA_MAYOR_3_MESES',
+                  severity: 'WARNING',
+                  field: 'vigencia',
+                }),
+                expect.objectContaining({
+                  ruleCode: 'PFAE_ACTIVITY_TENURE',
+                  severity: 'INFO',
+                  field: 'tenure',
+                }),
+              ]),
+            },
+          }),
+        }),
+      );
     });
   });
 
