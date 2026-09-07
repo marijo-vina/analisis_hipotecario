@@ -8,7 +8,11 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { IncomeCriterion } from '../../generated/prisma/client';
+import {
+  IncomeCriterion,
+  PfaeFactorMode,
+  TaxReturnPolicy,
+} from '../../generated/prisma/client';
 
 export class UpdateBankDto {
   @IsOptional()
@@ -33,4 +37,17 @@ export class UpdateBankDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsEnum(PfaeFactorMode)
+  pfaeFactorMode?: PfaeFactorMode;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  pfaeFlatFactor?: number | null;
+
+  @IsOptional()
+  @IsEnum(TaxReturnPolicy)
+  taxReturnPolicy?: TaxReturnPolicy;
 }

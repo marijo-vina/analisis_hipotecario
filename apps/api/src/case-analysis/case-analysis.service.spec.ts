@@ -614,4 +614,221 @@ describe('CaseAnalysisService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('runPhaseC', () => {
+    const priorPfaePhaseA: RuleResult[] = [
+      mockPassRuleResult,
+      mockPfaeValidationPassResult,
+    ];
+
+    const staleBankViability: RuleResult = {
+      ruleId: 'bank-viability',
+      outcome: 'PASS',
+      severity: 'INFO',
+      detail: {
+        sources: ['mortgage-case'],
+        fields: [],
+        bankViability: {
+          sourceVersion: 'STALE',
+          bankResults: [{ bankCode: 'OLD' }],
+        },
+      },
+      alerts: [],
+    };
+
+    const freshBankViability: RuleResult = {
+      ruleId: 'bank-viability',
+      outcome: 'PASS',
+      severity: 'INFO',
+      detail: {
+        sources: [
+          'mortgage-case',
+          'income-calculation',
+          'liability-snapshot',
+          'bank-catalog',
+        ],
+        fields: [],
+        bankViability: {
+          sourceVersion: 'ANAQUEL_MAYO_2026',
+          bankResults: [{ bankCode: 'BANORTE' }],
+        },
+      },
+      alerts: [],
+    };
+
+    function stubPriorRun(ruleResults: RuleResult[]) {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockPrismaService.analysisRun.findFirst.mockResolvedValue({
+        id: 'run-prior',
+        mortgageCaseId: 'case-1',
+        detail: {
+          ruleResults,
+          sources: ['official-id', 'csf'],
+          fields: [],
+          bankViability: (staleBankViability.detail as Record<string, unknown>)
+            .bankViability,
+        },
+      });
+      mockBankViabilityRule.execute.mockResolvedValue(freshBankViability);
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-phase-c' });
+    }
+
+    it('copies prior Phase A ruleResults (identity-match + pfae-validation) into a new AnalysisRun', async () => {
+      stubPriorRun([...priorPfaePhaseA, staleBankViability]);
+
+      const result = await service.runPhaseC('case-1', 'advisor-1');
+
+      expect(result.runId).toBe('run-phase-c');
+      expect(result.executionStatus).toBe('COMPLETED');
+      const persisted = mockPrismaService.analysisRun.create.mock.calls[0][0]
+        .data as {
+        detail: { ruleResults: RuleResult[] };
+      };
+      const copiedIds = persisted.detail.ruleResults.map((r) => r.ruleId);
+      expect(copiedIds).toEqual([
+        'identity-match',
+        'pfae-validation',
+        'bank-viability',
+      ]);
+      expect(persisted.detail.ruleResults[0]).toEqual(mockPassRuleResult);
+      expect(persisted.detail.ruleResults[1]).toEqual(mockPfaeValidationPassResult);
+    });
+
+    it('runs BankViabilityRule only and does not re-execute Phase A or Phase B', async () => {
+      stubPriorRun([...priorPfaePhaseA, staleBankViability]);
+
+      await service.runPhaseC('case-1', 'advisor-1');
+
+      expect(mockBankViabilityRule.execute).toHaveBeenCalledTimes(1);
+      expect(mockIdentityMatchRule.execute).not.toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
+      expect(mockIncomeCalcService.calculate).not.toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculate).not.toHaveBeenCalled();
+    });
+
+    it('drops the prior bank-viability result and persists the freshly executed snapshot', async () => {
+      stubPriorRun([...priorPfaePhaseA, staleBankViability]);
+
+      const result = await service.runPhaseC('case-1', 'advisor-1');
+
+      const persisted = mockPrismaService.analysisRun.create.mock.calls[0][0]
+        .data as {
+        mortgageCaseId: string;
+        executionStatus: string;
+        triggeredBy: string;
+        detail: { ruleResults: RuleResult[]; bankViability: unknown };
+      };
+      expect(persisted.mortgageCaseId).toBe('case-1');
+      expect(persisted.executionStatus).toBe('COMPLETED');
+      expect(persisted.triggeredBy).toBe('advisor-1');
+      const viabilityResults = persisted.detail.ruleResults.filter(
+        (r) => r.ruleId === 'bank-viability',
+      );
+      expect(viabilityResults).toHaveLength(1);
+      expect(viabilityResults[0].detail.bankViability).toEqual(
+        (freshBankViability.detail as Record<string, unknown>).bankViability,
+      );
+      expect(persisted.detail.bankViability).toEqual(
+        (freshBankViability.detail as Record<string, unknown>).bankViability,
+      );
+      expect(result.detail).toEqual(
+        expect.objectContaining({
+          bankViability: (freshBankViability.detail as Record<string, unknown>)
+            .bankViability,
+        }),
+      );
+    });
+
+    it('aggregates the same outcome as a full run given copied Phase A FAIL plus new Phase C PASS', async () => {
+      const pfaeFail: RuleResult = {
+        ruleId: 'pfae-validation',
+        outcome: 'FAIL',
+        severity: 'ERROR',
+        detail: { sources: ['csf'], fields: [], pfaeValidation: {} },
+        alerts: [
+          {
+            ruleCode: 'REGIMEN_EXCLUSIVAMENTE_ASALARIADO',
+            severity: 'ERROR',
+            field: 'regime',
+            message: 'solo sueldos',
+          },
+        ],
+      };
+      stubPriorRun([mockPassRuleResult, pfaeFail, staleBankViability]);
+
+      const result = await service.runPhaseC('case-1', 'advisor-1');
+
+      expect(result.outcome).toBe('FAIL');
+      expect(mockPrismaService.analysisRun.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            outcome: 'FAIL',
+            alerts: {
+              create: expect.arrayContaining([
+                expect.objectContaining({
+                  ruleCode: 'REGIMEN_EXCLUSIVAMENTE_ASALARIADO',
+                }),
+              ]),
+            },
+          }),
+        }),
+      );
+    });
+
+    it('SALARIED prior run copies identity-match + bankarization-validation, not pfae-validation', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'SALARIED' }),
+      );
+      mockPrismaService.analysisRun.findFirst.mockResolvedValue({
+        id: 'run-salaried',
+        mortgageCaseId: 'case-1',
+        detail: {
+          ruleResults: [
+            mockPassRuleResult,
+            mockBankarizationPassResult,
+            staleBankViability,
+          ],
+        },
+      });
+      mockBankViabilityRule.execute.mockResolvedValue(freshBankViability);
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-phase-c-sal' });
+
+      await service.runPhaseC('case-1', 'advisor-1');
+
+      const persisted = mockPrismaService.analysisRun.create.mock.calls[0][0]
+        .data as { detail: { ruleResults: RuleResult[] } };
+      expect(persisted.detail.ruleResults.map((r) => r.ruleId)).toEqual([
+        'identity-match',
+        'bankarization-validation',
+        'bank-viability',
+      ]);
+      expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the case does not exist', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(null);
+
+      await expect(service.runPhaseC('nope', 'advisor-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockBankViabilityRule.execute).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when no prior AnalysisRun exists to copy Phase A from', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockPrismaService.analysisRun.findFirst.mockResolvedValue(null);
+
+      await expect(service.runPhaseC('case-1', 'advisor-1')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockBankViabilityRule.execute).not.toHaveBeenCalled();
+      expect(mockPrismaService.analysisRun.create).not.toHaveBeenCalled();
+    });
+  });
 });

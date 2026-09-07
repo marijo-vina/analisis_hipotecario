@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CaseStatusCalculatorModule } from '../case-status-calculator/case-status-calculator.module';
 import { CaseAnalysisService } from './case-analysis.service';
@@ -12,7 +12,12 @@ import { IncomeCalculationModule } from '../income-calculation/income-calculatio
 import { LiabilityModule } from '../liability/liability.module';
 
 @Module({
-  imports: [PrismaModule, IncomeCalculationModule, LiabilityModule, CaseStatusCalculatorModule],
+  imports: [
+    PrismaModule,
+    forwardRef(() => IncomeCalculationModule),
+    LiabilityModule,
+    CaseStatusCalculatorModule,
+  ],
   providers: [
     CaseAnalysisService,
     IdentityMatchRule,

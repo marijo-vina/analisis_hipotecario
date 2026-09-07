@@ -1,12 +1,19 @@
 import { PfaeValidationRule } from './pfae-validation.rule';
+import type { PrismaService } from '../../prisma/prisma.service';
 import type { PrismaDocumentLike } from './identity-match.rule';
 import type { PfaeValidationSnapshot } from '../types/pfae-validation.types';
 
 describe('PfaeValidationRule', () => {
   let rule: PfaeValidationRule;
 
+  function emptyPrisma(): PrismaService {
+    return {
+      bank: { findMany: jest.fn().mockResolvedValue([]) },
+    } as unknown as PrismaService;
+  }
+
   beforeEach(() => {
-    rule = new PfaeValidationRule();
+    rule = new PfaeValidationRule(emptyPrisma());
   });
 
   it('has ruleId "pfae-validation"', () => {
@@ -319,6 +326,172 @@ describe('PfaeValidationRule', () => {
       expect(result.outcome).toBe('PASS');
       expect(result.alerts.map((a) => a.ruleCode)).not.toContain(
         'PERDIDA_FISCAL_KNOCKOUT_DECLARACION',
+      );
+    });
+  });
+
+  describe('ACTIVITY_UNMAPPED (MATRIX giro)', () => {
+    function makePrisma(banks: Record<string, unknown>[]) {
+      return {
+        bank: { findMany: jest.fn().mockResolvedValue(banks) },
+      } as unknown as PrismaService;
+    }
+
+    function matrixBank(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'bank-mifel',
+        code: 'MIFEL',
+        pfaeFactorMode: 'MATRIX',
+        activityFactors: [
+          {
+            nativeLabel: 'Comercio',
+            satAliases: ['comercio', 'hoteles'],
+            factor: 0.35,
+            factorTaxReturn: null,
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    it('returns PARTIAL WARNING ACTIVITY_UNMAPPED when any MATRIX bank misses the CSF alias', async () => {
+      const prisma = makePrisma([matrixBank()]);
+      const unmappedRule = new PfaeValidationRule(prisma);
+      const docs = [
+        doc(
+          'CSF',
+          independentCsf({
+            activities: [
+              {
+                description: 'Consultorios de medicina especializada',
+                percentage: 100,
+                endDate: null,
+              },
+            ],
+          }),
+        ),
+      ];
+
+      const result = await unmappedRule.execute(pfaeClient(), docs);
+
+      expect(result.outcome).toBe('PARTIAL');
+      expect(result.severity).toBe('WARNING');
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ruleCode: 'ACTIVITY_UNMAPPED',
+            severity: 'WARNING',
+            field: 'activity',
+          }),
+        ]),
+      );
+    });
+
+    it('does not emit ACTIVITY_UNMAPPED when the CSF alias hits every MATRIX bank', async () => {
+      const prisma = makePrisma([
+        matrixBank({
+          activityFactors: [
+            {
+              nativeLabel: 'Comercio',
+              satAliases: ['comercio'],
+              factor: 0.35,
+              factorTaxReturn: null,
+            },
+          ],
+        }),
+      ]);
+      const mappedRule = new PfaeValidationRule(prisma);
+      const docs = [
+        doc(
+          'CSF',
+          independentCsf({
+            activities: [
+              { description: 'Comercio al por menor', percentage: 100, endDate: null },
+            ],
+          }),
+        ),
+      ];
+
+      const result = await mappedRule.execute(pfaeClient(), docs);
+
+      expect(result.alerts.map((a) => a.ruleCode)).not.toContain('ACTIVITY_UNMAPPED');
+      expect(result.outcome).toBe('PASS');
+    });
+
+    it('skips FLAT and NONE banks so a missing alias does not warn', async () => {
+      const prisma = makePrisma([
+        {
+          id: 'bank-banorte',
+          code: 'BANORTE',
+          pfaeFactorMode: 'FLAT',
+          activityFactors: [],
+        },
+        {
+          id: 'bank-hsbc',
+          code: 'HSBC',
+          pfaeFactorMode: 'NONE',
+          activityFactors: [],
+        },
+      ]);
+      const skipRule = new PfaeValidationRule(prisma);
+      const docs = [
+        doc(
+          'CSF',
+          independentCsf({
+            activities: [
+              { description: 'Consultorios de medicina especializada', percentage: 100, endDate: null },
+            ],
+          }),
+        ),
+      ];
+
+      const result = await skipRule.execute(pfaeClient(), docs);
+
+      expect(result.alerts.map((a) => a.ruleCode)).not.toContain('ACTIVITY_UNMAPPED');
+      expect(result.outcome).toBe('PASS');
+    });
+
+    it('warns when ANY MATRIX bank misses even if another MATRIX bank hits', async () => {
+      const prisma = makePrisma([
+        matrixBank({
+          id: 'bank-mifel',
+          code: 'MIFEL',
+          activityFactors: [
+            { nativeLabel: 'Comercio', satAliases: ['comercio'], factor: 0.35, factorTaxReturn: null },
+          ],
+        }),
+        matrixBank({
+          id: 'bank-santander',
+          code: 'SANTANDER',
+          activityFactors: [
+            {
+              nativeLabel: 'PI',
+              satAliases: ['profesionista independiente'],
+              factor: 0.8,
+              factorTaxReturn: null,
+            },
+          ],
+        }),
+      ]);
+      const mixedRule = new PfaeValidationRule(prisma);
+      const docs = [
+        doc(
+          'CSF',
+          independentCsf({
+            activities: [
+              { description: 'Comercio al por menor', percentage: 100, endDate: null },
+            ],
+          }),
+        ),
+      ];
+
+      const result = await mixedRule.execute(pfaeClient(), docs);
+
+      expect(result.outcome).toBe('PARTIAL');
+      expect(result.alerts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ ruleCode: 'ACTIVITY_UNMAPPED', severity: 'WARNING' }),
+        ]),
       );
     });
   });

@@ -467,6 +467,20 @@ export type EnumIncomeCriterionFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel> | $Enums.IncomeCriterion
 }
 
+export type EnumPfaeFactorModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.PfaeFactorMode | Prisma.EnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  in?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel> | $Enums.PfaeFactorMode
+}
+
+export type EnumTaxReturnPolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaxReturnPolicy | Prisma.EnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel> | $Enums.TaxReturnPolicy
+}
+
 export type EnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
   in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
@@ -475,6 +489,26 @@ export type EnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
   _max?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+}
+
+export type EnumPfaeFactorModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PfaeFactorMode | Prisma.EnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  in?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPfaeFactorModeWithAggregatesFilter<$PrismaModel> | $Enums.PfaeFactorMode
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel>
+}
+
+export type EnumTaxReturnPolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaxReturnPolicy | Prisma.EnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTaxReturnPolicyWithAggregatesFilter<$PrismaModel> | $Enums.TaxReturnPolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel>
 }
 
 export type EnumProductDestinationFilter<$PrismaModel = never> = {
@@ -906,6 +940,20 @@ export type NestedEnumIncomeCriterionFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel> | $Enums.IncomeCriterion
 }
 
+export type NestedEnumPfaeFactorModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.PfaeFactorMode | Prisma.EnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  in?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel> | $Enums.PfaeFactorMode
+}
+
+export type NestedEnumTaxReturnPolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaxReturnPolicy | Prisma.EnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel> | $Enums.TaxReturnPolicy
+}
+
 export type NestedEnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.IncomeCriterion | Prisma.EnumIncomeCriterionFieldRefInput<$PrismaModel>
   in?: $Enums.IncomeCriterion[] | Prisma.ListEnumIncomeCriterionFieldRefInput<$PrismaModel>
@@ -914,6 +962,26 @@ export type NestedEnumIncomeCriterionWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
   _max?: Prisma.NestedEnumIncomeCriterionFilter<$PrismaModel>
+}
+
+export type NestedEnumPfaeFactorModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PfaeFactorMode | Prisma.EnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  in?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PfaeFactorMode[] | Prisma.ListEnumPfaeFactorModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPfaeFactorModeWithAggregatesFilter<$PrismaModel> | $Enums.PfaeFactorMode
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPfaeFactorModeFilter<$PrismaModel>
+}
+
+export type NestedEnumTaxReturnPolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaxReturnPolicy | Prisma.EnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TaxReturnPolicy[] | Prisma.ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTaxReturnPolicyWithAggregatesFilter<$PrismaModel> | $Enums.TaxReturnPolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTaxReturnPolicyFilter<$PrismaModel>
 }
 
 export type NestedEnumProductDestinationFilter<$PrismaModel = never> = {

@@ -273,6 +273,82 @@ describe('resolveActivity', () => {
     expect(alimentos.matchedKeyword).toBe('alimentos y bebidas');
   });
 
+  it('selects N=12 when the resolved CSF activity is cultivo', () => {
+    const result = resolveActivity([
+      {
+        order: 1,
+        description: 'cultivo de hortalizas',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+
+    expect(result.windowMonths).toBe(12);
+    expect(result.matchedKeyword).toBe('cultivo');
+    expect(result.description).toBe('cultivo de hortalizas');
+  });
+
+  it('strips NFD marks so ganadería matches ganaderia (N=12)', () => {
+    const result = resolveActivity([
+      {
+        order: 1,
+        description: 'Cría y explotación de ganadería bovina',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+
+    expect(result.windowMonths).toBe(12);
+    expect(result.matchedKeyword).toBe('ganaderia');
+    expect(result.description).toBe('Cría y explotación de ganadería bovina');
+  });
+
+  it('selects N=12 for pecuario, pesca, agrícola, and restaurante synonyms', () => {
+    const pecuario = resolveActivity([
+      {
+        order: 1,
+        description: 'Explotación pecuario independiente',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+    expect(pecuario.windowMonths).toBe(12);
+    expect(pecuario.matchedKeyword).toBe('pecuario');
+
+    const pesca = resolveActivity([
+      {
+        order: 1,
+        description: 'Pesca de camarón en altamar',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+    expect(pesca.windowMonths).toBe(12);
+    expect(pesca.matchedKeyword).toBe('pesca');
+
+    const agricola = resolveActivity([
+      {
+        order: 1,
+        description: 'Actividad agrícola de temporal',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+    expect(agricola.windowMonths).toBe(12);
+    expect(agricola.matchedKeyword).toBe('agricola');
+
+    const restaurante = resolveActivity([
+      {
+        order: 1,
+        description: 'Servicios de restaurante de comida corrida',
+        percentage: 100,
+        endDate: null,
+      },
+    ]);
+    expect(restaurante.windowMonths).toBe(12);
+    expect(restaurante.matchedKeyword).toBe('restaurante');
+  });
+
   it('uses the active activity with highest percentage; tie → lower order', () => {
     const result = resolveActivity([
       {

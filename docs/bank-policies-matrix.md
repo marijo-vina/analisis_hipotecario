@@ -221,8 +221,9 @@ Endeudamiento de entrada ≤ 50% (titular + cotitulares que comprueban).
 
 ### Capa 3 — Factores y cómo se calcula el ingreso (no asalariado)
 
-Santander aplica factor de giro **también a la declaración**. Excepción vs
-regla general PFAE (“declaración sin factor”):
+Santander aplica factor de giro a estados **y** a declaración. Eso ya no es
+excepción: la regla de producto (HU-20, 2026-09-04) es
+`ingresoAdmisible = baseElegida × factor` para todos los bancos.
 `ingresoAdmisible = (base/12 o suavizado) × factor`.
 
 **Estados de cuenta** (slide “Cálculo de Ingresos — No Asalariados”):

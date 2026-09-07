@@ -1,0 +1,19 @@
+change: pfae-hu-20-comparativa-bancaria
+status: archived
+artifact_store: hybrid
+execution_mode: interactive
+delivery_strategy: ask-on-risk
+chain_strategy: feature-branch-chain
+branch: feature/pfae-hu-20-comparativa-bancaria
+created: 2026-09-04
+archived: 2026-09-07
+archive_path: openspec/changes/archive/2026-09-07-pfae-hu-20-comparativa-bancaria
+phases:
+  explore: done
+  proposal: done
+  spec: done
+  design: done
+  tasks: done
+  apply: done
+  verify: done
+  archive: done

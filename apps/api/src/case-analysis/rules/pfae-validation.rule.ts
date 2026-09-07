@@ -19,6 +19,8 @@ import type {
 } from '../analysis-rule.interface';
 import type { PrismaDocumentLike } from './identity-match.rule';
 import type { PfaeValidationSnapshot } from '../types/pfae-validation.types';
+import { PrismaService } from '../../prisma/prisma.service';
+import { matchActivityFactor } from '../activity-factor-match';
 
 const RULE_ID = 'pfae-validation';
 const CSF_CODE = 'CSF';
@@ -39,6 +41,8 @@ const OUTCOME_RANK: Record<AnalysisOutcome, number> = { PASS: 0, PARTIAL: 1, FAI
 export class PfaeValidationRule implements AnalysisRule {
   readonly ruleId = RULE_ID;
   private readonly logger = new Logger(PfaeValidationRule.name);
+
+  constructor(private readonly prisma: PrismaService) {}
 
   async execute(
     client: Record<string, unknown>,
@@ -124,6 +128,18 @@ export class PfaeValidationRule implements AnalysisRule {
     }
 
     const activity = this.selectActivity(csfData.activities);
+    const unmapped = await this.anyMatrixBankUnmapped(activity?.satDescription ?? null);
+    if (unmapped) {
+      outcome = this.escalate(outcome, 'PARTIAL');
+      alerts.push({
+        ruleCode: 'ACTIVITY_UNMAPPED',
+        severity: 'WARNING',
+        field: 'activity',
+        message:
+          'La actividad SAT de la CSF no coincide con ningún giro del catálogo MATRIX de al menos un banco.',
+      });
+    }
+
     const { coherence, bankStatementPresent } = this.scanCoherence(docs);
     if (coherence?.outcome === 'WARNING') {
       outcome = this.escalate(outcome, 'PARTIAL');
@@ -152,6 +168,24 @@ export class PfaeValidationRule implements AnalysisRule {
     );
 
     return this.buildResult(outcome, severity, sources, alerts, pfaeValidation);
+  }
+
+  private async anyMatrixBankUnmapped(satDescription: string | null): Promise<boolean> {
+    const banks = await this.prisma.bank.findMany({
+      where: { isActive: true },
+      select: {
+        pfaeFactorMode: true,
+        activityFactors: true,
+      },
+    });
+    return banks.some((bank) => {
+      const match = matchActivityFactor({
+        pfaeFactorMode: bank.pfaeFactorMode,
+        satDescription,
+        activityFactors: bank.activityFactors,
+      });
+      return match.kind === 'miss';
+    });
   }
 
   private selectActivity(raw: unknown): PfaeValidationSnapshot['activity'] {

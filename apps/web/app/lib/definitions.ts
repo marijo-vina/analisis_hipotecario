@@ -41,6 +41,9 @@ export interface CreditType {
 
 // ---- CMA Bank Catalog (PR 6) -----------------------------------------------
 
+export type PfaeFactorMode = "MATRIX" | "FLAT" | "NONE";
+export type TaxReturnPolicy = "ACCEPTED" | "NOT_PREFERRED" | "REJECTED";
+
 export interface Bank {
   id: string;
   code: string;
@@ -49,7 +52,19 @@ export interface Bank {
   debtCommitmentFactor: number;
   minimumBureauScore: number | null;
   isActive: boolean;
+  pfaeFactorMode?: PfaeFactorMode;
+  pfaeFlatFactor?: number | null;
+  taxReturnPolicy?: TaxReturnPolicy;
   _count?: { policies: number };
+}
+
+export interface BankActivityFactor {
+  id: string;
+  bankId: string;
+  nativeLabel: string;
+  satAliases: string[];
+  factor: number;
+  factorTaxReturn: number | null;
 }
 
 export interface BankPolicy {
@@ -61,11 +76,15 @@ export interface BankPolicy {
   minimumEmploymentTenureMonths: number | null;
   minimumApplicantAgeMonths: number | null;
   maximumApplicationAgeMonths: number | null;
+  minimumActivityTenureMonths: number | null;
+  minimumIncomePfae: number | null;
+  minimumApplicantAgeMonthsPfae: number | null;
   isActive: boolean;
 }
 
 export interface BankDetail extends Bank {
   policies: BankPolicy[];
+  activityFactors?: BankActivityFactor[];
 }
 
 export interface CaseStatus {
@@ -352,6 +371,18 @@ export function getReasonLabel(reason: string): string {
 export const INCOME_CRITERION_LABELS: Record<string, string> = {
   NET: 'Neto',
   GROSS: 'Bruto',
+};
+
+export const PFAE_FACTOR_MODE_LABELS: Record<PfaeFactorMode, string> = {
+  MATRIX: "Matriz de giros",
+  FLAT: "Factor plano",
+  NONE: "Sin factor (1.0)",
+};
+
+export const TAX_RETURN_POLICY_LABELS: Record<TaxReturnPolicy, string> = {
+  ACCEPTED: "Acepta",
+  NOT_PREFERRED: "No preferida",
+  REJECTED: "Rechazada",
 };
 
 export const DESTINATION_LABELS: Record<string, string> = {
