@@ -2,11 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/app/lib/api";
-import type { ApiResult, BankDetail } from "@/app/lib/definitions";
+import type { ApiResult, BankActivityFactor, BankDetail } from "@/app/lib/definitions";
+
+function revalidateBankPages(code: string) {
+  revalidatePath(`/dashboard/bancos/${code}`);
+  revalidatePath("/dashboard/bancos");
+}
 
 /**
  * Update a bank's top-level fields (incomeCriterion, debtCommitmentFactor,
- * minimumBureauScore, isActive).
+ * minimumBureauScore, isActive, PFAE factor card).
  *
  * Revalidates the bank detail page and list page so server components reflect the change.
  */
@@ -20,15 +25,14 @@ export async function updateBank(
   });
 
   if (result.ok) {
-    revalidatePath(`/dashboard/bancos/${code}`);
-    revalidatePath("/dashboard/bancos");
+    revalidateBankPages(code);
   }
 
   return result;
 }
 
 /**
- * Update a single policy row for a bank+destination pair.
+ * Update a single policy row for a bank+destination pair (including PFAE CMA cells).
  *
  * Revalidates the bank detail page and list page so server components reflect the change.
  */
@@ -43,8 +47,66 @@ export async function updatePolicy(
   });
 
   if (result.ok) {
-    revalidatePath(`/dashboard/bancos/${code}`);
-    revalidatePath("/dashboard/bancos");
+    revalidateBankPages(code);
+  }
+
+  return result;
+}
+
+export async function createActivityFactor(
+  code: string,
+  data: {
+    nativeLabel: string;
+    satAliases: string[];
+    factor: number;
+    factorTaxReturn?: number | null;
+  },
+): Promise<ApiResult<BankActivityFactor>> {
+  const result = await apiFetch<BankActivityFactor>(
+    `/banks/${code}/activity-factors`,
+    {
+      method: "POST",
+      body: data,
+    },
+  );
+
+  if (result.ok) {
+    revalidateBankPages(code);
+  }
+
+  return result;
+}
+
+export async function updateActivityFactor(
+  code: string,
+  factorId: string,
+  data: Record<string, unknown>,
+): Promise<ApiResult<BankActivityFactor>> {
+  const result = await apiFetch<BankActivityFactor>(
+    `/banks/${code}/activity-factors/${factorId}`,
+    {
+      method: "PATCH",
+      body: data,
+    },
+  );
+
+  if (result.ok) {
+    revalidateBankPages(code);
+  }
+
+  return result;
+}
+
+export async function deleteActivityFactor(
+  code: string,
+  factorId: string,
+): Promise<ApiResult<unknown>> {
+  const result = await apiFetch(`/banks/${code}/activity-factors/${factorId}`, {
+    method: "DELETE",
+  });
+
+  if (result.ok) {
+    revalidateBankPages(code);
   }
 
   return result;

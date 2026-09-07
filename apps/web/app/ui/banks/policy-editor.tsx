@@ -11,14 +11,33 @@ interface PolicyEditorProps {
   policies: BankPolicy[];
 }
 
-const CURRENCY_COLUMNS = new Set<string>(["minimumIncome", "minimumPropertyValue"]);
+const PFAE_SALARIED_FALLBACK = "igual que asalariado";
 
-const COLUMNS: { key: keyof BankPolicy; label: string; isAge?: boolean }[] = [
-  { key: "minimumIncome", label: "Ingreso mín." },
-  { key: "minimumPropertyValue", label: "Valor prop. mín." },
+const COLUMNS: {
+  key: keyof BankPolicy;
+  label: string;
+  isAge?: boolean;
+  isCurrency?: boolean;
+  emptyDisplay?: string;
+}[] = [
+  { key: "minimumIncome", label: "Ingreso mín.", isCurrency: true },
+  { key: "minimumPropertyValue", label: "Valor prop. mín.", isCurrency: true },
   { key: "minimumEmploymentTenureMonths", label: "Antigüedad (meses)" },
   { key: "minimumApplicantAgeMonths", label: "Edad mín. (años)", isAge: true },
   { key: "maximumApplicationAgeMonths", label: "Edad máx. (años)", isAge: true },
+  { key: "minimumActivityTenureMonths", label: "Antigüedad PFAE" },
+  {
+    key: "minimumIncomePfae",
+    label: "Ingreso mín. PFAE",
+    isCurrency: true,
+    emptyDisplay: PFAE_SALARIED_FALLBACK,
+  },
+  {
+    key: "minimumApplicantAgeMonthsPfae",
+    label: "Edad mín. PFAE",
+    isAge: true,
+    emptyDisplay: PFAE_SALARIED_FALLBACK,
+  },
 ];
 
 export default function PolicyEditor({ bankCode, policies }: PolicyEditorProps) {
@@ -42,7 +61,7 @@ export default function PolicyEditor({ bankCode, policies }: PolicyEditorProps) 
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[800px]">
+        <table className="w-full text-left border-collapse min-w-[1180px]">
           <thead>
             <tr className="border-b border-gf-border bg-gf-surface-dim/60">
               <th className="py-3 px-4 text-xs font-semibold text-gf-text-muted uppercase tracking-wider w-[160px]">
@@ -167,8 +186,10 @@ function PolicyRow({ policy, onRequestSave }: PolicyRowProps) {
   const updateField = (field: string, value: unknown) => {
     setDirtyFields((prev) => {
       const next = { ...prev, [field]: value };
-      // If value equals original policy value, remove field from dirty
-      if (value === (policy as unknown as Record<string, unknown>)[field]) {
+      const original = (policy as unknown as Record<string, unknown>)[field];
+      const originalComparable =
+        typeof original === "boolean" ? original : coercePolicyNumber(original);
+      if (value === originalComparable) {
         delete next[field];
       }
       return next;
@@ -199,17 +220,20 @@ function PolicyRow({ policy, onRequestSave }: PolicyRowProps) {
       </td>
 
       {COLUMNS.map((col) => {
-        const rawValue = (dirtyFields[col.key] ?? policy[col.key]) as number | null;
-        // Age columns are stored in months in DB, but displayed in years in UI
+        const sourceValue =
+          col.key in dirtyFields ? dirtyFields[col.key] : policy[col.key];
+        const rawValue = coercePolicyNumber(sourceValue);
         const isAge = col.isAge ?? false;
-        const displayValue = isAge && rawValue != null ? Math.floor(rawValue / 12) : rawValue;
+        const displayValue =
+          isAge && rawValue != null ? Math.floor(rawValue / 12) : rawValue;
 
         return (
           <td key={col.key} className="py-2 px-3">
             <InlineCell
               value={displayValue}
               disabled={!isActive}
-              isCurrency={CURRENCY_COLUMNS.has(col.key)}
+              isCurrency={col.isCurrency === true}
+              emptyDisplay={col.emptyDisplay}
               onSave={(v) => {
                 const finalDbValue = isAge && v != null ? v * 12 : v;
                 updateField(col.key as string, finalDbValue);
@@ -250,6 +274,7 @@ interface InlineCellProps {
   value: number | null;
   disabled?: boolean;
   isCurrency?: boolean;
+  emptyDisplay?: string;
   onSave: (value: number | null) => void;
 }
 
@@ -267,7 +292,19 @@ function formatThousandInput(raw: string): string {
   return new Intl.NumberFormat("es-MX").format(Number(digits));
 }
 
-function InlineCell({ value, disabled, onSave, isCurrency }: InlineCellProps) {
+function coercePolicyNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function InlineCell({
+  value,
+  disabled,
+  onSave,
+  isCurrency,
+  emptyDisplay,
+}: InlineCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(
     value != null ? (isCurrency ? formatThousandInput(String(value)) : String(value)) : ""
@@ -300,14 +337,14 @@ function InlineCell({ value, disabled, onSave, isCurrency }: InlineCellProps) {
             setEditing(true);
           }
         }}
-        className={`inline-block min-w-[48px] px-2 py-1 rounded-md text-sm text-gf-text tabular-nums ${
+        className={`inline-block min-w-[48px] px-2 py-1 rounded-md text-sm tabular-nums ${
           disabled
             ? "cursor-not-allowed text-gf-text-muted"
             : "cursor-pointer hover:bg-gf-surface-dim font-medium"
-        }`}
+        } ${value == null ? "text-gf-text-muted font-normal" : "text-gf-text"}`}
       >
         {value == null
-          ? "—"
+          ? (emptyDisplay ?? "—")
           : isCurrency
           ? formatCurrencyDisplay(value)
           : String(value)}
@@ -346,7 +383,7 @@ function InlineCell({ value, disabled, onSave, isCurrency }: InlineCellProps) {
         }
       }}
       autoFocus
-      placeholder="—"
+      placeholder={emptyDisplay ?? "—"}
       className="w-32 h-8 border border-gf-border rounded-[10px] px-2 text-sm text-gf-text bg-white focus:outline-none focus:ring-2 focus:ring-gf-red/30 focus:border-gf-red font-medium shadow-xs"
     />
   );

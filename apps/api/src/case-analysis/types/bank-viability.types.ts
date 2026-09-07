@@ -29,6 +29,8 @@ export interface BankViabilityInputs {
   employmentStartDate: string | null;
   hasPagadoraIncome: boolean;
   scotiabankExcluded: boolean;
+  personType?: string | null;
+  incomeSource?: string | null;
 }
 
 export interface BankResultCalculation {

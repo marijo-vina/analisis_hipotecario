@@ -13,6 +13,12 @@ const TWELVE_MONTH_KEYWORDS = [
   'primaria',
   'restaurantero',
   'alimentos y bebidas',
+  'cultivo',
+  'ganaderia',
+  'pecuario',
+  'pesca',
+  'agricola',
+  'restaurante',
 ] as const;
 
 export interface AssembledMonth {
@@ -53,7 +59,11 @@ function toMonthlyNumber(value: Prisma.Decimal): number {
 }
 
 function normalizeKeywordHaystack(description: string): string {
-  return description.toLowerCase().replace(/-/g, ' ');
+  return description
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/-/g, ' ');
 }
 
 function matchKeyword(

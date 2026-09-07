@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -10,6 +12,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BanksService } from './banks.service';
 import { UpdateBankDto } from './dto/update-bank.dto';
 import { UpdatePolicyDto } from './dto/update-policy.dto';
+import {
+  CreateActivityFactorDto,
+  UpdateActivityFactorDto,
+} from './dto/activity-factor.dto';
 import { ProductDestination } from '../generated/prisma/client';
 
 @UseGuards(JwtAuthGuard)
@@ -49,6 +55,38 @@ export class BanksController {
       destination as ProductDestination,
       dto,
     );
+    return { data };
+  }
+
+  @Post(':code/activity-factors')
+  async createActivityFactor(
+    @Param('code') code: string,
+    @Body() dto: CreateActivityFactorDto,
+  ) {
+    const data = await this.banksService.createActivityFactor(code, dto);
+    return { data };
+  }
+
+  @Patch(':code/activity-factors/:factorId')
+  async updateActivityFactor(
+    @Param('code') code: string,
+    @Param('factorId') factorId: string,
+    @Body() dto: UpdateActivityFactorDto,
+  ) {
+    const data = await this.banksService.updateActivityFactor(
+      code,
+      factorId,
+      dto,
+    );
+    return { data };
+  }
+
+  @Delete(':code/activity-factors/:factorId')
+  async deleteActivityFactor(
+    @Param('code') code: string,
+    @Param('factorId') factorId: string,
+  ) {
+    const data = await this.banksService.deleteActivityFactor(code, factorId);
     return { data };
   }
 }

@@ -331,6 +331,64 @@ export class IncomeCalculationService {
     return this.snapshotToResult(snapshot, caseId);
   }
 
+  /**
+   * Clone the latest PFAE `bases`, persist a new snapshot with the chosen
+   * `source`, and project that base into the unfactored average columns.
+   * Rejects SALARIED cases and invalid/tax-loss chosen bases with 400.
+   */
+  async switchSource(
+    caseId: string,
+    source: IncomeSource,
+  ): Promise<IncomeCalculationResult> {
+    if (source !== 'BANK_STATEMENTS' && source !== 'TAX_RETURN') {
+      throw new BadRequestException(
+        'Income source must be BANK_STATEMENTS or TAX_RETURN',
+      );
+    }
+
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      select: { personType: true },
+    });
+    if (mortgageCase?.personType !== 'PFAE') {
+      throw new BadRequestException(
+        'Income source switch is only available for PFAE cases',
+      );
+    }
+
+    const latest = await this.getLatest(caseId);
+    const bases = latest.bases;
+    if (!bases) {
+      throw new BadRequestException(
+        'Income snapshot has no PFAE bases to clone',
+      );
+    }
+
+    const chosen = source === 'BANK_STATEMENTS' ? bases.bank : bases.taxReturn;
+    if (!chosen.valid) {
+      throw new BadRequestException(
+        `Cannot switch to ${source}: ${chosen.invalidReason ?? 'invalid base'}`,
+      );
+    }
+
+    const clonedBases = structuredClone(bases);
+    const snapshot = await this.prisma.incomeCalculation.create({
+      data: {
+        mortgageCaseId: caseId,
+        receiptResults: [] as unknown as never,
+        averageGrossIncome: new Prisma.Decimal(chosen.monthlyGross ?? 0).toFixed(
+          2,
+        ),
+        averageNetIncome: new Prisma.Decimal(chosen.monthlyNet ?? 0).toFixed(2),
+        status: IncomeCalculationStatus.CALCULATED,
+        source,
+        bases: clonedBases as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.snapshotToResult(snapshot, caseId);
+  }
+
   // ── Conciliation persistence ─────────────────────────────────────────
 
   /**

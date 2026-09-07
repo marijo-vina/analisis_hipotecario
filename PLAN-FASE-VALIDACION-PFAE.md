@@ -32,19 +32,20 @@ Rama base: `feature/perfil-pfae`.
 | Trigger | Un `POST /analyze`. Giro y antigüedad salen de la CSF; no hay paso previo. |
 | Giro | Automático desde CSF `activities[]`. La asesora no elige ni confirma. |
 | Varias actividades CSF | Activa (`endDate` null) con **mayor porcentaje**. Empate: menor `order`. Sin porcentaje: primera activa por `order`. |
-| Mapeo SAT → banco | Catálogo canónico `ActivityType` + alias SAT. Factor por banco en `BankActivityFactor`. Sin match: warning + `REQUIRES_REVIEW` en bancos de matriz. Banorte sigue flat; HSBC factor 1.0. |
-| 6 vs 12 meses | Flag `requiresTwelveMonths` en `ActivityType` (primarias / restaurantero). Default 6 meses. |
+| Mapeo SAT → banco | **No** hay catálogo SAT global. Cada banco tiene etiquetas nativas + alias SAT. Sin match: warning + `REQUIRES_REVIEW` en bancos MATRIX. Banorte flat; HSBC 1.0. |
+| 6 vs 12 meses | Del expediente, no del banco. Sinónimos SAT (cultivo, ganadería, pecuario, pesca, agrícola, restaurante, alimentos y bebidas…). Default 6. No depende de la palabra “primaria”. |
 | Bases de ingreso | El análisis calcula **ambas**. Default a enviar: estados de cuenta si hay base válida; si no, declaración. |
 | Elegir base | Después del análisis, en Cálculo. Recalcula **solo Fase C** (no re-extrae). |
+| Factor de giro | Se aplica **después** de elegir la base, a estados **y** a declaración. `ingresoAdmisible = baseElegida × factor(banco)`. BX+ puede tener `factorEstados` ≠ `factorDeclaracion`; el resto un solo número. Banorte flat 0.6; HSBC 1.0. **No** hay declaración “limpia”. |
 | Pérdida fiscal | Knockout **solo** del camino declaración. El expediente sigue por estados de cuenta. |
 | Identidad | PFAE: INE, CSF, **declaración anual (nombre + RFC)**, estados, buró, cliente. Nómina fuera. Misma normalización determinística. |
 | Bankarization | No corre en PFAE. La pestaña Validaciones no muestra conciliación nómina↔banco. |
 | Pasivos revolventes | PFAE: `MAX(saldo × 0.07, pago)`. Asalariado: 0.06 intacto. |
-| Arraigo | El único CMA que **cambia por perfil**. Asalariado: antigüedad laboral. PFAE: meses desde `activityStartDate` CSF. Cada uno tiene su umbral por banco (y por destino si el PDF lo distingue). |
+| Arraigo | CMA que **siempre** cambia por perfil. Asalariado: antigüedad laboral. PFAE: meses desde `activityStartDate` CSF. Umbral por banco (y por destino si el PDF lo distingue). |
 | Vigencia CSF | Warning si emisión > 3 meses. No descarta. |
 | Régimen | Solo sueldos y salarios → FAIL de camino PFAE (alerta de cambiar a asalariado). |
-| CMA (ingreso, inmueble, edad, destinos, CE, NET/GROSS, score) | **Iguales para asalariado y PFAE.** No se duplica la grilla por perfil. |
-| Módulo Bancos — qué se agrega | (1) columna de antigüedad PFAE junto a la asalariada; (2) tabla de factores por giro, cuando lleguen los datos. Nada más. |
+| CMA (ingreso, inmueble, edad, destinos, CE, NET/GROSS, score) | Misma grilla, no duplicada por perfil. Celdas PFAE **opcionales** en la misma fila: vacío = usa el número asalariado. Seed: Banamex edad 28; Santander ingreso 15k (construcción 67k); Banamex liquidez 35k. Sin `if` por nombre de banco. |
+| Módulo Bancos — qué se agrega | (1) columna antigüedad PFAE; (2) ingreso/edad PFAE opcionales en la misma fila; (3) tabla de factores por giro; (4) `taxReturnPolicy` y modo de factor en la tarjeta. |
 | Factores por giro | Los tiene la asesora; se cargan al empezar el módulo Bancos. No bloquean identidad ni el motor. |
 | CE / NET-GROSS | Compartido en tarjeta banco. Mifel CE **0.50** (confirmado; Excel 0.42 descartado). |
 | Factor salud Mifel 1.5 | Se siembra como está en el Excel; editable en Bancos. Confirmar con asesora en HU-20 si es typo. |
@@ -117,6 +118,8 @@ Orden: pasivos (buró) → ingresos PFAE.
 2. Base declaración: utilidad/12 (NETO) o acumulables/12 (BRUTO), ejercicio, flag de pérdida fiscal.
 3. Control **“Base a enviar al banco”** (una sola). Default: estados si la base es válida; si no, declaración. Pérdida fiscal deshabilita declaración y fuerza estados.
 
+Estas dos cifras en Cálculo son **promedios sin factor de giro**. El factor se aplica después, en Comparativa, a la base elegida (un factor por banco; BX+ puede diferir por base).
+
 Cambiar la base dispara recálculo de comparativa (Fase C) sin volver a extraer.
 
 ### 1.4 Tab Comparativa bancaria
@@ -129,7 +132,7 @@ Misma tabla. Columnas/razones nuevas en el detalle por banco:
 - `ingresoAdmisible` → `máximo = × CE` → `capacidad = − deuda`
 - `taxReturnPolicy`: si la base es declaración y el banco es `REJECTED` (Scotiabank) → NOT_COMPATIBLE; `NOT_PREFERRED` (Banorte) → CONDITIONED
 
-Antigüedad: asalariado sigue leyendo nóminas vs columna asalariada; PFAE usa `activityStartDate` CSF vs columna PFAE. El resto del CMA (ingreso, inmueble, edad, destino activo) es el mismo.
+Antigüedad: asalariado sigue leyendo nóminas vs columna asalariada; PFAE usa `activityStartDate` CSF vs columna PFAE. Ingreso mín. y edad mín. usan la celda PFAE si está llena; si no, la general.
 
 ### 1.5 Módulo Bancos — tres capas, no tres dimensiones
 
@@ -246,11 +249,11 @@ Por banco activo con política del destino del caso:
 1. Tomar base elegida (`IncomeCalculation.source`).
 2. Si `TAX_RETURN` y `taxReturnPolicy === REJECTED` → NOT_COMPATIBLE.
 3. Si `TAX_RETURN` y `NOT_PREFERRED` → CONDITIONED + seguir cálculo.
-4. `ingresoAdmisible`:
-   - Estados + MATRIX: `baseSuavizada × BankActivityFactor` (unmapped → REQUIRES_REVIEW, no se inventa 1.0).
-   - Estados + FLAT (Banorte): `baseSuavizada × pfaeFlatFactor` (0.6).
-   - Estados + NONE (HSBC): `baseSuavizada`.
-   - Declaración: base mensual neta o bruta **sin** factor de giro, luego el banco aplica `incomeCriterion`.
+4. `ingresoAdmisible` (misma fórmula con la **base elegida**, estados o declaración):
+   - MATRIX: `baseElegida × BankActivityFactor` de esa base (unmapped → REQUIRES_REVIEW, no se inventa 1.0). BX+ puede usar `factorEstados` o `factorDeclaracion`.
+   - FLAT (Banorte): `baseElegida × pfaeFlatFactor` (0.6).
+   - NONE (HSBC): `baseElegida` (factor 1.0).
+   - Luego el banco aplica `incomeCriterion` (NET vs GROSS) sobre esa cifra admisible.
 5. `maximumDebt = ingresoAdmisible × CE`
 6. `availableCapacity = maximumDebt − totalMonthlyLiabilities`
 7. Antigüedad: si `PFAE`, `activityStartDate` vs `minimumActivityTenureMonths`; si `SALARIED`, empleo vs `minimumEmploymentTenureMonths`. Sin override hardcodeado por banco.
@@ -317,9 +320,10 @@ y factores**. El análisis hace el match. No se copia la política por perfil.
    meses de arraigo CSF; score; edad; destino; valor; pasivos.
 2. De Bancos: política del destino + factor de la etiqueta que hizo match
    con el texto SAT (o flat Banorte / 1.0 HSBC).
-3. `ingresoAdmisible = base × factor` (estados; declaración según política
-   del banco) → `máximo = × CE` → `capacidad = − deuda`. CMA (edad, ingreso,
-   arraigo, score, inmueble) se evalúa con los hechos del expediente.
+3. `ingresoAdmisible = baseElegida × factor` (estados **o** declaración; el
+   factor es del banco, y en BX+ puede diferir por base) → `máximo = × CE` →
+   `capacidad = − deuda`. CMA (edad, ingreso, arraigo, score, inmueble) se
+   evalúa con los hechos del expediente.
 
 Sin match de giro → `REQUIRES_REVIEW` en ese banco; no se inventa 1.0.
 
@@ -439,5 +443,5 @@ Criterio de aceptación: un expediente PFAE con INE+CSF+estados+buró, al analiz
 - [ ] Bancos: CMA compartido por destino; antigüedad en dos columnas; factores en tabla aparte.
 - [ ] Dos bases visibles; una sola enviada.
 - [ ] Pérdida fiscal no mata el expediente.
-- [ ] Comparativa usa factor de giro solo en camino estados.
+- [ ] Comparativa aplica factor de giro a la base elegida (estados **y** declaración).
 - [ ] Cada HU en su rama hija; sin push; merge solo con OK de QA.

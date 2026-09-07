@@ -837,6 +837,108 @@ describe('IncomeCalculationService', () => {
     });
   });
 
+  describe('switchSource()', () => {
+    function stubPfaeLatest(overrides: Record<string, unknown> = {}) {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({
+        personType: 'PFAE',
+      });
+      mockPrisma.incomeCalculation.findFirst.mockResolvedValue(
+        makeSnapshot({
+          id: 'inc-prior',
+          source: 'BANK_STATEMENTS',
+          averageGrossIncome: 15,
+          averageNetIncome: 15,
+          receiptResults: [],
+          bases: samplePfaeBases(),
+          ...overrides,
+        }),
+      );
+    }
+
+    it('clones bases, stores TAX_RETURN, and projects tax averages', async () => {
+      stubPfaeLatest();
+
+      const result = await service.switchSource('case-1', 'TAX_RETURN');
+
+      expect(result.source).toBe('TAX_RETURN');
+      expect(result.averageGrossIncome).toBe(20000);
+      expect(result.averageNetIncome).toBe(10000);
+      expect(result.status).toBe(IncomeCalculationStatus.CALCULATED);
+      expect(result.bases).toEqual(samplePfaeBases());
+      expect(mockPrisma.incomeCalculation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            mortgageCaseId: 'case-1',
+            source: 'TAX_RETURN',
+            bases: samplePfaeBases(),
+          }),
+        }),
+      );
+    });
+
+    it('projects bank averages when switching back to BANK_STATEMENTS', async () => {
+      stubPfaeLatest({
+        source: 'TAX_RETURN',
+        averageGrossIncome: 20000,
+        averageNetIncome: 10000,
+      });
+
+      const result = await service.switchSource('case-1', 'BANK_STATEMENTS');
+
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(15);
+      expect(result.averageNetIncome).toBe(15);
+      expect(result.bases).toEqual(samplePfaeBases());
+    });
+
+    it('throws 400 when the chosen bank base is invalid', async () => {
+      const bases = samplePfaeBases();
+      bases.bank = {
+        ...bases.bank,
+        valid: false,
+        invalidReason: 'INSUFFICIENT_MONTHS',
+        monthlyGross: null,
+        monthlyNet: null,
+      };
+      stubPfaeLatest({ bases, source: 'TAX_RETURN' });
+
+      await expect(
+        service.switchSource('case-1', 'BANK_STATEMENTS'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when switching to TAX_RETURN on a tax-loss base', async () => {
+      const bases = samplePfaeBases();
+      bases.taxReturn = {
+        valid: false,
+        invalidReason: 'TAX_LOSS',
+        monthlyGross: null,
+        monthlyNet: null,
+      };
+      stubPfaeLatest({ bases });
+
+      await expect(
+        service.switchSource('case-1', 'TAX_RETURN'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when the case is SALARIED', async () => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({
+        personType: 'SALARIED',
+      });
+      mockPrisma.incomeCalculation.findFirst.mockResolvedValue(
+        makeSnapshot({ source: 'PAYROLL' }),
+      );
+
+      await expect(
+        service.switchSource('case-1', 'TAX_RETURN'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('GET latest source/bases contract', () => {
     it('exposes source and bases JSON from the persisted snapshot', async () => {
       const bases = samplePfaeBases();

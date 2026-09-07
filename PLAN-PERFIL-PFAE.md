@@ -73,11 +73,16 @@ extiende**, no se recalibra.
   - 12 meses → se promedian los 10 restantes.
 - **12 vs 6 meses**: SOLO por giro (actividades primarias / restaurantero), no
   por banco.
-- **Factor de castigo por giro**: aplica SOLO al camino de estados de cuenta
-  (no al de declaración anual).
-  - Estados de cuenta: `ingresoAdmisible = baseSuavizada × factorGiro(banco)`.
-  - Declaración: `ingresoAdmisible = utilidadFiscal ÷ 12` (NETO) o
-    `ingresosAcumulables ÷ 12` (BRUTO), sin factor.
+- **Factor de castigo por giro**: se aplica **después** de elegir la base, a
+  estados de cuenta **y** a declaración. No hay camino “limpio”.
+  - Primero se calculan las dos bases **sin** factor: estados = promedio
+    suavizado; declaración = `utilidadFiscal ÷ 12` (NETO) o
+    `ingresosAcumulables ÷ 12` (BRUTO).
+  - La asesora elige una base. Luego, por banco:
+    `ingresoAdmisible = baseElegida × factorGiro(banco, base)`.
+  - El factor se busca en la tabla de ese banco (alias SAT). Banorte es flat
+    0.6; HSBC es 1.0. BX+ puede tener un número distinto por base
+    (`factorEstados` vs `factorDeclaracion`); el resto de bancos usa el mismo.
 
 ### 3.3 Depuración de depósitos (peinado)
 - **Depósitos válidos**: los que coinciden con el giro de la persona (clientes,
@@ -285,8 +290,7 @@ pipelines; solo ramificar los puntos de variación.
   - Flag por banco `taxReturnPolicy` (Santander acepta, Scotiabank rechaza,
     Banorte no preferida, etc.).
   - Branch por `personType` en `BankViabilityRule` (origen del ingreso).
-  - Aplicar factor por giro al camino de estados de cuenta; declaración sin
-    factor (neto/bruto).
+  - Aplicar factor por giro a la base **elegida** (estados o declaración).
   - CE Mifel: **0.50** (cerrado; no bajar a 0.42).
   - Cálculo por banco: `ingresoAdmisible`, `máximo = ×CE`, `capacidad = −deuda`.
 - **No incluye**: UI (HU-21).
