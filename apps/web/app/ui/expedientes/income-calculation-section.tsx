@@ -11,11 +11,15 @@ import {
 
 import { Check, X } from "lucide-react";
 import Card from "@/app/ui/common/card";
+import PfaeIncomePanel from "@/app/ui/expedientes/pfae-income-panel";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
 interface IncomeCalculationSectionProps {
   caseId: string;
+  personType?: string;
+  onSourceSwitched?: () => void;
+  peinadoWarn?: boolean;
 }
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
@@ -143,6 +147,9 @@ function CurrencyInput({
  */
 export default function IncomeCalculationSection({
   caseId,
+  personType,
+  onSourceSwitched,
+  peinadoWarn = false,
 }: IncomeCalculationSectionProps) {
   const [snapshot, setSnapshot] = useState<IncomeCalculationResult | null>(
     null,
@@ -229,6 +236,32 @@ export default function IncomeCalculationSection({
           <div className="h-40 rounded bg-gray-100" />
         </div>
       </Card>
+    );
+  }
+
+  if (personType === "PFAE") {
+    return (
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gf-text">
+            Cálculo de ingreso mensual admisible
+          </h3>
+        </div>
+
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <PfaeIncomePanel
+          caseId={caseId}
+          snapshot={snapshot}
+          onSnapshotChange={setSnapshot}
+          onSourceSwitched={onSourceSwitched}
+          peinadoWarn={peinadoWarn}
+        />
+      </section>
     );
   }
 

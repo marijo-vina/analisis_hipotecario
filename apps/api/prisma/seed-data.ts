@@ -124,9 +124,24 @@ export interface BankActivityFactorSeed {
   factorTaxReturn: number | null;
 }
 
+/** SAT wording for medical practices often uses médico/consultorio, not each bank's native plural. */
+const MEDICAL_SAT_ALIASES = [
+  'medico',
+  'medicos',
+  'consultorio',
+  'consultorios',
+  'doctores',
+  'doctor',
+  'medicina',
+] as const;
+
+function withMedicalAliases(aliases: string[]): string[] {
+  return [...new Set([...aliases, ...MEDICAL_SAT_ALIASES])];
+}
+
 export const BANK_ACTIVITY_FACTORS: BankActivityFactorSeed[] = [
   // Mifel — captura "Ingresos no asalariados" (comercio 0.35, not Excel 0.20)
-  { bankCode: 'MIFEL', nativeLabel: 'Establecimientos y PI de salud', satAliases: ['hospitales', 'consultorios', 'medicos', 'dentistas', 'terapeutas', 'enfermeros', 'psicologos', 'nutriologos', 'veterinarios'], factor: 1.5, factorTaxReturn: null },
+  { bankCode: 'MIFEL', nativeLabel: 'Establecimientos y PI de salud', satAliases: withMedicalAliases(['hospitales', 'consultorios', 'medicos', 'dentistas', 'terapeutas', 'enfermeros', 'psicologos', 'nutriologos', 'veterinarios']), factor: 1.5, factorTaxReturn: null },
   { bankCode: 'MIFEL', nativeLabel: 'PI otras — grupo A', satAliases: ['abogados', 'contadores', 'consultores'], factor: 0.8, factorTaxReturn: null },
   { bankCode: 'MIFEL', nativeLabel: 'PI otras — grupo B', satAliases: ['agentes de seguros', 'arquitectos', 'ingenieros', 'valuadores', 'brokers', 'computacion', 'biologos', 'quimicos'], factor: 0.75, factorTaxReturn: null },
   { bankCode: 'MIFEL', nativeLabel: 'Esparcimiento cultural/deportivo', satAliases: ['actores', 'maestros', 'musicos', 'disenadores', 'comunicadores', 'fotografos', 'deportistas'], factor: 0.75, factorTaxReturn: null },
@@ -141,7 +156,7 @@ export const BANK_ACTIVITY_FACTORS: BankActivityFactorSeed[] = [
   { bankCode: 'MIFEL', nativeLabel: 'Otras actividades', satAliases: ['otros'], factor: 0.35, factorTaxReturn: null },
 
   // Citibanamex — columna Nuevo (taller mayo 2024)
-  { bankCode: 'CITIBANAMEX', nativeLabel: 'Médico, dentista', satAliases: ['medico', 'dentista'], factor: 1.0, factorTaxReturn: null },
+  { bankCode: 'CITIBANAMEX', nativeLabel: 'Médico, dentista', satAliases: withMedicalAliases(['medico', 'dentista']), factor: 1.0, factorTaxReturn: null },
   { bankCode: 'CITIBANAMEX', nativeLabel: 'Resto servicios profesionales', satAliases: ['abogado', 'administrador', 'agente de seguros', 'comunicador', 'contador', 'enfermera', 'informatico', 'maestro', 'periodista', 'psicologo', 'terapeuta', 'arquitecto', 'consultor', 'disenador grafico', 'ingeniero', 'piloto'], factor: 1.0, factorTaxReturn: null },
   { bankCode: 'CITIBANAMEX', nativeLabel: 'Comercio / servicios / manufactura', satAliases: ['comercio', 'alimentos y bebidas', 'restaurantero', 'servicios', 'representante de ventas', 'agencias de viajes', 'manufactura'], factor: 0.5, factorTaxReturn: null },
   { bankCode: 'CITIBANAMEX', nativeLabel: 'Comercio-comisionista', satAliases: ['comisionista'], factor: 1.0, factorTaxReturn: null },
@@ -153,7 +168,7 @@ export const BANK_ACTIVITY_FACTORS: BankActivityFactorSeed[] = [
 
   // Santander — factor de afectación (asesora sep-2026)
   { bankCode: 'SANTANDER', nativeLabel: 'PI', satAliases: ['profesionista independiente'], factor: 0.8, factorTaxReturn: null },
-  { bankCode: 'SANTANDER', nativeLabel: 'PI sector médico', satAliases: ['medico'], factor: 1.0, factorTaxReturn: null },
+  { bankCode: 'SANTANDER', nativeLabel: 'PI sector médico', satAliases: withMedicalAliases(['medico']), factor: 1.0, factorTaxReturn: null },
   { bankCode: 'SANTANDER', nativeLabel: 'Consultorías TOP', satAliases: ['consultoria'], factor: 1.0, factorTaxReturn: null },
   { bankCode: 'SANTANDER', nativeLabel: 'PFAE Servicio', satAliases: ['servicio'], factor: 0.6, factorTaxReturn: null },
   { bankCode: 'SANTANDER', nativeLabel: 'PFAE Comercio', satAliases: ['comercio'], factor: 0.6, factorTaxReturn: null },
@@ -163,13 +178,13 @@ export const BANK_ACTIVITY_FACTORS: BankActivityFactorSeed[] = [
   // Afirme — captura "Castigos x actividad"
   { bankCode: 'AFIRME', nativeLabel: 'Accionistas', satAliases: ['accionistas'], factor: 1.0, factorTaxReturn: null },
   { bankCode: 'AFIRME', nativeLabel: 'Honorarios', satAliases: ['honorarios'], factor: 1.0, factorTaxReturn: null },
-  { bankCode: 'AFIRME', nativeLabel: 'Servicios', satAliases: ['abogados', 'doctores', 'contadores', 'asesores inmobiliarios'], factor: 0.8, factorTaxReturn: null },
+  { bankCode: 'AFIRME', nativeLabel: 'Servicios', satAliases: withMedicalAliases(['abogados', 'doctores', 'contadores', 'asesores inmobiliarios']), factor: 0.8, factorTaxReturn: null },
   { bankCode: 'AFIRME', nativeLabel: 'Comercio', satAliases: ['comercio', 'restaurante'], factor: 0.5, factorTaxReturn: null },
   { bankCode: 'AFIRME', nativeLabel: 'Manufactura', satAliases: ['ganaderos', 'constructoras', 'industrias'], factor: 0.2, factorTaxReturn: null },
   { bankCode: 'AFIRME', nativeLabel: 'Gasolineros', satAliases: ['gasolineras', 'divisas'], factor: 0.1, factorTaxReturn: null },
 
   // Banregio — captura "Comprobación de ingresos"
-  { bankCode: 'BANREGIO', nativeLabel: 'Servicios', satAliases: ['servicios'], factor: 0.7, factorTaxReturn: null },
+  { bankCode: 'BANREGIO', nativeLabel: 'Servicios', satAliases: withMedicalAliases(['servicios']), factor: 0.7, factorTaxReturn: null },
   { bankCode: 'BANREGIO', nativeLabel: 'Otros', satAliases: ['otros'], factor: 0.6, factorTaxReturn: null },
   { bankCode: 'BANREGIO', nativeLabel: 'Informal', satAliases: ['informal'], factor: 0.15, factorTaxReturn: null },
   { bankCode: 'BANREGIO', nativeLabel: 'Accionistas', satAliases: ['accionistas'], factor: 1.0, factorTaxReturn: null },
@@ -177,14 +192,14 @@ export const BANK_ACTIVITY_FACTORS: BankActivityFactorSeed[] = [
   // BX+ — factor = estados, factorTaxReturn = declaración (dual diffs on PFAE rows)
   { bankCode: 'BXPLUS', nativeLabel: 'Socio o dueño (comprobación personal / dividendos)', satAliases: ['socio', 'dueno', 'dividendos'], factor: 0.9, factorTaxReturn: 0.9 },
   { bankCode: 'BXPLUS', nativeLabel: 'Arrendamiento', satAliases: ['arrendamiento'], factor: 0.8, factorTaxReturn: 0.8 },
-  { bankCode: 'BXPLUS', nativeLabel: 'Servicios profesionales', satAliases: ['servicios profesionales'], factor: 0.8, factorTaxReturn: 0.8 },
+  { bankCode: 'BXPLUS', nativeLabel: 'Servicios profesionales', satAliases: withMedicalAliases(['servicios profesionales']), factor: 0.8, factorTaxReturn: 0.8 },
   { bankCode: 'BXPLUS', nativeLabel: 'PFAE Servicios', satAliases: ['pfae servicios', 'servicios'], factor: 0.5, factorTaxReturn: 0.6 },
   { bankCode: 'BXPLUS', nativeLabel: 'PFAE Comercio', satAliases: ['pfae comercio', 'comercio'], factor: 0.4, factorTaxReturn: 0.5 },
   { bankCode: 'BXPLUS', nativeLabel: 'Pequeños contribuyentes', satAliases: ['pequenos contribuyentes', 'rif'], factor: 0.25, factorTaxReturn: 0.3 },
   { bankCode: 'BXPLUS', nativeLabel: 'Gasolinero', satAliases: ['gasolinero'], factor: 0.05, factorTaxReturn: 0.05 },
 
   // Scotiabank — captura "Ingresos por actividad"
-  { bankCode: 'SCOTIABANK', nativeLabel: 'Comisionistas, abogados no litigantes, médicos, arquitectos e ingenieros no construcción', satAliases: ['comisionistas', 'abogados', 'medicos', 'arquitectos', 'ingenieros'], factor: 1.0, factorTaxReturn: null },
+  { bankCode: 'SCOTIABANK', nativeLabel: 'Comisionistas, abogados no litigantes, médicos, arquitectos e ingenieros no construcción', satAliases: withMedicalAliases(['comisionistas', 'abogados', 'medicos', 'arquitectos', 'ingenieros']), factor: 1.0, factorTaxReturn: null },
   { bankCode: 'SCOTIABANK', nativeLabel: 'Contadores, consultores, asesores, artistas, arrendadores, profesores', satAliases: ['contadores', 'consultores', 'agentes aduanales', 'asesores', 'artistas', 'musicos', 'valuadores', 'arrendadores', 'profesores'], factor: 0.8, factorTaxReturn: null },
   { bankCode: 'SCOTIABANK', nativeLabel: 'Dueños de negocio, comerciantes, constructores', satAliases: ['duenos de negocio', 'comerciantes', 'constructores'], factor: 0.5, factorTaxReturn: null },
   { bankCode: 'SCOTIABANK', nativeLabel: 'Gasolineros, agropecuario, ganadero', satAliases: ['gasolineros', 'agropecuario', 'ganadero'], factor: 0.1, factorTaxReturn: null },
