@@ -9,7 +9,10 @@ import type {
 } from "@/app/lib/definitions";
 import { STATUS_LABELS, DESTINATION_LABELS, getReasonLabel } from "@/app/lib/definitions";
 import DataTable, { type Column } from "@/app/ui/common/data-table";
-import PfaeProductDetailExtras from "@/app/ui/expedientes/pfae-product-detail-extras";
+import PfaeProductDetailExtras, {
+  factorTimesHint,
+  originDisplay,
+} from "@/app/ui/expedientes/pfae-product-detail-extras";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -328,15 +331,29 @@ function FinancialSummary({
     inputs.estimatedTermMonths != null
       ? `${Math.round(inputs.estimatedTermMonths / 12)} años`
       : null;
+  const dest = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
+  const isPfae = inputs.personType === "PFAE";
+  const gross = formatCurrency(inputs.confirmedGrossIncome);
+  const net = formatCurrency(inputs.confirmedNetIncome);
+  const sent = gross === net ? gross : `${gross} bruto · ${net} neto`;
 
-  const fields = [
-    { label: "Ingreso bruto", value: formatCurrency(inputs.confirmedGrossIncome) },
-    { label: "Ingreso neto", value: formatCurrency(inputs.confirmedNetIncome) },
-    { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
-    { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
-    { label: "Plazo", value: termYears ?? "—" },
-    { label: "Destino", value: DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—" },
-  ];
+  const fields = isPfae
+    ? [
+        { label: "Ingreso enviado", value: sent },
+        { label: "Origen", value: originDisplay(inputs.incomeSource) },
+        { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
+        { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
+        { label: "Plazo", value: termYears ?? "—" },
+        { label: "Destino", value: dest },
+      ]
+    : [
+        { label: "Ingreso bruto", value: gross },
+        { label: "Ingreso neto", value: net },
+        { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
+        { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
+        { label: "Plazo", value: termYears ?? "—" },
+        { label: "Destino", value: dest },
+      ];
 
   return (
     <div
@@ -378,6 +395,7 @@ function ProductTable({
   inputs?: BankViabilitySnapshot["inputs"];
   suppressViablePresentation: boolean;
 }) {
+  const isPfae = inputs?.personType === "PFAE";
   const columns: Column<BankResult>[] = [
     {
       key: "bankCode",
@@ -407,18 +425,26 @@ function ProductTable({
         const criterion = m.policySnapshot.incomeCriterion;
         const isNet = String(criterion).toUpperCase().includes("NET");
         const label = isNet ? "Neto" : "Bruto";
+        const hint = isPfae ? factorTimesHint(m) : null;
         return (
-          <span className="text-xs text-gf-text">
-            {label} · {formatCurrency(m.calculation.incomeUsed)}
+          <span className="flex flex-col text-xs text-gf-text">
+            <span>
+              {label} · {formatCurrency(m.calculation.incomeUsed)}
+            </span>
+            {hint && (
+              <span className="text-[10px] text-gf-text-muted">{hint}</span>
+            )}
           </span>
         );
       },
     },
     {
       key: "ce",
-      header: "CE",
+      header: (
+        <span title="Compromiso de endeudamiento">CE</span>
+      ),
       render: (m) => (
-        <span className="text-xs text-gf-text">
+        <span className="text-xs text-gf-text" title="Compromiso de endeudamiento">
           {formatPercent(m.policySnapshot.debtCommitmentFactor)}
         </span>
       ),
@@ -587,7 +613,8 @@ function ProductDetail({
 
       {/* Body — 2 cols: left (calc + controls), right (reasons) */}
       <div className="px-5 pb-4 space-y-4">
-        {/* Top row: compact financial calc cards */}
+        {/* Top row: salaried repeats calc cards; PFAE leads with the factor sentence. */}
+        {!isPfae && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {[
             ["Criterio", incomeLabel],
@@ -603,11 +630,12 @@ function ProductDetail({
             </div>
           ))}
         </div>
+        )}
 
         {isPfae && (
           <PfaeProductDetailExtras
             match={match}
-            incomeSource={inputs?.incomeSource}
+            inputs={inputs}
           />
         )}
 
