@@ -9,6 +9,10 @@ export interface BankarizationFlags {
 
 export type CheckStatus = 'PASS' | 'FAIL' | 'REQUIRES_REVIEW' | 'NOT_APPLICABLE';
 
+export type PfaeFactorMode = 'MATRIX' | 'FLAT' | 'NONE';
+
+export type TaxReturnPolicy = 'ACCEPTED' | 'NOT_PREFERRED' | 'REJECTED';
+
 export type ProductMatchStatus =
   | 'PRELIMINARY_VIABLE'
   | 'CONDITIONED'
@@ -71,6 +75,11 @@ export interface BankResult {
   policySnapshot: BankPolicySnapshot;
   calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
+  appliedFactor: string | null;
+  factorMode: PfaeFactorMode | null;
+  matchedNativeLabel: string | null;
+  satDescription: string | null;
+  taxReturnPolicy: TaxReturnPolicy | null;
 }
 
 /** @deprecated Use BankResult instead. Kept for backward compat. */

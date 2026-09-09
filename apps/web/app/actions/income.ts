@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
  *   POST   /cases/:caseId/income/calculate
  *   GET    /cases/:caseId/income/latest
  *   PATCH  /cases/:caseId/income/receipts/:receiptIndex
+ *   PATCH  /cases/:caseId/income/source
  *   POST   /cases/:caseId/income/confirm
  */
 
@@ -20,6 +21,36 @@ import { revalidatePath } from "next/cache";
 
 export type IncomeCalculationStatus =
   | "CALCULATED";
+
+export type IncomeSource = "PAYROLL" | "BANK_STATEMENTS" | "TAX_RETURN";
+
+export interface IncomeBase {
+  valid: boolean;
+  invalidReason: string | null;
+  monthlyGross: number | null;
+  monthlyNet: number | null;
+}
+
+export interface BankIncomeBase extends IncomeBase {
+  windowMonths: 6 | 12;
+  monthsUsed: string[];
+  droppedMax: string | null;
+  droppedMin: string | null;
+}
+
+export interface ActivityResolution {
+  description: string | null;
+  percentage: number | null;
+  order: number | null;
+  matchedKeyword: string | null;
+  windowMonths: 6 | 12;
+}
+
+export interface PfaeIncomeBases {
+  bank: BankIncomeBase;
+  taxReturn: IncomeBase;
+  activity: ActivityResolution;
+}
 
 export interface IncomeReceiptResult {
   documentId: string;
@@ -49,6 +80,8 @@ export interface IncomeCalculationResult {
   confirmedBy: string | null;
   confirmedAt: string | null;
   observations: string | null;
+  source?: IncomeSource;
+  bases?: PfaeIncomeBases | null;
 }
 
 // ── Server actions ─────────────────────────────────────────────────────────
@@ -148,5 +181,35 @@ export async function toggleIncomeReceipt(
     success: false,
     error:
       result.errors?._form ?? "No se pudo actualizar el recibo",
+  };
+}
+
+/**
+ * Switches the PFAE chosen income source (bank statements vs tax return).
+ * Calls existing PATCH /cases/:caseId/income/source — no new endpoints.
+ * A 400 TAX_LOSS (invalid tax base) surfaces via `_form` like other income actions.
+ */
+export async function switchIncomeSource(
+  caseId: string,
+  source: "BANK_STATEMENTS" | "TAX_RETURN",
+): Promise<{
+  success: boolean;
+  data?: IncomeCalculationResult;
+  error?: string;
+}> {
+  const result = await apiFetch<IncomeCalculationResult>(
+    `/cases/${caseId}/income/source`,
+    { method: "PATCH", body: { source } },
+  );
+
+  if (result.ok) {
+    revalidatePath(`/dashboard/expedientes/${caseId}`);
+    return { success: true, data: result.data };
+  }
+
+  return {
+    success: false,
+    error:
+      result.errors?._form ?? "No se pudo cambiar la fuente de ingresos",
   };
 }

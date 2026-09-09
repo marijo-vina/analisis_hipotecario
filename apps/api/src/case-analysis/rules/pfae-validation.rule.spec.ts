@@ -217,6 +217,7 @@ describe('PfaeValidationRule', () => {
           expect.objectContaining({
             ruleCode: 'PFAE_ACTIVITY_TENURE',
             severity: 'INFO',
+            message: 'Antigüedad en la actividad independiente: 1 año.',
           }),
         ]),
       );
@@ -341,6 +342,7 @@ describe('PfaeValidationRule', () => {
       return {
         id: 'bank-mifel',
         code: 'MIFEL',
+        name: 'Mifel',
         pfaeFactorMode: 'MATRIX',
         activityFactors: [
           {
@@ -382,8 +384,71 @@ describe('PfaeValidationRule', () => {
             ruleCode: 'ACTIVITY_UNMAPPED',
             severity: 'WARNING',
             field: 'activity',
+            message:
+              'Ningún banco con matriz de giros tiene un factor para esta actividad SAT (Mifel). Esos bancos quedan en revisión.',
           }),
         ]),
+      );
+      expect(snapshot(result).activity?.unmappedBanks).toEqual(['Mifel']);
+      expect(snapshot(result).activity?.matchedBanks).toEqual([]);
+    });
+
+    it('lists banks that matched and banks that missed in the warning', async () => {
+      const prisma = makePrisma([
+        matrixBank({
+          activityFactors: [
+            {
+              nativeLabel: 'Establecimientos y PI de salud',
+              satAliases: ['consultorios', 'medicos'],
+              factor: 1.5,
+              factorTaxReturn: null,
+            },
+          ],
+        }),
+        {
+          id: 'bank-afirme',
+          code: 'AFIRME',
+          name: 'Afirme',
+          pfaeFactorMode: 'MATRIX',
+          activityFactors: [
+            {
+              nativeLabel: 'Honorarios',
+              satAliases: ['honorarios'],
+              factor: 1.0,
+              factorTaxReturn: null,
+            },
+          ],
+        },
+      ]);
+      const mixedRule = new PfaeValidationRule(prisma);
+      const docs = [
+        doc(
+          'CSF',
+          independentCsf({
+            activities: [
+              {
+                description:
+                  'Consultorios de medicina especializada pertenecientes al sector privado',
+                percentage: 100,
+                endDate: null,
+              },
+            ],
+          }),
+        ),
+      ];
+
+      const result = await mixedRule.execute(pfaeClient(), docs);
+
+      expect(result.outcome).toBe('PARTIAL');
+      const alert = result.alerts.find((a) => a.ruleCode === 'ACTIVITY_UNMAPPED');
+      expect(alert?.message).toBe(
+        'Esta actividad SAT sí tiene giro en Mifel. No hay factor de giro en Afirme; esos bancos quedan en revisión.',
+      );
+      expect(snapshot(result).activity).toEqual(
+        expect.objectContaining({
+          matchedBanks: ['Mifel'],
+          unmappedBanks: ['Afirme'],
+        }),
       );
     });
 
@@ -531,6 +596,8 @@ describe('PfaeValidationRule', () => {
       expect(snapshot(result).activity).toEqual({
         satDescription: 'Comercio al por menor',
         percentage: 70,
+        matchedBanks: [],
+        unmappedBanks: [],
       });
     });
   });

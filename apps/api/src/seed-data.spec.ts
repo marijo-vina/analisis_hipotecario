@@ -1,3 +1,4 @@
+import { matchActivityFactor } from './case-analysis/activity-factor-match';
 import {
   BANKS,
   BANK_POLICIES,
@@ -467,6 +468,24 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
       expect(comercio).toBeDefined();
       expect(comercio!.factor).toBe(0.4);
       expect(comercio!.factorTaxReturn).toBe(0.5);
+    });
+
+    it('matches consultorio SAT wording on every MATRIX bank', () => {
+      const sat =
+        'Consultorios de medicina especializada pertenecientes al sector privado que cuenten con título de médico conforme a las leyes.';
+      const matrixBanks = BANKS.filter((b) => b.pfaeFactorMode === 'MATRIX');
+      expect(matrixBanks.length).toBeGreaterThan(0);
+      for (const bank of matrixBanks) {
+        const match = matchActivityFactor({
+          pfaeFactorMode: bank.pfaeFactorMode,
+          satDescription: sat,
+          activityFactors: BANK_ACTIVITY_FACTORS.filter((f) => f.bankCode === bank.code),
+        });
+        expect({ bank: bank.code, kind: match.kind }).toEqual({
+          bank: bank.code,
+          kind: 'hit',
+        });
+      }
     });
   });
 

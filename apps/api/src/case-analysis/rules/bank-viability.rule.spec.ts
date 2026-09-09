@@ -1535,5 +1535,134 @@ describe('BankViabilityRule', () => {
       expect(br.status).toBe('NOT_COMPATIBLE');
       expect(br.reasons).toContain('INSUFFICIENT_ACTIVITY_TENURE');
     });
+
+    it('persists PFAE factor audit from the same evaluation (FLAT)', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      setupPfae(prisma, {
+        bank: makeBank({
+          code: 'BANORTE',
+          pfaeFactorMode: 'FLAT',
+          pfaeFlatFactor: { toString: () => '0.60' },
+          taxReturnPolicy: 'NOT_PREFERRED',
+        }),
+      });
+
+      const result = await rule.execute(defaultContext(), pfaeDocuments());
+      const br = getBv(result).bankResults[0];
+      // Phase C math must stay 80000 × 0.6
+      expect(br.calculation.incomeUsed).toBe('48000.00');
+      expect(br.appliedFactor).toBe('0.60');
+      expect(br.factorMode).toBe('FLAT');
+      expect(br.matchedNativeLabel).toBeNull();
+      expect(br.satDescription).toBe('Comercio al por menor');
+      expect(br.taxReturnPolicy).toBe('NOT_PREFERRED');
+    });
+
+    it('persists MATRIX hit audit including native label', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      setupPfae(prisma, {
+        minimumEmploymentTenureMonths: null,
+        bank: makeBank({
+          id: 'bank-mifel',
+          code: 'MIFEL',
+          name: 'Mifel',
+          pfaeFactorMode: 'MATRIX',
+          taxReturnPolicy: 'ACCEPTED',
+          activityFactors: [
+            {
+              nativeLabel: 'Comercio',
+              satAliases: ['comercio'],
+              factor: { toString: () => '0.35' },
+              factorTaxReturn: null,
+            },
+          ],
+        }),
+      });
+
+      const result = await rule.execute(defaultContext(), pfaeDocuments());
+      const br = getBv(result).bankResults[0];
+      // 80000 × 0.35 = 28000 — math unchanged
+      expect(br.calculation.incomeUsed).toBe('28000.00');
+      expect(br.appliedFactor).toBe('0.35');
+      expect(br.factorMode).toBe('MATRIX');
+      expect(br.matchedNativeLabel).toBe('Comercio');
+      expect(br.satDescription).toBe('Comercio al por menor');
+      expect(br.taxReturnPolicy).toBe('ACCEPTED');
+    });
+
+    it('unmapped MATRIX audit must not invent factor 1.0 and still stores satDescription', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      setupPfae(
+        prisma,
+        {
+          bank: makeBank({
+            id: 'bank-mifel',
+            code: 'MIFEL',
+            name: 'Mifel',
+            pfaeFactorMode: 'MATRIX',
+            taxReturnPolicy: 'ACCEPTED',
+            activityFactors: [
+              {
+                nativeLabel: 'Comercio',
+                satAliases: ['comercio'],
+                factor: { toString: () => '0.35' },
+                factorTaxReturn: null,
+              },
+            ],
+          }),
+        },
+        {
+          bases: {
+            bank: {
+              valid: true,
+              invalidReason: null,
+              monthlyGross: 100000,
+              monthlyNet: 80000,
+              windowMonths: 6,
+              monthsUsed: ['2025-01'],
+              droppedMax: null,
+              droppedMin: null,
+            },
+            taxReturn: { valid: true, invalidReason: null, monthlyGross: 90000, monthlyNet: 70000 },
+            activity: {
+              description: 'Consultorios de medicina especializada',
+              percentage: 100,
+              order: 1,
+              matchedKeyword: null,
+              windowMonths: 6,
+            },
+          },
+        },
+      );
+
+      const result = await rule.execute(
+        defaultContext(),
+        pfaeDocuments({ satDescription: 'Consultorios de medicina especializada' }),
+      );
+      const br = getBv(result).bankResults[0];
+      expect(br.reasons).toContain('ACTIVITY_UNMAPPED');
+      expect(br.appliedFactor).toBeNull();
+      expect(br.appliedFactor).not.toBe('1.00');
+      expect(br.factorMode).toBe('MATRIX');
+      expect(br.matchedNativeLabel).toBeNull();
+      expect(br.satDescription).toBe('Consultorios de medicina especializada');
+      expect(br.taxReturnPolicy).toBe('ACCEPTED');
+    });
+  });
+
+  describe('SALARIED factor audit', () => {
+    it('stores all five PFAE audit fields as null and leaves CE unfactored', async () => {
+      const { rule } = makeRuleAndMock();
+      const result = await rule.execute(defaultContext(), defaultDocuments());
+      const br = getBv(result).bankResults[0];
+
+      expect(br.appliedFactor).toBeNull();
+      expect(br.factorMode).toBeNull();
+      expect(br.matchedNativeLabel).toBeNull();
+      expect(br.satDescription).toBeNull();
+      expect(br.taxReturnPolicy).toBeNull();
+      // CE remains unfactored net income
+      expect(br.calculation.incomeUsed).toBe('56976.33');
+    });
   });
 });

@@ -21,6 +21,7 @@ import type { PrismaDocumentLike } from './identity-match.rule';
 import type { PfaeValidationSnapshot } from '../types/pfae-validation.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { matchActivityFactor } from '../activity-factor-match';
+import { formatActivityTenure, joinSpanishList } from '../format-activity-tenure';
 
 const RULE_ID = 'pfae-validation';
 const CSF_CODE = 'CSF';
@@ -123,20 +124,29 @@ export class PfaeValidationRule implements AnalysisRule {
         ruleCode: 'PFAE_ACTIVITY_TENURE',
         severity: 'INFO',
         field: 'tenure',
-        message: `Antigüedad en la actividad independiente: ${tenureMonths ?? 'N/D'} meses.`,
+        message: `Antigüedad en la actividad independiente: ${
+          tenureMonths != null ? formatActivityTenure(tenureMonths) : 'N/D'
+        }.`,
       });
     }
 
-    const activity = this.selectActivity(csfData.activities);
-    const unmapped = await this.anyMatrixBankUnmapped(activity?.satDescription ?? null);
-    if (unmapped) {
+    const selectedActivity = this.selectActivity(csfData.activities);
+    const classified = await this.classifyMatrixActivity(
+      selectedActivity?.satDescription ?? null,
+    );
+    const activity = selectedActivity
+      ? { ...selectedActivity, ...classified }
+      : null;
+    if (classified.unmappedBanks.length > 0) {
       outcome = this.escalate(outcome, 'PARTIAL');
       alerts.push({
         ruleCode: 'ACTIVITY_UNMAPPED',
         severity: 'WARNING',
         field: 'activity',
-        message:
-          'La actividad SAT de la CSF no coincide con ningún giro del catálogo MATRIX de al menos un banco.',
+        message: this.activityUnmappedMessage(
+          classified.matchedBanks,
+          classified.unmappedBanks,
+        ),
       });
     }
 
@@ -170,25 +180,51 @@ export class PfaeValidationRule implements AnalysisRule {
     return this.buildResult(outcome, severity, sources, alerts, pfaeValidation);
   }
 
-  private async anyMatrixBankUnmapped(satDescription: string | null): Promise<boolean> {
+  private async classifyMatrixActivity(satDescription: string | null): Promise<{
+    matchedBanks: string[];
+    unmappedBanks: string[];
+  }> {
     const banks = await this.prisma.bank.findMany({
       where: { isActive: true },
       select: {
+        name: true,
+        code: true,
         pfaeFactorMode: true,
         activityFactors: true,
       },
     });
-    return banks.some((bank) => {
+    const matchedBanks: string[] = [];
+    const unmappedBanks: string[] = [];
+    for (const bank of banks) {
       const match = matchActivityFactor({
         pfaeFactorMode: bank.pfaeFactorMode,
         satDescription,
         activityFactors: bank.activityFactors,
       });
-      return match.kind === 'miss';
-    });
+      const label =
+        typeof bank.name === 'string' && bank.name.trim() !== ''
+          ? bank.name
+          : bank.code;
+      if (match.kind === 'hit') matchedBanks.push(label);
+      else if (match.kind === 'miss') unmappedBanks.push(label);
+    }
+    const byEs = (a: string, b: string) => a.localeCompare(b, 'es');
+    matchedBanks.sort(byEs);
+    unmappedBanks.sort(byEs);
+    return { matchedBanks, unmappedBanks };
   }
 
-  private selectActivity(raw: unknown): PfaeValidationSnapshot['activity'] {
+  private activityUnmappedMessage(matched: string[], unmapped: string[]): string {
+    const unmappedList = joinSpanishList(unmapped);
+    if (matched.length === 0) {
+      return `Ningún banco con matriz de giros tiene un factor para esta actividad SAT (${unmappedList}). Esos bancos quedan en revisión.`;
+    }
+    return `Esta actividad SAT sí tiene giro en ${joinSpanishList(matched)}. No hay factor de giro en ${unmappedList}; esos bancos quedan en revisión.`;
+  }
+
+  private selectActivity(
+    raw: unknown,
+  ): { satDescription: string | null; percentage: number | null } | null {
     if (!Array.isArray(raw) || raw.length === 0) return null;
 
     const active = raw.filter((item): item is Record<string, unknown> => {

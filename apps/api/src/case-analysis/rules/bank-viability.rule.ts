@@ -17,6 +17,8 @@ import type {
   ProductMatchStatus,
   CheckResult,
   CaseAnalysisContext,
+  PfaeFactorMode,
+  TaxReturnPolicy,
 } from '../types/bank-viability.types';
 import { completeMonthsBetween } from '../../shared/utils/dates';
 import { matchActivityFactor } from '../activity-factor-match';
@@ -571,24 +573,50 @@ export class BankViabilityRule implements AnalysisRule {
     bank: PolicyWithBank['bank'],
     source: string | null,
     satDescription: string | null,
-  ): { factor: Prisma.Decimal | null; unmapped: boolean } {
-    const mode = bank.pfaeFactorMode;
-    if (mode === 'NONE') return { factor: new Prisma.Decimal(1), unmapped: false };
+  ): {
+    factor: Prisma.Decimal | null;
+    unmapped: boolean;
+    factorMode: PfaeFactorMode;
+    matchedNativeLabel: string | null;
+  } {
+    const mode = bank.pfaeFactorMode as PfaeFactorMode;
+    if (mode === 'NONE') {
+      return {
+        factor: new Prisma.Decimal(1),
+        unmapped: false,
+        factorMode: 'NONE',
+        matchedNativeLabel: null,
+      };
+    }
     if (mode === 'FLAT') {
-      if (bank.pfaeFlatFactor == null) return { factor: null, unmapped: false };
-      return { factor: new Prisma.Decimal(bank.pfaeFlatFactor.toString()), unmapped: false };
+      if (bank.pfaeFlatFactor == null) {
+        return { factor: null, unmapped: false, factorMode: 'FLAT', matchedNativeLabel: null };
+      }
+      return {
+        factor: new Prisma.Decimal(bank.pfaeFlatFactor.toString()),
+        unmapped: false,
+        factorMode: 'FLAT',
+        matchedNativeLabel: null,
+      };
     }
     const match = matchActivityFactor({
       pfaeFactorMode: 'MATRIX',
       satDescription,
       activityFactors: bank.activityFactors ?? [],
     });
-    if (match.kind !== 'hit') return { factor: null, unmapped: true };
+    if (match.kind !== 'hit') {
+      return { factor: null, unmapped: true, factorMode: 'MATRIX', matchedNativeLabel: null };
+    }
     const raw =
       source === 'TAX_RETURN' && match.factorTaxReturn != null
         ? match.factorTaxReturn
         : match.factor;
-    return { factor: new Prisma.Decimal(raw), unmapped: false };
+    return {
+      factor: new Prisma.Decimal(raw),
+      unmapped: false,
+      factorMode: 'MATRIX',
+      matchedNativeLabel: match.nativeLabel,
+    };
   }
 
   private resolveIncomeUsed(
@@ -916,6 +944,10 @@ export class BankViabilityRule implements AnalysisRule {
       minimumBureauScore: policy.bank.minimumBureauScore ?? null,
     };
 
+    const pfaeFactor = isPfae
+      ? this.resolvePfaeFactor(policy.bank, pfae.source, pfae.satDescription)
+      : null;
+
     return {
       bankCode: policy.bank.code,
       productCode: policy.code,
@@ -924,6 +956,11 @@ export class BankViabilityRule implements AnalysisRule {
       policySnapshot,
       calculation,
       checks,
+      appliedFactor: pfaeFactor?.factor != null ? d2(pfaeFactor.factor) : null,
+      factorMode: pfaeFactor?.factorMode ?? null,
+      matchedNativeLabel: pfaeFactor?.matchedNativeLabel ?? null,
+      satDescription: isPfae ? pfae.satDescription : null,
+      taxReturnPolicy: isPfae ? (policy.bank.taxReturnPolicy as TaxReturnPolicy) : null,
     };
   }
 

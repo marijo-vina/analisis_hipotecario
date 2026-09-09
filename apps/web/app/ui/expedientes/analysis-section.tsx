@@ -19,6 +19,7 @@ import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
+import PfaeValidationGates from "@/app/ui/expedientes/pfae-validation-gates";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,22 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "motor", label: "Cálculo financiero" },
   { id: "bancos", label: "Comparativa bancaria" },
 ];
+
+const PFAE_VALIDATION_RULE_ID = "pfae-validation";
+const SOLELY_SALARIED_RULE_CODE = "REGIMEN_EXCLUSIVAMENTE_ASALARIADO";
+const SOLELY_SALARIED_FAIL_COPY =
+  "este camino PFAE no aplica — cambie a asalariado";
+
+/** Presentational only — never persisted, never mutates stored BankResult.status. */
+function deriveSuppressViablePresentation(run: AnalysisRun): boolean {
+  if (run.alerts?.some((alert) => alert.ruleCode === SOLELY_SALARIED_RULE_CODE)) {
+    return true;
+  }
+  const rule = run.detail.ruleResults?.find(
+    (result) => result.ruleId === PFAE_VALIDATION_RULE_ID,
+  );
+  return rule?.detail.pfaeValidation?.regime.outcome === "FAIL";
+}
 
 const SOURCE_LABELS: Record<string, string> = {
   "official-id": "INE",
@@ -155,24 +172,35 @@ export default function AnalysisSection({
     );
   }, []);
 
-  // Cargar último análisis al montar
-  const loadLatest = useCallback(async () => {
-    setState({ phase: "loading" });
-    const res = await fetchLatestAnalysis(caseId);
-    if (!res.success) {
-      setState({ phase: "error", message: res.error ?? "Error" });
-      return;
-    }
-    if (res.data) {
-      setState(
-        isObservations(res.data)
-          ? { phase: "observations", run: res.data }
-          : { phase: "result", run: res.data },
-      );
-    } else {
-      setState({ phase: "idle" });
-    }
-  }, [caseId, isObservations]);
+  // Cargar último análisis al montar. Quiet path keeps the current result
+  // painted while GET /analysis/latest runs (source-switch refresh).
+  const loadLatest = useCallback(
+    async (options?: { quiet?: boolean }) => {
+      if (!options?.quiet) {
+        setState({ phase: "loading" });
+      }
+      const res = await fetchLatestAnalysis(caseId);
+      if (!res.success) {
+        if (options?.quiet) return;
+        setState({ phase: "error", message: res.error ?? "Error" });
+        return;
+      }
+      if (res.data) {
+        setState(
+          isObservations(res.data)
+            ? { phase: "observations", run: res.data }
+            : { phase: "result", run: res.data },
+        );
+      } else if (!options?.quiet) {
+        setState({ phase: "idle" });
+      }
+    },
+    [caseId, isObservations],
+  );
+
+  const quietLoadLatest = useCallback(() => {
+    void loadLatest({ quiet: true });
+  }, [loadLatest]);
 
   useEffect(() => {
     loadLatest();
@@ -228,6 +256,10 @@ export default function AnalysisSection({
     (d) => d.documentType.code === "PAYROLL_RECEIPT",
   );
   const bankParsed = parseBankStatements(bankStatementDocs);
+  const peinadoWarn = bankParsed.statements.some((statement) => {
+    const status = statement.financialDepuration?.integrityCheck?.status;
+    return status === "MINOR_DIFFERENCE" || status === "CRITICAL_DISCREPANCY";
+  });
 
   // ── Button label/variant based on phase ─────────────────────────────────
   const headerButton = (() => {
@@ -442,7 +474,12 @@ export default function AnalysisSection({
             <>
               <LiabilityCalculationSection caseId={caseId} />
               <div className="mt-6" />
-              <IncomeCalculationSection caseId={caseId} />
+              <IncomeCalculationSection
+                caseId={caseId}
+                personType={personType}
+                onSourceSwitched={quietLoadLatest}
+                peinadoWarn={peinadoWarn}
+              />
             </>
           )}
 
@@ -453,6 +490,12 @@ export default function AnalysisSection({
                   ? state.run.detail?.bankViability
                   : undefined
               }
+              suppressViablePresentation={
+                personType === "PFAE" &&
+                (state.phase === "result" || state.phase === "observations") &&
+                deriveSuppressViablePresentation(state.run)
+              }
+              overlayMessage={SOLELY_SALARIED_FAIL_COPY}
             />
           )}
         </>
@@ -501,6 +544,21 @@ function ValidacionesTab({
           personType={personType}
         />
       </section>
+
+      {isPFAE && (
+        <section>
+          <h3 className="text-sm font-semibold text-gf-text mb-3">
+            Validaciones PFAE
+          </h3>
+          <PfaeValidationGates
+            run={
+              state.phase === "result" || state.phase === "observations"
+                ? state.run
+                : undefined
+            }
+          />
+        </section>
+      )}
 
       {/* ── B) Conciliación nómina vs banco — no aplica para PFAE (sin nómina) ── */}
       {!isPFAE && (

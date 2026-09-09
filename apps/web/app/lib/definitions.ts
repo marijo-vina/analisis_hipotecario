@@ -195,6 +195,45 @@ export interface AnalysisDetail {
   sources: string[];
   fields: FieldComparison[];
   bankViability?: BankViabilitySnapshot;
+  ruleResults?: AnalysisRuleResult[];
+}
+
+export interface PfaeValidationSnapshot {
+  regime: { isSolelySalaried: boolean; outcome: "PASS" | "FAIL" };
+  vigencia: {
+    issuanceDate: string | null;
+    isOlderThan3Months: boolean;
+    outcome: "PASS" | "WARNING";
+  } | null;
+  tenure: {
+    months: number | null;
+    activityStartDate: string | null;
+  } | null;
+  activity: {
+    satDescription: string | null;
+    percentage: number | null;
+    matchedBanks?: string[];
+    unmappedBanks?: string[];
+  } | null;
+  coherence: { rentWithoutRegimeCount: number; outcome: "PASS" | "WARNING" } | null;
+}
+
+export interface AnalysisRuleResult {
+  ruleId: string;
+  outcome: "PASS" | "PARTIAL" | "FAIL";
+  severity: string;
+  detail: {
+    sources: string[];
+    fields: FieldComparison[];
+    pfaeValidation?: PfaeValidationSnapshot;
+    bankViability?: BankViabilitySnapshot;
+  };
+  alerts: Array<{
+    ruleCode: string;
+    severity: string;
+    field: string;
+    message: string;
+  }>;
 }
 
 export interface AnalysisAlert {
@@ -269,6 +308,8 @@ export interface BankViabilityInputs {
   employmentStartDate: string | null;
   hasPagadoraIncome: boolean;
   scotiabankExcluded: boolean;
+  personType?: string | null;
+  incomeSource?: string | null;
 }
 
 export interface BankResultCalculation {
@@ -311,6 +352,11 @@ export interface BankResult {
   policySnapshot: BankPolicySnapshot;
   calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
+  appliedFactor: string | null;
+  factorMode: PfaeFactorMode | null;
+  matchedNativeLabel: string | null;
+  satDescription: string | null;
+  taxReturnPolicy: TaxReturnPolicy | null;
 }
 
 /** @deprecated Use BankResult instead. Kept for backward compat. */
@@ -358,6 +404,11 @@ export const REASON_LABELS: Record<string, string> = {
   QUITA_QUEBRANTO_REJECTED: "Registro de quita o quebranto en Buró de Crédito",
   FRAUD_OR_IDENTITY_THEFT_REJECTED: "Alerta por riesgo de fraude o robo de identidad",
   LEGAL_ACTION_REJECTED: "Proceso o demanda judicial registrado en Buró",
+  TAX_RETURN_REJECTED: "Declaración anual rechazada por el banco",
+  TAX_RETURN_NOT_PREFERRED: "Declaración anual no preferida",
+  ACTIVITY_UNMAPPED: "Giro no mapeado en la matriz del banco",
+  INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
+  MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
 };
 
 export function getReasonLabel(reason: string): string {

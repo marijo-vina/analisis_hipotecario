@@ -27,6 +27,11 @@ export interface PfaeValidationSnapshot {
     months: number | null;
     activityStartDate: string | null;
   } | null;
-  activity: { satDescription: string | null; percentage: number | null } | null;
+  activity: {
+    satDescription: string | null;
+    percentage: number | null;
+    matchedBanks: string[];
+    unmappedBanks: string[];
+  } | null;
   coherence: { rentWithoutRegimeCount: number; outcome: 'PASS' | 'WARNING' } | null;
 }
