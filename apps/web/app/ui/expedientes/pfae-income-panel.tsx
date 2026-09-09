@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 
 import {
   switchIncomeSource,
@@ -8,10 +8,7 @@ import {
   type IncomeCalculationResult,
   type PfaeIncomeBases,
 } from "@/app/actions/income";
-import Button from "@/app/ui/common/button";
 import Card from "@/app/ui/common/card";
-import FieldGrid, { type FieldGridField } from "@/app/ui/common/field-grid";
-import FormField from "@/app/ui/common/form-field";
 import { formatMonthKey } from "@/app/lib/display-format";
 
 type PfaeSendSource = "BANK_STATEMENTS" | "TAX_RETURN";
@@ -23,11 +20,6 @@ interface PfaeIncomePanelProps {
   onSourceSwitched?: () => void;
   peinadoWarn?: boolean;
 }
-
-const SELECT_CLASS =
-  "h-[42px] w-full px-3 rounded-[8px] border border-gf-border bg-white text-sm text-gf-text " +
-  "focus:border-gf-red focus:ring-2 focus:ring-gf-red/20 focus:outline-none " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const INVALID_REASON_COPY: Record<string, string> = {
   TAX_LOSS: "Pérdida fiscal",
@@ -84,44 +76,19 @@ function mapSwitchError(raw: string | undefined, source: PfaeSendSource): string
   return text || "No se pudo cambiar la fuente de ingresos.";
 }
 
-function bankFields(bases: PfaeIncomeBases): FieldGridField[] {
-  const bank = bases.bank;
-  return [
-    {
-      label: "Promedio mensual (depósitos)",
-      value: formatMXN(bank.monthlyGross),
-    },
-    { label: "Ventana", value: `${bank.windowMonths} meses` },
-    {
-      label: "Meses usados",
-      value:
-        bank.monthsUsed.length > 0
-          ? bank.monthsUsed.map((month) => formatMonthKey(month) ?? month).join(", ")
-          : undefined,
-    },
-    {
-      label: "Mes alto excluido",
-      value: formatMonthKey(bank.droppedMax) ?? undefined,
-    },
-    {
-      label: "Mes bajo excluido",
-      value: formatMonthKey(bank.droppedMin) ?? undefined,
-    },
-  ];
+function bankPeriodCopy(bases: PfaeIncomeBases): string {
+  return `Promedio de ${bases.bank.windowMonths} meses de depósitos`;
 }
 
-function taxFields(bases: PfaeIncomeBases): FieldGridField[] {
-  const tax = bases.taxReturn;
-  return [
-    {
-      label: "Promedio bruto mensual (acumulables / 12)",
-      value: formatMXN(tax.monthlyGross),
-    },
-    {
-      label: "Promedio neto mensual (utilidad / 12)",
-      value: formatMXN(tax.monthlyNet),
-    },
-  ];
+function bankExcludedCopy(bases: PfaeIncomeBases): string | undefined {
+  const high = formatMonthKey(bases.bank.droppedMax);
+  const low = formatMonthKey(bases.bank.droppedMin);
+  if (high && low) {
+    return `Se dejó fuera el mes más alto (${high}) y el más bajo (${low}).`;
+  }
+  if (high) return `Se dejó fuera el mes más alto (${high}).`;
+  if (low) return `Se dejó fuera el mes más bajo (${low}).`;
+  return undefined;
 }
 
 function activityLine(bases: PfaeIncomeBases): string | undefined {
@@ -143,17 +110,75 @@ function EmptyPfaeIncomeCard() {
   );
 }
 
-function BaseStatus({ base }: { base: IncomeBase }) {
-  if (base.valid) {
-    return <p className="text-xs text-gf-text-muted mb-3">Base válida</p>;
+function PathChip({
+  selected,
+  selectable,
+}: {
+  selected: boolean;
+  selectable: boolean;
+}) {
+  if (selected) {
+    return (
+      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-gf-red-soft text-gf-red">
+        Se manda a los bancos
+      </span>
+    );
+  }
+  if (!selectable) {
+    return (
+      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-gf-danger">
+        No se puede usar
+      </span>
+    );
   }
   return (
-    <p className="text-xs text-gf-danger mb-3">
-      Base no válida
-      {reasonLabel(base.invalidReason)
-        ? `: ${reasonLabel(base.invalidReason)}`
-        : ""}
-    </p>
+    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gf-text-muted">
+      Disponible
+    </span>
+  );
+}
+
+function PathCard({
+  title,
+  selected,
+  selectable,
+  disabled,
+  onSelect,
+  children,
+}: {
+  title: string;
+  selected: boolean;
+  selectable: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  const canChoose = selectable && !disabled && !selected;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={title}
+      disabled={!canChoose && !selected}
+      onClick={() => {
+        if (canChoose) onSelect();
+      }}
+      className={
+        "flex flex-col text-left rounded-[12px] border p-5 transition-colors " +
+        (selected
+          ? "border-gf-red bg-gf-red-soft/40"
+          : "border-gf-border bg-gf-surface-dim/40") +
+        (canChoose ? " hover:border-gf-red/60 cursor-pointer" : "") +
+        (!selectable ? " opacity-80 cursor-not-allowed" : "")
+      }
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h4 className="text-sm font-semibold text-gf-text">{title}</h4>
+        <PathChip selected={selected} selectable={selectable} />
+      </div>
+      {children}
+    </button>
   );
 }
 
@@ -182,8 +207,10 @@ export default function PfaeIncomePanel({
   const taxHasLoss = bases.taxReturn.invalidReason === "TAX_LOSS";
   const bankSelectable = isSelectable(bases.bank);
   const taxSelectable = isSelectable(bases.taxReturn);
-  const pickerDisabled = isPending || (!bankSelectable && !taxSelectable);
   const activity = activityLine(bases);
+  const excluded = bankExcludedCopy(bases);
+  const bankInvalid = reasonLabel(bases.bank.invalidReason);
+  const taxInvalid = reasonLabel(bases.taxReturn.invalidReason);
 
   const applySource = (next: PfaeSendSource) => {
     if (next === "TAX_RETURN" && taxHasLoss) {
@@ -218,6 +245,9 @@ export default function PfaeIncomePanel({
     });
   };
 
+  const sendingLabel =
+    draftSource === "BANK_STATEMENTS" ? "estados de cuenta" : "declaración anual";
+
   return (
     <div className="space-y-4">
       {peinadoWarn && (
@@ -230,68 +260,91 @@ export default function PfaeIncomePanel({
       )}
 
       <Card>
+        <p className="text-sm text-gf-text mb-1">
+          Hay dos formas de comprobar el ingreso. Elija cuál se manda a los
+          bancos.
+        </p>
         {activity && (
           <p className="text-xs text-gf-text-muted mb-4">Actividad: {activity}</p>
         )}
+        {!activity && <div className="mb-4" />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-sm font-semibold text-gf-text mb-1">
-              Estados de cuenta
-            </h4>
-            <BaseStatus base={bases.bank} />
-            <FieldGrid fields={bankFields(bases)} />
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-gf-text mb-1">
-              Declaración
-            </h4>
-            <BaseStatus base={bases.taxReturn} />
-            {taxHasLoss && (
-              <p className="text-sm text-gf-danger mb-3">{TAX_LOSS_SEND_COPY}</p>
-            )}
-            <FieldGrid fields={taxFields(bases)} />
-          </div>
-        </div>
+        {error && (
+          <p role="alert" className="text-sm text-gf-danger mb-4">
+            {error}
+          </p>
+        )}
 
-        <div className="mt-6 pt-6 border-t border-gf-border space-y-3">
-          {error && (
-            <p role="alert" className="text-sm text-gf-danger">
-              {error}
-            </p>
-          )}
-
-          <FormField label="Base a enviar al banco" name="incomeSource">
-            <select
-              id="incomeSource"
-              name="incomeSource"
-              className={SELECT_CLASS}
-              value={draftSource}
-              disabled={pickerDisabled}
-              onChange={(event) => {
-                const next = event.target.value as PfaeSendSource;
-                setDraftSource(next);
-                applySource(next);
-              }}
-            >
-              <option value="BANK_STATEMENTS" disabled={!bankSelectable}>
-                Estados de cuenta
-              </option>
-              <option value="TAX_RETURN" disabled={!taxSelectable}>
-                Declaración
-              </option>
-            </select>
-          </FormField>
-
-          <Button
-            variant="secondary"
-            loading={isPending}
-            disabled={pickerDisabled}
-            onClick={() => applySource(draftSource)}
+        <div
+          role="radiogroup"
+          aria-label="Base a enviar al banco"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+        >
+          <PathCard
+            title="Estados de cuenta"
+            selected={draftSource === "BANK_STATEMENTS"}
+            selectable={bankSelectable}
+            disabled={isPending}
+            onSelect={() => applySource("BANK_STATEMENTS")}
           >
-            Aplicar base
-          </Button>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted">
+              Promedio mensual de depósitos
+            </p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-gf-text">
+              {formatMXN(bases.bank.monthlyGross)}
+            </p>
+            <p className="mt-2 text-xs text-gf-text-muted">{bankPeriodCopy(bases)}</p>
+            {excluded && (
+              <p className="mt-1 text-xs text-gf-text-muted">{excluded}</p>
+            )}
+            {bankInvalid && (
+              <p className="mt-3 text-xs text-gf-danger">{bankInvalid}</p>
+            )}
+          </PathCard>
+
+          <PathCard
+            title="Declaración anual"
+            selected={draftSource === "TAX_RETURN"}
+            selectable={taxSelectable}
+            disabled={isPending}
+            onSelect={() => applySource("TAX_RETURN")}
+          >
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted">
+                  Ingreso bruto mensual
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-gf-text">
+                  {formatMXN(bases.taxReturn.monthlyGross)}
+                </p>
+                <p className="mt-1 text-xs text-gf-text-muted">
+                  Ingresos acumulables del ejercicio ÷ 12
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted">
+                  Ingreso neto mensual
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-gf-text">
+                  {formatMXN(bases.taxReturn.monthlyNet)}
+                </p>
+                <p className="mt-1 text-xs text-gf-text-muted">
+                  Utilidad fiscal ÷ 12
+                </p>
+              </div>
+            </div>
+            {taxHasLoss && (
+              <p className="mt-3 text-xs text-gf-danger">{TAX_LOSS_SEND_COPY}</p>
+            )}
+            {!taxHasLoss && taxInvalid && (
+              <p className="mt-3 text-xs text-gf-danger">{taxInvalid}</p>
+            )}
+          </PathCard>
         </div>
+
+        <p className="mt-4 text-xs text-gf-text-muted">
+          Los bancos recibirán el ingreso de {sendingLabel}.
+        </p>
       </Card>
     </div>
   );
