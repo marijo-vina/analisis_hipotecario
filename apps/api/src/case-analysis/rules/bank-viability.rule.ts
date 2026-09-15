@@ -22,6 +22,7 @@ import type {
 } from '../types/bank-viability.types';
 import { completeMonthsBetween } from '../../shared/utils/dates';
 import { matchActivityFactor } from '../activity-factor-match';
+import { pickPrimaryIndependentActivity } from '../../documents/csf-independent-activity';
 import type { PfaeIncomeBases } from '../../income-calculation/income-calculation.types';
 
 const WARNING_LEGEND =
@@ -454,7 +455,10 @@ export class BankViabilityRule implements AnalysisRule {
       const typeCode = (doc.documentType as { code?: string } | undefined)?.code;
       if (typeCode !== 'CSF') continue;
       const ed = (doc.extractedData as Record<string, unknown> | null) ?? {};
-      if (typeof ed.activityStartDate === 'string') {
+      const independent = pickPrimaryIndependentActivity(ed.activities);
+      if (independent?.startDate) {
+        activityStartDate = independent.startDate;
+      } else if (typeof ed.activityStartDate === 'string') {
         activityStartDate = ed.activityStartDate;
       }
       if (!Array.isArray(ed.activities) || ed.activities.length === 0) continue;

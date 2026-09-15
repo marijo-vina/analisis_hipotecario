@@ -118,8 +118,8 @@ describe('TaxReturnExtractionService', () => {
           taxWithheld: 236,
           retainers: [
             {
-              rfc: 'GDF9712054NA',
-              legalName: 'GOBIERNO DE LA CIUDAD DE MEXICO',
+              rfc: 'IMS421231I45',
+              legalName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
               annualIncome: 77079,
               exemptIncome: 16138,
               taxWithheld: 236,
@@ -146,6 +146,10 @@ describe('TaxReturnExtractionService', () => {
       expect(result.salariedIncome?.annualGrossIncome).toBe(77079);
       expect(result.businessOrProfessionalIncome?.totalIncome).toBe(16323);
       expect(result.salariedIncome?.retainers).toHaveLength(1);
+      expect(result.salariedIncome?.retainers?.[0]).toMatchObject({
+        rfc: 'IMS421231I45',
+        legalName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
+      });
 
       const mixedAlert = result.alerts.find((a) => a.code === 'DECLARACION_INGRESOS_MIXTOS');
       expect(mixedAlert).toBeDefined();

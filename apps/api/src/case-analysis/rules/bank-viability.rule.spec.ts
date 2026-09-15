@@ -1496,6 +1496,46 @@ describe('BankViabilityRule', () => {
       expect(checks.employmentTenure.status).toBe('NOT_APPLICABLE');
     });
 
+    it('PFAE tenure prefers independent activity startDate over stored CSF date', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      setupPfae(prisma, {
+        minimumEmploymentTenureMonths: 6,
+        minimumActivityTenureMonths: 24,
+        bank: makeBank({
+          pfaeFactorMode: 'FLAT',
+          pfaeFlatFactor: { toString: () => '0.60' },
+          taxReturnPolicy: 'ACCEPTED',
+        }),
+      });
+
+      const docs = pfaeDocuments({ activityStartDate: '2026-06-01' });
+      const csf = docs.find(
+        (d) => (d.documentType as { code?: string }).code === 'CSF',
+      ) as { extractedData: Record<string, unknown> };
+      csf.extractedData.activities = [
+        {
+          description:
+            'Consultorios de medicina especializada pertenecientes al sector privado',
+          percentage: 70,
+          startDate: '2011-03-01',
+          endDate: null,
+        },
+        {
+          description: 'Asalariado',
+          percentage: 30,
+          startDate: '2019-01-01',
+          endDate: null,
+        },
+      ];
+
+      const result = await rule.execute(defaultContext(), docs);
+      const checks = getBv(result).bankResults[0].checks;
+      expect(checks.activityTenure.status).toBe('PASS');
+      expect(getBv(result).bankResults[0].reasons).not.toContain(
+        'INSUFFICIENT_ACTIVITY_TENURE',
+      );
+    });
+
     it('missing CSF activityStartDate with set tenure policy is REQUIRES_REVIEW', async () => {
       const { rule, prisma } = makeRuleAndMock();
       setupPfae(prisma, {

@@ -184,12 +184,6 @@ export default function DeclaracionTab({ documents }: DeclaracionTabProps) {
                       missing: !satReceipt.taxpayerName,
                     },
                     {
-                      label: "Número de operación",
-                      value: satReceipt.operationNumber ?? undefined,
-                      missing: !satReceipt.operationNumber,
-                      action: satReceipt.operationNumber ? <CopyButton value={satReceipt.operationNumber} /> : undefined,
-                    },
-                    {
                       label: "Tipo de declaración",
                       value: satReceipt.declarationType ?? undefined,
                       missing: !satReceipt.declarationType,
@@ -323,6 +317,27 @@ export default function DeclaracionTab({ documents }: DeclaracionTabProps) {
                       {salariedIncome.exemptIncome != null && (
                         <p className="text-[11px] text-gf-text-muted">
                           Exento: {formatCurrency(salariedIncome.exemptIncome)}
+                        </p>
+                      )}
+                      {salariedIncome.retainers && salariedIncome.retainers.length > 0 ? (
+                        <div className="pt-2 mt-1 border-t border-gf-border/50 space-y-2">
+                          {salariedIncome.retainers.map((retainer, idx) => (
+                            <div key={`${retainer.rfc ?? "retenedor"}-${idx}`} className="space-y-0.5">
+                              <p className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
+                                Retenedor{salariedIncome.retainers && salariedIncome.retainers.length > 1 ? ` ${idx + 1}` : ""}
+                              </p>
+                              <p className="text-xs font-semibold text-gf-text">
+                                {retainer.legalName ?? "Nombre no detectado"}
+                              </p>
+                              <p className="text-[11px] text-gf-text-muted font-mono">
+                                RFC: {retainer.rfc ?? "—"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-gf-text-muted pt-1">
+                          Retenedor no detectado
                         </p>
                       )}
                     </div>

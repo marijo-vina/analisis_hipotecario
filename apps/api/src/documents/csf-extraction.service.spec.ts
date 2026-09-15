@@ -121,7 +121,7 @@ describe('CsfExtractionService', () => {
       expect(result.taxpayer.rfc).toBe('PEGJ800101AB1');
       expect(result.taxpayer.curp).toBe('PEGJ800101HDFRRN09');
       expect(result.taxpayer.fullName).toBe('JUAN PEREZ GARCIA');
-      expect(result.activityStartDate).toBe('2003-10-01');
+      expect(result.activityStartDate).toBe('2011-03-01');
       expect(result.hasSalariedRegime).toBe(true);
       expect(result.hasIndependentRegime).toBe(true);
       expect(result.isSolelySalaried).toBe(false);
@@ -131,6 +131,31 @@ describe('CsfExtractionService', () => {
       const mixedAlert = result.alerts.find((a) => a.code === 'REGIMEN_SUELDOS_Y_SALARIOS_AVISO_MIXTO');
       expect(mixedAlert).toBeDefined();
       expect(mixedAlert?.severity).toBe('INFO');
+    });
+
+    it('does not use the independent tax-regime start date for arraigo', () => {
+      const rawData = {
+        taxpayer: { rfc: 'TEST900101XYZ', fullName: 'JUAN PEREZ' },
+        activities: [
+          {
+            description: 'Servicios profesionales',
+            percentage: 100,
+            startDate: '2018-05-01',
+            endDate: null,
+          },
+        ],
+        regimes: [
+          {
+            description:
+              'Régimen de las Personas Físicas con Actividades Empresariales y Profesionales',
+            startDate: '2003-10-01',
+            endDate: null,
+          },
+        ],
+      };
+
+      const result = service.postProcessCsf(rawData);
+      expect(result.activityStartDate).toBe('2018-05-01');
     });
 
     it('should generate VIGENCIA_MAYOR_3_MESES alert for old CSF', () => {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
+import { pickPrimaryIndependentActivity } from './csf-independent-activity';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger CSF extraction
@@ -394,25 +395,10 @@ export class CsfExtractionService {
     const isSolelySalaried = hasSalariedRegime && !hasIndependentRegime;
 
     // 4. Compute Activity Start Date & Tenure (Arraigo)
-    // Priority: Active independent regime start date -> active independent activity start date -> operationsStartDate
-    let activityStartDate: string | null = null;
-
-    const activeIndRegime = regimes.find((r) =>
-      /actividades empresariales|servicios profesionales|profesionales|resico|simplificado de confianza|arrendamiento|honorarios/i.test(
-        r.description,
-      ) && !r.endDate && r.startDate,
-    );
-
-    if (activeIndRegime?.startDate) {
-      activityStartDate = activeIndRegime.startDate;
-    } else {
-      const activeIndActivity = activities.find((a) => !/asalariado|sueldos/i.test(a.description) && !a.endDate && a.startDate);
-      if (activeIndActivity?.startDate) {
-        activityStartDate = activeIndActivity.startDate;
-      } else {
-        activityStartDate = operationsStartDate;
-      }
-    }
+    // Use the primary independent *economic activity* start date — never the
+    // tax-regime row (e.g. PFAE regime 2003-10-01 vs consultorio 2011-03-01).
+    const activityStartDate =
+      pickPrimaryIndependentActivity(activities)?.startDate ?? null;
 
     const tenureMonths = activityStartDate ? this.computeMonthsSince(activityStartDate) : null;
 
