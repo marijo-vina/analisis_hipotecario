@@ -7,7 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
-import { Sparkles, Loader2, FolderPlus, FileCheck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, FolderPlus, FileCheck, AlertTriangle } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -19,8 +19,6 @@ import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
-import PfaeValidationGates from "@/app/ui/expedientes/pfae-validation-gates";
-
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
@@ -544,21 +542,6 @@ function ValidacionesTab({
           personType={personType}
         />
       </section>
-
-      {isPFAE && (
-        <section>
-          <h3 className="text-sm font-semibold text-gf-text mb-3">
-            Validaciones PFAE
-          </h3>
-          <PfaeValidationGates
-            run={
-              state.phase === "result" || state.phase === "observations"
-                ? state.run
-                : undefined
-            }
-          />
-        </section>
-      )}
 
       {/* ── B) Conciliación nómina vs banco — no aplica para PFAE (sin nómina) ── */}
       {!isPFAE && (

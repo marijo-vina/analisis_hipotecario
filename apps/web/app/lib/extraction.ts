@@ -1748,6 +1748,42 @@ export interface ParsedCsf {
   alerts: ExtractionAlert[];
 }
 
+function isSalariedCsfActivity(description: string): boolean {
+  return /asalariado|sueldos/i.test(description);
+}
+
+function pickIndependentActivityStartDate(
+  activities: ParsedCsf["activities"],
+): string | null {
+  const independent = activities.filter(
+    (activity) =>
+      activity.endDate == null &&
+      activity.startDate &&
+      activity.description &&
+      !isSalariedCsfActivity(activity.description),
+  );
+  if (independent.length === 0) return null;
+  independent.sort((a, b) => {
+    const pctA = a.percentage ?? -1;
+    const pctB = b.percentage ?? -1;
+    if (pctB !== pctA) return pctB - pctA;
+    const orderA = a.order ?? 999;
+    const orderB = b.order ?? 999;
+    return orderA - orderB;
+  });
+  return independent[0].startDate;
+}
+
+function monthsSinceYearMonth(iso: string): number | null {
+  const match = /^(\d{4})-(\d{2})/.exec(iso.trim());
+  if (!match) return null;
+  const now = new Date();
+  const total =
+    (now.getFullYear() - Number(match[1])) * 12 +
+    (now.getMonth() + 1 - Number(match[2]));
+  return Math.max(0, total);
+}
+
 export function parseCsf(doc: Document): ParsedCsf | null {
   if (!doc) return null;
   const ed = doc.extractedData as Record<string, unknown> | null;
@@ -1781,6 +1817,15 @@ export function parseCsf(doc: Document): ParsedCsf | null {
 
   const street = [fa.streetType, fa.streetName, fa.exteriorNumber, fa.interiorNumber].filter(Boolean).join(" ").trim() || null;
 
+  const independentStart = pickIndependentActivityStartDate(activities);
+  const activityStartDate =
+    independentStart ?? (ed.activityStartDate as string) ?? null;
+  const tenureMonths = independentStart
+    ? (monthsSinceYearMonth(independentStart) ??
+      (ed.tenureMonths as number) ??
+      null)
+    : ((ed.tenureMonths as number) ?? null);
+
   return {
     documentId: doc.id,
     originalName: doc.originalName,
@@ -1811,8 +1856,8 @@ export function parseCsf(doc: Document): ParsedCsf | null {
     },
     activities,
     regimes,
-    activityStartDate: (ed.activityStartDate as string) ?? null,
-    tenureMonths: (ed.tenureMonths as number) ?? null,
+    activityStartDate,
+    tenureMonths,
     hasSalariedRegime: ed.hasSalariedRegime === true,
     hasIndependentRegime: ed.hasIndependentRegime === true,
     isSolelySalaried: ed.isSolelySalaried === true,
