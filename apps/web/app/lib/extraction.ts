@@ -1160,6 +1160,8 @@ export interface CreditAuditFields {
 export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueGuardrailFields, PaymentDueAmountTriple {
   institution: string | null;
   creditType: string | null;
+  /** Stored full account number — UI must mask as **** + last 4. */
+  accountNumber: string | null;
   classification: string;
   status: string;
   currentBalance: number | null;
@@ -1457,6 +1459,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     credits.push({
       institution: (credit.institution as string) ?? null,
       creditType: (credit.creditType as string) ?? null,
+      accountNumber: (credit.accountNumber as string) ?? null,
       classification,
       status,
       currentBalance: (credit.currentBalance as number) ?? null,

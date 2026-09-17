@@ -199,8 +199,7 @@ function parseCurrency(text: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-export function extractInstitutionFromLine(line: OcrLine): { institution: string | null; accountNumber: string | null } {
-  const text = line.text;
+export function parseInstitutionAndAccount(text: string): { institution: string | null; accountNumber: string | null } {
   if (!text) return { institution: null, accountNumber: null };
   const digitMatches = [...text.matchAll(/\d+/g)];
   let accountNumber: string | null = null, bestLen = 0;
@@ -211,6 +210,10 @@ export function extractInstitutionFromLine(line: OcrLine): { institution: string
     institution = text.slice(0, idx).replace(/[*.,;:]+$/g, '').trim() || null;
   } else { institution = text.replace(/[*]/g, '').trim() || null; }
   return { institution, accountNumber };
+}
+
+export function extractInstitutionFromLine(line: OcrLine): { institution: string | null; accountNumber: string | null } {
+  return parseInstitutionAndAccount(line.text);
 }
 
 export function extractPaymentFromLine(line: OcrLine): { paymentDueAmount: number | null; confidence: FinancialFieldsConfidence } {

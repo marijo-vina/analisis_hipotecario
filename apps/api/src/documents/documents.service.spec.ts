@@ -924,6 +924,47 @@ describe('DocumentsService', () => {
       expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
     });
 
+    it('should skip Document AI for CREDIT_BUREAU_REPORT when OCR text already exists', async () => {
+      const bureauDoc = {
+        ...mockDocument,
+        ocrText: 'BURÓ DE CRÉDITO\nScore: 685',
+        documentType: {
+          id: 3,
+          code: 'CREDIT_BUREAU_REPORT',
+          name: 'Buró de crédito',
+          isActive: true,
+        },
+        documentStatusId: mockOcrErrorStatus.id,
+        documentStatus: mockOcrErrorStatus,
+        processingError: 'Document processing service unavailable',
+      };
+
+      mockPrismaService.document.findUnique.mockResolvedValue(bureauDoc);
+      mockPrismaService.documentStatus.findUnique.mockImplementation(
+        (args: { where: { code: string } }) => {
+          const statusMap: Record<string, typeof mockProcessingStatus> = {
+            PROCESSING: mockProcessingStatus,
+            PROCESSED: mockProcessedStatus,
+            ERROR: mockErrorStatus,
+            OCR_ERROR: mockOcrErrorStatus,
+          };
+          return Promise.resolve(statusMap[args.where.code] || null);
+        },
+      );
+      mockPrismaService.document.update.mockResolvedValue({
+        ...bureauDoc,
+        documentStatusId: mockProcessedStatus.id,
+        documentStatus: mockProcessedStatus,
+        processingError: null,
+      });
+
+      const result = await service.processDocument(caseId, documentId, true);
+
+      expect(mockDocumentAiService.extractTextWithLayout).not.toHaveBeenCalled();
+      expect(result.documentStatus.code).toBe('PROCESSED');
+      expect(result.ocrText).toBe('BURÓ DE CRÉDITO\nScore: 685');
+    });
+
     it('should bypass PROCESSED gate when force=true and proceed to processing (Task 3.1)', async () => {
       const processedDoc = {
         ...mockDocument,

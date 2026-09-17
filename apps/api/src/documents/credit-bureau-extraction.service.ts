@@ -5,6 +5,7 @@ import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { GcsService } from './gcs.service';
+import { parseInstitutionAndAccount } from './layout-lines-extractor';
 import {
   CoordinateCredit,
   CoordinateExtractionResult,
@@ -914,9 +915,16 @@ export class CreditBureauExtractionService {
       throw new Error('Document not found');
     }
 
-    // ── 2. Status gate: allow PROCESSED and EXTRACTION_ERROR (retry) ──
+    // ── 2. Status gate: allow extract when OCR already ran (incl. OCR_ERROR) ──
     const statusCode = document.documentStatus.code;
-    if (statusCode !== 'PROCESSED' && statusCode !== 'EXTRACTION_ERROR') {
+    const extractableStatuses = new Set([
+      'PROCESSED',
+      'DATA_EXTRACTED',
+      'EXTRACTION_ERROR',
+      'OCR_ERROR',
+      'ERROR',
+    ]);
+    if (!extractableStatuses.has(statusCode)) {
       return {
         success: false,
         documentId,
@@ -1075,6 +1083,54 @@ export class CreditBureauExtractionService {
       this.logger.warn(
         `[CreditBureau] Gemini extraction failed for doc ${documentId}: ${geminiResult.error?.code}`,
       );
+
+      const stored = document.extractedData as Record<string, unknown> | null;
+      if (
+        stored &&
+        typeof stored === 'object' &&
+        Array.isArray(stored.credits) &&
+        stored.credits.length > 0
+      ) {
+        this.logger.warn(
+          `[CreditBureau] Gemini unavailable; enriching stored extraction for doc ${documentId}`,
+        );
+        const data = JSON.parse(JSON.stringify(stored)) as Record<
+          string,
+          unknown
+        >;
+        this.copyLayoutAccountNumbers(data, ocrLayout);
+        this.copyAccountNumbersFromOcrText(data, document.ocrText);
+        if (coordinateResult) {
+          this.mergeCoordinateResults(data, coordinateResult);
+        }
+        if (deterministicInquiryCount !== null) {
+          const reportData = (data.report ?? {}) as Record<string, unknown>;
+          reportData.numberOfInquiries = deterministicInquiryCount;
+          data.report = reportData;
+        }
+        this.normalizeCreditBureau(data);
+        data.alerts = this.computeAlerts(data);
+        const missingFields = this.computeMissingFields(data);
+        data.alerts = this.normalizeAlerts(
+          (data.alerts as ExtractionAlert[]) ?? [],
+        );
+
+        await this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            extractedData: data as any,
+            documentStatusId: processedStatus.id,
+          },
+        });
+
+        return {
+          success: true,
+          documentId,
+          extractedData: data,
+          alerts: data.alerts as ExtractionAlert[],
+          missingFields,
+        };
+      }
 
       try {
         await this.prisma.document.update({
@@ -1307,6 +1363,164 @@ export class CreditBureauExtractionService {
   }
 
   /**
+   * Copy layout account numbers onto stored Gemini credits without applying
+   * payment-due authority. Used when Vertex/Gemini is down so last-4 can
+   * still persist from `ocrLayout`.
+   */
+  private copyLayoutAccountNumbers(
+    data: Record<string, unknown>,
+    ocrLayout: OcrLayout | null,
+  ): void {
+    if (!ocrLayout?.pages?.length) return;
+
+    let layoutResult: LayoutFinancialResult;
+    try {
+      layoutResult = this.layoutExtractor.extract(ocrLayout);
+    } catch (err) {
+      this.logger.warn(
+        `[CreditBureau] Layout extractor threw while copying account numbers: ${(err as Error).message}`,
+      );
+      return;
+    }
+
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(credits) || layoutResult.credits.length === 0) return;
+
+    const institutionQueues = new Map<string, number[]>();
+    for (let i = 0; i < layoutResult.credits.length; i++) {
+      const inst = layoutResult.credits[i].institution
+        ?.toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!inst) continue;
+      if (!institutionQueues.has(inst)) institutionQueues.set(inst, []);
+      institutionQueues.get(inst)!.push(i);
+    }
+    const institutionConsumed = new Map<string, number>();
+    const claimed = new Set<number>();
+
+    for (const credit of credits) {
+      const gInst = String(credit.institution ?? '')
+        .toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+      let matchIdx = -1;
+
+      if (gInst && institutionQueues.has(gInst)) {
+        const queue = institutionQueues.get(gInst)!;
+        const consumed = institutionConsumed.get(gInst) ?? 0;
+        for (let q = consumed; q < queue.length; q++) {
+          if (!claimed.has(queue[q])) {
+            matchIdx = queue[q];
+            institutionConsumed.set(gInst, q + 1);
+            break;
+          }
+        }
+      }
+
+      if (matchIdx === -1) {
+        const geminiPos = credits.indexOf(credit);
+        const unclaimed = layoutResult.credits
+          .map((_, i) => i)
+          .filter((i) => !claimed.has(i));
+        if (geminiPos < unclaimed.length) {
+          matchIdx = unclaimed[geminiPos];
+        }
+      }
+
+      if (matchIdx === -1) continue;
+      claimed.add(matchIdx);
+      const accountNumber = layoutResult.credits[matchIdx].accountNumber;
+      if (accountNumber) {
+        credit.accountNumber = accountNumber;
+      }
+    }
+  }
+
+  /**
+   * When Document AI layout is missing, parse institution lines from raw
+   * OCR text and copy ≥6-digit account numbers onto stored credits.
+   * Mexican bureau PDFs print the issuer on one line and the account on the next.
+   */
+  private copyAccountNumbersFromOcrText(
+    data: Record<string, unknown>,
+    ocrText: string | null,
+  ): void {
+    if (!ocrText?.trim()) return;
+    const credits = data.credits as Record<string, unknown>[] | undefined;
+    if (!Array.isArray(credits) || credits.length === 0) return;
+
+    const lines = ocrText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    const candidates: { institution: string; accountNumber: string }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const sameLine = parseInstitutionAndAccount(lines[i]);
+      if (sameLine.institution && sameLine.accountNumber) {
+        candidates.push({
+          institution: sameLine.institution,
+          accountNumber: sameLine.accountNumber,
+        });
+        continue;
+      }
+
+      const accountNumber =
+        CreditBureauExtractionService.looksLikeAccountNumber(lines[i]);
+      if (!accountNumber) continue;
+      for (let back = 1; back <= 2; back++) {
+        const prev = lines[i - back];
+        if (!prev) break;
+        if (
+          credits.some((credit) =>
+            CreditBureauExtractionService.institutionsLooselyMatch(
+              String(credit.institution ?? ''),
+              prev,
+            ),
+          )
+        ) {
+          candidates.push({ institution: prev, accountNumber });
+          break;
+        }
+      }
+    }
+    if (candidates.length === 0) return;
+
+    const claimed = new Set<number>();
+    for (const credit of credits) {
+      if (credit.accountNumber) continue;
+      const creditInst = String(credit.institution ?? '');
+      const matchIdx = candidates.findIndex(
+        (candidate, idx) =>
+          !claimed.has(idx) &&
+          CreditBureauExtractionService.institutionsLooselyMatch(
+            creditInst,
+            candidate.institution,
+          ),
+      );
+      if (matchIdx === -1) continue;
+      claimed.add(matchIdx);
+      credit.accountNumber = candidates[matchIdx].accountNumber;
+    }
+  }
+
+  private static looksLikeAccountNumber(text: string): string | null {
+    if (/^\d{6,}$/.test(text)) return text;
+    const masked = text.match(/^(\d{4,}\*+\d{4})$/);
+    return masked ? masked[1] : null;
+  }
+
+  private static institutionsLooselyMatch(
+    creditInst: string,
+    lineInst: string,
+  ): boolean {
+    const a = CreditBureauExtractionService.normInstitution(creditInst);
+    const b = CreditBureauExtractionService.normInstitution(lineInst);
+    return Boolean(a && b && a === b);
+  }
+
+  /**
    * Run the layout extractor + merge when the feature flag is on and the
    * document has an `ocrLayout`. Otherwise no-op (current behavior).
    */
@@ -1480,6 +1694,9 @@ export class CreditBureauExtractionService {
       claimed.add(matchIdx);
 
       const lc = layoutCredits[matchIdx];
+      if (lc.accountNumber) {
+        credit.accountNumber = lc.accountNumber;
+      }
       const fieldConfidence = layoutConfidence[matchIdx] as FinancialFieldsConfidenceMap;
       if (usedFallback) {
         warnings.push(
@@ -1680,6 +1897,10 @@ export class CreditBureauExtractionService {
 
       claimed.add(matchIdx);
       const cc = coordCredits[matchIdx];
+
+      if (cc.accountNumber && !credit.accountNumber) {
+        credit.accountNumber = cc.accountNumber;
+      }
 
       // BAND_MATCH → authoritative: overwrite Gemini's paymentDueAmount.
       // RESCUE / UNCONFIRMED → defer to Gemini, do nothing.

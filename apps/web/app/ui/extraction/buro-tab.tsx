@@ -22,6 +22,14 @@ import {
   type ParsedCreditBureauCredit,
 } from "@/app/lib/extraction";
 import {
+  computeGlobalUtilization,
+  computeRowUtilization,
+  maskLastFour,
+  UTILIZATION_BANDS,
+  type UtilizationBand,
+  type UtilizationBandId,
+} from "@/app/lib/bureau-utilization";
+import {
   updatePaymentDueManual,
   updateInquiries24mManual,
 } from "@/app/actions/documents";
@@ -118,6 +126,60 @@ function formatWithCommas(value: string): string {
   const digits = value.replace(/\D/g, "");
   if (digits === "") return "";
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function utilizationChipClasses(bandId: UtilizationBandId): {
+  chipBg: string;
+  chipText: string;
+} {
+  switch (bandId) {
+    case "excelente":
+      return {
+        chipBg: "bg-emerald-50 border-emerald-200",
+        chipText: "text-emerald-700",
+      };
+    case "muy_buena":
+      return {
+        chipBg: "bg-green-50 border-green-200",
+        chipText: "text-green-700",
+      };
+    case "aceptable":
+      return {
+        chipBg: "bg-amber-50 border-amber-200",
+        chipText: "text-amber-700",
+      };
+    case "atencion":
+      return {
+        chipBg: "bg-orange-50 border-orange-200",
+        chipText: "text-orange-700",
+      };
+    case "critico":
+      return {
+        chipBg: "bg-red-50 border-red-200",
+        chipText: "text-red-700",
+      };
+    case "muy_critico":
+      return {
+        chipBg: "bg-red-100 border-red-300",
+        chipText: "text-red-800",
+      };
+  }
+}
+
+function UtilizationChip({ band }: { band: UtilizationBand }) {
+  const { chipBg, chipText } = utilizationChipClasses(band.id);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${chipBg} ${chipText}`}
+    >
+      {band.label}
+    </span>
+  );
+}
+
+function utilizationRangeLabel(band: UtilizationBand): string {
+  if (band.maxPercent == null) return `${band.minPercent}%+`;
+  return `${band.minPercent}–${band.maxPercent}%`;
 }
 
 // ---------------------------------------------------------------------------
@@ -444,9 +506,10 @@ function KpiRow({
     score != null && !parsed.scoreIsExcluded ? scoreBand(score) : null;
   const inquiriesEffective =
     parsed.inquiries24mEffective ?? parsed.numberOfInquiries;
+  const globalUtil = computeGlobalUtilization(parsed.credits);
 
   return (
-    <div className="bg-white border border-gf-border rounded-xl shadow-2xs overflow-hidden grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gf-border">
+    <div className="bg-white border border-gf-border rounded-xl shadow-2xs overflow-hidden grid grid-cols-1 sm:grid-cols-4 xl:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-gf-border">
       <div className="p-4 flex flex-col justify-between">
         <div className="text-2xl font-bold text-gf-text">
           {scoreIsNull ? "—" : score}
@@ -494,6 +557,22 @@ function KpiRow({
         documentId={parsed.documentId}
         onSave={onInquiriesUpdate}
       />
+
+      <div className="p-4 flex flex-col justify-between">
+        <div className="text-2xl font-bold text-gf-text">{globalUtil.display}</div>
+        <div>
+          <div className="text-xs font-bold text-gf-text-muted tracking-wider uppercase">
+            Utilización
+          </div>
+          <div className="text-xs text-gf-text-muted mt-0.5">
+            {globalUtil.band ? (
+              <UtilizationChip band={globalUtil.band} />
+            ) : (
+              "No disponible"
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -654,6 +733,8 @@ function CreditRow({
 
   const effectiveForDisplay =
     credit.paymentDueAmountEffective ?? credit.paymentDueAmount ?? null;
+  const utilization = computeRowUtilization(credit);
+  const lastFour = maskLastFour(credit);
 
   async function handleSave() {
     const parsed = parseFloat(editValue.replace(/,/g, ""));
@@ -693,7 +774,12 @@ function CreditRow({
 
       {/* Institución */}
       <td className="px-2.5 py-2.5 font-semibold text-gf-text">
-        {credit.institution ?? "—"}
+        <div>{credit.institution ?? "—"}</div>
+        {lastFour !== "—" && (
+          <div className="text-[10px] font-mono font-medium text-gf-text-muted tracking-wide">
+            {lastFour}
+          </div>
+        )}
       </td>
 
       {/* Tipo de crédito */}
@@ -772,6 +858,20 @@ function CreditRow({
         {formatMxn(credit.creditLimit)}
       </td>
 
+      {/* Utilización */}
+      <td className="px-2.5 py-2.5 text-right">
+        {utilization.percent == null || utilization.band == null ? (
+          <span className="text-gf-text-muted font-mono text-xs">—</span>
+        ) : (
+          <div className="inline-flex items-center justify-end gap-1.5">
+            <span className="font-mono text-xs font-medium text-gf-text">
+              {utilization.display}
+            </span>
+            <UtilizationChip band={utilization.band} />
+          </div>
+        )}
+      </td>
+
       {/* Comportamiento MOP (Carita + Globo) */}
       <td className="px-2.5 py-2.5 text-center">
         <MopBehaviorBadge credit={credit} />
@@ -827,6 +927,7 @@ function CreditTableSection({
               <th className="px-2.5 py-2.5 text-right">Saldo actual</th>
               <th className="px-2.5 py-2.5 text-right">Monto a pagar</th>
               <th className="px-2.5 py-2.5 text-right">Límite / crédito</th>
+              <th className="px-2.5 py-2.5 text-right">Utilización</th>
               <th className="px-2.5 py-2.5 text-center">Comportamiento</th>
             </tr>
           </thead>
@@ -889,6 +990,28 @@ function CreditsTable({
 // ---------------------------------------------------------------------------
 // 6. Leyenda de Comportamiento MOP (Sidebar)
 // ---------------------------------------------------------------------------
+
+function BuroUtilizationLegend() {
+  return (
+    <div className="bg-white border border-gf-border rounded-xl p-5 shadow-2xs space-y-3">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-gf-text-muted">
+        Utilización de crédito
+      </h4>
+      <p className="text-xs text-gf-text-muted leading-relaxed">
+        Porcentaje de saldo sobre límite en tarjetas revolventes abiertas. Cuentas cerradas o fuera de alcance muestran —.
+      </p>
+
+      <div className="space-y-2.5 pt-1 text-xs font-semibold">
+        {UTILIZATION_BANDS.map((band) => (
+          <div key={band.id} className="flex items-center gap-2.5">
+            <UtilizationChip band={band} />
+            <span className="text-gf-text">{utilizationRangeLabel(band)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function BuroBehaviorLegend() {
   return (
@@ -1109,6 +1232,7 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
           <BorrowerInfoCard parsed={parsed} />
           <CompactAlerts parsed={parsed} />
           <BuroBehaviorLegend />
+          <BuroUtilizationLegend />
         </div>
       </div>
     </div>
