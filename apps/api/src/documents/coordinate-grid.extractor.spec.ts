@@ -9,8 +9,10 @@ import {
   mapStatusCode,
   findNearestBandFallback,
   groupIntoBlocks,
+  extractBlockValues,
   type ColumnBand,
   type GridRow,
+  type CreditBlock,
 } from './coordinate-grid.extractor';
 import { CoordinateWord, CoordinateCredit, SummaryEntry } from './coordinate-extraction.types';
 import { PaymentDueAmountSource } from './document-ai.types';
@@ -386,6 +388,46 @@ describe('extractFromCoordinateWords', () => {
         expect(telcel).toBeDefined();
         // Summary has only 1 entry → TELCEL (block #2) keeps UNKNOWN (no summary to merge).
         expect(telcel!.status).toBe('UNKNOWN');
+      });
+    });
+
+    describe('extractBlockValues accountNumber from creditorInfo', () => {
+      function makeBlock(institution: string): CreditBlock {
+        return {
+          institution,
+          rows: [{
+            y: 290,
+            pageNum: 1,
+            cells: [{
+              columnName: 'creditorInfo',
+              text: institution,
+              x: 25,
+              y: 290,
+              pageNum: 1,
+            }],
+          }],
+          pageNum: 1,
+          yStart: 290,
+          yEnd: 290,
+        };
+      }
+
+      it('parses a ≥6-digit run from creditorInfo into accountNumber and strips it from institution', () => {
+        const { credit } = extractBlockValues(makeBlock('SANTANDER 82953660'), []);
+        expect(credit.accountNumber).toBe('82953660');
+        expect(credit.institution).toBe('SANTANDER');
+      });
+
+      it('sets accountNumber null when creditorInfo has no usable digit run', () => {
+        const { credit } = extractBlockValues(makeBlock('SANTANDER'), []);
+        expect(credit.accountNumber).toBeNull();
+        expect(credit.institution).toBe('SANTANDER');
+      });
+
+      it('does not treat a 5-digit run as accountNumber', () => {
+        const { credit } = extractBlockValues(makeBlock('SANTANDER 12345'), []);
+        expect(credit.accountNumber).toBeNull();
+        expect(credit.institution).toBe('SANTANDER 12345');
       });
     });
   });

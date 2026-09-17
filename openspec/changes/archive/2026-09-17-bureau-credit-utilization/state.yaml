@@ -1,0 +1,19 @@
+change: bureau-credit-utilization
+status: archived
+artifact_store: hybrid
+execution_mode: interactive
+delivery_strategy: ask-on-risk
+chain_strategy: feature-branch-chain
+branch: feature/bureau-credit-utilization
+created: 2026-09-15
+archived: 2026-09-17
+verify_verdict: PASS WITH WARNINGS
+phases:
+  explore: done
+  proposal: done
+  spec: done
+  design: done
+  tasks: done
+  apply: done
+  verify: done
+  archive: done
