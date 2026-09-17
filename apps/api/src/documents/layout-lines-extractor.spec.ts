@@ -3,7 +3,7 @@
 // detectHeaderFromLines.
 // ===========================================================================
 
-import { classifyLine, CreditBlock, detectHeaderFromLines, filterDetailLines, groupLinesIntoBlocks, LineType } from './layout-lines-extractor';
+import { classifyLine, detectHeaderFromLines, extractInstitutionFromLine, filterDetailLines, groupLinesIntoBlocks, LineType, parseInstitutionAndAccount } from './layout-lines-extractor';
 import { OcrLine } from './document-ai.types';
 
 function makeLine(text: string, top = 0): OcrLine {
@@ -51,4 +51,43 @@ describe('detectHeaderFromLines', () => {
   it('null for empty', () => { expect(detectHeaderFromLines([])).toBeNull(); });
   it('finds header', () => { expect(detectHeaderFromLines([makeLine('Saldo Límite Monto a Pagar')])).not.toBeNull(); });
   it('null when none', () => { expect(detectHeaderFromLines([makeLine('SANTANDER')])).toBeNull(); });
+});
+
+describe('parseInstitutionAndAccount', () => {
+  it('parses a ≥6-digit run as accountNumber and strips it from institution', () => {
+    expect(parseInstitutionAndAccount('SANTANDER 10002030')).toEqual({
+      institution: 'SANTANDER',
+      accountNumber: '10002030',
+    });
+  });
+
+  it('returns accountNumber null when the longest digit run is shorter than 6', () => {
+    expect(parseInstitutionAndAccount('SANTANDER 12345')).toEqual({
+      institution: 'SANTANDER 12345',
+      accountNumber: null,
+    });
+  });
+
+  it('picks the longest ≥6-digit run when several are present', () => {
+    expect(parseInstitutionAndAccount('BBVA 123456 10002030')).toEqual({
+      institution: 'BBVA 123456',
+      accountNumber: '10002030',
+    });
+  });
+
+  it('returns nulls for empty text', () => {
+    expect(parseInstitutionAndAccount('')).toEqual({
+      institution: null,
+      accountNumber: null,
+    });
+  });
+});
+
+describe('extractInstitutionFromLine', () => {
+  it('delegates to parseInstitutionAndAccount for the line text', () => {
+    const line = makeLine('SANTANDER 10002030');
+    expect(extractInstitutionFromLine(line)).toEqual(
+      parseInstitutionAndAccount(line.text),
+    );
+  });
 });
