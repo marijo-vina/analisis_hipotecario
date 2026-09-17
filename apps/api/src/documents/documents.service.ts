@@ -220,6 +220,34 @@ export class DocumentsService {
       throw new BadRequestException('Document has already been processed');
     }
 
+    // Bureau reports already OCR'd: never re-call Document AI (force or
+    // OCR_ERROR retries were 502ing). Extraction can reuse stored ocrText.
+    const existingOcr =
+      typeof document.ocrText === 'string' ? document.ocrText.trim() : '';
+    if (
+      document.documentType?.code === 'CREDIT_BUREAU_REPORT' &&
+      existingOcr.length > 0
+    ) {
+      this.logger.log(
+        `[OcrSkip] CREDIT_BUREAU_REPORT ${documentId} already has OCR text; skipping Document AI`,
+      );
+      if (
+        document.documentStatus.code === 'OCR_ERROR' ||
+        document.documentStatus.code === 'ERROR'
+      ) {
+        const processedStatusId = await this.resolveStatusId('PROCESSED');
+        return this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            documentStatusId: processedStatusId,
+            processingError: null,
+          },
+          include: DOCUMENT_INCLUDE,
+        });
+      }
+      return document;
+    }
+
     // 3. Metadata guard: reject null fileUrl or mimeType
     if (!document.fileUrl) {
       throw new BadRequestException('Document has no file to process');

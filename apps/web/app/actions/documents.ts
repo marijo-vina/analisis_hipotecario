@@ -279,6 +279,7 @@ export async function extractCreditBureau(
         requiresManualReview: boolean;
       }>;
       missingFields: string[];
+      error?: { code?: string; message?: string };
     };
   }>(
     `/mortgage-cases/${caseId}/documents/${documentId}/extract-bureau`,
@@ -288,6 +289,20 @@ export async function extractCreditBureau(
   if (!result.ok) {
     throw new Error(
       result.errors._form ??
+        "Error al extraer datos del buró de crédito",
+    );
+  }
+
+  if (!result.data.data.success) {
+    throw new Error(
+      result.data.data.error?.message ??
+        "Error al extraer datos del buró de crédito",
+    );
+  }
+
+  if (!result.data.data.success) {
+    throw new Error(
+      result.data.data.error?.message ??
         "Error al extraer datos del buró de crédito",
     );
   }

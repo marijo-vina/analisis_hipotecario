@@ -103,13 +103,24 @@ export default function DocumentActions({
     setProcessLoading(true);
     setProcessError(null);
     try {
+      const statusCode = document.documentStatus.code;
       const needsForce =
-        document.documentStatus.code === "PROCESSED" ||
-        document.documentStatus.code === "OCR_ERROR" ||
-        document.documentStatus.code === "ERROR";
+        statusCode === "PROCESSED" ||
+        statusCode === "DATA_EXTRACTED" ||
+        statusCode === "OCR_ERROR" ||
+        statusCode === "ERROR" ||
+        statusCode === "EXTRACTION_ERROR";
 
-      // Step 1: OCR
-      await processDocument(caseId, document.id, needsForce);
+      // Bureau already OCR'd (including OCR_ERROR after a failed re-OCR):
+      // skip Document AI and only re-run extraction so last-4 can persist.
+      const skipBureauOcr =
+        document.documentType.code === "CREDIT_BUREAU_REPORT" &&
+        statusCode !== "UPLOADED" &&
+        statusCode !== "PROCESSING";
+
+      if (!skipBureauOcr) {
+        await processDocument(caseId, document.id, needsForce);
+      }
 
       // Step 2: AI extraction for eligible document types
       if (document.documentType.code === "INE") {
@@ -147,7 +158,9 @@ export default function DocumentActions({
           await extractCreditBureau(caseId, document.id);
         } catch {
           setProcessError(
-            "OCR completado, pero la extracción del buró de crédito falló. Puede intentar reprocesar.",
+            skipBureauOcr
+              ? "No se pudo reextraer el buró. Intente de nuevo."
+              : "OCR completado, pero la extracción del buró de crédito falló. Puede intentar reprocesar.",
           );
         }
       }
@@ -192,7 +205,13 @@ export default function DocumentActions({
     } finally {
       setProcessLoading(false);
     }
-  }, [caseId, document.id, document.documentType.code, router]);
+  }, [
+    caseId,
+    document.id,
+    document.documentType.code,
+    document.documentStatus.code,
+    router,
+  ]);
 
   // ── Visibility ───────────────────────────────────────────────────────
   const statusCode = document.documentStatus.code;

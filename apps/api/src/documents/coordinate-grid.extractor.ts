@@ -15,6 +15,7 @@ import {
   SummaryEntry,
 } from './coordinate-extraction.types';
 import { PaymentDueAmountSource } from './document-ai.types';
+import { parseInstitutionAndAccount } from './layout-lines-extractor';
 
 // ── Defaults ───────────────────────────────────────────────────────────────
 
@@ -519,11 +520,12 @@ export function groupIntoBlocks(rows: GridRow[]): CreditBlock[] {
 
 // ── Stage 7: Extract financial values per block ────────────────────────────
 
-function extractBlockValues(block: CreditBlock, bands: ColumnBand[]): { credit: CoordinateCredit; warnings: string[] } {
+export function extractBlockValues(block: CreditBlock, bands: ColumnBand[]): { credit: CoordinateCredit; warnings: string[] } {
   const warnings: string[] = [];
+  const parsed = parseInstitutionAndAccount(block.institution);
   const credit: CoordinateCredit = {
-    institution: block.institution,
-    accountNumber: null,
+    institution: parsed.institution ?? block.institution,
+    accountNumber: parsed.accountNumber,
     creditType: null,
     paymentType: null,
     creditLimit: '', maxCredit: '', currentBalance: '', pastDueAmount: '', lastPaymentAmount: '', paymentDueAmount: '',
