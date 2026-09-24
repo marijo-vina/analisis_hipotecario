@@ -153,7 +153,6 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
                   className={INPUT_CLASS}
                 >
                   <option value="SALARIED">Asalariado</option>
-                  <option value="NON_SALARIED">No asalariado</option>
                   <option value="PFAE">Persona Física con Actividad Empresarial (PFAE)</option>
                   <option value="MORAL">Persona Moral</option>
                 </select>

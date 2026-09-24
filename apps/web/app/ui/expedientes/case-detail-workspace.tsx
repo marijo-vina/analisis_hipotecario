@@ -37,7 +37,6 @@ interface CaseDetailWorkspaceProps {
 
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
-  NON_SALARIED: "No asalariado",
   PFAE: "Persona Física con Actividad Empresarial (PFAE)",
   MORAL: "Persona Moral",
 };
