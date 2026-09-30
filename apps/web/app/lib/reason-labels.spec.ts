@@ -13,4 +13,13 @@ describe("reason labels", () => {
       "Giro no susceptible de financiamiento",
     );
   });
+
+  it("maps HSBC_LIQUIDITY_ACTIVITY_RESTRICTED to its Spanish label", () => {
+    expect(REASON_LABELS.HSBC_LIQUIDITY_ACTIVITY_RESTRICTED).toBe(
+      "Giro restringido para liquidez HSBC",
+    );
+    expect(getReasonLabel("HSBC_LIQUIDITY_ACTIVITY_RESTRICTED")).toBe(
+      "Giro restringido para liquidez HSBC",
+    );
+  });
 });

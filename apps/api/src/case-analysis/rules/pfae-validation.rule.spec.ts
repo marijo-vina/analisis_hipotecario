@@ -561,6 +561,64 @@ describe('PfaeValidationRule', () => {
     });
   });
 
+  describe('ACTIVITY_NOT_SUSCEPTIBLE (global exclusion)', () => {
+    const csfWith = (activities: Record<string, unknown>[]) =>
+      doc('CSF', independentCsf({ activities }));
+
+    it('returns FAIL with an ERROR alert on activity that names the matched label', async () => {
+      const result = await rule.execute(pfaeClient(), [
+        csfWith([{ description: 'Partidos políticos', percentage: 100, endDate: null }]),
+      ]);
+
+      expect(result.outcome).toBe('FAIL');
+      expect(result.severity).toBe('ERROR');
+      const alert = result.alerts.find((a) => a.ruleCode === 'ACTIVITY_NOT_SUSCEPTIBLE');
+      expect(alert).toEqual(
+        expect.objectContaining({ severity: 'ERROR', field: 'activity' }),
+      );
+      expect(alert?.message).toContain('Partidos políticos');
+      expect(snapshot(result).activity?.nonSusceptible).toBe('Partidos políticos');
+    });
+
+    it('compares the primary independent activity, skipping a larger salaried row', async () => {
+      const result = await rule.execute(pfaeClient(), [
+        csfWith([
+          { description: 'Sueldos y salarios', percentage: 60, endDate: null },
+          { description: 'Minería de carbón', percentage: 40, endDate: null },
+        ]),
+      ]);
+
+      expect(result.outcome).toBe('FAIL');
+      expect(result.alerts.map((a) => a.ruleCode)).toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+      expect(snapshot(result).activity?.nonSusceptible).toBe('Minería');
+    });
+
+    it('stays silent for an HSBC-only construction subsector', async () => {
+      const result = await rule.execute(pfaeClient(), [
+        csfWith([
+          {
+            description: 'Construcción de inmuebles comerciales, institucionales y de servicios',
+            percentage: 100,
+            endDate: null,
+          },
+        ]),
+      ]);
+
+      expect(result.outcome).toBe('PASS');
+      expect(result.alerts.map((a) => a.ruleCode)).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+      expect(snapshot(result).activity?.nonSusceptible).toBeUndefined();
+    });
+
+    it('emits no alert for an eligible activity', async () => {
+      const result = await rule.execute(pfaeClient(), [
+        csfWith([{ description: 'Servicios de arquitectura', percentage: 100, endDate: null }]),
+      ]);
+
+      expect(result.alerts.map((a) => a.ruleCode)).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+      expect(result.outcome).toBe('PASS');
+    });
+  });
+
   describe('detail contract', () => {
     it('keeps detail.fields empty on a completed run with gate outcomes', async () => {
       const docs = [

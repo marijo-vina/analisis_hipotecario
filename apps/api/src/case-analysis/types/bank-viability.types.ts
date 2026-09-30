@@ -80,6 +80,8 @@ export interface BankResult {
   matchedNativeLabel: string | null;
   satDescription: string | null;
   taxReturnPolicy: TaxReturnPolicy | null;
+  /** Label of the matched bank-scoped exclusion (e.g. HSBC liquidity sheet). */
+  matchedExclusionLabel?: string;
 }
 
 /** @deprecated Use BankResult instead. Kept for backward compat. */
