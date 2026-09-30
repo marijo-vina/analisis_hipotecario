@@ -690,3 +690,17 @@ UI MUST show `****` + last 4 under Institución (MUST NOT show the full number).
 - WHEN Institución renders
 - THEN UI MUST show `****3660`
 - AND with no `accountNumber` and institution "Visa 1234567890" MUST show `****7890`; if no ≥4-digit source, `"—"` without silent re-extract
+
+---
+
+## 11. Non-Susceptible Activity Reason Labels
+
+### Requirement: Non-Susceptible Reason Labels
+
+`REASON_LABELS` MUST map `ACTIVITY_NOT_SUSCEPTIBLE` and `HSBC_LIQUIDITY_ACTIVITY_RESTRICTED` to Spanish labels. Raw codes MUST NOT render.
+
+#### Scenario: Codes translated
+
+- GIVEN a result with either code
+- WHEN Comparativa renders the reasons
+- THEN it shows the Spanish labels
