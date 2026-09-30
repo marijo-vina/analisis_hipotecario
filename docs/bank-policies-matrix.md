@@ -28,7 +28,8 @@ Fuentes de esta entrega:
   `ANTIGUEDAD_LABORAL_BROKER_BANORTE.pdf` (vigencia dic-2025),
   `ANAQUEL_BROKER_ENERO_2026-_BANORTE.pdf` (solo CMA; sin tasas/productos).
 - HSBC: `Perfilamiento_y_Requisitos_Minimos__MAYO26 HSBC (1).pdf`
-  (mayo 2026; interno, no versionar el PDF).
+  (mayo 2026; interno, no versionar el PDF) + captura asesora sep-2026
+  de actividades no susceptibles (PFAE y PM).
 
 Ingesta de fuentes: **completa** (9 bancos).
 
@@ -762,13 +763,102 @@ Asalariado no-nómina HSBC pide Visor Laboral (&lt; $80k) o E-Visor Fiscal
 (estados o declaración) × **1.0**. El visor no se simula; si hace falta, una
 nota en comparativa de que HSBC autoriza con Visor, no con nuestro peinado.
 
+### Giros no susceptibles (captura asesora, sep-2026)
+
+La asesora: *“te dejo las actividades generalmente donde los bancos no traen
+apetito, estas son de HSBC no tengo info de los demás… pero puede servir para
+las demás.”*
+
+**Decisión cerrada.** Los giros de la lista general (abajo) aplican a **todos
+los bancos**, para **PFAE y persona moral**. La fuente escrita es HSBC; no
+hay lista propia de los demás. Cuando el giro sí es susceptible, cada banco
+conserva su factor (HSBC sigue en `NONE`, 1.0). Estas actividades se
+**excluyen**, no se castigan.
+
+**Excepción, solo HSBC:** la hoja de detalle (subsector, rama y subrama de
+construcción, casa de materiales, despacho contable, y química y
+farmacéutica). La asesora pidió esa hoja exclusivamente en HSBC. No se
+replica a los otros bancos.
+
+**Cómo se valida.** Se toma la actividad económica de la Constancia de
+Situación Fiscal (columna Actividad Económica, con orden, porcentaje, fecha
+de inicio y fecha de fin) y se compara contra la lista. La diapositiva de
+HSBC solo ilustra ese paso: en el ejemplo, la CSF trae “Construcción de
+inmuebles comerciales, institucionales y de servicios” al 100%, inicio
+13/11/2017. La nota al pie de esa diapositiva queda cortada (“Cuando la
+constancia… indique actividades como Ingenieros y/o Arquitectos especificar
+su actividad de forma…”); no se completa lo que no se ve.
+
+**Sin financiamiento** (cualquier destino, **todos los bancos**), PFAE y PM:
+
+1. Gobierno federal, estatal y municipal (incluyendo embajadas).
+2. ONG y actividades no lucrativas.
+3. Partidos políticos.
+4. Iglesias.
+5. Joyería (manufactura y/o comercio).
+6. Gasolineras.
+7. Moteles.
+8. Minería.
+9. Minería de productos no metálicos.
+10. Fabricación de armas de fuego, cartuchos y explosivos.
+11. Comercio de armas de fuego, cartuchos y explosivos.
+12. Entretenimiento para adultos: centros nocturnos, discotecas, bares y
+    cantinas, salones de billar, cervecerías, servicios en pulquerías, plazas
+    de toros, casinos y juegos de azar.
+13. Aprovechamiento forestal.
+
+**Hoja de detalle, solo HSBC.** No forma parte de la lista que aplica a todos
+los bancos. Texto de la captura: se adiciona para los créditos donde se
+otorgue una línea de liquidez; se limita el financiamiento a solicitantes
+**no asalariados** cuya actividad comprobatoria provenga de las actividades
+de abajo. El asterisco de “Liquidez*” no trae nota al pie en la captura.
+Adquisición y sustitución de estos cuatro subsectores quedan fuera de esta
+hoja.
+
+La liquidez de HSBC sigue cerrada para todo PFAE / independiente / PM. Esta
+tabla es el desglose por actividad de esa ficha.
+
+**Construcción**
+
+| Rama | Subrama |
+|------|---------|
+| Edificación residencial y edificación no residencial | Edificación residencial. Edificación de naves y plantas industriales. Edificación de inmuebles comerciales, institucionales y de servicios. |
+| Construcción de obras de ingeniería civil u obra pesada | Construcción de obras para el tratamiento, distribución y suministro de agua, drenaje y riego. Construcción de obras para petróleo y gas. Construcción de obras de generación y conducción de energía eléctrica y telecomunicaciones. División de terrenos y construcción de obras de urbanización. Construcción de vías de comunicación. Otras construcciones de ingeniería civil u obra pesada. |
+| Trabajos especializados para la construcción | Trabajos de cimentaciones. Montaje de estructuras prefabricadas. Trabajos de albañilería. Otros trabajos en exteriores. Instalaciones eléctricas en construcciones. Instalaciones hidrosanitarias, de gas, aire acondicionado y calefacción. Otras instalaciones y equipamiento en construcciones. Colocación de muros falsos, aislamiento y enyesado. Trabajos de pintura y otros cubrimientos de paredes. Colocación de pisos flexibles y de madera. Colocación de pisos cerámicos y azulejos. Instalación de productos de carpintería. Otros trabajos de acabados en edificaciones. Preparación de terrenos para la construcción. Otros trabajos especializados para la construcción. |
+
+**Compra-venta de materiales para construcción (casa de materiales)**
+
+| Rama | Subrama |
+|------|---------|
+| Comercio de cemento, tabique y grava | Comercio de cemento, tabique, grava, piedra dimensionada, tepetate, cal, yeso, bloque, adoquín, teja y productos de concreto prefabricados. Incluye el comercio de pisos y recubrimientos cerámicos. |
+| Comercio de otros materiales para la construcción, excepto de madera | Comercio al por mayor de otros materiales para la construcción, como productos de asfalto, láminas de acrílico, de asbesto, de cartón, aislantes térmicos, tablarroca. Incluye el comercio al por mayor de varilla para la construcción. |
+
+**Servicios y asesorías contables (despacho contable)**
+
+| Rama | Subrama |
+|------|---------|
+| Servicios de contabilidad y auditoría | Proporcionar servicios de contabilidad, auditoría y asesoría contable y fiscal. |
+| Otros servicios relacionados con la contabilidad | Proporcionar servicios técnicos de contabilidad, como cálculo de impuestos, elaboración de nóminas, llenado de formatos fiscales y otros servicios relacionados con la contabilidad no clasificados en otra parte. |
+
+**Industrias químicas y farmacéuticas**
+
+| Rama | Subrama |
+|------|---------|
+| Fabricación de productos químicos | Fabricación de productos petroquímicos. Fabricación de gases industriales. Fabricación de pigmentos y colorantes sintéticos. Fabricación de otros productos químicos básicos inorgánicos. Fabricación de otros productos químicos básicos orgánicos. Fabricación de hules y resinas sintéticos. Fabricación de fibras químicas. Fabricación de fertilizantes. Fabricación de pesticidas y agroquímicos. |
+| Fabricación de productos farmacéuticos | Fabricación de productos farmacéuticos. Fabricación de pinturas y recubrimientos. Fabricación de adhesivos y selladores. Fabricación de jabones, limpiadores y dentífricos. Fabricación de cosméticos, perfumes y otras preparaciones de tocador. Fabricación de tintas para impresión. Fabricación de explosivos. Fabricación de otros productos químicos. |
+
+No va a código todavía.
+
 ---
 
 ## Qué esto implica para el módulo
 
 1. Factores **no son un catálogo compartido**. Banorte es el caso **flat**
-   (0.60 / 0.70). HSBC es **NONE** (factor 1.0); el PDF no trae giro. El resto
-   es matriz nativa del banco.
+   (0.60 / 0.70). HSBC es **NONE** (factor 1.0); el PDF no trae matriz de
+   giro. La lista de **13 giros sin financiamiento** (PFAE y PM) aplica a
+   **todos los bancos**. La hoja de detalle (rama/subrama de los 4
+   subsectores de liquidez) es **solo HSBC**. El resto es matriz nativa del
+   banco.
 2. Arraigo PFAE: **24 meses** en los 9 bancos (HSBC “no asalariado” = 2 años).
    Asalariado Banorte: **6 meses** (seed hoy 12 → corregir). HSBC asalariado
    ya está en 6.
@@ -782,7 +872,12 @@ nota en comparativa de que HSBC autoriza con Visor, no con nuestro peinado.
    (inferir por estado Banorte + checkbox override + aviso UI). Asalariado
    no usa este factor.
 6. Confirmado HSBC (asesora): liquidez solo asalariado; edad máx. **70a11m**;
-   ingreso seed **vacío**. Confirmado Mifel CE **0.50**. Pendiente resto:
+   ingreso seed **vacío**. Giros no susceptibles: los 13 de exclusión total
+   aplican a **todos los bancos**. La hoja de detalle de liquidez
+   (construcción, casa de materiales, despacho contable, química y
+   farmacéutica) es **solo HSBC**. La actividad a comparar sale de la CSF.
+   Confirmado Mifel CE **0.50**.
+   Pendiente resto:
    - ¿Factores Banamex = columna Nuevo?
    - ¿Mifel comercio 0.35 vs Excel 0.20?
    - ¿Edad mín. Banamex PFAE = 28?
@@ -797,5 +892,8 @@ nota en comparativa de que HSBC autoriza con Visor, no con nuestro peinado.
 
 ## Siguiente
 
-Ingesta de PDFs **cerrada**. Sembrar / ajustar el módulo Bancos cuando se
-cierren las confirmaciones de la lista 6 (no es seed todavía).
+Ingesta de PDFs **cerrada**. Decisión cerrada: los 13 giros sin
+financiamiento aplican a **todos los bancos** (PFAE y PM); la hoja de
+detalle de liquidez queda **solo en HSBC**. Aún no se siembran ni se
+evalúan. Sembrar / ajustar el módulo Bancos cuando se cierren las
+confirmaciones de la lista 6 (no es seed todavía).

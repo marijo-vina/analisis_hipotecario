@@ -1688,6 +1688,339 @@ describe('BankViabilityRule', () => {
       expect(br.satDescription).toBe('Consultorios de medicina especializada');
       expect(br.taxReturnPolicy).toBe('ACCEPTED');
     });
+
+    describe('non-susceptible activity knockout', () => {
+      function mifelMiningPolicy() {
+        return {
+          minimumEmploymentTenureMonths: null,
+          bank: makeBank({
+            id: 'bank-mifel',
+            code: 'MIFEL',
+            name: 'Mifel',
+            pfaeFactorMode: 'MATRIX',
+            taxReturnPolicy: 'ACCEPTED',
+            activityFactors: [
+              {
+                nativeLabel: 'Construcción y mantenimiento',
+                satAliases: ['mineria'],
+                factor: { toString: () => '0.35' },
+                factorTaxReturn: null,
+              },
+              {
+                nativeLabel: 'Comercio',
+                satAliases: ['comercio'],
+                factor: { toString: () => '0.35' },
+                factorTaxReturn: null,
+              },
+            ],
+          }),
+        };
+      }
+
+      function csfDocuments(activities: Record<string, unknown>[]) {
+        return [
+          ...defaultDocuments(),
+          {
+            documentType: { code: 'CSF' },
+            extractedData: { activityStartDate: '2020-01-15', activities },
+            processingResults: null,
+          },
+        ];
+      }
+
+      it('excluded PFAE giro is FAIL with ACTIVITY_NOT_SUSCEPTIBLE and no bank results', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, mifelMiningPolicy());
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Minería de carbón' }),
+        );
+        const bv = getBv(result);
+
+        expect(result.outcome).toBe('FAIL');
+        expect(result.severity).toBe('ERROR');
+        expect(bv.reasons).toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(bv.nonSusceptibleActivity).toBe('Minería');
+        expect(bv.bankResults).toEqual([]);
+      });
+
+      it('is evaluated before the policy query, so no Mifel mining factor is applied', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, mifelMiningPolicy());
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Minería de carbón' }),
+        );
+
+        expect(prisma.bankPolicy.findMany).not.toHaveBeenCalled();
+        expect(getBv(result).bankResults.some((br) => br.appliedFactor === '0.35')).toBe(false);
+      });
+
+      it.each(['ACQUISITION', 'LIQUIDITY', 'MORTGAGE_REPLACEMENT'])(
+        'knocks out on destination %s',
+        async (destination) => {
+          const { rule, prisma } = makeRuleAndMock();
+          setupPfae(prisma, mifelMiningPolicy());
+          prisma.creditType.findUnique.mockResolvedValue({ id: 1, code: 'X', destination });
+
+          const result = await rule.execute(
+            defaultContext(),
+            pfaeDocuments({ satDescription: 'Comercio al por menor de gasolina y diésel' }),
+          );
+
+          expect(result.outcome).toBe('FAIL');
+          expect(getBv(result).reasons).toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+          expect(getBv(result).destination).toBe(destination);
+          expect(getBv(result).bankResults).toEqual([]);
+        },
+      );
+
+      it('compares the primary independent activity, skipping a larger salaried row', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, mifelMiningPolicy());
+
+        const result = await rule.execute(
+          defaultContext(),
+          csfDocuments([
+            { description: 'Sueldos y salarios', percentage: 60, endDate: null },
+            { description: 'Minería de carbón', percentage: 40, endDate: null },
+          ]),
+        );
+
+        expect(getBv(result).reasons).toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(getBv(result).bankResults).toEqual([]);
+      });
+
+      it('keeps an eligible 40% independent activity next to a 60% salaried row', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, mifelMiningPolicy());
+
+        const result = await rule.execute(
+          defaultContext(),
+          csfDocuments([
+            { description: 'Sueldos y salarios', percentage: 60, endDate: null },
+            { description: 'Comercio al por menor', percentage: 40, endDate: null },
+          ]),
+        );
+        const bv = getBv(result);
+
+        expect(bv.reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(bv.nonSusceptibleActivity).toBeUndefined();
+        expect(bv.bankResults).toHaveLength(1);
+        expect(bv.bankResults[0].appliedFactor).toBe('0.35');
+        expect(bv.bankResults[0].calculation.incomeUsed).toBe('28000.00');
+      });
+
+      it('eligible PFAE giro keeps HSBC NONE factor 1.0', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, {
+          bank: makeBank({
+            id: 'bank-hsbc',
+            code: 'HSBC',
+            name: 'HSBC',
+            pfaeFactorMode: 'NONE',
+            taxReturnPolicy: 'ACCEPTED',
+          }),
+        });
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Servicios de arquitectura' }),
+        );
+        const br = getBv(result).bankResults[0];
+
+        expect(getBv(result).reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(br.appliedFactor).toBe('1.00');
+        expect(br.calculation.incomeUsed).toBe('80000.00');
+      });
+
+      it('SALARIED case with a CSF mining activity emits no exclusion', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+
+        const result = await rule.execute(
+          defaultContext(),
+          csfDocuments([{ description: 'Minería de carbón', percentage: 100, endDate: null }]),
+        );
+
+        expect(getBv(result).reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(getBv(result).bankResults).toHaveLength(1);
+        expect(prisma.bankPolicy.findMany).toHaveBeenCalled();
+      });
+
+      it('bureau knockouts still take precedence over the activity knockout', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        setupPfae(prisma, mifelMiningPolicy());
+        const docs = [
+          ...pfaeDocuments({ satDescription: 'Minería de carbón' }),
+          { documentType: { code: 'BURO' }, extractedData: { score: 450 }, processingResults: null },
+        ];
+
+        const result = await rule.execute(defaultContext(), docs);
+
+        expect(getBv(result).reasons).toContain('BUREAU_SCORE_UNIVERSAL_REJECTION');
+        expect(getBv(result).reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+      });
+    });
+
+    describe('HSBC liquidity activity restriction', () => {
+      const CONSTRUCTION = 'Construcción de inmuebles comerciales, institucionales y de servicios';
+
+      function hsbcPolicy(destination: string, overrides: Record<string, unknown> = {}) {
+        return makePolicy({
+          id: `prod-hsbc-${destination}`,
+          bankId: 'bank-hsbc',
+          code: `HSBC_${destination}`,
+          destination,
+          minimumEmploymentTenureMonths: null,
+          bank: makeBank({
+            id: 'bank-hsbc',
+            code: 'HSBC',
+            name: 'HSBC',
+            pfaeFactorMode: 'NONE',
+            taxReturnPolicy: 'ACCEPTED',
+          }),
+          ...overrides,
+        });
+      }
+
+      function banortePolicy(destination: string) {
+        return makePolicy({
+          destination,
+          minimumEmploymentTenureMonths: null,
+          bank: makeBank({ pfaeFactorMode: 'FLAT', pfaeFlatFactor: { toString: () => '0.60' } }),
+        });
+      }
+
+      function runOn(
+        prisma: ReturnType<typeof makePrismaMock>,
+        destination: string,
+        policies: unknown[],
+      ) {
+        setupPfae(prisma);
+        prisma.creditType.findUnique.mockResolvedValue({ id: 1, code: 'X', destination });
+        prisma.bankPolicy.findMany.mockResolvedValue(policies);
+      }
+
+      it('mocked active HSBC LIQUIDITY rejects a PFAE construction giro as NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+        const bv = getBv(result);
+        const hsbc = bv.bankResults.find((br) => br.bankCode === 'HSBC');
+
+        expect(bv.reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(hsbc?.status).toBe('NOT_COMPATIBLE');
+        expect(hsbc?.reasons).toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+        expect(hsbc?.matchedExclusionLabel).toBe('Construcción');
+        expect(hsbc?.appliedFactor).toBe('1.00');
+        expect(result.outcome).toBe('FAIL');
+      });
+
+      it('outranks REQUIRES_REVIEW when income is also missing', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+        prisma.incomeCalculation.findFirst.mockResolvedValue(null);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Servicios de contabilidad y auditoría' }),
+        );
+        const hsbc = getBv(result).bankResults[0];
+
+        expect(hsbc.reasons).toEqual(
+          expect.arrayContaining(['UNCONFIRMED_INCOME', 'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED']),
+        );
+        expect(hsbc.status).toBe('NOT_COMPATIBLE');
+      });
+
+      it('leaves another bank on the same LIQUIDITY run untouched', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY'), banortePolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+        const banorte = getBv(result).bankResults.find((br) => br.bankCode === 'BANORTE');
+
+        expect(banorte?.reasons).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+        expect(banorte?.matchedExclusionLabel).toBeUndefined();
+        expect(banorte?.status).toBe('PRELIMINARY_VIABLE');
+        expect(result.outcome).toBe('PASS');
+      });
+
+      it.each(['ACQUISITION', 'MORTGAGE_REPLACEMENT'])(
+        'does not restrict HSBC %s',
+        async (destination) => {
+          const { rule, prisma } = makeRuleAndMock();
+          runOn(prisma, destination, [hsbcPolicy(destination)]);
+
+          const result = await rule.execute(
+            defaultContext(),
+            pfaeDocuments({ satDescription: CONSTRUCTION }),
+          );
+          const hsbc = getBv(result).bankResults[0];
+
+          expect(hsbc.reasons).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+          expect(hsbc.matchedExclusionLabel).toBeUndefined();
+          expect(hsbc.status).toBe('PRELIMINARY_VIABLE');
+        },
+      );
+
+      it('does not restrict an architecture giro on HSBC LIQUIDITY', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Servicios de arquitectura' }),
+        );
+
+        expect(getBv(result).bankResults[0].reasons).not.toContain(
+          'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED',
+        );
+        expect(getBv(result).bankResults[0].status).toBe('PRELIMINARY_VIABLE');
+      });
+
+      it('does not restrict a SALARIED case on HSBC LIQUIDITY', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.creditType.findUnique.mockResolvedValue({ id: 1, code: 'X', destination: 'LIQUIDITY' });
+        prisma.bankPolicy.findMany.mockResolvedValue([hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+
+        expect(getBv(result).bankResults[0].reasons).not.toContain(
+          'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED',
+        );
+      });
+
+      it('inactive seeded HSBC_LIQ yields no HSBC result (policy query filters isActive)', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [banortePolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+
+        expect(prisma.bankPolicy.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ isActive: true }) }),
+        );
+        expect(getBv(result).bankResults.some((br) => br.bankCode === 'HSBC')).toBe(false);
+        expect(
+          getBv(result).bankResults.flatMap((br) => br.reasons),
+        ).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+      });
+    });
   });
 
   describe('SALARIED factor audit', () => {
