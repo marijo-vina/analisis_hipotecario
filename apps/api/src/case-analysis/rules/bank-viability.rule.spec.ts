@@ -1863,6 +1863,164 @@ describe('BankViabilityRule', () => {
         expect(getBv(result).reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
       });
     });
+
+    describe('HSBC liquidity activity restriction', () => {
+      const CONSTRUCTION = 'Construcción de inmuebles comerciales, institucionales y de servicios';
+
+      function hsbcPolicy(destination: string, overrides: Record<string, unknown> = {}) {
+        return makePolicy({
+          id: `prod-hsbc-${destination}`,
+          bankId: 'bank-hsbc',
+          code: `HSBC_${destination}`,
+          destination,
+          minimumEmploymentTenureMonths: null,
+          bank: makeBank({
+            id: 'bank-hsbc',
+            code: 'HSBC',
+            name: 'HSBC',
+            pfaeFactorMode: 'NONE',
+            taxReturnPolicy: 'ACCEPTED',
+          }),
+          ...overrides,
+        });
+      }
+
+      function banortePolicy(destination: string) {
+        return makePolicy({
+          destination,
+          minimumEmploymentTenureMonths: null,
+          bank: makeBank({ pfaeFactorMode: 'FLAT', pfaeFlatFactor: { toString: () => '0.60' } }),
+        });
+      }
+
+      function runOn(
+        prisma: ReturnType<typeof makePrismaMock>,
+        destination: string,
+        policies: unknown[],
+      ) {
+        setupPfae(prisma);
+        prisma.creditType.findUnique.mockResolvedValue({ id: 1, code: 'X', destination });
+        prisma.bankPolicy.findMany.mockResolvedValue(policies);
+      }
+
+      it('mocked active HSBC LIQUIDITY rejects a PFAE construction giro as NOT_COMPATIBLE', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+        const bv = getBv(result);
+        const hsbc = bv.bankResults.find((br) => br.bankCode === 'HSBC');
+
+        expect(bv.reasons).not.toContain('ACTIVITY_NOT_SUSCEPTIBLE');
+        expect(hsbc?.status).toBe('NOT_COMPATIBLE');
+        expect(hsbc?.reasons).toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+        expect(hsbc?.matchedExclusionLabel).toBe('Construcción');
+        expect(hsbc?.appliedFactor).toBe('1.00');
+        expect(result.outcome).toBe('FAIL');
+      });
+
+      it('outranks REQUIRES_REVIEW when income is also missing', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+        prisma.incomeCalculation.findFirst.mockResolvedValue(null);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Servicios de contabilidad y auditoría' }),
+        );
+        const hsbc = getBv(result).bankResults[0];
+
+        expect(hsbc.reasons).toEqual(
+          expect.arrayContaining(['UNCONFIRMED_INCOME', 'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED']),
+        );
+        expect(hsbc.status).toBe('NOT_COMPATIBLE');
+      });
+
+      it('leaves another bank on the same LIQUIDITY run untouched', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY'), banortePolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+        const banorte = getBv(result).bankResults.find((br) => br.bankCode === 'BANORTE');
+
+        expect(banorte?.reasons).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+        expect(banorte?.matchedExclusionLabel).toBeUndefined();
+        expect(banorte?.status).toBe('PRELIMINARY_VIABLE');
+        expect(result.outcome).toBe('PASS');
+      });
+
+      it.each(['ACQUISITION', 'MORTGAGE_REPLACEMENT'])(
+        'does not restrict HSBC %s',
+        async (destination) => {
+          const { rule, prisma } = makeRuleAndMock();
+          runOn(prisma, destination, [hsbcPolicy(destination)]);
+
+          const result = await rule.execute(
+            defaultContext(),
+            pfaeDocuments({ satDescription: CONSTRUCTION }),
+          );
+          const hsbc = getBv(result).bankResults[0];
+
+          expect(hsbc.reasons).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+          expect(hsbc.matchedExclusionLabel).toBeUndefined();
+          expect(hsbc.status).toBe('PRELIMINARY_VIABLE');
+        },
+      );
+
+      it('does not restrict an architecture giro on HSBC LIQUIDITY', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: 'Servicios de arquitectura' }),
+        );
+
+        expect(getBv(result).bankResults[0].reasons).not.toContain(
+          'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED',
+        );
+        expect(getBv(result).bankResults[0].status).toBe('PRELIMINARY_VIABLE');
+      });
+
+      it('does not restrict a SALARIED case on HSBC LIQUIDITY', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        prisma.creditType.findUnique.mockResolvedValue({ id: 1, code: 'X', destination: 'LIQUIDITY' });
+        prisma.bankPolicy.findMany.mockResolvedValue([hsbcPolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+
+        expect(getBv(result).bankResults[0].reasons).not.toContain(
+          'HSBC_LIQUIDITY_ACTIVITY_RESTRICTED',
+        );
+      });
+
+      it('inactive seeded HSBC_LIQ yields no HSBC result (policy query filters isActive)', async () => {
+        const { rule, prisma } = makeRuleAndMock();
+        runOn(prisma, 'LIQUIDITY', [banortePolicy('LIQUIDITY')]);
+
+        const result = await rule.execute(
+          defaultContext(),
+          pfaeDocuments({ satDescription: CONSTRUCTION }),
+        );
+
+        expect(prisma.bankPolicy.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ isActive: true }) }),
+        );
+        expect(getBv(result).bankResults.some((br) => br.bankCode === 'HSBC')).toBe(false);
+        expect(
+          getBv(result).bankResults.flatMap((br) => br.reasons),
+        ).not.toContain('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+      });
+    });
   });
 
   describe('SALARIED factor audit', () => {

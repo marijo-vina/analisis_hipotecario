@@ -1,6 +1,13 @@
 import { normalizeSatText } from './activity-factor-match';
 
-export type NonSusceptibleScope = { kind: 'GLOBAL' };
+export type NonSusceptibleScope =
+  | { kind: 'GLOBAL' }
+  | {
+      kind: 'BANK';
+      bankCode: string;
+      destinations: string[];
+      personTypes: string[];
+    };
 
 export interface NonSusceptibleEntry {
   code: string;
@@ -19,6 +26,14 @@ export type NonSusceptibleMatch =
     };
 
 const GLOBAL: NonSusceptibleScope = { kind: 'GLOBAL' };
+
+/** PM is stored as policy data only; `PersonType` has no PM and runtime evaluates PFAE. */
+const HSBC_LIQUIDITY: NonSusceptibleScope = {
+  kind: 'BANK',
+  bankCode: 'HSBC',
+  destinations: ['LIQUIDITY'],
+  personTypes: ['PFAE', 'PM'],
+};
 
 /**
  * Closed policy: giros excluded from financing for every bank and destination.
@@ -177,6 +192,94 @@ export const NON_SUSCEPTIBLE_ACTIVITIES: readonly NonSusceptibleEntry[] = [
     ],
     scope: GLOBAL,
   },
+  /*
+   * HSBC liquidity detail sheet (rama/subrama), same source doc. Aliases are
+   * full SAT phrases so arquitecto/ingeniero services never read as construction.
+   */
+  {
+    code: 'CONSTRUCCION',
+    label: 'Construcción',
+    aliases: [
+      'edificación residencial',
+      'edificación no residencial',
+      'edificación de naves y plantas industriales',
+      'edificación de inmuebles comerciales',
+      'construcción de inmuebles comerciales',
+      'construcción de obras',
+      'obras de ingeniería civil',
+      'obra pesada',
+      'obras de urbanización',
+      'construcción de vías de comunicación',
+      'trabajos especializados para la construcción',
+      'trabajos de cimentaciones',
+      'montaje de estructuras prefabricadas',
+      'trabajos de albañilería',
+      'instalaciones eléctricas en construcciones',
+      'instalaciones hidrosanitarias',
+      'equipamiento en construcciones',
+      'colocación de muros falsos',
+      'colocación de pisos',
+      'instalación de productos de carpintería',
+      'trabajos de acabados en edificaciones',
+      'preparación de terrenos para la construcción',
+    ],
+    scope: HSBC_LIQUIDITY,
+  },
+  {
+    code: 'CASA_DE_MATERIALES',
+    label: 'Compra-venta de materiales para construcción (casa de materiales)',
+    aliases: [
+      'casa de materiales',
+      'comercio de cemento',
+      'comercio al por mayor de cemento',
+      'comercio al por menor de cemento',
+      'comercio de otros materiales para la construcción',
+      'comercio al por mayor de otros materiales para la construcción',
+      'comercio al por menor de otros materiales para la construcción',
+      'comercio al por mayor de materiales para la construcción',
+      'comercio al por menor de materiales para la construcción',
+      'varilla para la construcción',
+    ],
+    scope: HSBC_LIQUIDITY,
+  },
+  {
+    code: 'DESPACHO_CONTABLE',
+    label: 'Servicios y asesorías contables (despacho contable)',
+    aliases: [
+      'despacho contable',
+      'servicios de contabilidad',
+      'contabilidad y auditoría',
+      'asesoría contable',
+      'servicios relacionados con la contabilidad',
+    ],
+    scope: HSBC_LIQUIDITY,
+  },
+  {
+    code: 'QUIMICA_FARMACEUTICA',
+    label: 'Industrias químicas y farmacéuticas',
+    aliases: [
+      'industria química',
+      'industria farmacéutica',
+      'fabricación de productos químicos',
+      'fabricación de otros productos químicos',
+      'productos químicos básicos',
+      'fabricación de productos petroquímicos',
+      'fabricación de gases industriales',
+      'fabricación de pigmentos',
+      'fabricación de hules y resinas',
+      'fabricación de fibras químicas',
+      'fabricación de fertilizantes',
+      'fabricación de pesticidas',
+      'fabricación de productos farmacéuticos',
+      'fabricación de preparaciones farmacéuticas',
+      'fabricación de pinturas',
+      'fabricación de adhesivos',
+      'fabricación de jabones',
+      'fabricación de cosméticos',
+      'fabricación de tintas para impresión',
+    ],
+    scope: HSBC_LIQUIDITY,
+  },
 ];
 
 function escapeRegExp(value: string): string {
@@ -217,6 +320,28 @@ export function matchGlobalNonSusceptibleActivity(
   description: string | null | undefined,
 ): NonSusceptibleMatch {
   return matchAgainst(description, COMPILED_GLOBAL);
+}
+
+/**
+ * Bank-scoped sheets only (never the global list). Runtime evaluates PFAE
+ * only, even when the scope also stores PM.
+ */
+export function matchBankScopedNonSusceptibleActivity(input: {
+  description: string | null | undefined;
+  bankCode: string;
+  destination: string | null;
+  personType: string | null;
+}): NonSusceptibleMatch {
+  const { description, bankCode, destination, personType } = input;
+  if (personType !== 'PFAE' || !destination) return { kind: 'eligible' };
+  const candidates = COMPILED.filter(
+    ({ entry: { scope } }) =>
+      scope.kind === 'BANK' &&
+      scope.bankCode === bankCode &&
+      scope.destinations.includes(destination) &&
+      scope.personTypes.includes(personType),
+  );
+  return matchAgainst(description, candidates);
 }
 
 function matchAgainst(

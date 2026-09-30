@@ -408,6 +408,7 @@ export const REASON_LABELS: Record<string, string> = {
   TAX_RETURN_NOT_PREFERRED: "Declaración anual no preferida",
   ACTIVITY_UNMAPPED: "Giro no mapeado en la matriz del banco",
   ACTIVITY_NOT_SUSCEPTIBLE: "Giro no susceptible de financiamiento",
+  HSBC_LIQUIDITY_ACTIVITY_RESTRICTED: "Giro restringido para liquidez HSBC",
   INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
   MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
 };

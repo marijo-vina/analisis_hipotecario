@@ -32,6 +32,8 @@ export interface PfaeValidationSnapshot {
     percentage: number | null;
     matchedBanks: string[];
     unmappedBanks: string[];
+    /** Label of the matched global exclusion, when the primary independent activity is excluded. */
+    nonSusceptible?: string;
   } | null;
   coherence: { rentWithoutRegimeCount: number; outcome: 'PASS' | 'WARNING' } | null;
 }

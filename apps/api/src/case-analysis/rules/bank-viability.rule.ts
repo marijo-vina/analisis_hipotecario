@@ -22,7 +22,10 @@ import type {
 } from '../types/bank-viability.types';
 import { completeMonthsBetween } from '../../shared/utils/dates';
 import { matchActivityFactor } from '../activity-factor-match';
-import { matchGlobalNonSusceptibleActivity } from '../non-susceptible-activities';
+import {
+  matchBankScopedNonSusceptibleActivity,
+  matchGlobalNonSusceptibleActivity,
+} from '../non-susceptible-activities';
 import { pickPrimaryIndependentActivity } from '../../documents/csf-independent-activity';
 import type { PfaeIncomeBases } from '../../income-calculation/income-calculation.types';
 
@@ -856,6 +859,17 @@ export class BankViabilityRule implements AnalysisRule {
       reasons.push('SCOTIABANK_PAGADORA_EXCLUSION');
     }
 
+    // ── Bank-scoped activity sheet (HSBC liquidity) ──────────────────
+    const scopedExclusion = matchBankScopedNonSusceptibleActivity({
+      description: pfae.independentDescription,
+      bankCode: policy.bank.code,
+      destination: policy.destination,
+      personType: pfae.personType,
+    });
+    if (scopedExclusion.kind === 'excluded') {
+      reasons.push('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED');
+    }
+
     // ── Bureau Score Check (bank-specific) ────────────────────────────
     if (policy.bank.minimumBureauScore != null) {
       const minScore = policy.bank.minimumBureauScore;
@@ -1001,6 +1015,9 @@ export class BankViabilityRule implements AnalysisRule {
       matchedNativeLabel: pfaeFactor?.matchedNativeLabel ?? null,
       satDescription: isPfae ? pfae.satDescription : null,
       taxReturnPolicy: isPfae ? (policy.bank.taxReturnPolicy as TaxReturnPolicy) : null,
+      ...(scopedExclusion.kind === 'excluded'
+        ? { matchedExclusionLabel: scopedExclusion.label }
+        : {}),
     };
   }
 
@@ -1024,6 +1041,7 @@ export class BankViabilityRule implements AnalysisRule {
       reasons.includes('SANTANDER_MOP_KNOCKOUT') ||
       reasons.includes('TAX_RETURN_REJECTED') ||
       reasons.includes('INSUFFICIENT_ACTIVITY_TENURE') ||
+      reasons.includes('HSBC_LIQUIDITY_ACTIVITY_RESTRICTED') ||
       checks.capacity.status === 'FAIL';
 
     if (hasNotCompatible) return 'NOT_COMPATIBLE';

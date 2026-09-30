@@ -22,6 +22,8 @@ import type { PfaeValidationSnapshot } from '../types/pfae-validation.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { matchActivityFactor } from '../activity-factor-match';
 import { formatActivityTenure, joinSpanishList } from '../format-activity-tenure';
+import { matchGlobalNonSusceptibleActivity } from '../non-susceptible-activities';
+import { pickPrimaryIndependentActivity } from '../../documents/csf-independent-activity';
 
 const RULE_ID = 'pfae-validation';
 const CSF_CODE = 'CSF';
@@ -134,9 +136,24 @@ export class PfaeValidationRule implements AnalysisRule {
     const classified = await this.classifyMatrixActivity(
       selectedActivity?.satDescription ?? null,
     );
+    const independent = pickPrimaryIndependentActivity(csfData.activities);
+    const exclusion = matchGlobalNonSusceptibleActivity(independent?.description);
     const activity = selectedActivity
-      ? { ...selectedActivity, ...classified }
+      ? {
+          ...selectedActivity,
+          ...classified,
+          ...(exclusion.kind === 'excluded' ? { nonSusceptible: exclusion.label } : {}),
+        }
       : null;
+    if (exclusion.kind === 'excluded') {
+      outcome = this.escalate(outcome, 'FAIL');
+      alerts.push({
+        ruleCode: 'ACTIVITY_NOT_SUSCEPTIBLE',
+        severity: 'ERROR',
+        field: 'activity',
+        message: `La actividad económica "${independent?.description}" es un giro no susceptible de financiamiento (${exclusion.label}).`,
+      });
+    }
     if (classified.unmappedBanks.length > 0) {
       outcome = this.escalate(outcome, 'PARTIAL');
       alerts.push({
