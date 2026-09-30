@@ -22,6 +22,7 @@ import type {
 } from '../types/bank-viability.types';
 import { completeMonthsBetween } from '../../shared/utils/dates';
 import { matchActivityFactor } from '../activity-factor-match';
+import { matchGlobalNonSusceptibleActivity } from '../non-susceptible-activities';
 import { pickPrimaryIndependentActivity } from '../../documents/csf-independent-activity';
 import type { PfaeIncomeBases } from '../../income-calculation/income-calculation.types';
 
@@ -85,6 +86,7 @@ interface PfaeBranch {
   source: string | null;
   bases: PfaeIncomeBases | null;
   satDescription: string | null;
+  independentDescription: string | null;
   activityStartDate: string | null;
 }
 
@@ -264,6 +266,36 @@ export class BankViabilityRule implements AnalysisRule {
       }
     }
 
+    // ── PFAE Non-Susceptible Activity Knockout (short-circuit) ──────────
+    if (personType === 'PFAE') {
+      const exclusion = matchGlobalNonSusceptibleActivity(csfFields.independentDescription);
+      if (exclusion.kind === 'excluded') {
+        globalReasons.push('ACTIVITY_NOT_SUSCEPTIBLE');
+        const snapshot: BankViabilitySnapshot = {
+          sourceVersion: SOURCE_VERSION,
+          creditTypeCode,
+          destination,
+          calculatedAt: calculatedAt.toISOString(),
+          warningLegend: WARNING_LEGEND,
+          reasons: globalReasons,
+          inputs,
+          bankResults: [],
+          nonSusceptibleActivity: exclusion.label,
+        };
+        return {
+          ruleId: this.ruleId,
+          outcome: 'FAIL' as AnalysisOutcome,
+          severity: 'ERROR' as Severity,
+          detail: {
+            sources: ['mortgage-case', 'income-calculation', 'liability-snapshot', 'csf'],
+            fields: [],
+            bankViability: snapshot,
+          } as never,
+          alerts: [],
+        };
+      }
+    }
+
     // ── 2. Policy Query ────────────────────────────────────────────────
     let policies: PolicyWithBank[] = [];
     if (destination) {
@@ -289,6 +321,7 @@ export class BankViabilityRule implements AnalysisRule {
       source: incomeSource,
       bases: incomeBases,
       satDescription,
+      independentDescription: csfFields.independentDescription,
       activityStartDate: csfFields.activityStartDate,
     };
 
@@ -448,14 +481,17 @@ export class BankViabilityRule implements AnalysisRule {
   private deriveCsfFields(documents: Record<string, unknown>[]): {
     activityStartDate: string | null;
     satDescription: string | null;
+    independentDescription: string | null;
   } {
     let activityStartDate: string | null = null;
     let satDescription: string | null = null;
+    let independentDescription: string | null = null;
     for (const doc of documents) {
       const typeCode = (doc.documentType as { code?: string } | undefined)?.code;
       if (typeCode !== 'CSF') continue;
       const ed = (doc.extractedData as Record<string, unknown> | null) ?? {};
       const independent = pickPrimaryIndependentActivity(ed.activities);
+      if (independent) independentDescription = independent.description;
       if (independent?.startDate) {
         activityStartDate = independent.startDate;
       } else if (typeof ed.activityStartDate === 'string') {
@@ -479,7 +515,7 @@ export class BankViabilityRule implements AnalysisRule {
         satDescription = best.description;
       }
     }
-    return { activityStartDate, satDescription };
+    return { activityStartDate, satDescription, independentDescription };
   }
 
   // ── Birth Date Derivation (from documents array) ───────────────────

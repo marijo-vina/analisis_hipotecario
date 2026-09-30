@@ -100,4 +100,6 @@ export interface BankViabilitySnapshot {
   reasons: string[];
   inputs: BankViabilityInputs;
   bankResults: BankResult[];
+  /** Label of the matched global exclusion when reasons include ACTIVITY_NOT_SUSCEPTIBLE. */
+  nonSusceptibleActivity?: string;
 }
