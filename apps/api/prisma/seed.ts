@@ -3,7 +3,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
-import { BANKS, BANK_POLICIES, CREDIT_TYPES, SOURCE_VERSION } from './seed-data';
+import {
+  BANKS,
+  BANK_POLICIES,
+  BANK_ACTIVITY_FACTORS,
+  CREDIT_TYPES,
+  SOURCE_VERSION,
+} from './seed-data';
 
 const DOCUMENT_TYPES = [
   { code: 'PAYROLL_RECEIPT', name: 'Recibo de nómina', isActive: true },
@@ -12,6 +18,8 @@ const DOCUMENT_TYPES = [
   { code: 'CREDIT_SCORE', name: 'Mi Score', isActive: true },
   { code: 'INE', name: 'INE', isActive: true },
   { code: 'PASSPORT', name: 'Pasaporte', isActive: true },
+  { code: 'CSF', name: 'Constancia de Situación Fiscal', isActive: true },
+  { code: 'TAX_RETURN', name: 'Declaración anual', isActive: true },
   { code: 'PROOF_OF_ADDRESS', name: 'Comprobante de domicilio', isActive: false },
 ];
 
@@ -102,6 +110,9 @@ async function main() {
           incomeCriterion: bank.incomeCriterion,
           minimumBureauScore: bank.minimumBureauScore,
           sourceVersion: SOURCE_VERSION,
+          pfaeFactorMode: bank.pfaeFactorMode,
+          pfaeFlatFactor: bank.pfaeFlatFactor,
+          taxReturnPolicy: bank.taxReturnPolicy,
         },
         create: {
           code: bank.code,
@@ -110,6 +121,9 @@ async function main() {
           incomeCriterion: bank.incomeCriterion,
           minimumBureauScore: bank.minimumBureauScore,
           sourceVersion: SOURCE_VERSION,
+          pfaeFactorMode: bank.pfaeFactorMode,
+          pfaeFlatFactor: bank.pfaeFlatFactor,
+          taxReturnPolicy: bank.taxReturnPolicy,
         },
       });
       bankMap[bank.code] = created.id;
@@ -127,6 +141,9 @@ async function main() {
           minimumEmploymentTenureMonths: policy.minimumEmploymentTenureMonths,
           minimumApplicantAgeMonths: policy.minimumApplicantAgeMonths,
           maximumApplicationAgeMonths: policy.maximumApplicationAgeMonths,
+          minimumActivityTenureMonths: policy.minimumActivityTenureMonths,
+          minimumIncomePfae: policy.minimumIncomePfae,
+          minimumApplicantAgeMonthsPfae: policy.minimumApplicantAgeMonthsPfae,
           isActive: policy.isActive,
         },
         create: {
@@ -138,7 +155,33 @@ async function main() {
           minimumEmploymentTenureMonths: policy.minimumEmploymentTenureMonths,
           minimumApplicantAgeMonths: policy.minimumApplicantAgeMonths,
           maximumApplicationAgeMonths: policy.maximumApplicationAgeMonths,
+          minimumActivityTenureMonths: policy.minimumActivityTenureMonths,
+          minimumIncomePfae: policy.minimumIncomePfae,
+          minimumApplicantAgeMonthsPfae: policy.minimumApplicantAgeMonthsPfae,
           isActive: policy.isActive,
+        },
+      });
+    }
+
+    for (const factor of BANK_ACTIVITY_FACTORS) {
+      await prisma.bankActivityFactor.upsert({
+        where: {
+          bankId_nativeLabel: {
+            bankId: bankMap[factor.bankCode],
+            nativeLabel: factor.nativeLabel,
+          },
+        },
+        update: {
+          satAliases: factor.satAliases,
+          factor: factor.factor,
+          factorTaxReturn: factor.factorTaxReturn,
+        },
+        create: {
+          bankId: bankMap[factor.bankCode],
+          nativeLabel: factor.nativeLabel,
+          satAliases: factor.satAliases,
+          factor: factor.factor,
+          factorTaxReturn: factor.factorTaxReturn,
         },
       });
     }
@@ -166,6 +209,7 @@ async function main() {
     console.log('Seeded document statuses:', DOCUMENT_STATUSES.length);
     console.log('Seeded banks:', BANKS.length);
     console.log('Seeded bank policies:', BANK_POLICIES.length);
+    console.log('Seeded bank activity factors:', BANK_ACTIVITY_FACTORS.length);
     console.log('Seeded admin user:', admin.email);
   } finally {
     await prisma.$disconnect();

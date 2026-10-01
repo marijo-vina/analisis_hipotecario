@@ -16,6 +16,7 @@ import type { Document, DocumentType } from "@/app/lib/definitions";
 import StatusBadge from "@/app/ui/common/badge";
 import DocumentActions from "@/app/ui/documents/document-actions";
 import DocumentUpload from "@/app/ui/documents/document-upload";
+import BankStatementBatchActions from "@/app/ui/documents/bank-statement-batch-actions";
 
 interface CategoryDef {
   key: string;
@@ -23,9 +24,17 @@ interface CategoryDef {
   codes: string[];
 }
 
-const CATEGORIES: CategoryDef[] = [
+const CATEGORIES_SALARIED: CategoryDef[] = [
   { key: "identificacion", label: "Identificación", codes: ["INE", "PASSPORT"] },
   { key: "nomina", label: "Nómina", codes: ["PAYROLL_RECEIPT"] },
+  { key: "estados-cuenta", label: "Estados de cuenta", codes: ["BANK_STATEMENT"] },
+  { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"] },
+];
+
+const CATEGORIES_PFAE: CategoryDef[] = [
+  { key: "identificacion", label: "Identificación", codes: ["INE", "PASSPORT"] },
+  { key: "csf", label: "CSF", codes: ["CSF"] },
+  { key: "declaracion", label: "Declaración anual", codes: ["TAX_RETURN"] },
   { key: "estados-cuenta", label: "Estados de cuenta", codes: ["BANK_STATEMENT"] },
   { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"] },
 ];
@@ -36,6 +45,7 @@ interface DocumentBrowserProps {
   documentTypes: DocumentType[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  personType?: string;
 }
 
 export default function DocumentBrowser({
@@ -44,20 +54,25 @@ export default function DocumentBrowser({
   documentTypes,
   isCollapsed = false,
   onToggleCollapse,
+  personType,
 }: DocumentBrowserProps) {
   const router = useRouter();
 
+  const categories = useMemo(() => {
+    return personType === "PFAE" ? CATEGORIES_PFAE : CATEGORIES_SALARIED;
+  }, [personType]);
+
   // Category -> documents map
   const categoryData = useMemo(() => {
-    return CATEGORIES.map((cat) => {
+    return categories.map((cat) => {
       const docs = documents.filter((d) => cat.codes.includes(d.documentType.code));
       return { ...cat, documents: docs, count: docs.length };
     });
-  }, [documents]);
+  }, [documents, categories]);
 
   const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>(() => {
     const firstWithDocs = categoryData.find((c) => c.count > 0);
-    return firstWithDocs ? firstWithDocs.key : CATEGORIES[0].key;
+    return firstWithDocs ? firstWithDocs.key : categories[0].key;
   });
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -199,6 +214,13 @@ export default function DocumentBrowser({
           {selectedCategory?.label} ({selectedCategory?.documents.length ?? 0})
         </h3>
 
+        {selectedCategoryKey === "estados-cuenta" && selectedCategory && (
+          <BankStatementBatchActions
+            caseId={caseId}
+            documents={selectedCategory.documents}
+          />
+        )}
+
         {selectedCategory && selectedCategory.documents.length > 0 ? (
           selectedCategory.documents.map((doc) => (
             <div
@@ -281,10 +303,11 @@ export default function DocumentBrowser({
               documentTypes={documentTypes}
               onSuccess={handleUploadSuccess}
               defaultDocumentTypeId={preselectedDocumentTypeId}
+              personType={personType}
             />
           </div>
         </div>
       )}
     </aside>
   );
-}
+}

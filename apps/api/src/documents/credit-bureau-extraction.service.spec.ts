@@ -329,6 +329,44 @@ describe('CreditBureauExtractionService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('allows DATA_EXTRACTED re-extract without re-OCR', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          documentStatus: {
+            id: 4,
+            code: 'DATA_EXTRACTED',
+            name: 'Datos extraídos',
+            order: 4,
+          },
+        }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      expect(result.success).toBe(true);
+    });
+
+    it('allows OCR_ERROR re-extract when OCR text already exists', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          documentStatus: {
+            id: 8,
+            code: 'OCR_ERROR',
+            name: 'Error de OCR',
+            order: 8,
+          },
+        }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      expect(result.success).toBe(true);
+    });
+
     it('rejects wrong document type', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(
         makeDocument({
@@ -460,6 +498,235 @@ describe('CreditBureauExtractionService', () => {
         where: { id: 'doc-buro-1' },
         data: { documentStatusId: 7 }, // EXTRACTION_ERROR
       });
+    });
+
+    it('enriches stored credits when Gemini fails and prior extraction exists', async () => {
+      const stored = createMockExtractionResult({
+        credits: [
+          {
+            institution: 'BBVA',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'REVOLVING',
+            status: 'ACTIVE',
+            currentBalance: 100000,
+            paymentDueAmount: 2000,
+            creditLimit: 150000,
+            currency: 'MXN',
+          },
+        ],
+      });
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ extractedData: stored }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        geminiFailure(GeminiErrorCode.GEMINI_REQUEST_ERROR),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      expect(result.success).toBe(true);
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      expect(credits[0].institution).toBe('BBVA');
+      expect(credits[0].creditLimit).toBe(150000);
+      expect(mockPrisma.document.update).toHaveBeenCalledWith({
+        where: { id: 'doc-buro-1' },
+        data: expect.objectContaining({ documentStatusId: 4 }),
+      });
+    });
+
+    it('copies layout accountNumber onto stored credits when Gemini is down', async () => {
+      const stored = createMockExtractionResult({
+        credits: [
+          {
+            institution: 'BBVA',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'REVOLVING',
+            status: 'ACTIVE',
+            currentBalance: 100000,
+            paymentDueAmount: 2000,
+            creditLimit: 150000,
+            currency: 'MXN',
+          },
+        ],
+      });
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          extractedData: stored,
+          ocrLayout: {
+            pages: [
+              { pageNumber: 1, width: 612, height: 792, lines: [], tokens: [] },
+            ],
+          },
+        }),
+      );
+      mockLayoutExtractor.extract.mockReturnValue({
+        credits: [
+          {
+            accountNumber: '82953660',
+            institution: 'BBVA',
+            orderInBlock: 0,
+            subsection: null,
+            fields: {
+              currentBalance: null,
+              creditLimit: null,
+              maxCredit: null,
+              lastPaymentAmount: null,
+              paymentDueAmount: null,
+              pastDueAmount: null,
+            },
+          },
+        ],
+        confidence: [],
+        warnings: [],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        geminiFailure(GeminiErrorCode.GEMINI_REQUEST_ERROR),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      expect(result.success).toBe(true);
+      expect(mockLayoutExtractor.extract).toHaveBeenCalled();
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      expect(credits[0].accountNumber).toBe('82953660');
+    });
+
+    it('copies accountNumber from OCR institution lines when layout is missing', async () => {
+      const stored = createMockExtractionResult({
+        credits: [
+          {
+            institution: 'BBVA',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'REVOLVING',
+            status: 'ACTIVE',
+            currentBalance: 0,
+            paymentDueAmount: 0,
+            creditLimit: 42400,
+            currency: 'MXN',
+          },
+          {
+            institution: 'HSBC MEXICO',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'REVOLVING',
+            status: 'CLOSED',
+            currentBalance: 0,
+            paymentDueAmount: 0,
+            creditLimit: 63000,
+            currency: 'MXN',
+          },
+        ],
+      });
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          extractedData: stored,
+          ocrText: [
+            'DETALLE DE CRÉDITOS',
+            '1.',
+            'BBVA',
+            '41523182953660',
+            'TARJETA DE CRÉDITO',
+            '2.',
+            'HSBC MEXICO',
+            '987654321000',
+            'TARJETA DE CRÉDITO',
+          ].join('\n'),
+        }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        geminiFailure(GeminiErrorCode.GEMINI_REQUEST_ERROR),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+
+      expect(result.success).toBe(true);
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      expect(credits[0].accountNumber).toBe('41523182953660');
+      expect(credits[1].accountNumber).toBe('987654321000');
+    });
+
+    it('does not let AMEX steal AMEX COMPANY account numbers', async () => {
+      const stored = createMockExtractionResult({
+        credits: [
+          {
+            institution: 'AMEX',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'NON_BANK_SERVICE',
+            status: 'ACTIVE',
+            currentBalance: 30283,
+            paymentDueAmount: 1875,
+            creditLimit: 150000,
+            currency: 'MXN',
+          },
+          {
+            institution: 'AMEX COMPANY',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'NON_BANK_SERVICE',
+            status: 'ACTIVE',
+            currentBalance: 73881,
+            paymentDueAmount: 0,
+            creditLimit: 307825,
+            currency: 'MXN',
+          },
+        ],
+      });
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          extractedData: stored,
+          ocrText: [
+            '1.',
+            'AMEX',
+            '376722482104002',
+            'TARJETA DE CRÉDITO',
+            'AMEX COMPANY',
+            '376662329074002',
+            'TARJETA DE CRÉDITO',
+          ].join('\n'),
+        }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        geminiFailure(GeminiErrorCode.GEMINI_REQUEST_ERROR),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      expect(credits[0].accountNumber).toBe('376722482104002');
+      expect(credits[1].accountNumber).toBe('376662329074002');
+    });
+
+    it('does not treat a SALDO amount on a data line as accountNumber', async () => {
+      const stored = createMockExtractionResult({
+        credits: [
+          {
+            institution: 'BBVA',
+            creditType: 'TARJETA DE CREDITO',
+            classification: 'REVOLVING',
+            status: 'ACTIVE',
+            currentBalance: 100000,
+            paymentDueAmount: 2000,
+            creditLimit: 150000,
+            currency: 'MXN',
+          },
+        ],
+      });
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({
+          extractedData: stored,
+          ocrText:
+            'BBVA TARJETA CREDITO SALDO 100000 PAGO 2000',
+        }),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        geminiFailure(GeminiErrorCode.GEMINI_REQUEST_ERROR),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+      expect(credits[0].accountNumber).toBeUndefined();
     });
   });
 
@@ -2038,6 +2305,76 @@ describe('CreditBureauExtractionService', () => {
       expect(credits[0].institution).toBe('BBVA'); // Gemini's string kept
       expect(credits[0].paymentDueAmount).toBe(8775); // layout financial overrode
     });
+
+    it('copies layout accountNumber onto the matched credit and does not persist utilization', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '82953660',
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      const geminiData = createMockExtractionResult();
+      const geminiCredit = {
+        ...(geminiData.credits as Record<string, unknown>[])[0],
+      };
+      delete geminiCredit.accountNumber;
+      geminiData.credits = [geminiCredit];
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(geminiData),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].accountNumber).toBe('82953660');
+      expect(credits[0]).not.toHaveProperty('utilization');
+    });
+
+    it('layout accountNumber overwrites a Gemini accountNumber on match', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ ocrLayout }),
+      );
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) =>
+        key === 'USE_LAYOUT_EXTRACTION' ? 'true' : undefined,
+      );
+      mockLayoutExtractor.extract.mockReturnValue(
+        buildLayoutResult(
+          [
+            buildLayoutCredit({
+              institution: 'BBVA',
+              accountNumber: '82953660',
+              fields: { paymentDueAmount: 8775 },
+            }),
+          ],
+          [makeConfidence({ paymentDueAmount: FinancialFieldsConfidence.HIGH })],
+        ),
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].accountNumber).toBe('82953660');
+      expect(credits[0]).not.toHaveProperty('utilization');
+    });
   });
 
   // =========================================================================
@@ -2324,6 +2661,27 @@ describe('CreditBureauExtractionService', () => {
       expect(credit).toHaveProperty('hasLatePayments');
       expect(credit).toHaveProperty('hasSeriousDelinquency');
       expect(credit).toHaveProperty('rawTextReference');
+    });
+
+    it('LEAN and REDUCED schemas omit accountNumber and utilization', () => {
+      const leanCredit = CREDIT_BUREAU_SCHEMA_LEAN.credits[0];
+      const reducedCredit = CREDIT_BUREAU_SCHEMA_REDUCED.credits[0];
+      expect(leanCredit).not.toHaveProperty('accountNumber');
+      expect(leanCredit).not.toHaveProperty('utilization');
+      expect(reducedCredit).not.toHaveProperty('accountNumber');
+      expect(reducedCredit).not.toHaveProperty('utilization');
+      expect(JSON.stringify(CREDIT_BUREAU_SCHEMA_LEAN)).not.toContain(
+        'accountNumber',
+      );
+      expect(JSON.stringify(CREDIT_BUREAU_SCHEMA_LEAN)).not.toContain(
+        'utilization',
+      );
+      expect(JSON.stringify(CREDIT_BUREAU_SCHEMA_REDUCED)).not.toContain(
+        'accountNumber',
+      );
+      expect(JSON.stringify(CREDIT_BUREAU_SCHEMA_REDUCED)).not.toContain(
+        'utilization',
+      );
     });
 
     it('top-level structure (borrower, report, riskSummary) is unchanged', () => {
@@ -2851,6 +3209,64 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
         .credits as Record<string, unknown>[];
       // Gemini value preserved (no coordinate overwrite)
       expect(credits[0].paymentDueAmount).toBe(2000);
+    });
+
+    it('copies coordinate accountNumber when the matched credit has none and does not persist utilization', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      const coord = makeCoordinateResult(
+        '8775',
+        PaymentDueAmountSource.BAND_MATCH,
+      );
+      coord.credits[0].accountNumber = '82953660';
+      mockCoordinateExtractor.extract.mockResolvedValue(coord);
+      const geminiData = createMockExtractionResult();
+      const geminiCredit = {
+        ...(geminiData.credits as Record<string, unknown>[])[0],
+      };
+      delete geminiCredit.accountNumber;
+      geminiData.credits = [geminiCredit];
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(geminiData),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].accountNumber).toBe('82953660');
+      expect(credits[0]).not.toHaveProperty('utilization');
+    });
+
+    it('does not overwrite an existing accountNumber with the coordinate value', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      const coord = makeCoordinateResult(
+        '8775',
+        PaymentDueAmountSource.BAND_MATCH,
+      );
+      coord.credits[0].accountNumber = '82953660';
+      mockCoordinateExtractor.extract.mockResolvedValue(coord);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].accountNumber).toBe('1234567890');
+      expect(credits[0]).not.toHaveProperty('utilization');
     });
   });
 });

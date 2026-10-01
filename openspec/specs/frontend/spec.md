@@ -484,3 +484,223 @@ The tab previously labeled "Bancos / Viabilidad" SHALL be renamed to "Comparativ
 - GIVEN the analysis section renders
 - WHEN tabs are displayed
 - THEN the third tab shows "Comparativa bancaria"
+
+---
+
+## 8. PFAE Identity Match (HU-19a)
+
+### Requirement: PersonType-Aware Identity Source Rendering
+
+`AnalysisSection` SHALL accept an optional `personType?: string` prop, threaded from `case-detail-workspace.tsx` (`personType={caseData.personType}`), mirroring the existing pattern used by `DocumentUpload`/`DocumentBrowser`/`ExtractionSection`. `SOURCE_LABELS` and `SOURCE_ICONS` SHALL include a `csf` entry, and `IdentitySummaryCard.COLUMNS` SHALL include `csf`, so that a `csf` identity source returned by the API is rendered instead of being silently dropped by the `sources.filter(s => s in SOURCE_LABELS)` guard.
+
+#### Scenario: PFAE csf source renders in the identity table
+
+- GIVEN a PFAE case's analysis result includes a `csf` source
+- WHEN the Validaciones tab renders the identity comparison table
+- THEN a "CSF" column/row appears with its label and icon
+
+#### Scenario: SALARIED rendering unchanged (regression)
+
+- GIVEN a SALARIED case's analysis result (no `csf` source)
+- WHEN the identity table renders
+- THEN it displays exactly as before this change
+
+### Requirement: Bankarization Section Hidden for PFAE
+
+The Validaciones tab SHALL NOT render the "Conciliación nómina vs banco" section (including its empty-state card) when `personType === "PFAE"`. For any other `personType`, the section SHALL render as before.
+
+#### Scenario: PFAE case hides conciliation section entirely
+
+- GIVEN a case with `personType: "PFAE"`
+- WHEN the Validaciones tab renders
+- THEN no "Conciliación nómina vs banco" heading or empty-state card is present
+
+#### Scenario: SALARIED case still shows conciliation section (regression)
+
+- GIVEN a case with `personType: "SALARIED"`
+- WHEN the Validaciones tab renders
+- THEN the "Conciliación nómina vs banco" section renders as before this change
+
+### Requirement: PersonType-Aware Pre-Analysis Checklist
+
+The pre-analysis confirmation modal (`AnalysisConfirmModal`) and its `hasMissingDocs` check SHALL branch by `personType`. For PFAE, the checklist SHALL list: identification (INE/passport), CSF, tax return, bank statements, credit bureau — no nómina/payroll row. For SALARIED, the existing checklist SHALL remain unchanged. In both cases, missing documents SHALL produce a soft, non-blocking confirmation — never a blocking state.
+
+#### Scenario: PFAE checklist omits nómina row
+
+- GIVEN a PFAE case opening the pre-analysis modal
+- WHEN the checklist renders
+- THEN it shows INE/passport, CSF, tax return, bank statements, and credit bureau, with no payroll/nómina item
+
+#### Scenario: Missing PFAE documents do not block confirmation
+
+- GIVEN a PFAE case missing the tax return document
+- WHEN the pre-analysis modal renders
+- THEN it shows a soft warning for the missing document but still allows the advisor to confirm and proceed
+
+#### Scenario: SALARIED checklist unchanged (regression)
+
+- GIVEN a SALARIED case opening the pre-analysis modal
+- WHEN the checklist renders
+- THEN it lists the same items as before this change (Identificación, Recibo de nómina, Estado de cuenta, Buró)
+
+---
+
+## 9. PFAE Expediente UI (HU-21)
+
+### Requirement: PFAE Visual Kit and Tab Shell
+
+PFAE expediente surfaces MUST use existing `gf-*` tokens and existing common components (`Card`, `Button`, `DataTable`, `StatusBadge`, `FieldGrid`, `FormField`, `Drawer`). Copy MUST be Spanish sentence-case. SALARIED Validaciones, Cálculo, and Comparativa MUST NOT be restyled. The analysis section MUST keep the same three tabs. The system MUST NOT add a wizard, a fourth tab, a second Analyze control, Banks catalog UI, pasivos UI, or Banorte 0.70.
+
+#### Scenario: Salaried unchanged, three tabs
+
+- GIVEN a SALARIED case
+- WHEN the analysis section renders
+- THEN Validaciones, Cálculo, and Comparativa look and behave as before this change
+- AND no fourth tab, wizard, or second Analyze control appears
+
+#### Scenario: PFAE uses visual kit
+
+- GIVEN a PFAE case
+- WHEN PFAE gates, Cálculo panel, or Comparativa extras render
+- THEN they use `gf-*` tokens, existing common components, and Spanish sentence-case
+
+### Requirement: PFAE Validaciones Gates Card
+
+For `personType` PFAE, Validaciones MUST render a gates Card from persisted `ruleResults["pfae-validation"]` snapshot and `alerts`. Tenure MUST display as informational. The UI MUST NOT recompute gate outcomes.
+
+#### Scenario: Happy path gates Card
+
+- GIVEN a PFAE analysis with persisted pfae-validation snapshot and alerts
+- WHEN Validaciones renders
+- THEN a gates Card shows regime, vigencia, tenure (INFO), activity, and coherence from that snapshot/alerts
+
+#### Scenario: No CSF
+
+- GIVEN persisted PARTIAL missing-CSF snapshot/alerts
+- WHEN Validaciones renders
+- THEN the gates Card shows that PARTIAL missing-CSF outcome
+
+#### Scenario: Unmapped giro
+
+- GIVEN persisted `ACTIVITY_UNMAPPED` WARNING
+- WHEN Validaciones renders
+- THEN the gates Card shows that warning, including which MATRIX banks matched and which remain unmapped
+
+#### Scenario: Tenure and calendar dates
+
+- GIVEN persisted tenure months and ISO calendar dates
+- WHEN Validaciones renders
+- THEN tenure is years plus leftover months, not a raw month count
+- AND calendar dates display as `DD/MM/YYYY` without timezone shift
+
+### Requirement: PFAE Dual-Base Picker
+
+For PFAE, Cálculo MUST present two unfactored bases and a single “Base a enviar al banco” picker. Changing the picker MUST call the existing income-source PATCH, then refresh latest income and analysis. The picker MUST NOT add a second Analyze control.
+
+#### Scenario: PATCH refreshes Comparativa
+
+- GIVEN a completed PFAE analysis with both bases valid
+- WHEN the advisor selects the other valid base
+- THEN existing PATCH runs and Comparativa reflects the refreshed Phase C result
+- AND no second header Analyze appears
+
+#### Scenario: TAX_LOSS
+
+- GIVEN tax-return INVALID for fiscal loss
+- WHEN Cálculo renders or the advisor tries that base
+- THEN tax-return is not a successful send path and an inline Spanish error or disabled state appears
+
+### Requirement: Comparativa PFAE Detail Extras
+
+Comparativa table columns MUST stay unchanged. PFAE origin, giro (canonical + SAT text), applied factor, tax-return policy, and activity tenure MUST appear only in expanded product detail. Factor and giro MUST come from persisted `BankResult` audit, not reconstructed. PFAE reason codes MUST use centralized Spanish labels.
+
+#### Scenario: Extras in detail only
+
+- GIVEN a PFAE analysis with persisted audit on a product
+- WHEN the product row is expanded
+- THEN detail shows origin, giro+SAT, factor, tax-return policy, and activity tenure
+- AND the table gains no extra columns
+
+#### Scenario: Unmapped giro from audit
+
+- GIVEN persisted unmapped MATRIX audit
+- WHEN detail renders
+- THEN it shows the persisted unmapped audit and MUST NOT invent factor 1.0
+
+### Requirement: Solely-Salaried FAIL Non-Viable Presentation
+
+When régimen is solely salaried FAIL, Validaciones and Comparativa MUST show “este camino PFAE no aplica — cambie a asalariado”. The UI MUST suppress PRELIMINARY_VIABLE chips and viable presentation. Product rows MAY remain inspectable and MUST NOT be presented as a successful PFAE-viable result.
+
+#### Scenario: FAIL régimen
+
+- GIVEN `REGIMEN_EXCLUSIVAMENTE_ASALARIADO` FAIL
+- WHEN Comparativa and Validaciones render
+- THEN that Spanish message appears, PRELIMINARY_VIABLE chips/viable presentation are suppressed, and rows MAY stay inspectable
+
+---
+
+## 10. Bureau Credit Utilization
+
+### Requirement: Shared Buro Utilization Display
+
+Shared Buro tab MUST NOT fork by `personType` and MUST NOT add a third table. Utilización MUST appear on **all** rows of both tables. In-scope open cards with limit > 0 and non-null balance MUST show rate + traffic light; all other rows `"—"`. Utilization MUST be UI-derived from stored `currentBalance`/`creditLimit`.
+
+| Rule | Contract |
+|------|----------|
+| In-scope | `classification === 'REVOLVING'`; `DEPARTMENT_STORE` iff `creditLimit > 0`; `creditType` `/tarjeta/i` for all other classifications (covers NON_BANK_SERVICE AMEX in créditos no bancarios, OTHER/OTROS/UNKNOWN/FIXED_PAYMENT/PERSONAL_LOAN mislabels) |
+| Exclude | MORTGAGE, AUTO always; PERSONAL_LOAN, FIXED_PAYMENT, NON_BANK_SERVICE only when `creditType` does not match `/tarjeta/i` |
+| Rate | `currentBalance / creditLimit` if limit > 0. Null/0 limit → `"—"`, omit global. Null balance → `"—"` (not 0). Over-limit allowed, band 91+ |
+| Closed | Per-row `"—"`; excluded from global |
+| Global | Extra KPI (keep Score / activos / cerrados / consultas). `sum(balances)/sum(limits)` of in-scope active cards with limit > 0 and non-null balance. Denom 0 → `"—"` |
+| Bands | After rounding display %: 0–10 Excelente; 11–30 Muy buena; 31–50 Aceptable; 51–70 Atención; 71–90 Crítico; 91+ Muy crítico. Legend beside MOP |
+
+#### Scenario: In-scope rate
+
+- GIVEN open REVOLVING credit, balance 3000, limit 10000
+- WHEN the Buro tab renders
+- THEN Utilización MUST show 30% Muy buena with a traffic light on both tables
+- AND SALARIED and PFAE MUST share the same column, KPI, and MOP-adjacent legend
+
+#### Scenario: Dashes
+
+- GIVEN a MORTGAGE row, a closed REVOLVING row, and an in-scope row with null balance
+- WHEN rows render
+- THEN each cell MUST be `"—"` (null balance MUST NOT be 0)
+
+#### Scenario: Weighted KPI and stored bureau
+
+- GIVEN two open in-scope cards 5000/5000 and 10000/100000
+- WHEN the extra KPI renders
+- THEN global MUST be 15000/105000, not the average of per-card rates
+- AND original four KPIs MUST remain; denom 0 MUST show `"—"`; stored bureaus MUST show utilization without re-OCR
+
+#### Scenario: NON_BANK_SERVICE tarjeta in-scope
+
+- GIVEN an open NON_BANK_SERVICE credit in créditos no bancarios with `creditType` matching `/tarjeta/i` (e.g., AMEX), balance 3000, limit 10000
+- WHEN the Buro tab renders
+- THEN Utilización MUST show the computed rate and band (not `"—"`)
+
+### Requirement: Masked Last-4 under Institution
+
+UI MUST show `****` + last 4 under Institución (MUST NOT show the full number). Source: `accountNumber` → ≥4 digits in `institution` → `rawTextReference` → `"—"`. Existing JSONB last-4 MUST be best-effort. Parser MUST read stored `accountNumber`.
+
+#### Scenario: Mask and fallback
+
+- GIVEN `accountNumber` "82953660"
+- WHEN Institución renders
+- THEN UI MUST show `****3660`
+- AND with no `accountNumber` and institution "Visa 1234567890" MUST show `****7890`; if no ≥4-digit source, `"—"` without silent re-extract
+
+---
+
+## 11. Non-Susceptible Activity Reason Labels
+
+### Requirement: Non-Susceptible Reason Labels
+
+`REASON_LABELS` MUST map `ACTIVITY_NOT_SUSCEPTIBLE` and `HSBC_LIQUIDITY_ACTIVITY_RESTRICTED` to Spanish labels. Raw codes MUST NOT render.
+
+#### Scenario: Codes translated
+
+- GIVEN a result with either code
+- WHEN Comparativa renders the reasons
+- THEN it shows the Spanish labels

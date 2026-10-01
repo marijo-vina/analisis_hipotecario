@@ -3,15 +3,20 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   Param,
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
 import { IncomeCalculationService } from './income-calculation.service';
 import { SaveConciliationDto } from './dto/save-conciliation.dto';
+import { SwitchIncomeSourceDto } from './dto/switch-income-source.dto';
 
 /**
  * Optional body shape for `POST /cases/:caseId/income/calculate`.
@@ -51,12 +56,17 @@ interface ToggleReceiptBody {
  *   POST   /calculate                          → 201 (new snapshot)
  *   GET    /latest                              → 200 (most recent snapshot)
  *   PATCH  /receipts/:receiptIndex              → 200 (toggle + new snapshot)
+ *   PATCH  /source                              → 200 (PFAE source switch + Phase C)
  *   POST   /confirm                             → 200 (CONFIRMED snapshot)
  */
 @UseGuards(JwtAuthGuard)
 @Controller('cases/:caseId/income')
 export class IncomeCalculationController {
-  constructor(private readonly incomeService: IncomeCalculationService) {}
+  constructor(
+    private readonly incomeService: IncomeCalculationService,
+    @Inject(forwardRef(() => CaseAnalysisService))
+    private readonly caseAnalysisService: CaseAnalysisService,
+  ) {}
 
   /**
    * POST /cases/:caseId/income/calculate
@@ -107,6 +117,24 @@ export class IncomeCalculationController {
       receiptIndex,
       body.included,
     );
+  }
+
+  /**
+   * PATCH /cases/:caseId/income/source
+   *
+   * Clones the latest PFAE bases into a new snapshot with the chosen
+   * source, then re-runs Phase C only (copies prior Phase A).
+   */
+  @Patch('source')
+  @HttpCode(200)
+  async switchSource(
+    @Param('caseId') caseId: string,
+    @Body() dto: SwitchIncomeSourceDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    const snapshot = await this.incomeService.switchSource(caseId, dto.source);
+    await this.caseAnalysisService.runPhaseC(caseId, req.user.id);
+    return snapshot;
   }
 
   /**

@@ -10,6 +10,7 @@ import request from 'supertest';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IncomeCalculationController } from './income-calculation.controller';
 import { IncomeCalculationService } from './income-calculation.service';
+import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
 import {
   IncomeCalculationStatus,
   type IncomeCalculationResult,
@@ -59,6 +60,10 @@ describe('IncomeCalculationController', () => {
     calculate: jest.Mock;
     getLatest: jest.Mock;
     toggleReceipt: jest.Mock;
+    switchSource: jest.Mock;
+  };
+  let mockCaseAnalysis: {
+    runPhaseC: jest.Mock;
   };
 
   const caseId = 'case-uuid-1';
@@ -70,6 +75,10 @@ describe('IncomeCalculationController', () => {
       calculate: jest.fn(),
       getLatest: jest.fn(),
       toggleReceipt: jest.fn(),
+      switchSource: jest.fn(),
+    };
+    mockCaseAnalysis = {
+      runPhaseC: jest.fn().mockResolvedValue({ runId: 'run-phase-c' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -78,6 +87,10 @@ describe('IncomeCalculationController', () => {
         {
           provide: IncomeCalculationService,
           useValue: mockService,
+        },
+        {
+          provide: CaseAnalysisService,
+          useValue: mockCaseAnalysis,
         },
       ],
     })
@@ -261,6 +274,89 @@ describe('IncomeCalculationController', () => {
         .patch(`/cases/${caseId}/income/receipts/0`)
         .send({ included: false })
         .expect(400);
+    });
+  });
+
+  // ── PATCH /cases/:caseId/income/source ───────────────────────────────
+
+  describe('PATCH /cases/:caseId/income/source', () => {
+    it('persists the switched snapshot then re-runs Phase C only', async () => {
+      const switched = makeResult({
+        id: 'inc-tax',
+        source: 'TAX_RETURN',
+        averageGrossIncome: 20000,
+        averageNetIncome: 10000,
+      });
+      mockService.switchSource.mockResolvedValue(switched);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/cases/${caseId}/income/source`)
+        .send({ source: 'TAX_RETURN' })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: 'inc-tax',
+        source: 'TAX_RETURN',
+        averageGrossIncome: 20000,
+        averageNetIncome: 10000,
+      });
+      expect(mockService.switchSource).toHaveBeenCalledWith(
+        caseId,
+        'TAX_RETURN',
+      );
+      expect(mockCaseAnalysis.runPhaseC).toHaveBeenCalledWith(
+        caseId,
+        'advisor-1',
+      );
+      expect(mockService.switchSource.mock.invocationCallOrder[0]).toBeLessThan(
+        mockCaseAnalysis.runPhaseC.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('accepts BANK_STATEMENTS and still invokes runPhaseC', async () => {
+      mockService.switchSource.mockResolvedValue(
+        makeResult({ id: 'inc-bank', source: 'BANK_STATEMENTS' }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .patch(`/cases/${caseId}/income/source`)
+        .send({ source: 'BANK_STATEMENTS' })
+        .expect(200);
+
+      expect(response.body.source).toBe('BANK_STATEMENTS');
+      expect(mockService.switchSource).toHaveBeenCalledWith(
+        caseId,
+        'BANK_STATEMENTS',
+      );
+      expect(mockCaseAnalysis.runPhaseC).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 when switchSource rejects an invalid chosen base', async () => {
+      mockService.switchSource.mockRejectedValue(
+        new BadRequestException('Cannot switch to TAX_RETURN: TAX_LOSS'),
+      );
+
+      await request(app.getHttpServer())
+        .patch(`/cases/${caseId}/income/source`)
+        .send({ source: 'TAX_RETURN' })
+        .expect(400);
+
+      expect(mockCaseAnalysis.runPhaseC).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for PAYROLL or missing source (not a second Analyze path)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/cases/${caseId}/income/source`)
+        .send({ source: 'PAYROLL' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .patch(`/cases/${caseId}/income/source`)
+        .send({})
+        .expect(400);
+
+      expect(mockService.switchSource).not.toHaveBeenCalled();
+      expect(mockCaseAnalysis.runPhaseC).not.toHaveBeenCalled();
     });
   });
 });

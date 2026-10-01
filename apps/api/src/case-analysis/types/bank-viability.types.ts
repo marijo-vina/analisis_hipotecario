@@ -9,6 +9,10 @@ export interface BankarizationFlags {
 
 export type CheckStatus = 'PASS' | 'FAIL' | 'REQUIRES_REVIEW' | 'NOT_APPLICABLE';
 
+export type PfaeFactorMode = 'MATRIX' | 'FLAT' | 'NONE';
+
+export type TaxReturnPolicy = 'ACCEPTED' | 'NOT_PREFERRED' | 'REJECTED';
+
 export type ProductMatchStatus =
   | 'PRELIMINARY_VIABLE'
   | 'CONDITIONED'
@@ -29,6 +33,8 @@ export interface BankViabilityInputs {
   employmentStartDate: string | null;
   hasPagadoraIncome: boolean;
   scotiabankExcluded: boolean;
+  personType?: string | null;
+  incomeSource?: string | null;
 }
 
 export interface BankResultCalculation {
@@ -69,6 +75,13 @@ export interface BankResult {
   policySnapshot: BankPolicySnapshot;
   calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
+  appliedFactor: string | null;
+  factorMode: PfaeFactorMode | null;
+  matchedNativeLabel: string | null;
+  satDescription: string | null;
+  taxReturnPolicy: TaxReturnPolicy | null;
+  /** Label of the matched bank-scoped exclusion (e.g. HSBC liquidity sheet). */
+  matchedExclusionLabel?: string;
 }
 
 /** @deprecated Use BankResult instead. Kept for backward compat. */
@@ -89,4 +102,6 @@ export interface BankViabilitySnapshot {
   reasons: string[];
   inputs: BankViabilityInputs;
   bankResults: BankResult[];
+  /** Label of the matched global exclusion when reasons include ACTIVITY_NOT_SUSCEPTIBLE. */
+  nonSusceptibleActivity?: string;
 }

@@ -66,7 +66,8 @@ export const ModelName = {
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus',
   Bank: 'Bank',
-  BankPolicy: 'BankPolicy'
+  BankPolicy: 'BankPolicy',
+  BankActivityFactor: 'BankActivityFactor'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -173,6 +174,8 @@ export const IncomeCalculationScalarFieldEnum = {
   confirmedBy: 'confirmedBy',
   confirmedAt: 'confirmedAt',
   observations: 'observations',
+  source: 'source',
+  bases: 'bases',
   calculatedAt: 'calculatedAt'
 } as const
 
@@ -290,6 +293,9 @@ export const BankScalarFieldEnum = {
   minimumBureauScore: 'minimumBureauScore',
   isActive: 'isActive',
   sourceVersion: 'sourceVersion',
+  pfaeFactorMode: 'pfaeFactorMode',
+  pfaeFlatFactor: 'pfaeFlatFactor',
+  taxReturnPolicy: 'taxReturnPolicy',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -307,12 +313,29 @@ export const BankPolicyScalarFieldEnum = {
   minimumEmploymentTenureMonths: 'minimumEmploymentTenureMonths',
   minimumApplicantAgeMonths: 'minimumApplicantAgeMonths',
   maximumApplicationAgeMonths: 'maximumApplicationAgeMonths',
+  minimumActivityTenureMonths: 'minimumActivityTenureMonths',
+  minimumIncomePfae: 'minimumIncomePfae',
+  minimumApplicantAgeMonthsPfae: 'minimumApplicantAgeMonthsPfae',
   isActive: 'isActive',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type BankPolicyScalarFieldEnum = (typeof BankPolicyScalarFieldEnum)[keyof typeof BankPolicyScalarFieldEnum]
+
+
+export const BankActivityFactorScalarFieldEnum = {
+  id: 'id',
+  bankId: 'bankId',
+  nativeLabel: 'nativeLabel',
+  satAliases: 'satAliases',
+  factor: 'factor',
+  factorTaxReturn: 'factorTaxReturn',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BankActivityFactorScalarFieldEnum = (typeof BankActivityFactorScalarFieldEnum)[keyof typeof BankActivityFactorScalarFieldEnum]
 
 
 export const SortOrder = {

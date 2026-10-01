@@ -220,6 +220,34 @@ export class DocumentsService {
       throw new BadRequestException('Document has already been processed');
     }
 
+    // Bureau reports already OCR'd: never re-call Document AI (force or
+    // OCR_ERROR retries were 502ing). Extraction can reuse stored ocrText.
+    const existingOcr =
+      typeof document.ocrText === 'string' ? document.ocrText.trim() : '';
+    if (
+      document.documentType?.code === 'CREDIT_BUREAU_REPORT' &&
+      existingOcr.length > 0
+    ) {
+      this.logger.log(
+        `[OcrSkip] CREDIT_BUREAU_REPORT ${documentId} already has OCR text; skipping Document AI`,
+      );
+      if (
+        document.documentStatus.code === 'OCR_ERROR' ||
+        document.documentStatus.code === 'ERROR'
+      ) {
+        const processedStatusId = await this.resolveStatusId('PROCESSED');
+        return this.prisma.document.update({
+          where: { id: documentId },
+          data: {
+            documentStatusId: processedStatusId,
+            processingError: null,
+          },
+          include: DOCUMENT_INCLUDE,
+        });
+      }
+      return document;
+    }
+
     // 3. Metadata guard: reject null fileUrl or mimeType
     if (!document.fileUrl) {
       throw new BadRequestException('Document has no file to process');
@@ -247,11 +275,21 @@ export class DocumentsService {
     // is enabled, and is stored additively alongside ocrText.
     let ocrText: string;
     let ocrLayout: OcrLayout;
+    const ocrStart = Date.now();
     try {
       ({ ocrText, ocrLayout } = await this.documentAiService.extractTextWithLayout(
         document.fileUrl,
         document.mimeType,
       ));
+      this.logger.log(
+        `[OcrTiming] ${JSON.stringify({
+          documentId,
+          documentType: document.documentType?.code ?? null,
+          ocrMs: Date.now() - ocrStart,
+          pageCount: ocrLayout?.pages?.length ?? 0,
+          ocrTextChars: ocrText?.length ?? 0,
+        })}`,
+      );
     } catch (aiError) {
       this.logger.error(
         `Document AI processing failed for document ${documentId}: ${(aiError as Error).message}`,

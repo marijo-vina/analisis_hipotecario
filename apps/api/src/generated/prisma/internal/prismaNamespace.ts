@@ -399,7 +399,8 @@ export const ModelName = {
   CreditType: 'CreditType',
   CaseStatus: 'CaseStatus',
   Bank: 'Bank',
-  BankPolicy: 'BankPolicy'
+  BankPolicy: 'BankPolicy',
+  BankActivityFactor: 'BankActivityFactor'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "verificationToken" | "client" | "mortgageCase" | "liabilitySnapshot" | "incomeCalculation" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus" | "bank" | "bankPolicy"
+    modelProps: "user" | "verificationToken" | "client" | "mortgageCase" | "liabilitySnapshot" | "incomeCalculation" | "document" | "analysisRun" | "analysisAlert" | "reviewDecision" | "documentType" | "documentStatus" | "creditType" | "caseStatus" | "bank" | "bankPolicy" | "bankActivityFactor"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1603,6 +1604,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    BankActivityFactor: {
+      payload: Prisma.$BankActivityFactorPayload<ExtArgs>
+      fields: Prisma.BankActivityFactorFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BankActivityFactorFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BankActivityFactorFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        findFirst: {
+          args: Prisma.BankActivityFactorFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BankActivityFactorFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        findMany: {
+          args: Prisma.BankActivityFactorFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>[]
+        }
+        create: {
+          args: Prisma.BankActivityFactorCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        createMany: {
+          args: Prisma.BankActivityFactorCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BankActivityFactorCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>[]
+        }
+        delete: {
+          args: Prisma.BankActivityFactorDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        update: {
+          args: Prisma.BankActivityFactorUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        deleteMany: {
+          args: Prisma.BankActivityFactorDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BankActivityFactorUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BankActivityFactorUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>[]
+        }
+        upsert: {
+          args: Prisma.BankActivityFactorUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BankActivityFactorPayload>
+        }
+        aggregate: {
+          args: Prisma.BankActivityFactorAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBankActivityFactor>
+        }
+        groupBy: {
+          args: Prisma.BankActivityFactorGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BankActivityFactorGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BankActivityFactorCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BankActivityFactorCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1730,6 +1805,8 @@ export const IncomeCalculationScalarFieldEnum = {
   confirmedBy: 'confirmedBy',
   confirmedAt: 'confirmedAt',
   observations: 'observations',
+  source: 'source',
+  bases: 'bases',
   calculatedAt: 'calculatedAt'
 } as const
 
@@ -1847,6 +1924,9 @@ export const BankScalarFieldEnum = {
   minimumBureauScore: 'minimumBureauScore',
   isActive: 'isActive',
   sourceVersion: 'sourceVersion',
+  pfaeFactorMode: 'pfaeFactorMode',
+  pfaeFlatFactor: 'pfaeFlatFactor',
+  taxReturnPolicy: 'taxReturnPolicy',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1864,12 +1944,29 @@ export const BankPolicyScalarFieldEnum = {
   minimumEmploymentTenureMonths: 'minimumEmploymentTenureMonths',
   minimumApplicantAgeMonths: 'minimumApplicantAgeMonths',
   maximumApplicationAgeMonths: 'maximumApplicationAgeMonths',
+  minimumActivityTenureMonths: 'minimumActivityTenureMonths',
+  minimumIncomePfae: 'minimumIncomePfae',
+  minimumApplicantAgeMonthsPfae: 'minimumApplicantAgeMonthsPfae',
   isActive: 'isActive',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type BankPolicyScalarFieldEnum = (typeof BankPolicyScalarFieldEnum)[keyof typeof BankPolicyScalarFieldEnum]
+
+
+export const BankActivityFactorScalarFieldEnum = {
+  id: 'id',
+  bankId: 'bankId',
+  nativeLabel: 'nativeLabel',
+  satAliases: 'satAliases',
+  factor: 'factor',
+  factorTaxReturn: 'factorTaxReturn',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BankActivityFactorScalarFieldEnum = (typeof BankActivityFactorScalarFieldEnum)[keyof typeof BankActivityFactorScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2102,6 +2199,34 @@ export type ListEnumIncomeCriterionFieldRefInput<$PrismaModel> = FieldRefInputTy
 
 
 /**
+ * Reference to a field of type 'PfaeFactorMode'
+ */
+export type EnumPfaeFactorModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PfaeFactorMode'>
+    
+
+
+/**
+ * Reference to a field of type 'PfaeFactorMode[]'
+ */
+export type ListEnumPfaeFactorModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PfaeFactorMode[]'>
+    
+
+
+/**
+ * Reference to a field of type 'TaxReturnPolicy'
+ */
+export type EnumTaxReturnPolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaxReturnPolicy'>
+    
+
+
+/**
+ * Reference to a field of type 'TaxReturnPolicy[]'
+ */
+export type ListEnumTaxReturnPolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaxReturnPolicy[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -2240,6 +2365,7 @@ export type GlobalOmitConfig = {
   caseStatus?: Prisma.CaseStatusOmit
   bank?: Prisma.BankOmit
   bankPolicy?: Prisma.BankPolicyOmit
+  bankActivityFactor?: Prisma.BankActivityFactorOmit
 }
 
 /* Types for Logging */

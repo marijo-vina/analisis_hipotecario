@@ -11,6 +11,7 @@ import type { MortgageCase } from "@/app/lib/definitions";
 // ── Person type → human-readable Spanish label ─────────────────────────
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Física (Asalariado)",
+  PFAE: "Persona Física con Actividad Empresarial (PFAE)",
 };
 
 function personTypeLabel(code: string): string {

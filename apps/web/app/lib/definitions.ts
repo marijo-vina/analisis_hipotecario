@@ -41,6 +41,9 @@ export interface CreditType {
 
 // ---- CMA Bank Catalog (PR 6) -----------------------------------------------
 
+export type PfaeFactorMode = "MATRIX" | "FLAT" | "NONE";
+export type TaxReturnPolicy = "ACCEPTED" | "NOT_PREFERRED" | "REJECTED";
+
 export interface Bank {
   id: string;
   code: string;
@@ -49,7 +52,19 @@ export interface Bank {
   debtCommitmentFactor: number;
   minimumBureauScore: number | null;
   isActive: boolean;
+  pfaeFactorMode?: PfaeFactorMode;
+  pfaeFlatFactor?: number | null;
+  taxReturnPolicy?: TaxReturnPolicy;
   _count?: { policies: number };
+}
+
+export interface BankActivityFactor {
+  id: string;
+  bankId: string;
+  nativeLabel: string;
+  satAliases: string[];
+  factor: number;
+  factorTaxReturn: number | null;
 }
 
 export interface BankPolicy {
@@ -61,11 +76,15 @@ export interface BankPolicy {
   minimumEmploymentTenureMonths: number | null;
   minimumApplicantAgeMonths: number | null;
   maximumApplicationAgeMonths: number | null;
+  minimumActivityTenureMonths: number | null;
+  minimumIncomePfae: number | null;
+  minimumApplicantAgeMonthsPfae: number | null;
   isActive: boolean;
 }
 
 export interface BankDetail extends Bank {
   policies: BankPolicy[];
+  activityFactors?: BankActivityFactor[];
 }
 
 export interface CaseStatus {
@@ -176,6 +195,45 @@ export interface AnalysisDetail {
   sources: string[];
   fields: FieldComparison[];
   bankViability?: BankViabilitySnapshot;
+  ruleResults?: AnalysisRuleResult[];
+}
+
+export interface PfaeValidationSnapshot {
+  regime: { isSolelySalaried: boolean; outcome: "PASS" | "FAIL" };
+  vigencia: {
+    issuanceDate: string | null;
+    isOlderThan3Months: boolean;
+    outcome: "PASS" | "WARNING";
+  } | null;
+  tenure: {
+    months: number | null;
+    activityStartDate: string | null;
+  } | null;
+  activity: {
+    satDescription: string | null;
+    percentage: number | null;
+    matchedBanks?: string[];
+    unmappedBanks?: string[];
+  } | null;
+  coherence: { rentWithoutRegimeCount: number; outcome: "PASS" | "WARNING" } | null;
+}
+
+export interface AnalysisRuleResult {
+  ruleId: string;
+  outcome: "PASS" | "PARTIAL" | "FAIL";
+  severity: string;
+  detail: {
+    sources: string[];
+    fields: FieldComparison[];
+    pfaeValidation?: PfaeValidationSnapshot;
+    bankViability?: BankViabilitySnapshot;
+  };
+  alerts: Array<{
+    ruleCode: string;
+    severity: string;
+    field: string;
+    message: string;
+  }>;
 }
 
 export interface AnalysisAlert {
@@ -250,6 +308,8 @@ export interface BankViabilityInputs {
   employmentStartDate: string | null;
   hasPagadoraIncome: boolean;
   scotiabankExcluded: boolean;
+  personType?: string | null;
+  incomeSource?: string | null;
 }
 
 export interface BankResultCalculation {
@@ -292,6 +352,11 @@ export interface BankResult {
   policySnapshot: BankPolicySnapshot;
   calculation: BankResultCalculation;
   checks: Record<string, CheckResult>;
+  appliedFactor: string | null;
+  factorMode: PfaeFactorMode | null;
+  matchedNativeLabel: string | null;
+  satDescription: string | null;
+  taxReturnPolicy: TaxReturnPolicy | null;
 }
 
 /** @deprecated Use BankResult instead. Kept for backward compat. */
@@ -339,6 +404,13 @@ export const REASON_LABELS: Record<string, string> = {
   QUITA_QUEBRANTO_REJECTED: "Registro de quita o quebranto en Buró de Crédito",
   FRAUD_OR_IDENTITY_THEFT_REJECTED: "Alerta por riesgo de fraude o robo de identidad",
   LEGAL_ACTION_REJECTED: "Proceso o demanda judicial registrado en Buró",
+  TAX_RETURN_REJECTED: "Declaración anual rechazada por el banco",
+  TAX_RETURN_NOT_PREFERRED: "Declaración anual no preferida",
+  ACTIVITY_UNMAPPED: "Giro no mapeado en la matriz del banco",
+  ACTIVITY_NOT_SUSCEPTIBLE: "Giro no susceptible de financiamiento",
+  HSBC_LIQUIDITY_ACTIVITY_RESTRICTED: "Giro restringido para liquidez HSBC",
+  INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
+  MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
 };
 
 export function getReasonLabel(reason: string): string {
@@ -352,6 +424,18 @@ export function getReasonLabel(reason: string): string {
 export const INCOME_CRITERION_LABELS: Record<string, string> = {
   NET: 'Neto',
   GROSS: 'Bruto',
+};
+
+export const PFAE_FACTOR_MODE_LABELS: Record<PfaeFactorMode, string> = {
+  MATRIX: "Matriz de giros",
+  FLAT: "Factor plano",
+  NONE: "Sin factor (1.0)",
+};
+
+export const TAX_RETURN_POLICY_LABELS: Record<TaxReturnPolicy, string> = {
+  ACCEPTED: "Acepta",
+  NOT_PREFERRED: "No preferida",
+  REJECTED: "Rechazada",
 };
 
 export const DESTINATION_LABELS: Record<string, string> = {

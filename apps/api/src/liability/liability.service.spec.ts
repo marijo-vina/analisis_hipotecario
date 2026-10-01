@@ -33,6 +33,9 @@ function makeCredit(overrides: Partial<LiabilityCreditInput> = {}): LiabilityCre
 /** Minimal Prisma mock — snapshot.create just echoes an ID + timestamp. */
 function makeMockPrisma() {
   return {
+    mortgageCase: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     liabilitySnapshot: {
       create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) =>
         Promise.resolve({
@@ -61,6 +64,62 @@ describe('LiabilityCalculationService', () => {
       ],
     }).compile();
     service = module.get<LiabilityCalculationService>(LiabilityCalculationService);
+  });
+
+  // ── personType revolving factor (HU-18) ───────────────────────────────
+
+  describe('personType revolving factor', () => {
+    it('PFAE revolving: MAX(100000 × 0.07, 2000) = 7000, factorUsed 0.07', async () => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({ personType: 'PFAE' });
+
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'TARJETA DE CREDITO',
+          classification: 'REVOLVING',
+          currentBalance: 100000,
+          paymentDueAmountEffective: 2000,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.monthlyDebtContribution).toBe(7000);
+      expect(result.factorUsed).toBe(0.07);
+    });
+
+    it('SALARIED revolving: MAX(100000 × 0.06, 2000) = 6000, factorUsed 0.06 (regression)', async () => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({ personType: 'SALARIED' });
+
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'TARJETA DE CREDITO',
+          classification: 'REVOLVING',
+          currentBalance: 100000,
+          paymentDueAmountEffective: 2000,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.monthlyDebtContribution).toBe(6000);
+      expect(result.factorUsed).toBe(0.06);
+    });
+
+    it('PFAE UNKNOWN: MAX(100000 × 0.07, 0) = 7000, not 6000', async () => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({ personType: 'PFAE' });
+
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'CREDITO GENERICO',
+          classification: 'UNKNOWN',
+          currentBalance: 100000,
+          paymentDueAmountEffective: 0,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.UNKNOWN);
+      expect(credit.monthlyDebtContribution).toBe(7000);
+      expect(result.factorUsed).toBe(0.07);
+    });
   });
 
   // ── REVOLVING ──────────────────────────────────────────────────────────
@@ -595,6 +654,52 @@ describe('LiabilityCalculationService', () => {
       const credit = result.credits[0];
       expect(credit.creditNature).toBe(CreditNature.FIXED);
       expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
+    });
+
+    it('classifies MORTGAGE bienes raíces as FIXED and uses the payment', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'BIENES RAICES',
+          classification: 'MORTGAGE',
+          currentBalance: 4572586,
+          paymentDueAmountEffective: 51200,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+      expect(credit.classificationSource).toBe(ClassificationSource.EXTRACTED);
+      expect(credit.monthlyDebtContribution).toBe(51200);
+    });
+
+    it('classifies BIENES RAÍCES as FIXED via keyword when the bureau class is missing', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'BIENES RAÍCES',
+          classification: 'UNKNOWN',
+          currentBalance: 4475627,
+          paymentDueAmountEffective: 47606,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+      expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
+      expect(credit.monthlyDebtContribution).toBe(47606);
+    });
+
+    it('classifies ARRENDAMIENTO as FIXED via keyword', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'ARRENDAMIENTO AUTOMOTRIZ',
+          classification: 'UNKNOWN',
+          currentBalance: 120000,
+          paymentDueAmountEffective: 8000,
+        }),
+      ]);
+
+      expect(result.credits[0].creditNature).toBe(CreditNature.FIXED);
+      expect(result.credits[0].monthlyDebtContribution).toBe(8000);
     });
 
     it('falls back to UNKNOWN when no keywords match', async () => {

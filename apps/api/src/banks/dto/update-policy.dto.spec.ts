@@ -202,4 +202,81 @@ describe('UpdatePolicyDto', () => {
       expect(errors).toHaveLength(0);
     });
   });
+
+  describe('PFAE CMA cells (HU-20)', () => {
+    it('should accept minimumActivityTenureMonths 24', async () => {
+      const dto = plainToInstance(UpdatePolicyDto, {
+        minimumActivityTenureMonths: 24,
+      });
+      const errors = await validate(dto);
+      const tenureErrors = errors.filter(
+        (e) => e.property === 'minimumActivityTenureMonths',
+      );
+      expect(tenureErrors).toHaveLength(0);
+      expect(dto.minimumActivityTenureMonths).toBe(24);
+    });
+
+    it('should reject negative minimumActivityTenureMonths', async () => {
+      const dto = plainToInstance(UpdatePolicyDto, {
+        minimumActivityTenureMonths: -1,
+      });
+      const errors = await validate(dto);
+      const tenureErrors = errors.filter(
+        (e) => e.property === 'minimumActivityTenureMonths',
+      );
+      expect(tenureErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept minimumIncomePfae 67000 and null', async () => {
+      const filled = plainToInstance(UpdatePolicyDto, {
+        minimumIncomePfae: 67000,
+      });
+      const empty = plainToInstance(UpdatePolicyDto, {
+        minimumIncomePfae: null,
+      });
+      const filledErrors = await validate(filled);
+      const emptyErrors = await validate(empty);
+      expect(
+        filledErrors.filter((e) => e.property === 'minimumIncomePfae'),
+      ).toHaveLength(0);
+      expect(
+        emptyErrors.filter((e) => e.property === 'minimumIncomePfae'),
+      ).toHaveLength(0);
+      expect(filled.minimumIncomePfae).toBe(67000);
+    });
+
+    it('should reject negative minimumIncomePfae', async () => {
+      const dto = plainToInstance(UpdatePolicyDto, {
+        minimumIncomePfae: -100,
+      });
+      const errors = await validate(dto);
+      const incomeErrors = errors.filter(
+        (e) => e.property === 'minimumIncomePfae',
+      );
+      expect(incomeErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept minimumApplicantAgeMonthsPfae 336', async () => {
+      const dto = plainToInstance(UpdatePolicyDto, {
+        minimumApplicantAgeMonthsPfae: 336,
+      });
+      const errors = await validate(dto);
+      const ageErrors = errors.filter(
+        (e) => e.property === 'minimumApplicantAgeMonthsPfae',
+      );
+      expect(ageErrors).toHaveLength(0);
+      expect(dto.minimumApplicantAgeMonthsPfae).toBe(336);
+    });
+
+    it('should reject negative minimumApplicantAgeMonthsPfae', async () => {
+      const dto = plainToInstance(UpdatePolicyDto, {
+        minimumApplicantAgeMonthsPfae: -1,
+      });
+      const errors = await validate(dto);
+      const ageErrors = errors.filter(
+        (e) => e.property === 'minimumApplicantAgeMonthsPfae',
+      );
+      expect(ageErrors.length).toBeGreaterThan(0);
+    });
+  });
 });

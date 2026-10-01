@@ -93,3 +93,153 @@ The "Cálculo de ingresos" section MUST appear BELOW "Cálculo de pasivos" in th
 - GIVEN the Motor Financiero tab renders
 - WHEN both liability and income sections are present
 - THEN the income section SHALL appear immediately after the liability section
+
+### Requirement: PFAE Dual-Base Snapshot
+
+PFAE `calculate()` MUST NOT 404 for missing payroll. Analyze MUST compute both bases. GET `/cases/:id/income/latest` MUST return `source` (`PAYROLL` | `BANK_STATEMENTS` | `TAX_RETURN`) and JSON `bases`. Prior rows SHALL backfill `source=PAYROLL`, `bases=null`.
+
+#### Scenario: GET latest returns source and bases
+
+- GIVEN a PFAE calculated snapshot
+- WHEN GET `/cases/:id/income/latest` runs
+- THEN `source` SHALL be PAYROLL, BANK_STATEMENTS, or TAX_RETURN and `bases` JSON
+
+#### Scenario: PFAE analyze without payroll
+
+- GIVEN a PFAE case with no payroll
+- WHEN analyze calculates income
+- THEN the call MUST NOT 404 and both bases SHALL be computed
+
+### Requirement: Bank-Statement Base
+
+Month = unique `YYYY-MM` of `statementPeriod.periodStartDate` (fallback end). Sum VALID post-cleaner income; exclude `isCurrentIncompleteMonth`; take most recent N; drop max AND min. Unique valid months < N ⇒ bank base INVALID. N=12 when resolved CSF activity (active, `endDate` null, highest percentage, tie → lower `order`) matches primaria / restaurantero / alimentos-y-bebidas; else 6.
+
+| N | Mean after drop max+min | Forbidden |
+|---|-------------------------|-----------|
+| 6 | remaining 4 | plain mean of 6 |
+| 12 | remaining 10 | plain mean of 12 |
+
+#### Scenario: Six-month smoothing
+
+- GIVEN N=6 and totals [10, 12, 14, 16, 18, 100]
+- WHEN the bank base is computed
+- THEN mean SHALL be 15 (drop 100 and 10), not 28.33
+
+#### Scenario: Twelve-month smoothing
+
+- GIVEN N=12 and totals [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 100]
+- WHEN the bank base is computed
+- THEN mean SHALL be 6.5 (drop 100 and 1), not 13.83
+
+#### Scenario: Short window invalid
+
+- GIVEN N=6 and 5 unique valid months
+- WHEN the bank base is computed
+- THEN bank base SHALL be INVALID
+
+#### Scenario: CSF activity selects N
+
+- GIVEN resolved CSF activity (active, `endDate` null, highest %, tie → lower `order`)
+- WHEN the window is resolved
+- THEN N SHALL be 12 if primaria / restaurantero / alimentos-y-bebidas, else 6
+
+### Requirement: Tax Base, Default Source, and Review
+
+Tax NETO MUST be `fiscalProfit/12`; BRUTO MUST be `accumulableIncomeTotal/12`. Fiscal loss MUST invalidate tax-return only; bank remains if valid. Default `source` MUST be BANK_STATEMENTS if valid, else TAX_RETURN if valid. Chosen figures MUST fill `averageGrossIncome` / `averageNetIncome`. Both invalid ⇒ `REQUIRES_REVIEW`, no throw; GET latest MUST succeed; `source` MUST be `BANK_STATEMENTS` (preferred default, not `PAYROLL`).
+
+#### Scenario: Tax monthly conversion
+
+- GIVEN fiscalProfit=120000, accumulableIncomeTotal=240000
+- WHEN the tax base is computed
+- THEN NETO SHALL be 10000 and BRUTO 20000
+
+#### Scenario: Fiscal loss knocks out tax only
+
+- GIVEN fiscal loss and a valid bank base
+- WHEN PFAE income is calculated
+- THEN tax-return SHALL be INVALID and source BANK_STATEMENTS
+
+#### Scenario: Default source projection
+
+- GIVEN both bases valid
+- WHEN the snapshot is persisted
+- THEN source SHALL be BANK_STATEMENTS and averages equal bank figures
+
+#### Scenario: Tax source when bank invalid
+
+- GIVEN bank INVALID and tax valid
+- WHEN the snapshot is persisted
+- THEN source SHALL be TAX_RETURN and averages equal tax figures
+
+#### Scenario: Both invalid requires review
+
+- GIVEN both PFAE bases INVALID
+- WHEN income is calculated
+- THEN status SHALL be REQUIRES_REVIEW, no throw, and GET latest succeeds
+- AND source SHALL be BANK_STATEMENTS
+
+### Requirement: SALARIED Payroll Path Unchanged
+
+SALARIED averages MUST stay payroll-only Decimal means.
+
+#### Scenario: SALARIED payroll regression
+
+- GIVEN SALARIED included gross [15000.50, 14999.50]
+- WHEN income is calculated
+- THEN averageGrossIncome SHALL be 15000.00 and source PAYROLL
+
+### Requirement: SAT Synonyms for Window N
+
+N=12 MUST match SAT synonyms (cultivo, ganadería, pecuario, pesca, agrícola, restaurante, alimentos y bebidas) and MUST NOT depend on "primaria". Default MUST remain 6. Window MUST stay case-level.
+
+#### Scenario: Synonym selects twelve months
+
+- GIVEN CSF activity "cultivo"
+- WHEN the bank window is resolved
+- THEN N SHALL be 12
+
+### Requirement: PATCH Income Source
+
+`PATCH /cases/:caseId/income/source` MUST create a new IncomeCalculation with the same `bases`, new `source`, and projected averages, then invoke `runPhaseC`. Invalid chosen bases MUST be rejected.
+
+#### Scenario: Switch source
+
+- GIVEN PFAE snapshot with both bases valid
+- WHEN PATCH sets TAX_RETURN
+- THEN a new snapshot keeps identical bases, stores TAX_RETURN, and projects tax averages
+
+### Requirement: PFAE Cálculo Panel
+
+For PFAE, Cálculo MUST show two unfactored bases (bank statements and tax return) and a single “Base a enviar al banco” picker. Changing the picker MUST call existing PATCH `/income/source`, then refresh latest income and analysis. Peinado discrepancies MUST warn and link to existing extraction. The panel MUST NOT include a deposit editor. SALARIED payroll table requirements MUST remain unchanged. The system MUST NOT add income endpoints.
+
+#### Scenario: Dual bases and picker
+
+- GIVEN a PFAE snapshot with both bases valid
+- WHEN Cálculo renders
+- THEN both unfactored bases display and the picker shows the persisted source
+
+#### Scenario: PATCH refresh
+
+- GIVEN a completed PFAE analysis with both bases valid
+- WHEN the advisor selects the other valid base
+- THEN existing PATCH runs and Cálculo plus Comparativa refresh from latest
+
+#### Scenario: TAX_LOSS disables tax base
+
+- GIVEN tax-return INVALID for fiscal loss and bank valid
+- WHEN Cálculo renders
+- THEN tax-return is not selectable as a successful send path; bank remains; no in-panel editor
+
+#### Scenario: Peinado warn and link
+
+- GIVEN peinado discrepancies exist
+- WHEN Cálculo renders
+- THEN a warning and a link to existing extraction appear, with no deposit editor
+
+#### Scenario: Bank vs tax labels
+
+- GIVEN a PFAE snapshot with both bases
+- WHEN Cálculo renders
+- THEN bank statements show a single monthly deposit average
+- AND tax return shows bruto as acumulables/12 and neto as utilidad/12
+- AND month keys display as `MM/YYYY`

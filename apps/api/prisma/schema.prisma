@@ -122,6 +122,8 @@ model IncomeCalculation {
   confirmedBy          String?
   confirmedAt          DateTime?
   observations         String?
+  source               String   @default("PAYROLL")
+  bases                Json?
   calculatedAt         DateTime @default(now())
 }
 
@@ -238,6 +240,18 @@ enum ProductDestination {
   REMODELACION
 }
 
+enum PfaeFactorMode {
+  MATRIX
+  FLAT
+  NONE
+}
+
+enum TaxReturnPolicy {
+  ACCEPTED
+  NOT_PREFERRED
+  REJECTED
+}
+
 model Bank {
   id                   String              @id @default(uuid())
   code                 String              @unique
@@ -247,7 +261,11 @@ model Bank {
   minimumBureauScore   Int?
   isActive             Boolean             @default(true)
   sourceVersion        String
+  pfaeFactorMode       PfaeFactorMode      @default(MATRIX)
+  pfaeFlatFactor       Decimal?            @db.Decimal(5, 4)
+  taxReturnPolicy      TaxReturnPolicy     @default(ACCEPTED)
   policies             BankPolicy[]
+  activityFactors      BankActivityFactor[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 }
@@ -262,6 +280,9 @@ model BankPolicy {
   minimumEmploymentTenureMonths Int?
   minimumApplicantAgeMonths     Int?
   maximumApplicationAgeMonths   Int?
+  minimumActivityTenureMonths   Int?
+  minimumIncomePfae             Decimal?           @db.Decimal(12, 2)
+  minimumApplicantAgeMonthsPfae Int?
   isActive                      Boolean            @default(true)
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
@@ -270,4 +291,20 @@ model BankPolicy {
 
   @@unique([bankId, destination])
   @@index([destination, isActive])
+}
+
+model BankActivityFactor {
+  id              String   @id @default(uuid())
+  bankId          String
+  nativeLabel     String
+  satAliases      Json
+  factor          Decimal  @db.Decimal(5, 4)
+  factorTaxReturn Decimal? @db.Decimal(5, 4)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bank Bank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@unique([bankId, nativeLabel])
+  @@index([bankId])
 }

@@ -32,7 +32,18 @@ describe('CreateMortgageCaseDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('should reject personType different from SALARIED', async () => {
+  it('should accept PFAE personType', async () => {
+    const dto = plainToInstance(CreateMortgageCaseDto, {
+      ...validPayload,
+      personType: 'PFAE',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should reject personType different from SALARIED and PFAE', async () => {
     const dto = plainToInstance(CreateMortgageCaseDto, {
       ...validPayload,
       personType: 'INDEPENDENT',

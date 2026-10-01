@@ -97,3 +97,8 @@ export type Bank = Prisma.BankModel
  * 
  */
 export type BankPolicy = Prisma.BankPolicyModel
+/**
+ * Model BankActivityFactor
+ * 
+ */
+export type BankActivityFactor = Prisma.BankActivityFactorModel
