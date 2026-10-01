@@ -14,16 +14,33 @@ import {
 
 // ── Keyword sets for classification ───────────────────────────────────────
 
-const REVOLVING_KEYWORDS = ['TARJETA', 'REVOLVENTE', 'LINEA', 'LÍNEA'];
+const REVOLVING_KEYWORDS = ['TARJETA', 'REVOLVENTE', 'LINEA'];
 const FIXED_KEYWORDS = [
   'AUTO',
   'HIPOTECA',
+  'HIPOTECARIO',
+  'BIENES RAICES',
+  'ARRENDAMIENTO',
   'PERSONAL',
   'NOMINA',
-  'NÓMINA',
   'SERVICIO',
   'SIMPLE',
 ];
+const EXTRACTED_FIXED_CLASSES = new Set([
+  'FIXED_PAYMENT',
+  'FIXED',
+  'FIXED_INSTALLMENT',
+  'MORTGAGE',
+  'AUTO',
+  'PERSONAL_LOAN',
+]);
+
+function normalizeClassText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
 
 // ── Institution name → category mapping ──────────────────────────────────
 
@@ -351,7 +368,7 @@ export class LiabilityCalculationService {
     reason: string | null;
   } {
     // Step 1: Gemini explicit classification
-    const geminiClass = (input.classification ?? '').toUpperCase();
+    const geminiClass = normalizeClassText(input.classification ?? '');
     if (geminiClass === 'REVOLVING') {
       return {
         nature: CreditNature.REVOLVING,
@@ -359,11 +376,7 @@ export class LiabilityCalculationService {
         reason: null,
       };
     }
-    if (
-      geminiClass === 'FIXED_PAYMENT' ||
-      geminiClass === 'FIXED' ||
-      geminiClass === 'FIXED_INSTALLMENT'
-    ) {
+    if (EXTRACTED_FIXED_CLASSES.has(geminiClass)) {
       return {
         nature: CreditNature.FIXED,
         source: ClassificationSource.EXTRACTED,
@@ -372,9 +385,9 @@ export class LiabilityCalculationService {
     }
 
     // Step 2: Keyword matching on creditType + productName + institution
-    const searchText = [input.creditType, input.productName ?? '', input.institution ?? '']
-      .join(' ')
-      .toUpperCase();
+    const searchText = normalizeClassText(
+      [input.creditType, input.productName ?? '', input.institution ?? ''].join(' '),
+    );
 
     const revolvingMatches = REVOLVING_KEYWORDS.filter((kw) =>
       searchText.includes(kw),

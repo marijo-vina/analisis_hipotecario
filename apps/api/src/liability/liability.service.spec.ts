@@ -656,6 +656,52 @@ describe('LiabilityCalculationService', () => {
       expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
     });
 
+    it('classifies MORTGAGE bienes raíces as FIXED and uses the payment', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'BIENES RAICES',
+          classification: 'MORTGAGE',
+          currentBalance: 4572586,
+          paymentDueAmountEffective: 51200,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+      expect(credit.classificationSource).toBe(ClassificationSource.EXTRACTED);
+      expect(credit.monthlyDebtContribution).toBe(51200);
+    });
+
+    it('classifies BIENES RAÍCES as FIXED via keyword when the bureau class is missing', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'BIENES RAÍCES',
+          classification: 'UNKNOWN',
+          currentBalance: 4475627,
+          paymentDueAmountEffective: 47606,
+        }),
+      ]);
+
+      const credit = result.credits[0];
+      expect(credit.creditNature).toBe(CreditNature.FIXED);
+      expect(credit.classificationSource).toBe(ClassificationSource.KEYWORD);
+      expect(credit.monthlyDebtContribution).toBe(47606);
+    });
+
+    it('classifies ARRENDAMIENTO as FIXED via keyword', async () => {
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'ARRENDAMIENTO AUTOMOTRIZ',
+          classification: 'UNKNOWN',
+          currentBalance: 120000,
+          paymentDueAmountEffective: 8000,
+        }),
+      ]);
+
+      expect(result.credits[0].creditNature).toBe(CreditNature.FIXED);
+      expect(result.credits[0].monthlyDebtContribution).toBe(8000);
+    });
+
     it('falls back to UNKNOWN when no keywords match', async () => {
       const result = await service.calculate('case-1', [
         makeCredit({

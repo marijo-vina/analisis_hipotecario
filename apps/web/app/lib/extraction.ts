@@ -622,6 +622,7 @@ export interface ParsedBankStatement {
 
   // Financial Depuration (PFAE & v1.2)
   financialDepuration?: {
+    incomeMode?: 'PAYROLL' | 'BUSINESS';
     depurationSummary: {
       totalGrossDeposits: number;
       totalTrashDeposits: number;

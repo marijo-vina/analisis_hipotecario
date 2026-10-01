@@ -164,4 +164,67 @@ describe('BankStatementGridExtractor', () => {
     const transactions = BankStatementGridExtractor.extractTransactions(layout, 2025);
     expect(transactions).toEqual([]);
   });
+
+  it('reads a Banorte deposit whose description wraps below the amount', () => {
+    const page: OcrPage = {
+      pageNumber: 2,
+      width: 1700,
+      height: 2200,
+      lines: [
+        {
+          text: 'MONTO DEL DEPOSITO MONTO DEL RETIRO',
+          boundingBox: { top: 200, bottom: 220, left: 1000, right: 1400 },
+          confidence: 0.99,
+        },
+        {
+          text: '01-JUN-26 FN779 SPEI RECIBIDO DEL CLIENTE',
+          boundingBox: { top: 300, bottom: 320, left: 100, right: 900 },
+          confidence: 0.98,
+        },
+        {
+          text: '190,000.00',
+          boundingBox: { top: 300, bottom: 320, left: 1080, right: 1180 },
+          confidence: 0.99,
+        },
+        {
+          text: '200,755.95',
+          boundingBox: { top: 300, bottom: 320, left: 1500, right: 1600 },
+          confidence: 0.99,
+        },
+        {
+          text: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL DE LA CLABE 699 CON RFC',
+          boundingBox: { top: 340, bottom: 360, left: 150, right: 900 },
+          confidence: 0.98,
+        },
+        {
+          text: 'LST230905G7A CONCEPTO: PAGO REFERENCIA: 1777159',
+          boundingBox: { top: 370, bottom: 390, left: 150, right: 900 },
+          confidence: 0.98,
+        },
+        {
+          text: '01-JUN-26 COMPRA ORDEN DE PAGO SPEI',
+          boundingBox: { top: 480, bottom: 500, left: 100, right: 900 },
+          confidence: 0.98,
+        },
+        {
+          text: '66,488.00',
+          boundingBox: { top: 480, bottom: 500, left: 1280, right: 1380 },
+          confidence: 0.99,
+        },
+      ],
+      tokens: [],
+    };
+
+    const transactions = BankStatementGridExtractor.extractTransactions(
+      { pages: [page] },
+      2026,
+    );
+
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0].amount).toBe(190000);
+    expect(transactions[0].date).toBe('2026-06-01');
+    expect(transactions[0].originalConcept).toContain('LUXMARBY');
+    expect(transactions[0].originalConcept).toContain('LST230905G7A');
+    expect(transactions[0].payerRfc).toBe('LST230905G7A');
+  });
 });
