@@ -34,6 +34,12 @@ export default function EstadosMesesMovimientos({
     return false;
   });
 
+  // Prefer aggregated context; fall back to periods on each statement card.
+  const coveredMonths =
+    context?.coveredMonths && context.coveredMonths.length > 0
+      ? context.coveredMonths
+      : deriveCoveredMonths(dataStatements);
+
   return (
     <div className="bg-white border border-gf-border rounded-xl p-6 shadow-2xs space-y-5 mt-4">
       <h3 className="text-xs font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5">
@@ -41,43 +47,10 @@ export default function EstadosMesesMovimientos({
         Cobertura de meses
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-gf-surface p-4 rounded-xl border border-gf-border/60 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-            Estados procesados
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-bold text-gf-text">
-              {dataStatements.length}
-            </span>
-            <span className="text-xs font-medium text-gf-text-muted">
-              de {statements.length} totales
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-gf-surface p-4 rounded-xl border border-gf-border/60 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-gf-text-muted uppercase tracking-wider">
-            Meses cerrados válidos
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-bold text-gf-text">
-              {closedStatements.length}
-            </span>
-            {context?.requiredMonths != null && (
-              <span className="text-xs font-medium text-gf-text-muted">
-                mínimo requerido: {context.requiredMonths}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Month grid visualization */}
-      {context && context.coveredMonths.length > 0 ? (
+      {coveredMonths.length > 0 ? (
         <div className="space-y-3 pt-1">
           <div className="flex flex-wrap gap-3">
-            {context.coveredMonths.map((ym) => {
+            {coveredMonths.map((ym) => {
               const parts = ym.split("-");
               const monthLabel = MONTH_LABELS[parts[1]] ?? parts[1];
 
@@ -138,20 +111,41 @@ export default function EstadosMesesMovimientos({
             })}
           </div>
 
-          {/* Summary line */}
           <p className="text-xs text-gf-text-muted pt-1">
-            {closedStatements.length} de{" "}
-            {context.requiredMonths ?? "?"} meses cerrados requeridos.
-            {context.isRequirementSatisfied &&
-            context.requiredMonths != null &&
-            closedStatements.length >= context.requiredMonths
-              ? " El requisito de antigüedad está satisfecho."
-              : context.requiredMonths != null &&
-                  closedStatements.length < context.requiredMonths
-                ? ` Pendientes ${
-                    context.requiredMonths - closedStatements.length
-                  } mes${context.requiredMonths - closedStatements.length > 1 ? "es" : ""} cerrado${context.requiredMonths - closedStatements.length > 1 ? "s" : ""} adicional${context.requiredMonths - closedStatements.length > 1 ? "es" : ""}.`
-                : ""}
+            {context?.requiredMonths != null ? (
+              <>
+                {closedStatements.length} de {context.requiredMonths} meses
+                cerrados requeridos.
+                {context.isRequirementSatisfied &&
+                closedStatements.length >= context.requiredMonths
+                  ? " El requisito de antigüedad está satisfecho."
+                  : closedStatements.length < context.requiredMonths
+                    ? ` Pendientes ${
+                        context.requiredMonths - closedStatements.length
+                      } mes${
+                        context.requiredMonths - closedStatements.length > 1
+                          ? "es"
+                          : ""
+                      } cerrado${
+                        context.requiredMonths - closedStatements.length > 1
+                          ? "s"
+                          : ""
+                      } adicional${
+                        context.requiredMonths - closedStatements.length > 1
+                          ? "es"
+                          : ""
+                      }.`
+                    : ""}
+              </>
+            ) : (
+              <>
+                {coveredMonths.length} mes
+                {coveredMonths.length !== 1 ? "es" : ""} cubierto
+                {coveredMonths.length !== 1 ? "s" : ""} ·{" "}
+                {closedStatements.length} cerrado
+                {closedStatements.length !== 1 ? "s" : ""}.
+              </>
+            )}
           </p>
         </div>
       ) : (
@@ -161,6 +155,18 @@ export default function EstadosMesesMovimientos({
       )}
     </div>
   );
+}
+
+function deriveCoveredMonths(statements: ParsedBankStatement[]): string[] {
+  const months = new Set<string>();
+  for (const s of statements) {
+    for (const iso of [s.periodStart, s.periodEnd]) {
+      if (!iso) continue;
+      const m = /^(\d{4}-\d{2})/.exec(iso);
+      if (m) months.add(m[1]);
+    }
+  }
+  return Array.from(months).sort();
 }
 
 function getBankForMonth(

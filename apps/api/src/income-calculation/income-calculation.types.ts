@@ -14,6 +14,36 @@ export enum IncomeCalculationStatus {
   REQUIRES_REVIEW = 'REQUIRES_REVIEW',
 }
 
+export type IncomeSource = 'PAYROLL' | 'BANK_STATEMENTS' | 'TAX_RETURN';
+
+export interface IncomeBase {
+  valid: boolean;
+  invalidReason: string | null;
+  monthlyGross: number | null;
+  monthlyNet: number | null;
+}
+
+export interface BankIncomeBase extends IncomeBase {
+  windowMonths: 6 | 12;
+  monthsUsed: string[];
+  droppedMax: string | null;
+  droppedMin: string | null;
+}
+
+export interface ActivityResolution {
+  description: string | null;
+  percentage: number | null;
+  order: number | null;
+  matchedKeyword: string | null;
+  windowMonths: 6 | 12;
+}
+
+export interface PfaeIncomeBases {
+  bank: BankIncomeBase;
+  taxReturn: IncomeBase;
+  activity: ActivityResolution;
+}
+
 // ── Interfaces ───────────────────────────────────────────────────────────
 
 /**
@@ -56,4 +86,6 @@ export interface IncomeCalculationResult {
   confirmedBy: string | null;
   confirmedAt: string | null;
   observations: string | null;
+  source?: IncomeSource;
+  bases?: PfaeIncomeBases | null;
 }

@@ -118,7 +118,7 @@ export interface MatchTrace {
   amountDiffPercent?: number;
   conceptKeyword?: string;
   /** Candidatos evaluados y descartados antes de llegar al resultado final. */
-  discardReasons: DiscardReason[];
+  discardReasons?: DiscardReason[];
 }
 
 // ── Resultado ───────────────────────────────────────────────────────────────

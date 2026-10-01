@@ -24,10 +24,11 @@ import {
 } from './bankarization.types';
 
 describe('bankarization.types', () => {
-  describe('PayrollReconciliationStatus (8 valores del proposal)', () => {
-    it('expone exactamente los 8 estados definidos', () => {
+  describe('PayrollReconciliationStatus (valores del proposal)', () => {
+    it('expone exactamente los estados definidos', () => {
       expect(PAYROLL_RECONCILIATION_STATUSES).toEqual([
         'MATCHED',
+        'MATCHED_2_OF_3',
         'NOT_MATCHED',
         'DISCREPANCY',
         'RFC_INCOMPATIBLE',
@@ -40,13 +41,13 @@ describe('bankarization.types', () => {
 
     it('acepta cada valor del catalogo como miembro valido del tipo', () => {
       const statusProbes: PayrollReconciliationStatus[] = [
-        'MATCHED', 'NOT_MATCHED', 'DISCREPANCY', 'RFC_INCOMPATIBLE',
+        'MATCHED', 'MATCHED_2_OF_3', 'NOT_MATCHED', 'DISCREPANCY', 'RFC_INCOMPATIBLE',
         'AMBIGUOUS', 'PROVIDER_CANDIDATE', 'PROVIDER_MIRROR_CONFIRMED',
         'MANUAL_REVIEW',
       ];
-      expect(statusProbes).toHaveLength(8);
+      expect(statusProbes).toHaveLength(9);
       expect(statusProbes[0]).toBe('MATCHED');
-      expect(statusProbes[7]).toBe('MANUAL_REVIEW');
+      expect(statusProbes[8]).toBe('MANUAL_REVIEW');
     });
   });
 
@@ -94,8 +95,15 @@ describe('bankarization.types', () => {
         index: 0,
         netIncome: 15000,
         paymentDate: '2026-07-01',
+        resolvedPaymentDate: {
+          resolvedPaymentDate: '2026-07-01',
+          source: 'EXPLICIT',
+          estimated: false,
+          originalPeriodLabel: null,
+        },
         employerRfc: 'ABC123456XYZ',
         employerName: 'Empresa Demo',
+        originalName: 'nomina.pdf',
       };
       expect(receipt.index).toBe(0);
       expect(receipt.netIncome).toBe(15000);
@@ -137,6 +145,7 @@ describe('bankarization.types', () => {
         candidateConcept: 'PAGO DE NOMINA',
         score: null,
         scotiabankExcluded: false,
+        usedPaymentDate: '2026-07-01',
         traceability: {
           rule: 'RFC_MATCH',
           rfcUsed: 'ABC123456XYZ',

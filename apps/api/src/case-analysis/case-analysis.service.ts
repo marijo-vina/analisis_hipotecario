@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   AnalysisRule,
@@ -6,17 +6,24 @@ import type {
 } from './analysis-rule.interface';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
+import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
 import { mapBureauCreditToInput } from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
 import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
+import {
+  applySalariedPayrollDepuration,
+  employersFromDocuments,
+  promoteEmployerPayrollDeposits,
+} from '../documents/payroll-deposit-match';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
   id: string;
   client: Record<string, unknown>;
+  personType?: string | null;
   documents: {
     extractedData: unknown;
     documentType: { code: string };
@@ -43,7 +50,8 @@ export interface AnalysisResultPayload {
  * Orchestrates cross-document analysis for a mortgage case.
  *
  * 3-phase execution:
- *  Phase A: identity-match + bankarization-validation rules
+ *  Phase A: identity-match + personType-specific validation rules
+ *    (SALARIED: bankarization-validation; PFAE: pfae-validation)
  *  Phase B: income calculation + liability calculation (services)
  *  Phase C: bank-viability rule (reads income/liability from DB)
  *
@@ -51,19 +59,58 @@ export interface AnalysisResultPayload {
  */
 @Injectable()
 export class CaseAnalysisService {
-  private readonly phaseARules: AnalysisRule[];
-
   constructor(
     private readonly prisma: PrismaService,
-    identityMatchRule: IdentityMatchRule,
-    bankarizationValidationRule: BankarizationValidationRule,
+    private readonly identityMatchRule: IdentityMatchRule,
+    private readonly bankarizationValidationRule: BankarizationValidationRule,
+    private readonly pfaeValidationRule: PfaeValidationRule,
     private readonly bankViabilityRule: BankViabilityRule,
+    @Inject(forwardRef(() => IncomeCalculationService))
     private readonly incomeCalcService: IncomeCalculationService,
     private readonly liabilityCalcService: LiabilityCalculationService,
     private readonly caseStatusCalculator: CaseStatusCalculatorService,
-  ) {
-    // Phase A rules — pure evaluation, no side-effect-producing services.
-    this.phaseARules = [identityMatchRule, bankarizationValidationRule];
+  ) {}
+
+  /**
+   * Resolves the Phase A rule set per request based on `personType`.
+   * PFAE runs `identity-match` + `pfae-validation` (CSF/bank gates).
+   * SALARIED (or absent/unrecognized `personType`) runs `identity-match` +
+   * `bankarization-validation`, matching prior behavior.
+   */
+  private resolvePhaseARules(personType?: string | null): AnalysisRule[] {
+    if (personType === 'PFAE') {
+      return [this.identityMatchRule, this.pfaeValidationRule];
+    }
+    return [this.identityMatchRule, this.bankarizationValidationRule];
+  }
+
+  /**
+   * SPEI deposits often say only "PAGO". Match them to the payroll employer
+   * name or RFC and store them so the empty-payroll alert and the
+   * reconciliation see the same deposits.
+   */
+  private async persistEmployerPayrollDeposits(
+    docs: Record<string, unknown>[],
+  ): Promise<void> {
+    const employers = employersFromDocuments(
+      docs as { documentType?: { code?: string } | null; extractedData?: unknown }[],
+    );
+
+    for (const doc of docs) {
+      if ((doc.documentType as { code?: string } | undefined)?.code !== 'BANK_STATEMENT') {
+        continue;
+      }
+      const extractedData = doc.extractedData;
+      if (!extractedData || typeof extractedData !== 'object') continue;
+      const payload = extractedData as Record<string, unknown>;
+      const promoted = promoteEmployerPayrollDeposits(payload, employers);
+      const incomeRestricted = applySalariedPayrollDepuration(payload);
+      if ((!promoted && !incomeRestricted) || typeof doc.id !== 'string') continue;
+      await this.prisma.document.update({
+        where: { id: doc.id },
+        data: { extractedData: payload as never },
+      });
+    }
   }
 
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
@@ -79,12 +126,17 @@ export class CaseAnalysisService {
     const context = {
       ...mortgageCase.client,
       caseId,
+      personType: mortgageCase.personType,
     } as Record<string, unknown>;
     const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+    if (mortgageCase.personType !== 'PFAE') {
+      await this.persistEmployerPayrollDeposits(docs);
+    }
 
     // ── Phase A: Document validation rules ──────────────────────────────
+    const phaseARules = this.resolvePhaseARules(mortgageCase.personType);
     const ruleResults: RuleResult[] = [];
-    for (const rule of this.phaseARules) {
+    for (const rule of phaseARules) {
       const result = await rule.execute(context, docs);
       ruleResults.push(result);
     }
@@ -124,14 +176,90 @@ export class CaseAnalysisService {
     const bankViabilityResult = await this.bankViabilityRule.execute(phaseCContext, docs);
     ruleResults.push(bankViabilityResult);
 
+    return this.persistCompletedRun(
+      caseId,
+      triggeredBy,
+      ruleResults,
+      bankViabilityResult,
+    );
+  }
+
+  /**
+   * Phase-C-only re-run: copy prior Phase A `ruleResults`, skip Phase B
+   * recalculation, execute BankViabilityRule against the latest income and
+   * liability snapshots already in the database, and persist a new AnalysisRun.
+   */
+  async runPhaseC(
+    caseId: string,
+    triggeredBy: string,
+  ): Promise<AnalysisResultPayload> {
+    const mortgageCase = (await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      include: { client: true, documents: { include: { documentType: true } } },
+    })) as LoadedMortgageCase | null;
+
+    if (!mortgageCase) {
+      throw new NotFoundException('Mortgage case not found');
+    }
+
+    const priorRun = await this.prisma.analysisRun.findFirst({
+      where: { mortgageCaseId: caseId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!priorRun) {
+      throw new NotFoundException('No analysis run found for this case');
+    }
+
+    const priorDetail = (priorRun.detail ?? {}) as {
+      ruleResults?: RuleResult[];
+    };
+    const phaseAResults = (priorDetail.ruleResults ?? []).filter(
+      (result) => result.ruleId !== 'bank-viability',
+    );
+
+    const bankarizationResult = phaseAResults.find(
+      (result) => result.ruleId === 'bankarization-validation',
+    );
+    const bankarizationFlags: BankarizationFlags = {
+      hasPagadoraIncome:
+        (bankarizationResult?.detail.hasPagadoraIncome as boolean) ?? false,
+      scotiabankExcluded:
+        (bankarizationResult?.detail.scotiabankExcluded as boolean) ?? false,
+    };
+
+    const phaseCContext = {
+      ...mortgageCase.client,
+      caseId,
+      personType: mortgageCase.personType,
+      bankarizationFlags,
+    } as Record<string, unknown>;
+    const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+
+    const bankViabilityResult = await this.bankViabilityRule.execute(
+      phaseCContext,
+      docs,
+    );
+    const ruleResults = [...phaseAResults, bankViabilityResult];
+
+    return this.persistCompletedRun(
+      caseId,
+      triggeredBy,
+      ruleResults,
+      bankViabilityResult,
+    );
+  }
+
+  private async persistCompletedRun(
+    caseId: string,
+    triggeredBy: string,
+    ruleResults: RuleResult[],
+    bankViabilityResult: RuleResult,
+  ): Promise<AnalysisResultPayload> {
     const aggregate = this.aggregate(ruleResults);
+    const bankViability = (bankViabilityResult.detail as Record<string, unknown>)
+      .bankViability;
 
-    // Merge bankViability snapshot from the bank-viability rule into detail.
-    const bankViability = bankViabilityResult
-      ? (bankViabilityResult.detail as Record<string, unknown>).bankViability
-      : undefined;
-
-    // Persist the immutable AnalysisRun + its AnalysisAlert records.
     const createdRun = await this.prisma.analysisRun.create({
       data: {
         mortgageCaseId: caseId,
@@ -150,7 +278,6 @@ export class CaseAnalysisService {
       },
     });
 
-    // Recalculate case status — the new COMPLETED run may advance to PRELIMINARY_RESULT.
     await this.caseStatusCalculator.recalculate(caseId);
 
     return {

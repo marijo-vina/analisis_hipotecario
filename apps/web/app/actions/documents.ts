@@ -279,6 +279,7 @@ export async function extractCreditBureau(
         requiresManualReview: boolean;
       }>;
       missingFields: string[];
+      error?: { code?: string; message?: string };
     };
   }>(
     `/mortgage-cases/${caseId}/documents/${documentId}/extract-bureau`,
@@ -288,6 +289,20 @@ export async function extractCreditBureau(
   if (!result.ok) {
     throw new Error(
       result.errors._form ??
+        "Error al extraer datos del buró de crédito",
+    );
+  }
+
+  if (!result.data.data.success) {
+    throw new Error(
+      result.data.data.error?.message ??
+        "Error al extraer datos del buró de crédito",
+    );
+  }
+
+  if (!result.data.data.success) {
+    throw new Error(
+      result.data.data.error?.message ??
         "Error al extraer datos del buró de crédito",
     );
   }
@@ -431,3 +446,102 @@ export async function updateDocumentExtractedDataField(
   revalidatePath(`/dashboard/expedientes/${caseId}`);
   return { success: true, extractedData: result.data.data };
 }
+
+/**
+ * Extrae datos estructurados de una Constancia de Situación Fiscal (CSF)
+ * usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-csf`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ */
+export async function extractCsf(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+}> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-csf`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al extraer datos de la Constancia de Situación Fiscal",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+  return { success: true, extractedData: result.data.data };
+}
+
+/**
+ * Extrae datos estructurados de una Declaración Anual del SAT
+ * usando Gemini AI.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-tax-return`
+ * del backend NestJS. El documento debe estar en estado PROCESSED.
+ */
+export async function extractTaxReturn(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+}> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-tax-return`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al extraer datos de la Declaración Anual",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+  return { success: true, extractedData: result.data.data };
+}
+
+/**
+ * Actualiza la clasificación de un depósito en la depuración financiera de un estado de cuenta.
+ *
+ * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/bank-deposits/:depositIndex/classification`
+ */
+export async function updateBankDepositClassification(
+  caseId: string,
+  documentId: string,
+  depositIndex: number,
+  classification: "VALID" | "TRASH",
+  reason?: string,
+): Promise<{ success: boolean; extractedData: Record<string, unknown> }> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/bank-deposits/${depositIndex}/classification`,
+    {
+      method: "PATCH",
+      body: { classification, reason },
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al actualizar la clasificación del depósito",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+
+  return {
+    success: true,
+    extractedData: result.data.data,
+  };
+}
+

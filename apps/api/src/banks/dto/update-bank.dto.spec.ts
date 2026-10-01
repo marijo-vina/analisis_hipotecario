@@ -196,4 +196,68 @@ describe('UpdateBankDto', () => {
       expect(errors).toHaveLength(0);
     });
   });
+
+  describe('PFAE factor card (HU-20)', () => {
+    it('should accept PATCH card FLAT 0.6', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        pfaeFactorMode: 'FLAT',
+        pfaeFlatFactor: 0.6,
+      });
+      const errors = await validate(dto);
+      const modeErrors = errors.filter((e) => e.property === 'pfaeFactorMode');
+      const factorErrors = errors.filter((e) => e.property === 'pfaeFlatFactor');
+      expect(modeErrors).toHaveLength(0);
+      expect(factorErrors).toHaveLength(0);
+      expect(dto.pfaeFactorMode).toBe('FLAT');
+      expect(dto.pfaeFlatFactor).toBe(0.6);
+    });
+
+    it('should reject invalid pfaeFactorMode', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        pfaeFactorMode: 'INVALID',
+      });
+      const errors = await validate(dto);
+      const modeErrors = errors.filter((e) => e.property === 'pfaeFactorMode');
+      expect(modeErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept NONE and REJECTED taxReturnPolicy', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        pfaeFactorMode: 'NONE',
+        taxReturnPolicy: 'REJECTED',
+      });
+      const errors = await validate(dto);
+      const modeErrors = errors.filter((e) => e.property === 'pfaeFactorMode');
+      const taxErrors = errors.filter((e) => e.property === 'taxReturnPolicy');
+      expect(modeErrors).toHaveLength(0);
+      expect(taxErrors).toHaveLength(0);
+    });
+
+    it('should reject invalid taxReturnPolicy', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        taxReturnPolicy: 'MAYBE',
+      });
+      const errors = await validate(dto);
+      const taxErrors = errors.filter((e) => e.property === 'taxReturnPolicy');
+      expect(taxErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept pfaeFlatFactor 1.5 (no max, unlike debtCommitmentFactor)', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        pfaeFlatFactor: 1.5,
+      });
+      const errors = await validate(dto);
+      const factorErrors = errors.filter((e) => e.property === 'pfaeFlatFactor');
+      expect(factorErrors).toHaveLength(0);
+    });
+
+    it('should reject negative pfaeFlatFactor', async () => {
+      const dto = plainToInstance(UpdateBankDto, {
+        pfaeFlatFactor: -0.1,
+      });
+      const errors = await validate(dto);
+      const factorErrors = errors.filter((e) => e.property === 'pfaeFlatFactor');
+      expect(factorErrors.length).toBeGreaterThan(0);
+    });
+  });
 });

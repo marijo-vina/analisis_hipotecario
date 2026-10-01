@@ -1,0 +1,26 @@
+---
+description: Modelos Cursor por fase SDD (cuota Grok/Composer; Opus solo en propose y design)
+alwaysApply: true
+---
+
+# SDD phase models (Cursor)
+
+When launching SDD or Judgment-Day subagents with the Task tool, pass these exact `model` slugs. Do not use Gentle AI aliases `sonnet` / `opus` / `haiku` — they are not in Cursor's allowlist.
+
+| Phase | Cursor `model` |
+|-------|----------------|
+| sdd-explore | `cursor-grok-4.6-high` |
+| sdd-propose | `claude-opus-5-thinking-high` |
+| sdd-spec | `cursor-grok-4.6-high` |
+| sdd-design | `claude-opus-5-thinking-high` |
+| sdd-tasks | `composer-2.5-fast` |
+| sdd-apply | `cursor-grok-4.6-high` |
+| sdd-verify | `cursor-grok-4.6-high` |
+| sdd-archive | `composer-2.5-fast` |
+| sdd-onboard | `composer-2.5-fast` |
+| jd-judge-a | `cursor-grok-4.6-high` |
+| jd-judge-b | `cursor-grok-4.6-high` |
+| jd-fix-agent | `cursor-grok-4.6-high` |
+| default | `cursor-grok-4.6-high` |
+
+Orchestrator chat may stay on Grok 4.6. Do not spend Opus except propose and design.

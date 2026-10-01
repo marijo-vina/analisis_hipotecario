@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CaseAnalysisService } from '../case-analysis/case-analysis.service';
 import { IncomeCalculationController } from './income-calculation.controller';
 import { IncomeCalculationService } from './income-calculation.service';
 import {
@@ -105,6 +106,10 @@ describe('IncomeCalculationController — full lifecycle (integration)', () => {
       controllers: [IncomeCalculationController],
       providers: [
         { provide: IncomeCalculationService, useValue: mockService },
+        {
+          provide: CaseAnalysisService,
+          useValue: { runPhaseC: jest.fn() },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)

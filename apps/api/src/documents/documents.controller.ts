@@ -27,6 +27,8 @@ import { BankStatementExtractionService } from './bank-statement-extraction.serv
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { CsfExtractionService } from './csf-extraction.service';
+import { TaxReturnExtractionService } from './tax-return-extraction.service';
 import { GcsService } from './gcs.service';
 
 @UseGuards(JwtAuthGuard)
@@ -39,6 +41,8 @@ export class DocumentsController {
     private readonly bankStatementExtractionService: BankStatementExtractionService,
     private readonly creditBureauExtractionService: CreditBureauExtractionService,
     private readonly creditScoreExtractionService: CreditScoreExtractionService,
+    private readonly csfExtractionService: CsfExtractionService,
+    private readonly taxReturnExtractionService: TaxReturnExtractionService,
     private readonly coordinateExtractionService: CoordinateExtractionService,
     private readonly gcsService: GcsService,
   ) {}
@@ -180,6 +184,33 @@ export class DocumentsController {
     return { data };
   }
 
+  /**
+   * DEV-ONLY: Benchmark bank-statement extraction.
+   *
+   * Re-runs extraction `runs` times WITHOUT persisting, reusing the stored
+   * OCR layout, and returns aggregated timing (p50/p95) plus RFC/grid
+   * detection-rate and non-determinism statistics. Used to gather evidence
+   * before optimizing. Disabled in production.
+   */
+  @Post(':documentId/bank-statement-benchmark')
+  @HttpCode(200)
+  async benchmarkBankStatement(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Query('runs') runs?: string,
+  ) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('Benchmark endpoint is disabled in production.');
+    }
+    const parsedRuns = parseInt(runs || '5', 10);
+    const data = await this.bankStatementExtractionService.benchmark(
+      caseId,
+      documentId,
+      Number.isNaN(parsedRuns) ? 5 : parsedRuns,
+    );
+    return { data };
+  }
+
   @Post(':documentId/extract-bureau')
   @HttpCode(200)
   async extractCreditBureau(
@@ -218,6 +249,28 @@ export class DocumentsController {
   }
 
   /**
+   * PATCH /mortgage-cases/:caseId/documents/:documentId/bank-deposits/:depositIndex/classification
+   *
+   * Allows an analyst to manually approve (VALID) or discard (TRASH)
+   * a single deposit in a bank statement's financial depuration.
+   */
+  @Patch(':documentId/bank-deposits/:depositIndex/classification')
+  @HttpCode(200)
+  async updateBankDepositClassification(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+    @Param('depositIndex', ParseIntPipe) depositIndex: number,
+    @Body() body: { classification: 'VALID' | 'TRASH'; reason?: string; trashCategory?: string },
+  ) {
+    const data = await this.bankStatementExtractionService.updateDepositClassification(
+      documentId,
+      depositIndex,
+      body,
+    );
+    return { data };
+  }
+
+  /**
    * PATCH /mortgage-cases/:caseId/documents/:documentId/inquiries
    *
    * Allows an analyst to manually set or confirm the "Consultas 24 meses"
@@ -247,6 +300,26 @@ export class DocumentsController {
       caseId,
       documentId,
     );
+    return { data };
+  }
+
+  @Post(':documentId/extract-csf')
+  @HttpCode(200)
+  async extractCsf(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.csfExtractionService.extract(caseId, documentId);
+    return { data };
+  }
+
+  @Post(':documentId/extract-tax-return')
+  @HttpCode(200)
+  async extractTaxReturn(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.taxReturnExtractionService.extract(caseId, documentId);
     return { data };
   }
 

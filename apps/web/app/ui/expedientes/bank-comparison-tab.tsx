@@ -5,9 +5,14 @@ import type {
   BankViabilitySnapshot,
   BankResult,
   BankResultStatus,
+  CheckResult,
 } from "@/app/lib/definitions";
-import { STATUS_LABELS, REASON_LABELS, DESTINATION_LABELS, getReasonLabel } from "@/app/lib/definitions";
+import { STATUS_LABELS, DESTINATION_LABELS, getReasonLabel } from "@/app/lib/definitions";
 import DataTable, { type Column } from "@/app/ui/common/data-table";
+import PfaeProductDetailExtras, {
+  factorTimesHint,
+  originDisplay,
+} from "@/app/ui/expedientes/pfae-product-detail-extras";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +43,27 @@ const STATUS_BADGE_COLORS: Record<string, string> = {
   REQUIRES_REVIEW: "#1D4ED8",
   NOT_COMPATIBLE: "#991B1B",
 };
+
+/** Neutral gray — mute PRELIMINARY_VIABLE chrome without rewriting stored status. */
+const MUTED_STATUS_BADGE_COLOR = "#6B7280";
+
+function statusBadgeColor(
+  status: string,
+  suppressViablePresentation: boolean,
+): string {
+  if (suppressViablePresentation && status === "PRELIMINARY_VIABLE") {
+    return MUTED_STATUS_BADGE_COLOR;
+  }
+  return STATUS_BADGE_COLORS[status] ?? MUTED_STATUS_BADGE_COLOR;
+}
+
+function checkMonths(
+  check: CheckResult | undefined,
+  key: "actualMonths" | "requiredMonths",
+): number | null {
+  const raw = check?.[key];
+  return typeof raw === "number" ? raw : null;
+}
 
 const BANK_BRANDS: Record<string, { bg: string; text: string; initials: string }> = {
   SCOTIABANK: { bg: "#EC111A", text: "#FFFFFF", initials: "SCO" },
@@ -104,10 +130,15 @@ function isInsufficientReasons(reasons: string[]): boolean {
 
 interface BankComparisonTabProps {
   bankViability?: BankViabilitySnapshot;
+  /** Presentational overlay — never persisted, never mutates stored `status`. */
+  suppressViablePresentation?: boolean;
+  overlayMessage?: string;
 }
 
 export default function BankComparisonTab({
   bankViability,
+  suppressViablePresentation = false,
+  overlayMessage,
 }: BankComparisonTabProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
@@ -144,6 +175,8 @@ export default function BankComparisonTab({
           destination={destination}
           calculatedAt={bankViability.calculatedAt}
           sourceVersion={bankViability.sourceVersion}
+          suppressViablePresentation={suppressViablePresentation}
+          overlayMessage={overlayMessage}
         />
         <FinancialSummary inputs={bankViability.inputs} destination={bankViability.destination} />
         <ProductTable
@@ -151,6 +184,7 @@ export default function BankComparisonTab({
           expandedIndex={expandedIndex}
           onToggle={(i) => setExpandedIndex(expandedIndex === i ? null : i)}
           inputs={bankViability.inputs}
+          suppressViablePresentation={suppressViablePresentation}
         />
         <WarningLegend legend={bankViability.warningLegend} />
       </div>
@@ -192,11 +226,15 @@ function EmptyState({ message }: { message: string }) {
 function StatusHeader({
   bankResults,
   destination,
+  suppressViablePresentation,
+  overlayMessage,
 }: {
   bankResults: BankResult[];
   destination: string | null;
   calculatedAt?: string;
   sourceVersion?: string;
+  suppressViablePresentation: boolean;
+  overlayMessage?: string;
 }) {
   const counts: Record<BankResultStatus, number> = {
     PRELIMINARY_VIABLE: 0,
@@ -211,15 +249,38 @@ function StatusHeader({
   const hasViable = counts.PRELIMINARY_VIABLE > 0;
   const total = bankResults.length;
   const destLabel = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
+  const title = suppressViablePresentation
+    ? (overlayMessage ?? "este camino PFAE no aplica — cambie a asalariado")
+    : hasViable
+      ? "Evaluación con opciones viables"
+      : "Sin bancos compatibles";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-md bg-emerald-50/80 border border-emerald-200/80 text-xs">
+    <div
+      className={
+        suppressViablePresentation
+          ? "flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-md bg-amber-50/80 border border-amber-200/80 text-xs"
+          : "flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-md bg-emerald-50/80 border border-emerald-200/80 text-xs"
+      }
+    >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-bold shrink-0">
-          ✓
+        <span
+          className={
+            suppressViablePresentation
+              ? "flex items-center justify-center w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold shrink-0"
+              : "flex items-center justify-center w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-bold shrink-0"
+          }
+        >
+          {suppressViablePresentation ? "!" : "✓"}
         </span>
-        <span className="font-semibold text-emerald-900">
-          {hasViable ? "Evaluación con opciones viables" : "Sin bancos compatibles"}
+        <span
+          className={
+            suppressViablePresentation
+              ? "font-semibold text-gf-warning"
+              : "font-semibold text-emerald-900"
+          }
+        >
+          {title}
         </span>
         <span className="text-gf-text-muted hidden sm:inline">•</span>
         <span className="text-gf-text-muted font-normal">
@@ -235,8 +296,11 @@ function StatusHeader({
             ["REQUIRES_REVIEW", "#1D4ED8", "Revisión"],
             ["NOT_COMPATIBLE", "#991B1B", "No compatibles"],
           ] as const
-        ).map(([status, color, label]) =>
-          counts[status] > 0 ? (
+        ).map(([status, color, label]) => {
+          if (suppressViablePresentation && status === "PRELIMINARY_VIABLE") {
+            return null;
+          }
+          return counts[status] > 0 ? (
             <span
               key={status}
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white border border-gf-border/40 text-gf-text"
@@ -247,8 +311,8 @@ function StatusHeader({
               />
               <span>{counts[status]} {label}</span>
             </span>
-          ) : null,
-        )}
+          ) : null;
+        })}
       </div>
     </div>
   );
@@ -267,15 +331,29 @@ function FinancialSummary({
     inputs.estimatedTermMonths != null
       ? `${Math.round(inputs.estimatedTermMonths / 12)} años`
       : null;
+  const dest = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
+  const isPfae = inputs.personType === "PFAE";
+  const gross = formatCurrency(inputs.confirmedGrossIncome);
+  const net = formatCurrency(inputs.confirmedNetIncome);
+  const sent = gross === net ? gross : `${gross} bruto · ${net} neto`;
 
-  const fields = [
-    { label: "Ingreso bruto", value: formatCurrency(inputs.confirmedGrossIncome) },
-    { label: "Ingreso neto", value: formatCurrency(inputs.confirmedNetIncome) },
-    { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
-    { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
-    { label: "Plazo", value: termYears ?? "—" },
-    { label: "Destino", value: DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—" },
-  ];
+  const fields = isPfae
+    ? [
+        { label: "Ingreso enviado", value: sent },
+        { label: "Origen", value: originDisplay(inputs.incomeSource) },
+        { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
+        { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
+        { label: "Plazo", value: termYears ?? "—" },
+        { label: "Destino", value: dest },
+      ]
+    : [
+        { label: "Ingreso bruto", value: gross },
+        { label: "Ingreso neto", value: net },
+        { label: "Pasivo mensual", value: formatCurrency(inputs.totalMonthlyLiabilities) },
+        { label: "Valor inmueble", value: formatCurrency(inputs.propertyValue) },
+        { label: "Plazo", value: termYears ?? "—" },
+        { label: "Destino", value: dest },
+      ];
 
   return (
     <div
@@ -309,12 +387,15 @@ function ProductTable({
   expandedIndex,
   onToggle,
   inputs,
+  suppressViablePresentation,
 }: {
   rows: BankResult[];
   expandedIndex: number | null;
   onToggle: (index: number) => void;
   inputs?: BankViabilitySnapshot["inputs"];
+  suppressViablePresentation: boolean;
 }) {
+  const isPfae = inputs?.personType === "PFAE";
   const columns: Column<BankResult>[] = [
     {
       key: "bankCode",
@@ -344,18 +425,26 @@ function ProductTable({
         const criterion = m.policySnapshot.incomeCriterion;
         const isNet = String(criterion).toUpperCase().includes("NET");
         const label = isNet ? "Neto" : "Bruto";
+        const hint = isPfae ? factorTimesHint(m) : null;
         return (
-          <span className="text-xs text-gf-text">
-            {label} · {formatCurrency(m.calculation.incomeUsed)}
+          <span className="flex flex-col text-xs text-gf-text">
+            <span>
+              {label} · {formatCurrency(m.calculation.incomeUsed)}
+            </span>
+            {hint && (
+              <span className="text-[10px] text-gf-text-muted">{hint}</span>
+            )}
           </span>
         );
       },
     },
     {
       key: "ce",
-      header: "CE",
+      header: (
+        <span title="Compromiso de endeudamiento">CE</span>
+      ),
       render: (m) => (
-        <span className="text-xs text-gf-text">
+        <span className="text-xs text-gf-text" title="Compromiso de endeudamiento">
           {formatPercent(m.policySnapshot.debtCommitmentFactor)}
         </span>
       ),
@@ -393,7 +482,7 @@ function ProductTable({
           <div className="flex flex-col gap-0.5">
             <span
               className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap"
-              style={{ backgroundColor: STATUS_BADGE_COLORS[m.status] ?? "#6B7280" }}
+              style={{ backgroundColor: statusBadgeColor(m.status, suppressViablePresentation) }}
             >
               {STATUS_LABELS[m.status] ?? m.status}
             </span>
@@ -419,7 +508,11 @@ function ProductTable({
       />
       {/* Expanded detail panels — rendered below the table */}
       {expandedIndex != null && expandedIndex < rows.length && (
-        <ProductDetail match={rows[expandedIndex]} inputs={inputs} />
+        <ProductDetail
+          match={rows[expandedIndex]}
+          inputs={inputs}
+          suppressViablePresentation={suppressViablePresentation}
+        />
       )}
     </div>
   );
@@ -427,10 +520,19 @@ function ProductTable({
 
 // ── Product Detail (expandable) ──────────────────────────────────────────────
 
-function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViabilitySnapshot["inputs"] }) {
+function ProductDetail({
+  match,
+  inputs,
+  suppressViablePresentation,
+}: {
+  match: BankResult;
+  inputs?: BankViabilitySnapshot["inputs"];
+  suppressViablePresentation: boolean;
+}) {
   const { calculation, checks, reasons, policySnapshot } = match;
   const snap = policySnapshot as unknown as Record<string, unknown>;
   const bankName = (snap.bankName as string) || match.bankCode;
+  const isPfae = inputs?.personType === "PFAE";
 
   const criterion = policySnapshot.incomeCriterion;
   const isNet = String(criterion).toUpperCase().includes("NET");
@@ -438,13 +540,17 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
   const statusLabel = STATUS_LABELS[match.status] ?? match.status;
   const mainReason =
     reasons.length > 0 ? getReasonLabel(reasons[0]) : "Sin restricciones detectadas";
+  const badgeColor = statusBadgeColor(match.status, suppressViablePresentation);
 
-  const controlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue", "minimumBureauScore"] as const;
+  const salariedControlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "employmentTenure", "minimumIncome", "minimumPropertyValue", "minimumBureauScore"] as const;
+  const pfaeControlKeys = ["capacity", "minimumApplicantAge", "maximumApplicationAge", "activityTenure", "minimumIncome", "minimumPropertyValue", "minimumBureauScore"] as const;
+  const controlKeys = isPfae ? pfaeControlKeys : salariedControlKeys;
   const controlLabels: Record<string, string> = {
     capacity: "Capacidad de pago",
     minimumApplicantAge: "Edad mínima solicitante",
     maximumApplicationAge: "Edad máxima de solicitud",
     employmentTenure: "Antigüedad laboral",
+    activityTenure: "Antigüedad de actividad",
     minimumIncome: "Ingreso mínimo",
     minimumPropertyValue: "Valor mínimo inmueble",
     minimumBureauScore: "Score mínimo de Buró",
@@ -463,6 +569,10 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
       case "minimumApplicantAge": return minAge ? `Mín. ${formatAge(minAge)}` : "—";
       case "maximumApplicationAge": return maxAge ? `Máx. ${formatAge(maxAge)}` : "—";
       case "employmentTenure": return minTenure ? `Mín. ${formatAge(minTenure)}` : "—";
+      case "activityTenure": {
+        const required = checkMonths(checks.activityTenure, "requiredMonths");
+        return required != null ? `Mín. ${formatAge(required)}` : "—";
+      }
       case "minimumIncome": return minInc ? `Mín. ${formatCurrency(minInc)}` : "—";
       case "minimumPropertyValue": return minProp ? `Mín. ${formatCurrency(minProp)}` : "—";
       case "minimumBureauScore": return minScore ? `Mín. ${minScore} pts` : "No especificado";
@@ -476,6 +586,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
       case "minimumApplicantAge": return formatAge(calculation.currentAgeMonths);
       case "maximumApplicationAge": return formatAge(calculation.currentAgeMonths);
       case "employmentTenure": return formatAge(calculation.employmentTenureMonths);
+      case "activityTenure": return formatAge(checkMonths(checks.activityTenure, "actualMonths"));
       case "minimumIncome": return formatCurrency(calculation.incomeUsed);
       case "minimumPropertyValue": return formatCurrency((match.checks?.minimumPropertyValue?.actual as string) ?? (inputs?.propertyValue ?? null));
       case "minimumBureauScore": {
@@ -486,7 +597,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
     }
   }
 
-  const borderAccentColor = STATUS_BADGE_COLORS[match.status] ?? "#6B7280";
+  const borderAccentColor = badgeColor;
 
   return (
     <div className="border-t-0 rounded-b-lg" style={{ backgroundColor: "#F8F9FA", borderLeft: `4px solid ${borderAccentColor}` }}>
@@ -495,14 +606,15 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
         <div className="flex items-center gap-2.5 min-w-0">
           <BankBadge code={match.bankCode} name={bankName} />
           <span className="text-sm font-semibold text-gf-text truncate">{bankName}</span>
-          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap" style={{ backgroundColor: STATUS_BADGE_COLORS[match.status] ?? "#6B7280" }}>{statusLabel}</span>
+          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap" style={{ backgroundColor: badgeColor }}>{statusLabel}</span>
         </div>
         <span className="text-[11px] text-gf-text-muted">{mainReason}</span>
       </div>
 
       {/* Body — 2 cols: left (calc + controls), right (reasons) */}
       <div className="px-5 pb-4 space-y-4">
-        {/* Top row: compact financial calc cards */}
+        {/* Top row: salaried repeats calc cards; PFAE leads with the factor sentence. */}
+        {!isPfae && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {[
             ["Criterio", incomeLabel],
@@ -518,6 +630,14 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
             </div>
           ))}
         </div>
+        )}
+
+        {isPfae && (
+          <PfaeProductDetailExtras
+            match={match}
+            inputs={inputs}
+          />
+        )}
 
         {/* Controls table */}
         <div className="overflow-x-auto rounded border border-gf-border/30">
@@ -551,7 +671,7 @@ function ProductDetail({ match, inputs }: { match: BankResult; inputs?: BankViab
           </table>
         </div>
 
-        {/* Reasons — always shown */}
+        {/* Reasons — always shown; PFAE codes go through getReasonLabel / REASON_LABELS */}
         <div className="text-xs text-gf-text-muted">
           <span className="font-medium text-gf-text">Razones: </span>
           {reasons.length === 0

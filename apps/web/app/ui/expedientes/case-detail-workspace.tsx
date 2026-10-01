@@ -37,7 +37,6 @@ interface CaseDetailWorkspaceProps {
 
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
-  NON_SALARIED: "No asalariado",
   PFAE: "Persona Física con Actividad Empresarial (PFAE)",
   MORAL: "Persona Moral",
 };
@@ -91,6 +90,7 @@ export default function CaseDetailWorkspace({
           documentTypes={documentTypes}
           isCollapsed={isDocsCollapsed}
           onToggleCollapse={() => setIsDocsCollapsed(!isDocsCollapsed)}
+          personType={caseData.personType}
         />
 
         {/* ── Right Main Content Area ─────────────────────────────────── */}
@@ -194,10 +194,19 @@ export default function CaseDetailWorkspace({
           </section>
 
           {/* ── Extracted Data Section ─────────────────────────────── */}
-          <ExtractionSection documents={documents} caseId={caseId} />
+          <ExtractionSection
+            documents={documents}
+            caseId={caseId}
+            personType={caseData.personType}
+          />
 
           {/* ── Analysis Section (Sprint 3) ────────────────────────── */}
-          <AnalysisSection caseId={caseId} statusCode={statusCode} documents={documents} />
+          <AnalysisSection
+            caseId={caseId}
+            statusCode={statusCode}
+            documents={documents}
+            personType={caseData.personType}
+          />
         </div>
       </div>
 

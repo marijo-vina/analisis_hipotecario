@@ -71,3 +71,21 @@ export const ProductDestination = {
 } as const
 
 export type ProductDestination = (typeof ProductDestination)[keyof typeof ProductDestination]
+
+
+export const PfaeFactorMode = {
+  MATRIX: 'MATRIX',
+  FLAT: 'FLAT',
+  NONE: 'NONE'
+} as const
+
+export type PfaeFactorMode = (typeof PfaeFactorMode)[keyof typeof PfaeFactorMode]
+
+
+export const TaxReturnPolicy = {
+  ACCEPTED: 'ACCEPTED',
+  NOT_PREFERRED: 'NOT_PREFERRED',
+  REJECTED: 'REJECTED'
+} as const
+
+export type TaxReturnPolicy = (typeof TaxReturnPolicy)[keyof typeof TaxReturnPolicy]

@@ -81,6 +81,9 @@ export class BanksService {
         policies: {
           orderBy: { destination: 'asc' },
         },
+        activityFactors: {
+          orderBy: { nativeLabel: 'asc' },
+        },
       },
     });
   }
@@ -135,5 +138,81 @@ export class BanksService {
       },
       update: data,
     });
+  }
+
+  async createActivityFactor(
+    bankCode: string,
+    data: {
+      nativeLabel: string;
+      satAliases: string[];
+      factor: number;
+      factorTaxReturn?: number | null;
+    },
+  ) {
+    const bank = await this.prisma.bank.findUnique({
+      where: { code: bankCode },
+    });
+
+    if (!bank) {
+      throw new NotFoundException(`Bank with code ${bankCode} not found`);
+    }
+
+    return this.prisma.bankActivityFactor.create({
+      data: {
+        bankId: bank.id,
+        nativeLabel: data.nativeLabel,
+        satAliases: data.satAliases,
+        factor: data.factor,
+        factorTaxReturn: data.factorTaxReturn,
+      },
+    });
+  }
+
+  async updateActivityFactor(
+    bankCode: string,
+    factorId: string,
+    data: {
+      nativeLabel?: string;
+      satAliases?: string[];
+      factor?: number;
+      factorTaxReturn?: number | null;
+    },
+  ) {
+    await this.assertFactorBelongsToBank(bankCode, factorId);
+
+    return this.prisma.bankActivityFactor.update({
+      where: { id: factorId },
+      data,
+    });
+  }
+
+  async deleteActivityFactor(bankCode: string, factorId: string) {
+    await this.assertFactorBelongsToBank(bankCode, factorId);
+
+    return this.prisma.bankActivityFactor.delete({
+      where: { id: factorId },
+    });
+  }
+
+  private async assertFactorBelongsToBank(bankCode: string, factorId: string) {
+    const bank = await this.prisma.bank.findUnique({
+      where: { code: bankCode },
+    });
+
+    if (!bank) {
+      throw new NotFoundException(`Bank with code ${bankCode} not found`);
+    }
+
+    const factor = await this.prisma.bankActivityFactor.findUnique({
+      where: { id: factorId },
+    });
+
+    if (!factor || factor.bankId !== bank.id) {
+      throw new NotFoundException(
+        `Activity factor ${factorId} not found for bank ${bankCode}`,
+      );
+    }
+
+    return { bank, factor };
   }
 }

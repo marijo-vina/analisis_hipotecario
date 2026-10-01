@@ -7,7 +7,7 @@ import {
   fetchLatestAnalysis,
 } from "@/app/actions/analysis";
 import { parseBankStatements } from "@/app/lib/extraction";
-import { Sparkles, Loader2, FolderPlus, FileCheck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, FolderPlus, FileCheck, AlertTriangle } from "lucide-react";
 import type {
   AnalysisRun,
   FieldComparison,
@@ -19,7 +19,6 @@ import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
-
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
@@ -27,6 +26,8 @@ interface AnalysisSectionProps {
   statusCode: string;
   /** All documents in the case (needed for conciliación cross-tab) */
   documents: Document[];
+  /** PFAE vs SALARIED — mirrors the pattern used by DocumentUpload/ExtractionSection. */
+  personType?: string;
 }
 
 type TabId = "validaciones" | "motor" | "bancos";
@@ -47,9 +48,27 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "bancos", label: "Comparativa bancaria" },
 ];
 
+const PFAE_VALIDATION_RULE_ID = "pfae-validation";
+const SOLELY_SALARIED_RULE_CODE = "REGIMEN_EXCLUSIVAMENTE_ASALARIADO";
+const SOLELY_SALARIED_FAIL_COPY =
+  "este camino PFAE no aplica — cambie a asalariado";
+
+/** Presentational only — never persisted, never mutates stored BankResult.status. */
+function deriveSuppressViablePresentation(run: AnalysisRun): boolean {
+  if (run.alerts?.some((alert) => alert.ruleCode === SOLELY_SALARIED_RULE_CODE)) {
+    return true;
+  }
+  const rule = run.detail.ruleResults?.find(
+    (result) => result.ruleId === PFAE_VALIDATION_RULE_ID,
+  );
+  return rule?.detail.pfaeValidation?.regime.outcome === "FAIL";
+}
+
 const SOURCE_LABELS: Record<string, string> = {
   "official-id": "INE",
   payroll: "Nómina",
+  csf: "CSF",
+  "tax-return": "Declaración",
   "bank-statement": "Edo. cuenta",
   "credit-bureau": "Buró",
   client: "Expediente",
@@ -58,10 +77,60 @@ const SOURCE_LABELS: Record<string, string> = {
 const SOURCE_ICONS: Record<string, string> = {
   "official-id": "🆔",
   payroll: "💰",
+  csf: "🏛️",
+  "tax-return": "🧾",
   "bank-statement": "🏦",
   "credit-bureau": "📊",
   client: "📋",
 };
+
+/**
+ * PersonType-aware required-document checklist. Single source of truth
+ * consumed by both `hasMissingDocs` and `AnalysisConfirmModal`'s checklist
+ * (mirrors `case-status-calculator.service.ts`'s PFAE/SALARIED branch) —
+ * prevents the two from drifting out of sync.
+ */
+interface RequiredDocCheck {
+  key: string;
+  label: string;
+  /** DocumentType codes that satisfy this check (any one is sufficient). */
+  codes: string[];
+}
+
+function getRequiredDocChecks(personType?: string): RequiredDocCheck[] {
+  const identity: RequiredDocCheck = {
+    key: "identity",
+    label: "Identificación oficial (INE/Pasaporte)",
+    codes: ["INE", "PASSPORT"],
+  };
+  const bankStatement: RequiredDocCheck = {
+    key: "bank-statement",
+    label: "Estado de cuenta bancario",
+    codes: ["BANK_STATEMENT"],
+  };
+  const creditBureau: RequiredDocCheck = {
+    key: "credit-bureau",
+    label: "Buró de crédito / Score",
+    codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"],
+  };
+
+  if (personType === "PFAE") {
+    return [
+      identity,
+      { key: "csf", label: "Constancia de Situación Fiscal (CSF)", codes: ["CSF"] },
+      { key: "tax-return", label: "Declaración anual", codes: ["TAX_RETURN"] },
+      bankStatement,
+      creditBureau,
+    ];
+  }
+
+  return [
+    identity,
+    { key: "payroll", label: "Recibo de nómina", codes: ["PAYROLL_RECEIPT"] },
+    bankStatement,
+    creditBureau,
+  ];
+}
 
 const FIELD_STATUS_BADGE: Record<
   string,
@@ -81,6 +150,7 @@ export default function AnalysisSection({
   caseId,
   statusCode,
   documents,
+  personType,
 }: AnalysisSectionProps) {
   const [activeTab, setActiveTab] = useState<TabId>("validaciones");
   const [state, setState] = useState<UiState>({ phase: "loading" });
@@ -100,57 +170,59 @@ export default function AnalysisSection({
     );
   }, []);
 
-  // Cargar último análisis al montar
-  const loadLatest = useCallback(async () => {
-    setState({ phase: "loading" });
-    const res = await fetchLatestAnalysis(caseId);
-    if (!res.success) {
-      setState({ phase: "error", message: res.error ?? "Error" });
-      return;
-    }
-    if (res.data) {
-      setState(
-        isObservations(res.data)
-          ? { phase: "observations", run: res.data }
-          : { phase: "result", run: res.data },
-      );
-    } else {
-      setState({ phase: "idle" });
-    }
-  }, [caseId, isObservations]);
+  // Cargar último análisis al montar. Quiet path keeps the current result
+  // painted while GET /analysis/latest runs (source-switch refresh).
+  const loadLatest = useCallback(
+    async (options?: { quiet?: boolean }) => {
+      if (!options?.quiet) {
+        setState({ phase: "loading" });
+      }
+      const res = await fetchLatestAnalysis(caseId);
+      if (!res.success) {
+        if (options?.quiet) return;
+        setState({ phase: "error", message: res.error ?? "Error" });
+        return;
+      }
+      if (res.data) {
+        setState(
+          isObservations(res.data)
+            ? { phase: "observations", run: res.data }
+            : { phase: "result", run: res.data },
+        );
+      } else if (!options?.quiet) {
+        setState({ phase: "idle" });
+      }
+    },
+    [caseId, isObservations],
+  );
+
+  const quietLoadLatest = useCallback(() => {
+    void loadLatest({ quiet: true });
+  }, [loadLatest]);
 
   useEffect(() => {
     loadLatest();
   }, [loadLatest]);
 
   // Disparar análisis con comprobación de confirmación (Propuesta 2)
+  const requiredDocChecks = useMemo(
+    () => getRequiredDocChecks(personType),
+    [personType],
+  );
   const hasMissingDocs = useMemo(() => {
-    const hasIdentity = documents.some(
-      (d) =>
-        (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
-        d.documentStatus.code === "PROCESSED",
-    );
-    const hasPayroll = documents.some(
-      (d) =>
-        d.documentType.code === "PAYROLL_RECEIPT" &&
-        d.documentStatus.code === "PROCESSED",
-    );
-    const hasBankStatement = documents.some(
-      (d) =>
-        d.documentType.code === "BANK_STATEMENT" &&
-        d.documentStatus.code === "PROCESSED",
-    );
-    const hasBuro = documents.some(
-      (d) =>
-        (d.documentType.code === "CREDIT_BUREAU_REPORT" ||
-          d.documentType.code === "CREDIT_SCORE") &&
-        d.documentStatus.code === "PROCESSED",
-    );
     const hasUnprocessed = documents.some(
       (d) => d.documentStatus.code !== "PROCESSED",
     );
-    return !hasIdentity || !hasPayroll || !hasBankStatement || !hasBuro || hasUnprocessed;
-  }, [documents]);
+    const hasMissingRequired = requiredDocChecks.some(
+      (check) =>
+        !documents.some(
+          (d) =>
+            check.codes.includes(d.documentType.code) &&
+            d.documentStatus.code === "PROCESSED",
+        ),
+    );
+    return hasMissingRequired || hasUnprocessed;
+  }, [documents, requiredDocChecks]);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
@@ -182,6 +254,10 @@ export default function AnalysisSection({
     (d) => d.documentType.code === "PAYROLL_RECEIPT",
   );
   const bankParsed = parseBankStatements(bankStatementDocs);
+  const peinadoWarn = bankParsed.statements.some((statement) => {
+    const status = statement.financialDepuration?.integrityCheck?.status;
+    return status === "MINOR_DIFFERENCE" || status === "CRITICAL_DISCREPANCY";
+  });
 
   // ── Button label/variant based on phase ─────────────────────────────────
   const headerButton = (() => {
@@ -388,6 +464,7 @@ export default function AnalysisSection({
               state={state}
               allDeposits={bankParsed.allDeposits}
               payrollDocs={payrollDocs}
+              personType={personType}
             />
           )}
 
@@ -395,7 +472,12 @@ export default function AnalysisSection({
             <>
               <LiabilityCalculationSection caseId={caseId} />
               <div className="mt-6" />
-              <IncomeCalculationSection caseId={caseId} />
+              <IncomeCalculationSection
+                caseId={caseId}
+                personType={personType}
+                onSourceSwitched={quietLoadLatest}
+                peinadoWarn={peinadoWarn}
+              />
             </>
           )}
 
@@ -406,6 +488,12 @@ export default function AnalysisSection({
                   ? state.run.detail?.bankViability
                   : undefined
               }
+              suppressViablePresentation={
+                personType === "PFAE" &&
+                (state.phase === "result" || state.phase === "observations") &&
+                deriveSuppressViablePresentation(state.run)
+              }
+              overlayMessage={SOLELY_SALARIED_FAIL_COPY}
             />
           )}
         </>
@@ -417,6 +505,7 @@ export default function AnalysisSection({
       <AnalysisConfirmModal
         isOpen={confirmModalOpen}
         documents={documents}
+        personType={personType}
         onClose={() => setConfirmModalOpen(false)}
         onConfirm={executeAnalysis}
       />
@@ -431,12 +520,16 @@ function ValidacionesTab({
   state,
   allDeposits,
   payrollDocs,
+  personType,
 }: {
   caseId: string;
   state: UiState;
   allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
   payrollDocs: Document[];
+  personType?: string;
 }) {
+  const isPFAE = personType === "PFAE";
+
   return (
     <div className="space-y-6">
       {/* ── A) Validación de identidad ──────────────────────────────────── */}
@@ -446,29 +539,32 @@ function ValidacionesTab({
         </h3>
         <IdentityValidationSection
           state={state}
+          personType={personType}
         />
       </section>
 
-      {/* ── B) Conciliación nómina vs banco ─────────────────────────────── */}
-      <section>
-        <h3 className="text-sm font-semibold text-gf-text mb-3">
-          Conciliación nómina vs banco
-        </h3>
-        {allDeposits.length > 0 && payrollDocs.length > 0 ? (
-          <EstadosConciliacion
-            caseId={caseId}
-            allDeposits={allDeposits}
-            payrollDocs={payrollDocs}
-          />
-        ) : (
-          <Card>
-            <p className="text-sm text-gf-text-muted">
-              Sin datos suficientes para conciliación. Se requieren estados de
-              cuenta y recibos de nómina procesados.
-            </p>
-          </Card>
-        )}
-      </section>
+      {/* ── B) Conciliación nómina vs banco — no aplica para PFAE (sin nómina) ── */}
+      {!isPFAE && (
+        <section>
+          <h3 className="text-sm font-semibold text-gf-text mb-3">
+            Conciliación nómina vs banco
+          </h3>
+          {allDeposits.length > 0 && payrollDocs.length > 0 ? (
+            <EstadosConciliacion
+              caseId={caseId}
+              allDeposits={allDeposits}
+              payrollDocs={payrollDocs}
+            />
+          ) : (
+            <Card>
+              <p className="text-sm text-gf-text-muted">
+                Sin datos suficientes para conciliación. Se requieren estados de
+                cuenta y recibos de nómina procesados.
+              </p>
+            </Card>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -477,8 +573,10 @@ function ValidacionesTab({
 
 function IdentityValidationSection({
   state,
+  personType,
 }: {
   state: UiState;
+  personType?: string;
 }) {
   if (state.phase === "loading") {
     return (
@@ -517,6 +615,7 @@ function IdentityValidationSection({
       <IdentitySummaryCard
         fields={run.detail.fields}
         sources={run.detail.sources}
+        personType={personType}
       />
 
       {/* ── Tabla comparativa completa ──────────────────────────────────── */}
@@ -646,11 +745,34 @@ function ValidationTable({
 
 // ── IdentitySummaryCard ───────────────────────────────────────────────────────
 
+/** PersonType-aware discrepancy-table columns — PFAE swaps Nómina for CSF + Declaración. */
+function getIdentityColumns(personType?: string) {
+  if (personType === "PFAE") {
+    return [
+      { key: "csf", label: "CSF" },
+      { key: "tax-return", label: "DECLARACIÓN" },
+      { key: "official-id", label: "INE" },
+      { key: "bank-statement", label: "EDO. CUENTA" },
+      { key: "credit-bureau", label: "BURÓ" },
+      { key: "client", label: "EXPEDIENTE" },
+    ] as const;
+  }
+  return [
+    { key: "payroll", label: "NÓMINA" },
+    { key: "official-id", label: "INE" },
+    { key: "bank-statement", label: "EDO. CUENTA" },
+    { key: "credit-bureau", label: "BURÓ" },
+    { key: "client", label: "EXPEDIENTE" },
+  ] as const;
+}
+
 function IdentitySummaryCard({
   fields,
+  personType,
 }: {
   fields: FieldComparison[];
   sources: string[];
+  personType?: string;
 }) {
   const matchCount = fields.filter(
     (f) =>
@@ -682,13 +804,7 @@ function IdentitySummaryCard({
     return { fieldLabel, observation, mismatch, getVal };
   });
 
-  const COLUMNS = [
-    { key: "payroll", label: "NÓMINA" },
-    { key: "official-id", label: "INE" },
-    { key: "bank-statement", label: "EDO. CUENTA" },
-    { key: "credit-bureau", label: "BURÓ" },
-    { key: "client", label: "EXPEDIENTE" },
-  ] as const;
+  const COLUMNS = getIdentityColumns(personType);
 
   return (
     <Card
@@ -887,37 +1003,27 @@ function CompactStatusBar({
 function AnalysisConfirmModal({
   isOpen,
   documents,
+  personType,
   onClose,
   onConfirm,
 }: {
   isOpen: boolean;
   documents: Document[];
+  personType?: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   if (!isOpen) return null;
 
-  const identityReady = documents.some(
-    (d) =>
-      (d.documentType.code === "INE" || d.documentType.code === "PASSPORT") &&
-      d.documentStatus.code === "PROCESSED",
-  );
-  const payrollReady = documents.some(
-    (d) =>
-      d.documentType.code === "PAYROLL_RECEIPT" &&
-      d.documentStatus.code === "PROCESSED",
-  );
-  const bankReady = documents.some(
-    (d) =>
-      d.documentType.code === "BANK_STATEMENT" &&
-      d.documentStatus.code === "PROCESSED",
-  );
-  const buroReady = documents.some(
-    (d) =>
-      (d.documentType.code === "CREDIT_BUREAU_REPORT" ||
-        d.documentType.code === "CREDIT_SCORE") &&
-      d.documentStatus.code === "PROCESSED",
-  );
+  const requiredDocChecks = getRequiredDocChecks(personType);
+  const checklist = requiredDocChecks.map((check) => ({
+    ...check,
+    ready: documents.some(
+      (d) =>
+        check.codes.includes(d.documentType.code) &&
+        d.documentStatus.code === "PROCESSED",
+    ),
+  }));
   const unprocessedCount = documents.filter(
     (d) => d.documentStatus.code !== "PROCESSED",
   ).length;
@@ -940,30 +1046,16 @@ function AnalysisConfirmModal({
         </div>
 
         <div className="bg-gf-surface border border-gf-border/60 rounded-xl p-3.5 space-y-2 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-gf-text font-medium">1. Identificación oficial (INE/Pasaporte):</span>
-            <span className={identityReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-              {identityReady ? "✓ Procesada" : "⚠ Pendiente"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gf-text font-medium">2. Recibo de nómina:</span>
-            <span className={payrollReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-              {payrollReady ? "✓ Procesado" : "⚠ Pendiente"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gf-text font-medium">3. Estado de cuenta bancario:</span>
-            <span className={bankReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-              {bankReady ? "✓ Procesado" : "⚠ Pendiente"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gf-text font-medium">4. Buró de crédito / Score:</span>
-            <span className={buroReady ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-              {buroReady ? "✓ Procesado" : "⚠ Pendiente"}
-            </span>
-          </div>
+          {checklist.map((check, i) => (
+            <div key={check.key} className="flex items-center justify-between">
+              <span className="text-gf-text font-medium">
+                {i + 1}. {check.label}:
+              </span>
+              <span className={check.ready ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+                {check.ready ? "✓ Procesado" : "⚠ Pendiente"}
+              </span>
+            </div>
+          ))}
           {unprocessedCount > 0 && (
             <div className="pt-1.5 border-t border-gf-border/40 flex items-center justify-between text-amber-800 font-medium">
               <span>Archivos sin procesar:</span>

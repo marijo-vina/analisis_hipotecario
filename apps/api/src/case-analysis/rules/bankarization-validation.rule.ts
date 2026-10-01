@@ -165,6 +165,13 @@ function pad(n: number): string {
 /**
  * Regla de bancarizacion. Sin estado: cada ejecucion produce un resultado
  * determinista a partir de los documentos del caso.
+ *
+ * HU-19a: para casos PFAE, `CaseAnalysisService.resolvePhaseARules()` NUNCA
+ * incluye esta regla en `phaseARules` — es una decision explicita del
+ * orquestador, no un efecto secundario implicito. El guard de
+ * `computeOutcome([]) => 'PASS'` de mas abajo se conserva como
+ * salvaguarda defensiva (p. ej. si algun caller futuro invoca esta regla
+ * con cero recibos), pero no es el mecanismo que la excluye para PFAE.
  */
 @Injectable()
 export class BankarizationValidationRule implements AnalysisRule {

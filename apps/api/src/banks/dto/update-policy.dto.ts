@@ -35,4 +35,19 @@ export class UpdatePolicyDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumActivityTenureMonths?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minimumIncomePfae?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumApplicantAgeMonthsPfae?: number | null;
 }

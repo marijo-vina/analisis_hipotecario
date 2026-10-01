@@ -15,10 +15,18 @@ export interface ExtractionAlert {
   message: string;
 }
 
-export type ExtractionCategory = "identidad" | "nomina" | "estados" | "buro";
+export type ExtractionCategory =
+  | "identidad"
+  | "csf"
+  | "declaracion"
+  | "nomina"
+  | "estados"
+  | "buro";
 
 export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
   identidad: "Identidad",
+  csf: "Constancia fiscal (CSF)",
+  declaracion: "Declaración anual",
   nomina: "Recibos de nómina",
   estados: "Estados de cuenta",
   buro: "Buró de crédito",
@@ -53,6 +61,10 @@ export function docCategory(
     case "INE":
     case "PASSPORT":
       return "identidad";
+    case "CSF":
+      return "csf";
+    case "TAX_RETURN":
+      return "declaracion";
     case "PAYROLL_RECEIPT":
       return "nomina";
     case "BANK_STATEMENT":
@@ -66,14 +78,23 @@ export function docCategory(
 }
 
 /**
- * Converts an ISO `YYYY-MM-DD` date to the Mexican display format `DD-MM-YYYY`.
+ * Converts an ISO `YYYY-MM-DD` (or other date strings) to the Mexican display format `DD-MM-YYYY`.
  * Non-matching strings pass through unchanged.
  */
-export function formatDateDisplay(iso: string | undefined): string | undefined {
+export function formatDateDisplay(iso: string | null | undefined): string | undefined {
   if (!iso) return undefined;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
-  if (!m) return iso;
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  const trimmed = iso.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (m) {
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  const m2 = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/.exec(trimmed);
+  if (m2) {
+    const d = m2[1].padStart(2, "0");
+    const mo = m2[2].padStart(2, "0");
+    return `${d}-${mo}-${m2[3]}`;
+  }
+  return trimmed;
 }
 
 /**
@@ -599,6 +620,30 @@ export interface ParsedBankStatement {
   averageBalance: number | null;
   endingBalance: number | null;
 
+  // Financial Depuration (PFAE & v1.2)
+  financialDepuration?: {
+    incomeMode?: 'PAYROLL' | 'BUSINESS';
+    depurationSummary: {
+      totalGrossDeposits: number;
+      totalTrashDeposits: number;
+      totalValidIncome: number;
+      trashDepositsCount: number;
+      validDepositsCount: number;
+      needsReviewCount: number;
+      detectedSector: string;
+    };
+    integrityCheck: {
+      status: 'MATCHED' | 'MINOR_DIFFERENCE' | 'CRITICAL_DISCREPANCY' | 'NO_COVER_DATA';
+      bankReportedTotal: number | null;
+      extractedSum: number;
+      difference: number;
+      differencePercent: number;
+      message: string;
+    };
+    cleanedDeposits: Array<any>;
+    highImpactExceptions: Array<any>;
+  } | null;
+
   // Payroll deposits
   deposits: ParsedBankStatementDeposit[];
 
@@ -628,6 +673,10 @@ export interface ParsedBankStatements {
     totalDeposits: number;
     totalCriticalAlerts: number;
     totalWarningAlerts: number;
+    isPfae?: boolean;
+    totalValidIncome?: number;
+    totalGrossDeposits?: number;
+    totalTrashDeposits?: number;
   } | null;
   statements: ParsedBankStatement[];
 
@@ -644,6 +693,32 @@ export interface ParsedBankStatements {
 
   // All alerts across statements
   allAlerts: ExtractionAlert[];
+}
+
+/**
+ * Collapse Gemini/OCR bank name variants into a stable display key
+ * so "Bancos detectados" counts unique institutions (e.g. BBVA México → BBVA).
+ */
+function canonicalizeBankInstitutionName(name: string): string {
+  const key = name
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^A-Z0-9]/g, "");
+
+  if (key.includes("BBVA")) return "BBVA";
+  if (key.includes("BANAMEX") || key.includes("CITIBANAMEX")) return "Citibanamex";
+  if (key.includes("SANTANDER")) return "Santander";
+  if (key.includes("BANORTE")) return "Banorte";
+  if (key.includes("HSBC")) return "HSBC";
+  if (key.includes("SCOTIABANK") || key.includes("SCOTIA")) return "Scotiabank";
+  if (key.includes("AZTECA")) return "Azteca";
+  if (key.includes("INBURSA")) return "Inbursa";
+  if (key.includes("MIFEL")) return "Mifel";
+  if (key.includes("BANREGIO")) return "Banregio";
+  if (key.includes("BANBAJIO") || key.includes("BAJIO")) return "BanBajío";
+
+  return name.trim().replace(/\s+/g, " ");
 }
 
 function emptyStatement(doc: Document): ParsedBankStatement {
@@ -748,7 +823,10 @@ export function parseBankStatements(
 
     // ── Bank & account ──────────────────────────────────────────────────
     const bank = (ed.bank as Record<string, unknown>) ?? {};
-    const bankName = (bank.institutionName as string) ?? null;
+    const rawBankName = (bank.institutionName as string) ?? null;
+    const bankName = rawBankName
+      ? canonicalizeBankInstitutionName(rawBankName)
+      : null;
     const accountNumber = (bank.accountNumber as string) ?? null;
     const clabe = (bank.clabe as string) ?? null;
 
@@ -896,6 +974,9 @@ export function parseBankStatements(
     }
     allAlerts.push(...alerts);
 
+    const financialDepuration =
+      (ed.financialDepuration as ParsedBankStatement["financialDepuration"]) ?? null;
+
     statements.push({
       documentId: doc.id,
       originalName: doc.originalName,
@@ -915,6 +996,7 @@ export function parseBankStatements(
       isCurrentIncompleteMonth,
       averageBalance,
       endingBalance,
+      financialDepuration,
       deposits,
       providers,
       otherMovements,
@@ -934,8 +1016,37 @@ export function parseBankStatements(
   });
 
   // ── Aggregated context ─────────────────────────────────────────────────
+  // Always surface covered months from statement periods, even when Gemini
+  // omitted documentRequirementContext (common after cover-prompt trim).
+  const sortedCoveredMonths = Array.from(coveredMonths).sort();
   if (aggregatedContext) {
-    aggregatedContext.coveredMonths = Array.from(coveredMonths).sort();
+    aggregatedContext.coveredMonths = sortedCoveredMonths;
+  } else if (sortedCoveredMonths.length > 0) {
+    aggregatedContext = {
+      incomeBehavior: null,
+      requiredMonths: null,
+      detectedMonths: sortedCoveredMonths.length,
+      isRequirementSatisfied: null,
+      coveredMonths: sortedCoveredMonths,
+    };
+  }
+
+  // ── PFAE Aggregates ────────────────────────────────────────────────────
+  const pfaeStatements = statements.filter((s) => s.financialDepuration != null);
+  const isPfae = pfaeStatements.length > 0;
+  let totalGrossDeposits = 0;
+  let totalTrashDeposits = 0;
+  let totalValidIncome = 0;
+
+  if (isPfae) {
+    for (const s of pfaeStatements) {
+      const dep = s.financialDepuration?.depurationSummary;
+      if (dep) {
+        totalGrossDeposits += dep.totalGrossDeposits || 0;
+        totalTrashDeposits += dep.totalTrashDeposits || 0;
+        totalValidIncome += dep.totalValidIncome || 0;
+      }
+    }
   }
 
   // ── Summary ────────────────────────────────────────────────────────────
@@ -946,9 +1057,20 @@ export function parseBankStatements(
     banks: Array.from(banks).sort(),
     periodStart,
     periodEnd,
-    totalDeposits: allDeposits.length,
+    totalDeposits: isPfae
+      ? pfaeStatements.reduce(
+          (sum, s) =>
+            sum +
+            (s.financialDepuration?.depurationSummary?.validDepositsCount || 0),
+          0,
+        )
+      : allDeposits.length,
     totalCriticalAlerts,
     totalWarningAlerts,
+    isPfae,
+    totalGrossDeposits,
+    totalTrashDeposits,
+    totalValidIncome,
   };
 
   return {
@@ -1039,6 +1161,8 @@ export interface CreditAuditFields {
 export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueGuardrailFields, PaymentDueAmountTriple {
   institution: string | null;
   creditType: string | null;
+  /** Stored full account number — UI must mask as **** + last 4. */
+  accountNumber: string | null;
   classification: string;
   status: string;
   currentBalance: number | null;
@@ -1336,6 +1460,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
     credits.push({
       institution: (credit.institution as string) ?? null,
       creditType: (credit.creditType as string) ?? null,
+      accountNumber: (credit.accountNumber as string) ?? null,
       classification,
       status,
       currentBalance: (credit.currentBalance as number) ?? null,
@@ -1575,4 +1700,301 @@ export interface LiabilityCalculationResult {
   globalStatus: GlobalLiabilityStatus;
   grossCurrentMonthlyDebt: number;
   totalCurrentBalance: number;
+}
+
+// ── CSF extraction parsing ──────────────────────────────────────────────────
+
+export interface ParsedCsf {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+  taxpayer: {
+    rfc: string | null;
+    curp: string | null;
+    fullName: string | null;
+    operationsStartDate: string | null;
+    statusInPadron: string | null;
+    commercialName: string | null;
+  };
+  issuance: {
+    issuanceDate: string | null;
+    issuanceDateRaw: string | null;
+    issuanceLocation: string | null;
+    idCIF: string | null;
+    isOlderThan3Months: boolean;
+  };
+  fiscalAddress: {
+    postalCode: string | null;
+    street: string | null;
+    neighborhood: string | null;
+    municipality: string | null;
+    state: string | null;
+  };
+  activities: Array<{
+    order?: number | null;
+    description: string;
+    percentage: number | null;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  regimes: Array<{
+    description: string;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  activityStartDate: string | null;
+  tenureMonths: number | null;
+  hasSalariedRegime: boolean;
+  hasIndependentRegime: boolean;
+  isSolelySalaried: boolean;
+  alerts: ExtractionAlert[];
+}
+
+function isSalariedCsfActivity(description: string): boolean {
+  return /asalariado|sueldos/i.test(description);
+}
+
+function pickIndependentActivityStartDate(
+  activities: ParsedCsf["activities"],
+): string | null {
+  const independent = activities.filter(
+    (activity) =>
+      activity.endDate == null &&
+      activity.startDate &&
+      activity.description &&
+      !isSalariedCsfActivity(activity.description),
+  );
+  if (independent.length === 0) return null;
+  independent.sort((a, b) => {
+    const pctA = a.percentage ?? -1;
+    const pctB = b.percentage ?? -1;
+    if (pctB !== pctA) return pctB - pctA;
+    const orderA = a.order ?? 999;
+    const orderB = b.order ?? 999;
+    return orderA - orderB;
+  });
+  return independent[0].startDate;
+}
+
+function monthsSinceYearMonth(iso: string): number | null {
+  const match = /^(\d{4})-(\d{2})/.exec(iso.trim());
+  if (!match) return null;
+  const now = new Date();
+  const total =
+    (now.getFullYear() - Number(match[1])) * 12 +
+    (now.getMonth() + 1 - Number(match[2]));
+  return Math.max(0, total);
+}
+
+export function parseCsf(doc: Document): ParsedCsf | null {
+  if (!doc) return null;
+  const ed = doc.extractedData as Record<string, unknown> | null;
+  if (!ed || typeof ed !== "object") {
+    return {
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: false,
+      taxpayer: { rfc: null, curp: null, fullName: null, operationsStartDate: null, statusInPadron: null, commercialName: null },
+      issuance: { issuanceDate: null, issuanceDateRaw: null, issuanceLocation: null, idCIF: null, isOlderThan3Months: false },
+      fiscalAddress: { postalCode: null, street: null, neighborhood: null, municipality: null, state: null },
+      activities: [],
+      regimes: [],
+      activityStartDate: null,
+      tenureMonths: null,
+      hasSalariedRegime: false,
+      hasIndependentRegime: false,
+      isSolelySalaried: false,
+      alerts: [],
+    };
+  }
+
+  const taxpayer = (ed.taxpayer as Record<string, unknown>) ?? {};
+  const issuance = (ed.issuance as Record<string, unknown>) ?? {};
+  const fa = (ed.fiscalAddress as Record<string, unknown>) ?? {};
+  const activities = Array.isArray(ed.activities) ? (ed.activities as ParsedCsf["activities"]) : [];
+  const regimes = Array.isArray(ed.regimes) ? (ed.regimes as ParsedCsf["regimes"]) : [];
+  const alerts = filterAlerts(ed.alerts);
+
+  const street = [fa.streetType, fa.streetName, fa.exteriorNumber, fa.interiorNumber].filter(Boolean).join(" ").trim() || null;
+
+  const independentStart = pickIndependentActivityStartDate(activities);
+  const activityStartDate =
+    independentStart ?? (ed.activityStartDate as string) ?? null;
+  const tenureMonths = independentStart
+    ? (monthsSinceYearMonth(independentStart) ??
+      (ed.tenureMonths as number) ??
+      null)
+    : ((ed.tenureMonths as number) ?? null);
+
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: true,
+    taxpayer: {
+      rfc: (taxpayer.rfc as string) ?? null,
+      curp: (taxpayer.curp as string) ?? null,
+      fullName: (taxpayer.fullName as string) ?? null,
+      operationsStartDate: (taxpayer.operationsStartDate as string) ?? null,
+      statusInPadron: (taxpayer.statusInPadron as string) ?? null,
+      commercialName: (taxpayer.commercialName as string) ?? null,
+    },
+    issuance: {
+      issuanceDate: (issuance.issuanceDate as string) ?? null,
+      issuanceDateRaw: (issuance.issuanceDateRaw as string) ?? null,
+      issuanceLocation: (issuance.issuanceLocation as string) ?? null,
+      idCIF: (issuance.idCIF as string) ?? null,
+      isOlderThan3Months: issuance.isOlderThan3Months === true,
+    },
+    fiscalAddress: {
+      postalCode: (fa.postalCode as string) ?? null,
+      street,
+      neighborhood: (fa.neighborhood as string) ?? null,
+      municipality: (fa.municipality as string) ?? null,
+      state: (fa.state as string) ?? null,
+    },
+    activities,
+    regimes,
+    activityStartDate,
+    tenureMonths,
+    hasSalariedRegime: ed.hasSalariedRegime === true,
+    hasIndependentRegime: ed.hasIndependentRegime === true,
+    isSolelySalaried: ed.isSolelySalaried === true,
+    alerts,
+  };
+}
+
+// ── Tax Return extraction parsing ──────────────────────────────────────────
+
+export interface ParsedTaxReturn {
+  documentId: string;
+  originalName: string;
+  statusCode: string;
+  statusName: string;
+  hasData: boolean;
+  satReceipt: {
+    rfc: string | null;
+    taxpayerName: string | null;
+    declarationType: string | null;
+    taxYear: number | null;
+    presentationDate: string | null;
+    operationNumber: string | null;
+  };
+  taxPayment?: {
+    paymentConcept: string | null;
+    amountInFavor: number | null;
+    amountDue: number | null;
+    amountToPay: number | null;
+  };
+  declaredRegimes: string[];
+  salariedIncome?: {
+    annualGrossIncome: number | null;
+    exemptIncome: number | null;
+    employmentSubsidy: number | null;
+    taxWithheld: number | null;
+    retainers?: Array<{
+      rfc: string | null;
+      legalName: string | null;
+      annualIncome: number | null;
+      taxWithheld: number | null;
+    }>;
+  };
+  businessOrProfessionalIncome?: {
+    totalIncome: number | null;
+    detailedIncome?: Array<{
+      concept: string;
+      amount: number;
+    }>;
+    taxWithheld: number | null;
+    authorizedDeductions: number | null;
+  };
+  resicoIncome?: {
+    totalEffectiveIncome: number | null;
+    totalActivityIncome: number | null;
+    taxWithheld: number | null;
+  };
+  fiscalResult: {
+    accumulableIncomeTotal: number | null;
+    fiscalProfit: number | null;
+    fiscalLoss: number | null;
+    taxResult: number | null;
+  };
+  isValidTaxYear: boolean;
+  hasTaxLoss: boolean;
+  isMixedDeclaration: boolean;
+  hasOfficialReceipt: boolean;
+  alerts: ExtractionAlert[];
+}
+
+export function parseTaxReturn(doc: Document): ParsedTaxReturn | null {
+  if (!doc) return null;
+  const ed = doc.extractedData as Record<string, unknown> | null;
+  if (!ed || typeof ed !== "object") {
+    return {
+      documentId: doc.id,
+      originalName: doc.originalName,
+      statusCode: doc.documentStatus.code,
+      statusName: doc.documentStatus.name,
+      hasData: false,
+      satReceipt: { rfc: null, taxpayerName: null, declarationType: null, taxYear: null, presentationDate: null, operationNumber: null },
+      declaredRegimes: [],
+      fiscalResult: { accumulableIncomeTotal: null, fiscalProfit: null, fiscalLoss: null, taxResult: null },
+      isValidTaxYear: false,
+      hasTaxLoss: false,
+      isMixedDeclaration: false,
+      hasOfficialReceipt: false,
+      alerts: [],
+    };
+  }
+
+  const satReceipt = (ed.satReceipt as Record<string, unknown>) ?? {};
+  const taxPayment = (ed.taxPayment as Record<string, unknown>) ?? {};
+  const fiscalResult = (ed.fiscalResult as Record<string, unknown>) ?? {};
+  const salariedIncome = (ed.salariedIncome as Record<string, unknown>) ?? undefined;
+  const businessOrProfessionalIncome = (ed.businessOrProfessionalIncome as Record<string, unknown>) ?? undefined;
+  const resicoIncome = (ed.resicoIncome as Record<string, unknown>) ?? undefined;
+  const declaredRegimes = Array.isArray(ed.declaredRegimes) ? (ed.declaredRegimes as string[]) : [];
+  const alerts = filterAlerts(ed.alerts);
+
+  return {
+    documentId: doc.id,
+    originalName: doc.originalName,
+    statusCode: doc.documentStatus.code,
+    statusName: doc.documentStatus.name,
+    hasData: true,
+    satReceipt: {
+      rfc: (satReceipt.rfc as string) ?? null,
+      taxpayerName: (satReceipt.taxpayerName as string) ?? null,
+      declarationType: (satReceipt.declarationType as string) ?? null,
+      taxYear: (satReceipt.taxYear as number) ?? null,
+      presentationDate: (satReceipt.presentationDate as string) ?? null,
+      operationNumber: (satReceipt.operationNumber as string) ?? null,
+    },
+    taxPayment: {
+      paymentConcept: (taxPayment.paymentConcept as string) ?? null,
+      amountInFavor: (taxPayment.amountInFavor as number) ?? null,
+      amountDue: (taxPayment.amountDue as number) ?? null,
+      amountToPay: (taxPayment.amountToPay as number) ?? null,
+    },
+    declaredRegimes,
+    salariedIncome: salariedIncome as ParsedTaxReturn["salariedIncome"],
+    businessOrProfessionalIncome: businessOrProfessionalIncome as ParsedTaxReturn["businessOrProfessionalIncome"],
+    resicoIncome: resicoIncome as ParsedTaxReturn["resicoIncome"],
+    fiscalResult: {
+      accumulableIncomeTotal: (fiscalResult.accumulableIncomeTotal as number) ?? null,
+      fiscalProfit: (fiscalResult.fiscalProfit as number) ?? null,
+      fiscalLoss: (fiscalResult.fiscalLoss as number) ?? null,
+      taxResult: (fiscalResult.taxResult as number) ?? null,
+    },
+    isValidTaxYear: ed.isValidTaxYear === true,
+    hasTaxLoss: ed.hasTaxLoss === true,
+    isMixedDeclaration: ed.isMixedDeclaration === true,
+    hasOfficialReceipt: ed.hasOfficialReceipt === true,
+    alerts,
+  };
 }

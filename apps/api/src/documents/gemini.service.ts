@@ -32,13 +32,41 @@ export interface ExtractionResult {
   documentType: string;
   extractedData: Record<string, unknown> | null;
   rawResponse?: string;
+  /**
+   * Observability metadata for the Vertex AI call. Populated on both success
+   * and failure so callers can attribute latency and retry behavior without
+   * changing the extraction flow.
+   */
+  timings?: GeminiCallTimings;
   error?: { code: string; message: string; details?: unknown };
+}
+
+/** Per-call Gemini observability metrics (no behavior impact). */
+export interface GeminiCallTimings {
+  /** Wall-clock duration of extractStructuredData, in milliseconds. */
+  durationMs: number;
+  /** Number of API attempts made (1 = no retries). */
+  attempts: number;
+  /** Vertex AI candidate finishReason (STOP, MAX_TOKENS, UNKNOWN, ...). */
+  finishReason: string;
+  /** Character length of the prompt sent to the model. */
+  promptChars: number;
+  /** Character length of the raw model response (0 on transport failure). */
+  responseChars: number;
 }
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_LOCATION = 'us-central1';
 const DEFAULT_TIMEOUT_MS = 60000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
+/** Structured JSON extraction should be deterministic. */
+const DEFAULT_TEMPERATURE = 0;
+
+/** Optional per-call overrides for extractStructuredData. */
+export interface GeminiExtractOptions {
+  maxOutputTokens?: number;
+  temperature?: number;
+}
 
 /** HTTP status codes that indicate a temporary server-side overload. */
 const RETRYABLE_STATUSES = new Set([429, 503]);
@@ -90,12 +118,12 @@ export class GeminiService {
    * This ensures generationConfig is set correctly each time (Vertex AI SDK
    * does not support per-request generationConfig overrides).
    */
-  private getModel(maxTokens: number) {
+  private getModel(maxTokens: number, temperature: number = DEFAULT_TEMPERATURE) {
     return this.vertexAI.getGenerativeModel({
       model: this.modelName,
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.1,
+        temperature,
         maxOutputTokens: maxTokens,
       },
       safetySettings: [
@@ -272,6 +300,7 @@ export class GeminiService {
     documentType: string,
     schema: Record<string, unknown>,
     extraInstructions?: string,
+    options?: GeminiExtractOptions,
   ): Promise<ExtractionResult> {
     if (!ocrText || ocrText.trim() === '') {
       return {
@@ -303,11 +332,15 @@ export class GeminiService {
       schema,
       extraInstructions,
     );
+    const promptChars = prompt.length;
 
-    const model = this.getModel(this.maxOutputTokens);
+    const maxTokens = options?.maxOutputTokens ?? this.maxOutputTokens;
+    const temperature = options?.temperature ?? DEFAULT_TEMPERATURE;
+    const model = this.getModel(maxTokens, temperature);
 
     // ---- Retry loop for transient errors ----
     let lastError: unknown;
+    const startedAt = Date.now();
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
@@ -321,6 +354,13 @@ export class GeminiService {
 
         const genResult = await this.executeRequest(model, prompt);
         const { text: rawText, finishReason } = this.extractText(genResult);
+        const timings: GeminiCallTimings = {
+          durationMs: Date.now() - startedAt,
+          attempts: attempt + 1,
+          finishReason,
+          promptChars,
+          responseChars: rawText.length,
+        };
 
         // Detect truncated output — the model hit its token limit.
         // Log as warning (not error) because the salvage logic in
@@ -339,6 +379,7 @@ export class GeminiService {
             documentType,
             extractedData: extracted,
             rawResponse: rawText,
+            timings,
           };
         } catch (parseErr) {
           const code =
@@ -353,6 +394,7 @@ export class GeminiService {
             documentType,
             extractedData: null,
             rawResponse: rawText,
+            timings,
             error: {
               code,
               message:
@@ -376,6 +418,13 @@ export class GeminiService {
             success: false,
             documentType,
             extractedData: null,
+            timings: {
+              durationMs: Date.now() - startedAt,
+              attempts: attempt + 1,
+              finishReason: 'TIMEOUT',
+              promptChars,
+              responseChars: 0,
+            },
             error: {
               code: GeminiErrorCode.GEMINI_TIMEOUT,
               message: err instanceof Error ? err.message : String(err),
@@ -392,11 +441,20 @@ export class GeminiService {
       lastError instanceof Error ? lastError.message : String(lastError);
     this.logger.error(`[Gemini] extraction error: ${message}`);
 
+    const failureTimings: GeminiCallTimings = {
+      durationMs: Date.now() - startedAt,
+      attempts: MAX_RETRIES,
+      finishReason: 'ERROR',
+      promptChars,
+      responseChars: 0,
+    };
+
     if (this.isRetryable(lastError)) {
       return {
         success: false,
         documentType,
         extractedData: null,
+        timings: failureTimings,
         error: {
           code: GeminiErrorCode.GEMINI_TEMPORARILY_UNAVAILABLE,
           message:
@@ -414,6 +472,7 @@ export class GeminiService {
       success: false,
       documentType,
       extractedData: null,
+      timings: failureTimings,
       error: {
         code: GeminiErrorCode.GEMINI_REQUEST_ERROR,
         message,

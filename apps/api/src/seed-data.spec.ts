@@ -1,4 +1,11 @@
-import { BANKS, BANK_POLICIES, CREDIT_TYPES, SOURCE_VERSION } from '../prisma/seed-data';
+import { matchActivityFactor } from './case-analysis/activity-factor-match';
+import {
+  BANKS,
+  BANK_POLICIES,
+  BANK_ACTIVITY_FACTORS,
+  CREDIT_TYPES,
+  SOURCE_VERSION,
+} from '../prisma/seed-data';
 
 describe('Seed Data — Catálogo Bancario CMA', () => {
   describe('SOURCE_VERSION', () => {
@@ -38,10 +45,10 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
       expect(banorte!.minimumBureauScore).toBeNull();
     });
 
-    it('should have Santander with minimumBureauScore=541', () => {
+    it('should have Santander with minimumBureauScore=542', () => {
       const santander = BANKS.find((b) => b.code === 'SANTANDER');
       expect(santander).toBeDefined();
-      expect(santander!.minimumBureauScore).toBe(541);
+      expect(santander!.minimumBureauScore).toBe(542);
       expect(santander!.incomeCriterion).toBe('NET');
       expect(santander!.debtCommitmentFactor).toBe(0.5);
     });
@@ -237,9 +244,9 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
         expect(liq!.minimumPropertyValue).toBeNull();
       });
 
-      it('should have age range 252-960', () => {
+      it('should have age range 252-966', () => {
         expect(policies.every((p) => p.minimumApplicantAgeMonths === 252)).toBe(true);
-        expect(policies.every((p) => p.maximumApplicationAgeMonths === 960)).toBe(true);
+        expect(policies.every((p) => p.maximumApplicationAgeMonths === 966)).toBe(true);
       });
 
       it('should use code format SANTANDER_{shortDest}', () => {
@@ -386,6 +393,148 @@ describe('Seed Data — Catálogo Bancario CMA', () => {
           expect(p.code).toMatch(/^BANORTE_|SCOTIABANK_|SANTANDER_|HSBC_|CITIBANAMEX_|MIFEL_|BANREGIO_/);
         }
       });
+    });
+  });
+
+  describe('PFAE factor catalog (HU-20 locked seed)', () => {
+    it('should lock Banorte as FLAT 0.6 and NOT_PREFERRED', () => {
+      const banorte = BANKS.find((b) => b.code === 'BANORTE');
+      expect(banorte).toBeDefined();
+      expect(banorte!.pfaeFactorMode).toBe('FLAT');
+      expect(banorte!.pfaeFlatFactor).toBe(0.6);
+      expect(banorte!.taxReturnPolicy).toBe('NOT_PREFERRED');
+    });
+
+    it('should lock HSBC as NONE 1.0', () => {
+      const hsbc = BANKS.find((b) => b.code === 'HSBC');
+      expect(hsbc).toBeDefined();
+      expect(hsbc!.pfaeFactorMode).toBe('NONE');
+      expect(hsbc!.pfaeFlatFactor).toBe(1.0);
+    });
+
+    it('should lock Scotiabank taxReturnPolicy as REJECTED', () => {
+      const scotia = BANKS.find((b) => b.code === 'SCOTIABANK');
+      expect(scotia).toBeDefined();
+      expect(scotia!.taxReturnPolicy).toBe('REJECTED');
+      expect(scotia!.pfaeFactorMode).toBe('MATRIX');
+    });
+
+    it('should keep Mifel CE at 0.50 (not Excel 0.42)', () => {
+      const mifel = BANKS.find((b) => b.code === 'MIFEL');
+      expect(mifel).toBeDefined();
+      expect(mifel!.debtCommitmentFactor).toBe(0.5);
+      expect(mifel!.pfaeFactorMode).toBe('MATRIX');
+    });
+
+    it('should lock Mifel health factor at 1.5 (MAY exceed 1)', () => {
+      const health = BANK_ACTIVITY_FACTORS.find(
+        (f) =>
+          f.bankCode === 'MIFEL' &&
+          f.nativeLabel.toLowerCase().includes('salud'),
+      );
+      expect(health).toBeDefined();
+      expect(health!.factor).toBe(1.5);
+      expect(health!.factor).toBeGreaterThan(1);
+    });
+
+    it('should lock Mifel comercio at captura 0.35 (not Excel 0.20)', () => {
+      const comercio = BANK_ACTIVITY_FACTORS.find(
+        (f) =>
+          f.bankCode === 'MIFEL' &&
+          f.nativeLabel.toLowerCase().includes('comercio'),
+      );
+      expect(comercio).toBeDefined();
+      expect(comercio!.factor).toBe(0.35);
+      expect(comercio!.factor).not.toBe(0.2);
+    });
+
+    it('should seed BX+ dual factors with factorEstados ≠ factorDeclaracion', () => {
+      const servicios = BANK_ACTIVITY_FACTORS.find(
+        (f) =>
+          f.bankCode === 'BXPLUS' &&
+          f.nativeLabel.toLowerCase().includes('servicios') &&
+          f.nativeLabel.toLowerCase().includes('pfae'),
+      );
+      expect(servicios).toBeDefined();
+      expect(servicios!.factor).toBe(0.5);
+      expect(servicios!.factorTaxReturn).toBe(0.6);
+      expect(servicios!.factor).not.toBe(servicios!.factorTaxReturn);
+
+      const comercio = BANK_ACTIVITY_FACTORS.find(
+        (f) =>
+          f.bankCode === 'BXPLUS' &&
+          f.nativeLabel.toLowerCase().includes('comercio'),
+      );
+      expect(comercio).toBeDefined();
+      expect(comercio!.factor).toBe(0.4);
+      expect(comercio!.factorTaxReturn).toBe(0.5);
+    });
+
+    it('matches consultorio SAT wording on every MATRIX bank', () => {
+      const sat =
+        'Consultorios de medicina especializada pertenecientes al sector privado que cuenten con título de médico conforme a las leyes.';
+      const matrixBanks = BANKS.filter((b) => b.pfaeFactorMode === 'MATRIX');
+      expect(matrixBanks.length).toBeGreaterThan(0);
+      for (const bank of matrixBanks) {
+        const match = matchActivityFactor({
+          pfaeFactorMode: bank.pfaeFactorMode,
+          satDescription: sat,
+          activityFactors: BANK_ACTIVITY_FACTORS.filter((f) => f.bankCode === bank.code),
+        });
+        expect({ bank: bank.code, kind: match.kind }).toEqual({
+          bank: bank.code,
+          kind: 'hit',
+        });
+      }
+    });
+  });
+
+  describe('PFAE CMA cells (HU-20 locked seed)', () => {
+    it('should lock Banamex PFAE age at 28 years (336 months)', () => {
+      const policies = BANK_POLICIES.filter((p) => p.bankCode === 'CITIBANAMEX');
+      expect(policies.length).toBeGreaterThan(0);
+      expect(
+        policies.every((p) => p.minimumApplicantAgeMonthsPfae === 336),
+      ).toBe(true);
+      expect(policies.every((p) => p.minimumApplicantAgeMonths === 276)).toBe(
+        true,
+      );
+    });
+
+    it('should lock Banamex LIQUIDITY salaried income at 35k', () => {
+      const liq = BANK_POLICIES.find((p) => p.code === 'CITIBANAMEX_LIQ');
+      expect(liq).toBeDefined();
+      expect(liq!.minimumIncome).toBe(35000);
+    });
+
+    it('should lock Santander PFAE income at 15k and CONSTRUCCION at 67k', () => {
+      const adq = BANK_POLICIES.find((p) => p.code === 'SANTANDER_ADQ');
+      const cns = BANK_POLICIES.find((p) => p.code === 'SANTANDER_CNS');
+      expect(adq).toBeDefined();
+      expect(cns).toBeDefined();
+      expect(adq!.minimumIncomePfae).toBe(15000);
+      expect(adq!.minimumIncome).toBe(7500);
+      expect(cns!.code).toBe('SANTANDER_CNS');
+      expect(cns!.destination).toBe('CONSTRUCCION');
+      expect(cns!.minimumIncomePfae).toBe(67000);
+      expect(cns!.minimumIncome).toBe(20000);
+    });
+
+    it('should keep HSBC_LIQ inactive', () => {
+      const liq = BANK_POLICIES.find((p) => p.code === 'HSBC_LIQ');
+      expect(liq).toBeDefined();
+      expect(liq!.isActive).toBe(false);
+      expect(liq!.destination).toBe('LIQUIDITY');
+    });
+
+    it('should seed PFAE activity tenure where captura-first (Mifel 24 months)', () => {
+      const mifel = BANK_POLICIES.filter(
+        (p) => p.bankCode === 'MIFEL' && p.isActive,
+      );
+      expect(mifel.length).toBeGreaterThan(0);
+      expect(
+        mifel.every((p) => p.minimumActivityTenureMonths === 24),
+      ).toBe(true);
     });
   });
 });

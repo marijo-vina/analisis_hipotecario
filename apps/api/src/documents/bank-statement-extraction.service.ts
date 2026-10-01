@@ -1,6 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
+import {
+  BankStatementCleanerService,
+  ClientFiscalContext,
+  RawTransaction,
+  StatementSummary,
+} from './bank-statement-cleaner.service';
+import {
+  BankStatementGridExtractor,
+  GridDiagnostics,
+} from './bank-statement-grid.extractor';
+import { OcrLayout } from './document-ai.types';
+import {
+  employersFromDocuments,
+  promoteEmployerPayrollDeposits,
+  applySalariedPayrollDepuration,
+} from './payroll-deposit-match';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger bank-statement extraction
@@ -11,138 +27,41 @@ const BANK_STATEMENT_DOC_TYPES = ['BANK_STATEMENT'];
 // RFC validation regex — post-Gemini deterministic cleanup
 // ---------------------------------------------------------------------------
 const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+const RFC_GENERIC_NORMALIZE_REGEX = /[^A-Z0-9]/g;
+const RFC_GENERIC_PLACEHOLDER_REGEX = /^X[AE]X{1,2}010101000$/;
 
 // ---------------------------------------------------------------------------
-// Specialized instructions for bank-statement extraction
+// Specialized instructions for bank-statement extraction (Fast cover extraction)
 // ---------------------------------------------------------------------------
+/** Cover-only prompt: matches FAST_BANK_STATEMENT_COVER_SCHEMA (no movements). */
 const BANK_STATEMENT_INSTRUCTIONS = [
-  'Estado de cuenta bancario mexicano para análisis hipotecario.',
+  'Estado de cuenta bancario mexicano. Extraé SOLO metadatos de carátula y resumen.',
+  'NO inventes datos. Ante duda, usá null. Extraé ÚNICAMENTE del texto de carátula.',
   '',
-  'El documento puede tener CUALQUIER formato, layout, nombres de campos o posiciones.',
-  'NO asumas que todos los estados de cuenta usan los mismos nombres. Analizá TODO el texto OCR.',
+  'accountHolder:',
+  '  fullName: titular en MAYÚSCULAS.',
+  '  rfc: RFC del titular (12-13 chars). Si no hay match claro o es genérico SAT (XAXX…), usá null.',
+  '  isJointAccount: true si mancomunada, false si individual, null si no es evidente.',
   '',
-  '─── REGLA DE ORO ───',
-  'NO inventes datos. Ante cualquier duda, usá null.',
-  'Extraé ÚNICAMENTE de la información presente en el OCR.',
+  'bank:',
+  '  institutionName: banco (BBVA, BANORTE, SANTANDER, CITIBANAMEX, HSBC, etc.).',
+  '  accountNumber: número de cuenta.',
+  '  clabe: CLABE (18 dígitos) o null.',
   '',
-  '─── Titular (accountHolder) ───',
-  '  fullName: nombre completo del titular de la cuenta. Buscar: TITULAR, NOMBRE DEL TITULAR,',
-  '    NOMBRE, Cuenta de. Normalizar a MAYÚSCULAS.',
-  '  rfc: RFC del titular de la cuenta (12-13 caracteres). Buscar: RFC, RFC TITULAR,',
-  '    RFC CUENTAHABIENTE, RFC CLIENTE. Puede aparecer en el encabezado o junto al nombre.',
-  '    Pista de regex RFC: [A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}. Si no hay match claro, usar null.',
-  '  isJointAccount: true si el estado de cuenta muestra dos o más titulares, "cuenta mancomunada",',
-  '    "cuenta conjunta", o múltiples nombres con "Y" entre ellos. false si hay un solo titular claro.',
-  '    null si no es evidente.',
+  'statementPeriod:',
+  '  periodStartDate / periodEndDate / cutoffDate: YYYY-MM-DD o null.',
+  '  isClosedMonth / isCurrentIncompleteMonth: boolean o null.',
+  '  averageBalance / endingBalance: número decimal sin $ ni comas (pueden ser negativos).',
   '',
-  '─── Banco (bank) ───',
-  '  institutionName: nombre del banco. Buscar: BANCO, INSTITUCIÓN, NOMBRE DEL BANCO.',
-  '    Ejemplos: BBVA, BANORTE, SANTANDER, BANCOMER, HSBC, CITIBANAMEX, BANREGIO, etc.',
-  '  accountNumber: número de cuenta (NO la CLABE). Suele tener 10-12 dígitos.',
-  '  clabe: CLABE interbancaria (18 dígitos). Buscar: CLABE, CLABE INTERBANCARIA.',
+  'statementSummary:',
+  '  totalDepositsAmount / totalDepositsCount / totalWithdrawalsAmount / totalWithdrawalsCount.',
+  '  averageBalance / endingBalance: números decimales o null.',
   '',
-  '─── Periodo del estado de cuenta (statementPeriod) ───',
-  '  periodStartDate: fecha de inicio del periodo YYYY-MM-DD. Buscar: PERIODO, DESDE, FECHA INICIO.',
-  '  periodEndDate: fecha de fin del periodo YYYY-MM-DD. Buscar: HASTA, FECHA FIN, FECHA DE CORTE.',
-  '  cutoffDate: fecha de corte YYYY-MM-DD. Puede coincidir con periodEndDate.',
-  '  isClosedMonth: true si corresponde a un mes cerrado (ej. mayo 2026 con fecha de corte 31/05).',
-  '  isCurrentIncompleteMonth: true si corresponde al mes en curso que aún no cierra.',
-  '  averageBalance: saldo promedio del periodo. Número decimal sin $ ni comas.',
-  '  endingBalance: saldo final al cierre del periodo. Número decimal sin $ ni comas.',
-  '',
-  '─── Depósitos de nómina (payrollDeposits[]) ───',
-  '  Extraé TODOS los depósitos que parezcan de nómina, pagos quincenales o mensuales del empleador.',
-  '  Para cada depósito:',
-  '    date: YYYY-MM-DD.',
-  '    amount: monto del depósito. Número decimal sin $ ni comas.',
-  '    currency: "MXN", "USD", u "OTHER". Default "MXN" si no se especifica.',
-  '    originalConcept: texto original del concepto tal como aparece (ej. "NOMINA", "ABONO NOMINA").',
-  '    detectedEmployerOrPayerName: nombre del empleador/pagador detectado en el concepto.',
-  '    detectedPayerRfc: RFC del pagador si se detecta en el concepto.',
-  '      Pista de regex RFC: [A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}',
-  '      Buscar patrones de 12-13 caracteres alfanuméricos que comiencen con 3-4 letras.',
-  '      Si no hay match claro, usar null.',
-  '    isPayrollConcept: true si el concepto claramente indica nómina.',
-  '    containsPayrollKeyword: true si el concepto contiene palabras como NOMINA, NÓMINA, SUELDO, PAGO.',
-  '    possiblePayrollProvider: true si podría ser una pagadora externa (outsourcing/staffing).',
-  '',
-  '  matchCandidateForPayrollReceipt:',
-  '    expectedPayrollReceiptId: null (se completará en conciliación posterior).',
-  '    amountMatchesPayrollNetIncome: null (requiere comparación contra recibo).',
-  '    dateMatchesPayrollPaymentDate: null (requiere comparación contra recibo).',
-  '    conceptMatchesEmployer: null (requiere comparación contra recibo).',
-  '    matchConfidence: null.',
-  '',
-  '─── Posibles pagadoras (possiblePayrollProviders[]) ───',
-  '  Extraé ÚNICAMENTE depósitos recurrentes provenientes de Personas Morales (empresas) que podrían ser de un empleador/pagadora (outsourcing).',
-  '  REGLAS CRÍTICAS DE DETECCIÓN (Aplicar estrictamente):',
-  '  1. REGLA DE PERSONA MORAL: El emisor DEBE ser una empresa (Persona Moral).',
-  '     - IGNORA transferencias de personas físicas (ej. "Transf a Alejandro", "Juan Perez").',
-  '     - IGNORA transferencias entre cuentas propias.',
-  '  2. REGLA DE CONCEPTOS CLAVE: El concepto debe ser relacionado a pagos laborales:',
-  '     - Ejemplos: "nómina", "abono nómina", "pago de nómina", "remanente", "asimilados", "bonos", "compensación".',
-  '  3. EXIGE RECURRENCIA:',
-  '     - NO extraigas si es un pago aislado (no puede ser IRREGULAR).',
-  '     - IGNORA conceptos genéricos de SPEI (ej. "BNET", "Traspaso", "SPEI") a menos que provengan claramente de una empresa con patrón de pago.',
-  '  Para cada uno:',
-  '    payerName: nombre del pagador detectado.',
-  '    depositDate: YYYY-MM-DD.',
-  '    amount: monto del depósito.',
-  '    originalConcept: texto original del concepto.',
-  '    detectedPayerRfc: RFC si detecta en el concepto (misma pista de regex).',
-  '    receivingBank: banco receptor (usualmente el del estado de cuenta).',
-  '    receivingAccount: cuenta receptora.',
-  '    estimatedRecurrence: WEEKLY, BIWEEKLY, MONTHLY, IRREGULAR, UNKNOWN.',
-  '    containsPayrollKeyword: true/false/null.',
-  '',
-  '─── Otros movimientos relevantes (otherRelevantMovements[]) ───',
-  '  Extraé movimientos que NO son nómina pero son relevantes para el análisis:',
-  '    depósitos grandes, transferencias entre cuentas, ingresos extraordinarios,',
-  '    o depósitos que podrían confundirse con nómina.',
-  '  Para cada uno:',
-  '    date: YYYY-MM-DD.',
-  '    amount: monto.',
-  '    movementType: DEPOSIT, WITHDRAWAL, TRANSFER, CHARGE, UNKNOWN.',
-  '    originalConcept: texto original.',
-  '    trashDepositAnalysis:',
-  '      isDiscardableTrashDeposit: true si es un depósito descartable (ej. transferencia entre propias,',
-  '        reembolso, depósito de terceros no recurrente).',
-  '      confidence: 0.0-1.0.',
-  '      reason: breve explicación.',
-  '      evidenceText: texto del concepto que evidencia la clasificación.',
-  '    relevanceReason: por qué es relevante para el análisis.',
-  '',
-  '─── Contexto de requerimiento documental (documentRequirementContext) ───',
-  '  incomeBehavior: FIXED, VARIABLE, o UNKNOWN según se pueda inferir de los depósitos.',
-  '  requiredPayrollReceiptMonths: número de meses requeridos (3 fijo, 6 variable). null si desconocido.',
-  '  requiredBankStatementMonths: número de meses de estado de cuenta requeridos (3 fijo, 6 variable).',
-  '  detectedDocumentMonths: cuántos meses abarca el estado de cuenta detectado.',
-  '  isRequirementSatisfied: true si detectedDocumentMonths >= requiredBankStatementMonths.',
-  '  requirementNotes: notas sobre el cumplimiento del requerimiento.',
-  '',
-  '─── Detección de moneda ───',
-  '  El campo currency admite "MXN", "USD" u "OTHER".',
-  '  Default "MXN" si no se detecta símbolo o código de moneda distinto.',
-  '  Si aparece $, MXN, pesos mexicanos → "MXN".',
-  '  Si aparece US$, USD, dólares → "USD".',
-  '  Cualquier otra moneda → "OTHER".',
-  '  Moneda no MXN NO bloquea la extracción.',
-  '',
-  '─── Detección de saldo negativo ───',
-  '  Si averageBalance o endingBalance son negativos (sobregiro), registrar el valor negativo tal cual.',
-  '  NO se debe bloquear la extracción por saldo negativo.',
-  '  El post-procesamiento generará una alerta si detecta saldo negativo.',
-  '',
-  '─── Detección de cuenta mancomunada ───',
-  '  Si el estado de muestra múltiples titulares o texto indicativo de mancomunidad,',
-  '  isJointAccount = true.',
-  '  Cuando la titularidad no sea clara, usar null.',
-  '',
-  '─── Reglas de alertas ───',
-  '  Generá las alertas que correspondan según los datos detectados.',
-  '  NO generes alertas por campos que sí fueron detectados correctamente.',
-  '  Las alertas serán validadas y filtradas en post-procesamiento.',
+  'NO extraigas nómina, movimientos, pagadoras ni depuración: eso lo hace el post-procesamiento.',
 ].join('\n');
+
+/** Cap output tokens for cover-only extraction (schema is small; lower = faster). */
+const BANK_STATEMENT_COVER_MAX_OUTPUT_TOKENS = 4096;
 
 // ---------------------------------------------------------------------------
 // Alert severity and category enums
@@ -168,10 +87,43 @@ interface ExtractionAlert {
 }
 
 // ---------------------------------------------------------------------------
-// Schema — output contract Gemini must fulfill (bank-statement.schema.md v1.1)
+// Fast cover-only schema for ultra-fast Gemini metadata extraction (~1.2s)
+// ---------------------------------------------------------------------------
+const FAST_BANK_STATEMENT_COVER_SCHEMA = {
+  accountHolder: {
+    fullName: 'string | null',
+    rfc: 'string | null',
+    isJointAccount: 'boolean | null',
+  },
+  bank: {
+    institutionName: 'string | null',
+    accountNumber: 'string | null',
+    clabe: 'string | null',
+  },
+  statementPeriod: {
+    periodStartDate: 'YYYY-MM-DD | null',
+    periodEndDate: 'YYYY-MM-DD | null',
+    cutoffDate: 'YYYY-MM-DD | null',
+    isClosedMonth: 'boolean | null',
+    isCurrentIncompleteMonth: 'boolean | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+  statementSummary: {
+    totalDepositsAmount: 'number | null',
+    totalDepositsCount: 'number | null',
+    totalWithdrawalsAmount: 'number | null',
+    totalWithdrawalsCount: 'number | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Schema — output contract Gemini must fulfill (bank-statement.schema.md v1.2)
 // ---------------------------------------------------------------------------
 const BANK_STATEMENT_SCHEMA = {
-  schemaVersion: '1.1',
+  schemaVersion: '1.2',
   documentType: 'BANK_STATEMENT',
   extractionMetadata: {
     sourceDocumentId: null,
@@ -208,6 +160,26 @@ const BANK_STATEMENT_SCHEMA = {
     averageBalance: 'number | null',
     endingBalance: 'number | null',
   },
+  statementSummary: {
+    totalDepositsAmount: 'number | null',
+    totalDepositsCount: 'number | null',
+    totalWithdrawalsAmount: 'number | null',
+    totalWithdrawalsCount: 'number | null',
+    averageBalance: 'number | null',
+    endingBalance: 'number | null',
+  },
+  allTransactions: [
+    {
+      date: 'YYYY-MM-DD | null',
+      amount: 'number | null',
+      currency: 'MXN | USD | OTHER',
+      movementType: 'DEPOSIT | WITHDRAWAL | TRANSFER | CHARGE | UNKNOWN',
+      originalConcept: 'string | null',
+      payerOrBeneficiaryName: 'string | null',
+      payerRfc: 'string | null',
+      referenceNumber: 'string | null',
+    },
+  ],
   payrollDeposits: [
     {
       date: 'YYYY-MM-DD | null',
@@ -256,6 +228,26 @@ const BANK_STATEMENT_SCHEMA = {
       relevanceReason: 'string | null',
     },
   ],
+  financialDepuration: {
+    integrityCheck: {
+      bankReportedTotal: null,
+      calculatedDepositsTotal: 0.0,
+      discrepancy: 0.0,
+      status: 'MATCHED | MINOR_DIFFERENCE | CRITICAL_DISCREPANCY',
+      message: 'string',
+    },
+    depurationSummary: {
+      totalGrossDeposits: 0.0,
+      totalTrashDeposits: 0.0,
+      totalValidIncome: 0.0,
+      trashDepositsCount: 0,
+      validDepositsCount: 0,
+      needsReviewCount: 0,
+      detectedSector: 'HEALTH_MEDICAL | PROFESSIONAL_SERVICES | FOOD_RESTAURANT | RENTAL | CONSTRUCTION_TRADE | GENERAL_COMMERCE',
+    },
+    cleanedDeposits: [],
+    highImpactExceptions: [],
+  },
   bankarizationValidationPreparation: {
     purpose: 'MATCH_PAYROLL_NET_INCOME_WITH_BANK_DEPOSIT',
     requiresPayrollReceiptComparison: true,
@@ -267,6 +259,61 @@ const BANK_STATEMENT_SCHEMA = {
 };
 
 // ---------------------------------------------------------------------------
+// Observability: per-stage timings and source-of-truth traces
+// ---------------------------------------------------------------------------
+
+/** Wall-clock duration of each pipeline stage, in milliseconds. */
+export interface BankStatementStageTimings {
+  coverTextPrepMs: number;
+  geminiMs: number;
+  gridMs: number;
+  cleanerMs: number;
+  persistMs: number;
+  totalMs: number;
+}
+
+/**
+ * Full diagnostics for one extraction run. Populated only when
+ * `collectDiagnostics` is requested (benchmark path). Never alters the
+ * extraction result itself.
+ */
+export interface BankStatementDiagnostics {
+  documentId: string;
+  timings: BankStatementStageTimings;
+  gemini: {
+    success: boolean;
+    durationMs: number | null;
+    attempts: number | null;
+    finishReason: string | null;
+    promptChars: number | null;
+    responseChars: number | null;
+    errorCode: string | null;
+  };
+  rfc: {
+    rawFromGemini: string | null;
+    valueBeforeValidation: string | null;
+    final: string | null;
+    rejectedByRegex: boolean;
+    usedCsfFallback: boolean;
+  };
+  grid: GridDiagnostics | null;
+  transactions: {
+    source: 'grid' | 'gemini-fallback' | 'none';
+    count: number;
+  };
+  coverTextChars: number;
+  coverPagesUsed: number;
+}
+
+/** Options controlling side effects and observability of `extract`. */
+export interface BankStatementExtractOptions {
+  /** When false, skip all DB writes (status transitions + final persist). Default true. */
+  persist?: boolean;
+  /** When true, collect and return per-run diagnostics. Default false. */
+  collectDiagnostics?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Extraction result envelope
 // ---------------------------------------------------------------------------
 export interface BankStatementExtractionResult {
@@ -275,6 +322,7 @@ export interface BankStatementExtractionResult {
   extractedData: Record<string, unknown> | null;
   alerts: ExtractionAlert[];
   missingFields: string[];
+  diagnostics?: BankStatementDiagnostics;
   error?: { code: string; message: string };
 }
 
@@ -288,6 +336,7 @@ export class BankStatementExtractionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
+    private readonly cleanerService: BankStatementCleanerService,
   ) {}
 
   static isBankStatementDocument(documentTypeCode: string): boolean {
@@ -297,11 +346,30 @@ export class BankStatementExtractionService {
   async extract(
     caseId: string,
     documentId: string,
+    options: BankStatementExtractOptions = {},
   ): Promise<BankStatementExtractionResult> {
-    // ── 1. Fetch document with type + status ───────────────────────────
+    const persist = options.persist ?? true;
+    const collectDiagnostics = options.collectDiagnostics ?? false;
+
+    // Stage timing accumulators (ms). Populated as the pipeline advances.
+    const startedAt = Date.now();
+    const timings: BankStatementStageTimings = {
+      coverTextPrepMs: 0,
+      geminiMs: 0,
+      gridMs: 0,
+      cleanerMs: 0,
+      persistMs: 0,
+      totalMs: 0,
+    };
+
+    // ── 1. Fetch document with type + status + case ────────────────────
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
-      include: { documentType: true, documentStatus: true },
+      include: {
+        documentType: true,
+        documentStatus: true,
+        mortgageCase: true,
+      },
     });
     if (!document || document.mortgageCaseId !== caseId) {
       throw new Error('Document not found');
@@ -366,13 +434,58 @@ export class BankStatementExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Call Gemini with specialized instructions ────────────────────
+    // ── 6. Query CSF context if available ──────────────────────────────
+    const csfDoc = await this.prisma.document.findFirst({
+      where: {
+        mortgageCaseId: caseId,
+        documentType: { code: { in: ['CSF', 'TAX_SITUATION_PROOF'] } },
+        documentStatus: { code: 'PROCESSED' },
+      },
+    });
+    const csfData = csfDoc?.extractedData as Record<string, any> | null;
+    const clientContext: ClientFiscalContext = {
+      clientRfc: csfData?.taxpayer?.rfc || csfData?.rfc || null,
+      clientFullName: csfData?.taxpayer?.fullName || csfData?.fullName || null,
+      regimes: (csfData?.regimes || []).map((r: any) =>
+        typeof r === 'string' ? r : r.description || '',
+      ),
+      economicActivities: (
+        csfData?.activities ||
+        csfData?.economicActivities ||
+        []
+      ).map((a: any) => (typeof a === 'string' ? a : a.description || '')),
+    };
+
+    // ── 7. Call Gemini with specialized instructions (Fast cover page extraction) ────
+    // Send only cover page(s) to Gemini to extract metadata & summary in ~1.5s
+    const coverPrepStart = Date.now();
+    let textForGemini = document.ocrText;
+    let coverPagesUsed = 0;
+    const layout = (document as any).ocrLayout as OcrLayout | undefined;
+    if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
+      // Cover page text (pages 1 and 2 for summary)
+      const coverPages = layout.pages.slice(0, 2);
+      coverPagesUsed = coverPages.length;
+      const coverLines = coverPages
+        .flatMap((p) => p.lines || [])
+        .map((l) => l.text.trim())
+        .filter(Boolean);
+      if (coverLines.length > 0) {
+        textForGemini = coverLines.join('\n');
+      }
+    }
+    timings.coverTextPrepMs = Date.now() - coverPrepStart;
+    const coverTextChars = textForGemini.length;
+
+    const geminiStart = Date.now();
     const geminiResult = await this.geminiService.extractStructuredData(
-      document.ocrText,
+      textForGemini,
       document.documentType.code,
-      { ...BANK_STATEMENT_SCHEMA },
+      { ...FAST_BANK_STATEMENT_COVER_SCHEMA },
       BANK_STATEMENT_INSTRUCTIONS,
+      { maxOutputTokens: BANK_STATEMENT_COVER_MAX_OUTPUT_TOKENS, temperature: 0 },
     );
+    timings.geminiMs = Date.now() - geminiStart;
 
     if (!geminiResult.success) {
       this.logger.warn(
@@ -380,16 +493,45 @@ export class BankStatementExtractionService {
       );
 
       // Transition to EXTRACTION_ERROR so the UI can show the real state
-      try {
-        await this.prisma.document.update({
-          where: { id: documentId },
-          data: { documentStatusId: extractionErrorStatus.id },
-        });
-      } catch (dbError) {
-        this.logger.error(
-          `[BankStatement] Failed to set EXTRACTION_ERROR status for doc ${documentId}: ${(dbError as Error).message}`,
-        );
+      if (persist) {
+        try {
+          await this.prisma.document.update({
+            where: { id: documentId },
+            data: { documentStatusId: extractionErrorStatus.id },
+          });
+        } catch (dbError) {
+          this.logger.error(
+            `[BankStatement] Failed to set EXTRACTION_ERROR status for doc ${documentId}: ${(dbError as Error).message}`,
+          );
+        }
       }
+
+      timings.totalMs = Date.now() - startedAt;
+      const failureDiagnostics: BankStatementDiagnostics = {
+        documentId,
+        timings,
+        gemini: {
+          success: false,
+          durationMs: geminiResult.timings?.durationMs ?? null,
+          attempts: geminiResult.timings?.attempts ?? null,
+          finishReason: geminiResult.timings?.finishReason ?? null,
+          promptChars: geminiResult.timings?.promptChars ?? null,
+          responseChars: geminiResult.timings?.responseChars ?? null,
+          errorCode: geminiResult.error?.code ?? 'UNKNOWN',
+        },
+        rfc: {
+          rawFromGemini: null,
+          valueBeforeValidation: null,
+          final: null,
+          rejectedByRegex: false,
+          usedCsfFallback: false,
+        },
+        grid: null,
+        transactions: { source: 'none', count: 0 },
+        coverTextChars,
+        coverPagesUsed,
+      };
+      this.logDiagnostics(failureDiagnostics);
 
       return {
         success: false,
@@ -397,6 +539,7 @@ export class BankStatementExtractionService {
         extractedData: geminiResult.extractedData,
         alerts: [],
         missingFields: [],
+        diagnostics: collectDiagnostics ? failureDiagnostics : undefined,
         error: geminiResult.error
           ? {
               code: geminiResult.error.code,
@@ -406,16 +549,116 @@ export class BankStatementExtractionService {
       };
     }
 
-    const data = geminiResult.extractedData as Record<string, unknown>;
+    const data = geminiResult.extractedData as Record<string, any>;
+    data.schemaVersion = '1.2';
+    data.documentType = 'BANK_STATEMENT';
+    data.payrollDeposits = data.payrollDeposits || [];
+    data.possiblePayrollProviders = data.possiblePayrollProviders || [];
+    data.otherRelevantMovements = data.otherRelevantMovements || [];
 
-    // ── 7. Normalize bank-statement fields ───────────────────────────────
+    // RFC trace: raw value as returned by Gemini (before any fallback/validation)
+    const rfcRawFromGemini: string | null = data.accountHolder?.rfc ?? null;
+    let rfcUsedCsfFallback = false;
+
+    // Replace SAT generic placeholders from Gemini with the client's CSF RFC.
+    // Gemini occasionally corrupts XAXX010101000 into XAX010101000; both are
+    // placeholders and should never persist as the titular RFC.
+    const shouldUseCsfRfcFallback =
+      !data.accountHolder?.rfc ||
+      this.isGenericPlaceholderRfc(data.accountHolder.rfc);
+    if (shouldUseCsfRfcFallback && clientContext.clientRfc) {
+      if (!data.accountHolder) {
+        data.accountHolder = { fullName: null, rfc: null, isJointAccount: null };
+      }
+      data.accountHolder.rfc = clientContext.clientRfc;
+      rfcUsedCsfFallback = true;
+    } else if (data.accountHolder?.rfc && shouldUseCsfRfcFallback) {
+      data.accountHolder.rfc = null;
+    }
+
+    // RFC trace: value entering validateRfc (after fallback, before regex cleanup)
+    const rfcValueBeforeValidation: string | null =
+      data.accountHolder?.rfc ?? null;
+
+    // ── 8. Normalize bank-statement fields ───────────────────────────────
     this.normalizeBankStatement(data);
 
-    // ── 8. Compute alerts from normalized data ───────────────────────────
-    const alerts = this.computeAlerts(data);
+    // RFC trace: final value after validateRfc regex enforcement
+    const rfcFinal: string | null = data.accountHolder?.rfc ?? null;
+    const rfcRejectedByRegex =
+      !!rfcValueBeforeValidation &&
+      rfcValueBeforeValidation.trim() !== '' &&
+      rfcFinal == null;
+
+    // ── 9. Extract Transactions via Spatial Grid (Deterministic fallback to Gemini) ──
+    const statementPeriod = (data.statementPeriod ?? {}) as Record<string, unknown>;
+    const periodStart = statementPeriod.periodStartDate as string | undefined;
+    const yearMatch = periodStart ? /^(\d{4})/.exec(periodStart) : null;
+    const statementYear = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
+
+    let rawTransactions: RawTransaction[] = [];
+    let gridDiagnostics: GridDiagnostics | null = null;
+    let transactionSource: 'grid' | 'gemini-fallback' | 'none' = 'none';
+    const gridStart = Date.now();
+    if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
+      const gridOutput = BankStatementGridExtractor.extractWithDiagnostics(
+        layout,
+        statementYear,
+      );
+      gridDiagnostics = gridOutput.diagnostics;
+      if (gridOutput.transactions.length > 0) {
+        rawTransactions = gridOutput.transactions;
+        data.allTransactions = gridOutput.transactions;
+        transactionSource = 'grid';
+      }
+    }
+    timings.gridMs = Date.now() - gridStart;
+
+    // Fallback: if grid did not extract transactions, collect from Gemini output
+    if (rawTransactions.length === 0) {
+      rawTransactions = this.collectTransactions(data);
+      if (rawTransactions.length > 0) {
+        transactionSource = 'gemini-fallback';
+      }
+    }
+
+    const statementSummary = (data.statementSummary ||
+      data.statementPeriod ||
+      {}) as StatementSummary;
+
+    const cleanerStart = Date.now();
+    const depurationResult = this.cleanerService.clean(
+      rawTransactions,
+      statementSummary,
+      clientContext,
+    );
+    timings.cleanerMs = Date.now() - cleanerStart;
+    data.financialDepuration = depurationResult;
+
+    const isPfaeCase =
+      (document as { mortgageCase?: { personType?: string | null } }).mortgageCase
+        ?.personType === 'PFAE';
+
+    if (!isPfaeCase) {
+      const payrollEmployers = employersFromDocuments(
+        await this.prisma.document.findMany({
+          where: {
+            mortgageCaseId: caseId,
+            documentType: { code: 'PAYROLL_RECEIPT' },
+          },
+          select: { extractedData: true, documentType: { select: { code: true } } },
+        }),
+      );
+      promoteEmployerPayrollDeposits(data, payrollEmployers);
+      applySalariedPayrollDepuration(data);
+    }
+
+    // ── 10. Compute alerts from normalized data & depuration ─────────────
+    const alerts = this.computeAlerts(data, isPfaeCase);
+    this.appendDepurationAlerts(alerts, depurationResult);
     const missingFields = this.computeMissingFields(data);
 
-    // ── 9. Merge + dedup + filter contradictions ────────────────────────
+    // ── 11. Merge + dedup + filter contradictions ───────────────────────
     this.normalizeGeminiAlertCodes(data);
 
     const existingCodes = new Set<string>();
@@ -445,15 +688,58 @@ export class BankStatementExtractionService {
       (data.alerts as ExtractionAlert[]) ?? [],
     );
 
-    // ── 10. Persist extractedData + status atomically ──────────────────
+    // If PFAE profile / CSF active, suppress salaried payroll alerts
+    if (isPfaeCase && Array.isArray(data.alerts)) {
+      data.alerts = (data.alerts as ExtractionAlert[]).filter(
+        (a) =>
+          a.code !== 'BANK_NO_PAYROLL_DEPOSITS' &&
+          a.code !== 'BANK_PAYROLL_MISMATCH',
+      );
+    }
 
-    await this.prisma.document.update({
-      where: { id: documentId },
-      data: {
-        extractedData: data as any,
-        documentStatusId: processedStatus.id,
+    // ── 12. Persist extractedData + status atomically ────────────────────
+
+    const persistStart = Date.now();
+    if (persist) {
+      await this.prisma.document.update({
+        where: { id: documentId },
+        data: {
+          extractedData: data as any,
+          documentStatusId: processedStatus.id,
+        },
+      });
+    }
+    timings.persistMs = Date.now() - persistStart;
+    timings.totalMs = Date.now() - startedAt;
+
+    const diagnostics: BankStatementDiagnostics = {
+      documentId,
+      timings,
+      gemini: {
+        success: true,
+        durationMs: geminiResult.timings?.durationMs ?? null,
+        attempts: geminiResult.timings?.attempts ?? null,
+        finishReason: geminiResult.timings?.finishReason ?? null,
+        promptChars: geminiResult.timings?.promptChars ?? null,
+        responseChars: geminiResult.timings?.responseChars ?? null,
+        errorCode: null,
       },
-    });
+      rfc: {
+        rawFromGemini: rfcRawFromGemini,
+        valueBeforeValidation: rfcValueBeforeValidation,
+        final: rfcFinal,
+        rejectedByRegex: rfcRejectedByRegex,
+        usedCsfFallback: rfcUsedCsfFallback,
+      },
+      grid: gridDiagnostics,
+      transactions: {
+        source: transactionSource,
+        count: rawTransactions.length,
+      },
+      coverTextChars,
+      coverPagesUsed,
+    };
+    this.logDiagnostics(diagnostics);
 
     return {
       success: true,
@@ -461,6 +747,140 @@ export class BankStatementExtractionService {
       extractedData: data,
       alerts: data.alerts as ExtractionAlert[],
       missingFields,
+      diagnostics: collectDiagnostics ? diagnostics : undefined,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: structured diagnostics logging (one compact JSON line per run)
+  // -----------------------------------------------------------------------
+  private logDiagnostics(d: BankStatementDiagnostics): void {
+    this.logger.log(
+      `[BankStatementDiag] ${JSON.stringify({
+        documentId: d.documentId,
+        totalMs: d.timings.totalMs,
+        geminiMs: d.timings.geminiMs,
+        gridMs: d.timings.gridMs,
+        cleanerMs: d.timings.cleanerMs,
+        gemini: {
+          ok: d.gemini.success,
+          attempts: d.gemini.attempts,
+          finishReason: d.gemini.finishReason,
+          promptChars: d.gemini.promptChars,
+          responseChars: d.gemini.responseChars,
+          errorCode: d.gemini.errorCode,
+        },
+        rfc: {
+          raw: d.rfc.rawFromGemini,
+          final: d.rfc.final,
+          rejectedByRegex: d.rfc.rejectedByRegex,
+          usedCsfFallback: d.rfc.usedCsfFallback,
+        },
+        tx: {
+          source: d.transactions.source,
+          count: d.transactions.count,
+          pagesWithHeader: d.grid?.pagesWithDepositHeader ?? null,
+          headerAccentPages: d.grid
+            ? d.grid.pages.filter((p) => p.depositHeaderHadAccent).length
+            : null,
+        },
+      })}`,
+    );
+  }
+
+  /**
+   * Runs `extract` N times WITHOUT persisting, aggregating timing and
+   * detection-rate statistics. DEV-only observability helper used to
+   * quantify latency variance and non-determinism before optimizing.
+   */
+  async benchmark(
+    caseId: string,
+    documentId: string,
+    runs: number,
+  ): Promise<Record<string, unknown>> {
+    const clampedRuns = Math.max(1, Math.min(20, Math.floor(runs) || 1));
+    const runResults: BankStatementDiagnostics[] = [];
+
+    for (let i = 0; i < clampedRuns; i++) {
+      const result = await this.extract(caseId, documentId, {
+        persist: false,
+        collectDiagnostics: true,
+      });
+      if (result.diagnostics) {
+        runResults.push(result.diagnostics);
+      }
+    }
+
+    if (runResults.length === 0) {
+      return {
+        documentId,
+        runs: clampedRuns,
+        error: 'No diagnostics collected (all runs failed before diagnostics).',
+      };
+    }
+
+    const totalMs = runResults.map((r) => r.timings.totalMs);
+    const geminiMs = runResults.map((r) => r.timings.geminiMs);
+    const gridMs = runResults.map((r) => r.timings.gridMs);
+    const txCounts = runResults.map((r) => r.transactions.count);
+    const rfcFinals = runResults.map((r) => r.rfc.final);
+
+    const rfcDetected = rfcFinals.filter((v) => !!v).length;
+    const rfcRejected = runResults.filter(
+      (r) => r.rfc.rejectedByRegex,
+    ).length;
+    const csfFallbackUsed = runResults.filter(
+      (r) => r.rfc.usedCsfFallback,
+    ).length;
+    const gridSource = runResults.filter(
+      (r) => r.transactions.source === 'grid',
+    ).length;
+    const distinctTxCounts = [...new Set(txCounts)];
+
+    return {
+      documentId,
+      runs: clampedRuns,
+      timingsMs: {
+        total: this.summarize(totalMs),
+        gemini: this.summarize(geminiMs),
+        grid: this.summarize(gridMs),
+      },
+      geminiAttempts: this.summarize(
+        runResults.map((r) => r.gemini.attempts ?? 0),
+      ),
+      rfc: {
+        detectionRate: `${rfcDetected}/${clampedRuns}`,
+        rejectedByRegexCount: rfcRejected,
+        csfFallbackCount: csfFallbackUsed,
+        distinctValues: [...new Set(rfcFinals)],
+      },
+      transactions: {
+        gridSourceRate: `${gridSource}/${clampedRuns}`,
+        counts: txCounts,
+        distinctCounts: distinctTxCounts,
+        nonDeterministic: distinctTxCounts.length > 1,
+        min: Math.min(...txCounts),
+        max: Math.max(...txCounts),
+      },
+      perRun: runResults,
+    };
+  }
+
+  /** Computes min/max/mean/p50/p95 for a numeric series. */
+  private summarize(values: number[]): Record<string, number> {
+    if (values.length === 0) {
+      return { min: 0, max: 0, mean: 0, p50: 0, p95: 0 };
+    }
+    const sorted = [...values].sort((a, b) => a - b);
+    const pct = (p: number) =>
+      sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    return {
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      mean: Math.round(sum / sorted.length),
+      p50: pct(50),
+      p95: pct(95),
     };
   }
 
@@ -568,11 +988,27 @@ export class BankStatementExtractionService {
     return null;
   }
 
+  /**
+   * Detects SAT generic placeholder RFCs, including the corrupted variant
+   * observed from Gemini (`XAX010101000` missing one X).
+   */
+  private isGenericPlaceholderRfc(rfc: string | null | undefined): boolean {
+    if (!rfc) return false;
+    const normalized = String(rfc)
+      .trim()
+      .toUpperCase()
+      .replace(RFC_GENERIC_NORMALIZE_REGEX, '');
+    return RFC_GENERIC_PLACEHOLDER_REGEX.test(normalized);
+  }
+
   // -----------------------------------------------------------------------
   // Private: alert computation (post-normalization) — 10 BANK_ codes
   // -----------------------------------------------------------------------
 
-  private computeAlerts(data: Record<string, unknown>): ExtractionAlert[] {
+  private computeAlerts(
+    data: Record<string, unknown>,
+    isPfaeCase = false,
+  ): ExtractionAlert[] {
     const alerts: ExtractionAlert[] = [];
 
     const payrollDeposits = data.payrollDeposits as
@@ -586,10 +1022,10 @@ export class BankStatementExtractionService {
     const documentRequirementContext = (data.documentRequirementContext ??
       {}) as Record<string, unknown>;
 
-    // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty ────────────────
+    // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty (salaried only) ────
     const hasPayrollDeposits =
       Array.isArray(payrollDeposits) && payrollDeposits.length > 0;
-    if (!hasPayrollDeposits) {
+    if (!hasPayrollDeposits && !isPfaeCase) {
       alerts.push({
         code: 'BANK_NO_PAYROLL_DEPOSITS',
         severity: 'WARNING',
@@ -928,5 +1364,215 @@ export class BankStatementExtractionService {
         a.code = codeMap[a.code];
       }
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: collect all transactions from extractedData
+  // -----------------------------------------------------------------------
+  private collectTransactions(
+    data: Record<string, unknown>,
+  ): RawTransaction[] {
+    const transactions: RawTransaction[] = [];
+
+    // 1. Check allTransactions array
+    if (Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
+      for (const t of data.allTransactions as Record<string, any>[]) {
+        transactions.push({
+          date: t.date || null,
+          amount: typeof t.amount === 'number' ? t.amount : null,
+          currency: t.currency || 'MXN',
+          movementType: t.movementType || 'DEPOSIT',
+          originalConcept: t.originalConcept || '',
+          payerOrBeneficiaryName: t.payerOrBeneficiaryName || null,
+          payerRfc: t.payerRfc || null,
+          referenceNumber: t.referenceNumber || null,
+        });
+      }
+      return transactions;
+    }
+
+    // 2. Fallback: consolidate from payrollDeposits & otherRelevantMovements
+    if (Array.isArray(data.payrollDeposits)) {
+      for (const p of data.payrollDeposits as Record<string, any>[]) {
+        transactions.push({
+          date: p.date || null,
+          amount: typeof p.amount === 'number' ? p.amount : null,
+          currency: p.currency || 'MXN',
+          movementType: 'DEPOSIT',
+          originalConcept: p.originalConcept || '',
+          payerOrBeneficiaryName: p.detectedEmployerOrPayerName || null,
+          payerRfc: p.detectedPayerRfc || null,
+        });
+      }
+    }
+
+    if (Array.isArray(data.otherRelevantMovements)) {
+      for (const o of data.otherRelevantMovements as Record<string, any>[]) {
+        transactions.push({
+          date: o.date || null,
+          amount: typeof o.amount === 'number' ? o.amount : null,
+          currency: 'MXN',
+          movementType: o.movementType || 'DEPOSIT',
+          originalConcept: o.originalConcept || '',
+        });
+      }
+    }
+
+    return transactions;
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: append depuration alerts
+  // -----------------------------------------------------------------------
+  private appendDepurationAlerts(
+    alerts: ExtractionAlert[],
+    depurationResult: any,
+  ): void {
+    if (!depurationResult) return;
+
+    // Critical mathematical discrepancy
+    if (
+      depurationResult.integrityCheck?.status === 'CRITICAL_DISCREPANCY'
+    ) {
+      alerts.push({
+        code: 'STATEMENT_MATHEMATICAL_DISCREPANCY_CRITICAL',
+        severity: 'CRITICAL',
+        category: 'BANK_STATEMENT',
+        message: depurationResult.integrityCheck.message,
+        field: 'statementSummary.totalDepositsAmount',
+        requiresManualReview: true,
+      });
+    } else if (
+      depurationResult.integrityCheck?.status === 'MINOR_DIFFERENCE'
+    ) {
+      alerts.push({
+        code: 'STATEMENT_MATHEMATICAL_DISCREPANCY_MINOR',
+        severity: 'INFO',
+        category: 'BANK_STATEMENT',
+        message: depurationResult.integrityCheck.message,
+        field: 'statementSummary.totalDepositsAmount',
+        requiresManualReview: false,
+      });
+    }
+
+    // High impact outliers
+    if (
+      Array.isArray(depurationResult.highImpactExceptions) &&
+      depurationResult.highImpactExceptions.length > 0
+    ) {
+      alerts.push({
+        code: 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+        severity: 'WARNING',
+        category: 'INCOME',
+        message: `Se detectaron ${depurationResult.highImpactExceptions.length} depósito(s) atípico(s) de alto impacto que requieren confirmación rápida.`,
+        field: 'financialDepuration.highImpactExceptions',
+        requiresManualReview: true,
+      });
+    }
+  }
+
+  /**
+   * Allows an analyst to manually approve (VALID) or discard (TRASH)
+   * a single deposit transaction within financialDepuration, recalculating totals instantly.
+   */
+  async updateDepositClassification(
+    documentId: string,
+    depositIndex: number,
+    body: {
+      classification: 'VALID' | 'TRASH';
+      reason?: string;
+      trashCategory?: string;
+    },
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new Error(`Document ${documentId} not found`);
+    }
+
+    const data = (document.extractedData || {}) as Record<string, any>;
+    const depuration = data.financialDepuration;
+
+    if (!depuration || !Array.isArray(depuration.cleanedDeposits)) {
+      throw new Error('No financial depuration data found on document');
+    }
+
+    if (depositIndex < 0 || depositIndex >= depuration.cleanedDeposits.length) {
+      throw new Error(`Deposit index ${depositIndex} out of range`);
+    }
+
+    const dep = depuration.cleanedDeposits[depositIndex];
+    dep.classification = body.classification;
+    dep.isHighImpactOutlier = false;
+
+    if (body.classification === 'VALID') {
+      dep.validCategory = 'CONFIRMED_BY_ANALYST';
+      dep.trashCategory = undefined;
+      dep.reason = body.reason || 'Aprobado manualmente por la asesora';
+    } else {
+      dep.trashCategory = (body.trashCategory as any) || 'OTHER_NON_BUSINESS';
+      dep.validCategory = undefined;
+      dep.reason = body.reason || 'Descartado manualmente por la asesora';
+    }
+
+    // Recalculate totals
+    let totalTrash = 0;
+    let totalValid = 0;
+    let trashCount = 0;
+    let validCount = 0;
+    let needsReviewCount = 0;
+    const remainingExceptions: any[] = [];
+
+    for (const d of depuration.cleanedDeposits) {
+      if (d.classification === 'TRASH') {
+        totalTrash += d.amount || 0;
+        trashCount++;
+      } else if (d.classification === 'VALID') {
+        totalValid += d.amount || 0;
+        validCount++;
+      } else {
+        needsReviewCount++;
+      }
+
+      if (d.classification === 'NEEDS_REVIEW' || d.isHighImpactOutlier) {
+        remainingExceptions.push(d);
+      }
+    }
+
+    depuration.depurationSummary = {
+      ...depuration.depurationSummary,
+      totalTrashDeposits: Math.round(totalTrash * 100) / 100,
+      totalValidIncome: Math.round(totalValid * 100) / 100,
+      trashDepositsCount: trashCount,
+      validDepositsCount: validCount,
+      needsReviewCount,
+    };
+    depuration.highImpactExceptions = remainingExceptions;
+
+    // Update alerts: remove or update STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED
+    if (Array.isArray(data.alerts)) {
+      data.alerts = data.alerts.filter(
+        (a: any) => a.code !== 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+      );
+      if (remainingExceptions.length > 0) {
+        data.alerts.push({
+          code: 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED',
+          severity: 'WARNING',
+          category: 'INCOME',
+          message: `Se detectaron ${remainingExceptions.length} depósito(s) atípico(s) de alto impacto que requieren confirmación rápida.`,
+          field: 'financialDepuration.highImpactExceptions',
+          requiresManualReview: true,
+        });
+      }
+    }
+
+    const updated = await this.prisma.document.update({
+      where: { id: documentId },
+      data: { extractedData: data },
+    });
+
+    return updated.extractedData;
   }
 }

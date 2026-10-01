@@ -14,6 +14,9 @@ import { CreditBureauExtractionService } from './credit-bureau-extraction.servic
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { CsfExtractionService } from './csf-extraction.service';
+import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 
 @Module({
   imports: [PrismaModule, CaseStatusCalculatorModule],
@@ -27,11 +30,20 @@ import { CoordinateExtractionService } from './coordinate-extraction.service';
     OfficialIdExtractionService,
     PayrollExtractionService,
     BankStatementExtractionService,
+    BankStatementCleanerService,
     CreditBureauExtractionService,
     CreditScoreExtractionService,
     LayoutFinancialExtractorService,
     CoordinateExtractionService,
+    CsfExtractionService,
+    TaxReturnExtractionService,
   ],
-  exports: [DocumentsService, StoragePathService],
+  exports: [
+    DocumentsService,
+    StoragePathService,
+    CsfExtractionService,
+    TaxReturnExtractionService,
+    BankStatementCleanerService,
+  ],
 })
 export class DocumentsModule {}
