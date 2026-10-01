@@ -49,8 +49,15 @@ export interface GridExtractionOutput {
 
 /** Detects a Spanish accent anywhere in a header token. */
 const ACCENT_REGEX = /[ÁÉÍÓÚÑáéíóúñ]/;
-const DATE_LINE_PATTERN = /^\d{1,2}\s+(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/i;
-const BBVA_DATE_LINE_PATTERN = /^\d{1,2}\/(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/i;
+const MONTH_TOKEN = 'ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC';
+const DATE_LINE_PATTERN = new RegExp(`^\\d{1,2}\\s+(?:${MONTH_TOKEN})\\b`, 'i');
+const BBVA_DATE_LINE_PATTERN = new RegExp(`^\\d{1,2}\\/(?:${MONTH_TOKEN})\\b`, 'i');
+const DASHED_MONTH_DATE_PATTERN = new RegExp(
+  `^\\d{1,2}-(?:${MONTH_TOKEN})-\\d{2,4}\\b`,
+  'i',
+);
+const BANORTE_MOVEMENT_HEADER_PATTERN =
+  /MONTO\s+DEL\s+DEP[OÓ]SITO.*MONTO\s+DEL\s+RETIRO/i;
 const CURRENCY_AMOUNT_PATTERN = /^\$?[\d,]+\.\d{2}$/;
 const CURRENCY_AMOUNT_GLOBAL_PATTERN = /\$?[\d,]+\.\d{2}/g;
 const COMBINED_MOVEMENT_HEADER_PATTERN = /CARGOS.*ABONOS|ABONOS.*CARGOS/i;
@@ -215,6 +222,17 @@ export class BankStatementGridExtractor {
         continue;
       }
 
+      if (BANORTE_MOVEMENT_HEADER_PATTERN.test(text)) {
+        const mid = (box.left + box.right) / 2;
+        depositHeader = { ...box, right: mid };
+        withdrawalHeader = { ...box, left: mid };
+        diagnostics.depositHeaderFound = true;
+        diagnostics.depositHeaderText = rawText;
+        diagnostics.depositHeaderHadAccent = ACCENT_REGEX.test(rawText);
+        diagnostics.withdrawalHeaderFound = true;
+        continue;
+      }
+
       // Headers typically reside in the upper 45% of the page
       if (box.top > page.height * 0.45) continue;
 
@@ -249,17 +267,7 @@ export class BankStatementGridExtractor {
     // sometimes omit headers, so reuse the latest known transaction columns.
     const columnContext: ColumnContext = canInheritHeader
       ? previousContext!
-      : {
-          depLeft: withdrawalHeader
-            ? (withdrawalHeader.right + depositHeader!.left) / 2
-            : depositHeader!.left - 40,
-          depRight: balanceHeader
-            ? (depositHeader!.right + balanceHeader.left) / 2
-            : depositHeader!.right + 60,
-          withdrawalLeft: withdrawalHeader
-            ? withdrawalHeader.left
-            : depositHeader!.left - 40,
-        };
+      : this.resolveColumnContext(depositHeader!, withdrawalHeader, balanceHeader);
 
     const depLeft = columnContext.depLeft;
     const depRight = columnContext.depRight;
@@ -304,45 +312,41 @@ export class BankStatementGridExtractor {
     // Sort deposits top-to-bottom
     depositCells.sort((a, b) => a.top - b.top);
 
-    // 4. Associate concept block and date for each deposit
-    //    Strategy: for each deposit amount, scan BACKWARD through left-column
-    //    lines to find the nearest date line (DD MMM pattern). This eliminates
-    //    withdrawal concepts that sit between consecutive deposits.
+    // 4. Associate concept block and date for each deposit.
+    //    The description runs from its date line until the next date line,
+    //    including wrap lines that sit below the amount (Banorte).
+    const leftLines = lines
+      .filter((l) => {
+        const b = l.boundingBox;
+        return b.right < withdrawalLeft && b.top > tableTop;
+      })
+      .sort((a, b) => a.boundingBox.top - b.boundingBox.top);
+    const dateIndexes = leftLines
+      .map((line, index) =>
+        this.isTransactionDateLine(line.text.trim()) ? index : -1,
+      )
+      .filter((index) => index >= 0);
+
     const pageTransactions: RawTransaction[] = [];
     let lastKnownDate: string | null = null;
 
-    for (let i = 0; i < depositCells.length; i++) {
-      const current = depositCells[i];
-      const prev = i > 0 ? depositCells[i - 1] : null;
-
-      // Safe floor: previous deposit bottom or table top
-      const safeFloor = prev ? prev.bottom : tableTop;
-      const blockBottom = current.bottom + 15;
-
-      // Collect ALL left-column candidate lines in the full Y range
-      const candidateLines = lines.filter((l) => {
-        const b = l.boundingBox;
-        const isLeftOfAmounts = b.right < withdrawalLeft;
-        return isLeftOfAmounts && b.top >= safeFloor && b.bottom <= blockBottom && b.top > tableTop;
-      });
-      candidateLines.sort((a, b) => a.boundingBox.top - b.boundingBox.top);
-
-      // Find the deposit's own date line by scanning BACKWARD from the amount
-      // position. The first date line found going upward is the start of this
-      // deposit's concept block; everything above belongs to withdrawals.
-      let dateLineIndex = -1;
-      for (let j = candidateLines.length - 1; j >= 0; j--) {
-        if (this.isTransactionDateLine(candidateLines[j].text.trim())) {
-          dateLineIndex = j;
-          break;
+    for (const current of depositCells) {
+      let chosenPos = -1;
+      for (let k = 0; k < dateIndexes.length; k++) {
+        if (leftLines[dateIndexes[k]].boundingBox.top <= current.bottom + 8) {
+          chosenPos = k;
         }
       }
 
-      // Use only lines from the deposit's date line to the end;
-      // fallback to all candidates if no date line found (rare edge case).
-      const blockLines = dateLineIndex >= 0
-        ? candidateLines.slice(dateLineIndex)
-        : candidateLines;
+      const blockLines =
+        chosenPos >= 0
+          ? leftLines.slice(
+              dateIndexes[chosenPos],
+              chosenPos + 1 < dateIndexes.length
+                ? dateIndexes[chosenPos + 1]
+                : leftLines.length,
+            )
+          : [];
       const rawConcept = blockLines.map((l) => l.text.trim()).join(' ');
 
       // Parse date
@@ -371,6 +375,46 @@ export class BankStatementGridExtractor {
     diagnostics.transactionCount = pageTransactions.length;
 
     return { transactions: pageTransactions, diagnostics, columnContext };
+  }
+
+  private static resolveColumnContext(
+    depositHeader: OcrLine['boundingBox'],
+    withdrawalHeader: OcrLine['boundingBox'] | null,
+    balanceHeader: OcrLine['boundingBox'] | null,
+  ): ColumnContext {
+    const depositCenter = (depositHeader.left + depositHeader.right) / 2;
+    const withdrawalCenter = withdrawalHeader
+      ? (withdrawalHeader.left + withdrawalHeader.right) / 2
+      : null;
+    const withdrawalOnLeft =
+      withdrawalCenter != null && withdrawalCenter < depositCenter;
+
+    if (withdrawalHeader && withdrawalOnLeft) {
+      return {
+        depLeft: (withdrawalHeader.right + depositHeader.left) / 2,
+        depRight: balanceHeader
+          ? (depositHeader.right + balanceHeader.left) / 2
+          : depositHeader.right + 60,
+        withdrawalLeft: withdrawalHeader.left,
+      };
+    }
+
+    if (withdrawalHeader) {
+      const split = (depositHeader.right + withdrawalHeader.left) / 2;
+      return {
+        depLeft: depositHeader.left - 30,
+        depRight: split,
+        withdrawalLeft: split,
+      };
+    }
+
+    return {
+      depLeft: depositHeader.left - 40,
+      depRight: balanceHeader
+        ? (depositHeader.right + balanceHeader.left) / 2
+        : depositHeader.right + 60,
+      withdrawalLeft: depositHeader.left - 40,
+    };
   }
 
   private static parseAmount(text: string): number | null {
@@ -430,10 +474,31 @@ export class BankStatementGridExtractor {
   }
 
   private static isTransactionDateLine(text: string): boolean {
-    return DATE_LINE_PATTERN.test(text) || BBVA_DATE_LINE_PATTERN.test(text);
+    return (
+      DATE_LINE_PATTERN.test(text) ||
+      BBVA_DATE_LINE_PATTERN.test(text) ||
+      DASHED_MONTH_DATE_PATTERN.test(text)
+    );
   }
 
   private static extractDate(text: string, defaultYear: string): string | null {
+    const dashedMonthMatches = Array.from(
+      text.matchAll(
+        new RegExp(`\\b(\\d{1,2})-(${MONTH_TOKEN})-(\\d{2}|\\d{4})\\b`, 'gi'),
+      ),
+    );
+    if (dashedMonthMatches.length > 0) {
+      const lastMatch = dashedMonthMatches[dashedMonthMatches.length - 1];
+      const day = lastMatch[1].padStart(2, '0');
+      const month = MONTH_MAP[lastMatch[2].toUpperCase()] || '01';
+      const rawYear = lastMatch[3];
+      const year =
+        rawYear.length === 4
+          ? rawYear
+          : `${Number(rawYear) <= 69 ? 2000 + Number(rawYear) : 1900 + Number(rawYear)}`;
+      return `${year}-${month}-${day}`;
+    }
+
     // 1. Check all "DD MMM" occurrences and pick the LAST one in the block
     const ddMmmMatches = Array.from(
       text.matchAll(/\b(\d{1,2})\s+(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\b/gi),
@@ -474,6 +539,7 @@ export class BankStatementGridExtractor {
     return text
       .replace(/^\d{1,2}\s+(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+/i, '')
       .replace(/^\d{1,2}\/(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+/i, '')
+      .replace(/^\d{1,2}-(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-\d{2,4}\s+/i, '')
       .replace(/\bCAJA\s+\d+\s+AUT\s+\d+\b/gi, '')
       .replace(/\bHORA\s+\d{2}:\d{2}\s+SUC\s+\d+\b/gi, '')
       .replace(/\s+/g, ' ')
@@ -493,6 +559,13 @@ export class BankStatementGridExtractor {
       const pagoMatch = /PAGO RECIBIDO DE\s+([A-ZÑ\s.,\/]+?)(?:\s+SU REF|\s+CTA\.|\s+REF\.|\s+POR ORDEN|$)/i.exec(concept);
       if (pagoMatch) {
         payerName = pagoMatch[1].replace(/[,/]/g, ' ').trim();
+      }
+    }
+
+    if (!payerName) {
+      const clienteMatch = /DEL CLIENTE\s+(.+?)\s+DE LA CLABE/i.exec(concept);
+      if (clienteMatch) {
+        payerName = clienteMatch[1].replace(/\s+/g, ' ').trim();
       }
     }
 

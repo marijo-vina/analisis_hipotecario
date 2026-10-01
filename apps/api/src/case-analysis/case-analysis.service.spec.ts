@@ -34,6 +34,9 @@ describe('CaseAnalysisService', () => {
       create: jest.fn(),
       findFirst: jest.fn(),
     },
+    document: {
+      update: jest.fn().mockResolvedValue({}),
+    },
   };
 
   const mockIdentityMatchRule = {

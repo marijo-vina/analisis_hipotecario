@@ -13,6 +13,11 @@ import { LiabilityCalculationService } from '../liability/liability.service';
 import { mapBureauCreditToInput } from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
 import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
+import {
+  applySalariedPayrollDepuration,
+  employersFromDocuments,
+  promoteEmployerPayrollDeposits,
+} from '../documents/payroll-deposit-match';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
@@ -79,6 +84,35 @@ export class CaseAnalysisService {
     return [this.identityMatchRule, this.bankarizationValidationRule];
   }
 
+  /**
+   * SPEI deposits often say only "PAGO". Match them to the payroll employer
+   * name or RFC and store them so the empty-payroll alert and the
+   * reconciliation see the same deposits.
+   */
+  private async persistEmployerPayrollDeposits(
+    docs: Record<string, unknown>[],
+  ): Promise<void> {
+    const employers = employersFromDocuments(
+      docs as { documentType?: { code?: string } | null; extractedData?: unknown }[],
+    );
+
+    for (const doc of docs) {
+      if ((doc.documentType as { code?: string } | undefined)?.code !== 'BANK_STATEMENT') {
+        continue;
+      }
+      const extractedData = doc.extractedData;
+      if (!extractedData || typeof extractedData !== 'object') continue;
+      const payload = extractedData as Record<string, unknown>;
+      const promoted = promoteEmployerPayrollDeposits(payload, employers);
+      const incomeRestricted = applySalariedPayrollDepuration(payload);
+      if ((!promoted && !incomeRestricted) || typeof doc.id !== 'string') continue;
+      await this.prisma.document.update({
+        where: { id: doc.id },
+        data: { extractedData: payload as never },
+      });
+    }
+  }
+
   async run(caseId: string, triggeredBy: string): Promise<AnalysisResultPayload> {
     const mortgageCase = (await this.prisma.mortgageCase.findUnique({
       where: { id: caseId },
@@ -95,6 +129,9 @@ export class CaseAnalysisService {
       personType: mortgageCase.personType,
     } as Record<string, unknown>;
     const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+    if (mortgageCase.personType !== 'PFAE') {
+      await this.persistEmployerPayrollDeposits(docs);
+    }
 
     // ── Phase A: Document validation rules ──────────────────────────────
     const phaseARules = this.resolvePhaseARules(mortgageCase.personType);

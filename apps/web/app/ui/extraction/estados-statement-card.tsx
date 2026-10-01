@@ -458,8 +458,62 @@ export default function EstadosStatementCard({
             </div>
           )}
 
-          {/* 4. Depuración: solo atípicos / advertencias y rechazados */}
+          {/* 4. Asalariado: solo nómina o patrón. PFAE: atípicos y rechazados. */}
           {(() => {
+            const payrollOnly = statement.financialDepuration?.incomeMode === "PAYROLL";
+            if (payrollOnly) {
+              if (!deposits?.length) return null;
+              return (
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted flex items-center gap-1.5 mb-3">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Depósitos de nómina
+                  </h4>
+                  <div className="space-y-2.5">
+                    {deposits.map((dep: any, i: number) => {
+                      const dateParts = dep.date ? parseDateParts(dep.date) : null;
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-xl p-3.5 flex items-center gap-3.5 border border-emerald-200/80 bg-gf-surface"
+                        >
+                          <div className="flex flex-col items-center justify-center w-11 text-center bg-white p-1.5 rounded-lg border border-gf-border/60 shrink-0">
+                            <span className="text-[10px] font-bold text-gf-red uppercase">
+                              {dateParts?.monthAbbr ?? "—"}
+                            </span>
+                            <span className="text-sm font-bold text-gf-text leading-tight">
+                              {dateParts?.day ?? "—"}
+                            </span>
+                            <span className="text-[8px] text-gf-text-muted">
+                              {dateParts?.year ?? "—"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-bold text-emerald-700">
+                              {dep.amount != null ? `${fmtCurrency(dep.amount)} MXN` : "—"}
+                            </span>
+                            <span className="text-xs font-semibold text-gf-text uppercase line-clamp-1">
+                              {dep.payerOrBeneficiaryName ?? dep.originalConcept ?? "—"}
+                            </span>
+                            {dep.originalConcept && (
+                              <span className="text-[11px] text-gf-text-muted line-clamp-1">
+                                Concepto: {dep.originalConcept}
+                              </span>
+                            )}
+                            {dep.reason && (
+                              <span className="text-[11px] text-emerald-700 font-medium">
+                                {dep.reason}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
             const hasFlagged =
               deposits?.some(
                 (dep: any) =>

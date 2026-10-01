@@ -161,18 +161,19 @@ const geminiFailure = (code = GeminiErrorCode.GEMINI_TIMEOUT) => ({
 describe('BankStatementExtractionService', () => {
   let service: BankStatementExtractionService;
   let mockPrisma: {
-    document: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    document: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
     documentStatus: { findUnique: jest.Mock };
   };
   let mockGemini: { extractStructuredData: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
-      document: {
-        findUnique: jest.fn(),
-        findFirst: jest.fn().mockResolvedValue(null),
-        update: jest.fn(),
-      },
+    document: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+    },
       documentStatus: {
         findUnique: jest.fn().mockImplementation(
           (args: { where: { code: string } }) => {
@@ -443,7 +444,7 @@ describe('BankStatementExtractionService', () => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
       mockGemini.extractStructuredData.mockResolvedValue(
         validGeminiSuccess(
-          createMockExtractionResult({ payrollDeposits: [] }),
+          createMockExtractionResult({ payrollDeposits: [], allTransactions: [] }),
         ),
       );
 
@@ -1012,6 +1013,7 @@ describe('BankStatementExtractionService', () => {
       mockGemini.extractStructuredData.mockResolvedValue(
         validGeminiSuccess(
           createMockExtractionResult({
+            allTransactions: [],
             payrollDeposits: [
               {
                 date: '2026-05-15',
@@ -1579,7 +1581,10 @@ describe('BankStatementExtractionService', () => {
   // ── Financial Depuration & CSF Enrichment Integration ─────────────────
   describe('Financial Depuration and CSF Enrichment Integration', () => {
     it('should query CSF context, enrich depuration and compute financial totals', () => {
-      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'PFAE' },
+      });
       mockPrisma.document.findFirst.mockResolvedValue({
         id: 'doc-csf-1',
         extractedData: {
@@ -1665,6 +1670,70 @@ describe('BankStatementExtractionService', () => {
         );
         expect(criticalAlert).toBeDefined();
         expect(criticalAlert?.severity).toBe('CRITICAL');
+      });
+    });
+
+    it('salaried statements count only payroll keyword or employer deposits and skip review actions', () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'SALARIED' },
+      });
+      mockPrisma.document.findMany.mockResolvedValue([
+        {
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: {
+            employer: {
+              legalName: 'ACAMEX SA DE CV',
+              rfc: 'ACM230101AA1',
+            },
+          },
+        },
+      ]);
+
+      const extractionData = createMockExtractionResult({
+        payrollDeposits: [],
+        statementSummary: { totalDepositsAmount: 300000 },
+        allTransactions: [
+          {
+            date: '2026-06-01',
+            amount: 190000,
+            movementType: 'DEPOSIT',
+            originalConcept:
+              'SPEI RECIBIDO DEL CLIENTE ACAMEX CON RFC ACM230101AA1 CONCEPTO: PAGO',
+          },
+          {
+            date: '2026-06-02',
+            amount: 61000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'DEP.EFECTIVO',
+          },
+          {
+            date: '2026-06-03',
+            amount: 10000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'PAGO NOMINA QUINCENA',
+          },
+        ],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(extractionData),
+      );
+
+      return service.extract('case-1', 'doc-bank-1').then((result) => {
+        expect(result.success).toBe(true);
+        const depuration = result.extractedData?.financialDepuration as Record<string, any>;
+        expect(depuration.incomeMode).toBe('PAYROLL');
+        expect(depuration.depurationSummary.totalValidIncome).toBe(200000);
+        expect(depuration.depurationSummary.validDepositsCount).toBe(2);
+        expect(depuration.depurationSummary.needsReviewCount).toBe(0);
+        expect(depuration.highImpactExceptions).toEqual([]);
+        expect(
+          result.alerts.find((a) => a.code === 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED'),
+        ).toBeUndefined();
+        expect(
+          result.alerts.find((a) => a.code === 'STATEMENT_MATHEMATICAL_DISCREPANCY_CRITICAL'),
+        ).toBeDefined();
+        expect(result.alerts.find((a) => a.code === 'BANK_NO_PAYROLL_DEPOSITS')).toBeUndefined();
       });
     });
   });

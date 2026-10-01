@@ -12,6 +12,11 @@ import {
   GridDiagnostics,
 } from './bank-statement-grid.extractor';
 import { OcrLayout } from './document-ai.types';
+import {
+  employersFromDocuments,
+  promoteEmployerPayrollDeposits,
+  applySalariedPayrollDepuration,
+} from './payroll-deposit-match';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger bank-statement extraction
@@ -631,10 +636,22 @@ export class BankStatementExtractionService {
     data.financialDepuration = depurationResult;
 
     const isPfaeCase =
-      (document as any)?.mortgageCase?.personType === 'PFAE' ||
-      (clientContext.economicActivities &&
-        clientContext.economicActivities.length > 0) ||
-      (clientContext.regimes && clientContext.regimes.length > 0);
+      (document as { mortgageCase?: { personType?: string | null } }).mortgageCase
+        ?.personType === 'PFAE';
+
+    if (!isPfaeCase) {
+      const payrollEmployers = employersFromDocuments(
+        await this.prisma.document.findMany({
+          where: {
+            mortgageCaseId: caseId,
+            documentType: { code: 'PAYROLL_RECEIPT' },
+          },
+          select: { extractedData: true, documentType: { select: { code: true } } },
+        }),
+      );
+      promoteEmployerPayrollDeposits(data, payrollEmployers);
+      applySalariedPayrollDepuration(data);
+    }
 
     // ── 10. Compute alerts from normalized data & depuration ─────────────
     const alerts = this.computeAlerts(data, isPfaeCase);
