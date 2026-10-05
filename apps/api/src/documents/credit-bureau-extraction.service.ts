@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import {
+  BureauGridClient,
+  BureauGridCredit,
+  mergeBureauGrid,
+} from './bureau-grid.client';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { GcsService } from './gcs.service';
 import { parseInstitutionAndAccount } from './layout-lines-extractor';
@@ -510,6 +515,7 @@ export class CreditBureauExtractionService {
     private readonly layoutExtractor: LayoutFinancialExtractorService,
     private readonly coordinateExtractor: CoordinateExtractionService,
     private readonly gcsService: GcsService,
+    private readonly bureauGrid: BureauGridClient,
   ) {}
 
   static isCreditBureauDocument(documentTypeCode: string): boolean {
@@ -1041,6 +1047,30 @@ export class CreditBureauExtractionService {
       }
     }
 
+    // ── 6d. Python column grid (limit, maximum, payment history) ─────
+    // The pdfplumber service separates Límite de Crédito from Crédito
+    // Máximo and keeps digit MOP codes. A down service leaves the
+    // extraction that already ran.
+    let bureauGridCredits: BureauGridCredit[] | null = null;
+    if (this.isBureauGridEnabled() && document.storagePath) {
+      try {
+        const pdfBuffer = await this.gcsService.downloadFile(
+          document.storagePath,
+        );
+        bureauGridCredits = await this.bureauGrid.extract(pdfBuffer);
+        if (bureauGridCredits) {
+          this.logger.log(
+            `[CreditBureau] Bureau grid: ${bureauGridCredits.length} credits for doc ${documentId}`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `[CreditBureau] Bureau grid failed — keeping the current extraction: ${(err as Error).message}`,
+        );
+        bureauGridCredits = null;
+      }
+    }
+
     // ── 6c. Deterministic inquiry count from DETALLE DE CONSULTAS ─────
     // Runs BEFORE Gemini so it always executes, even when Gemini fails.
     // Extracts consultation date directly from the OCR text.
@@ -1102,6 +1132,10 @@ export class CreditBureauExtractionService {
         this.copyAccountNumbersFromOcrText(data, document.ocrText);
         if (coordinateResult) {
           this.mergeCoordinateResults(data, coordinateResult);
+        }
+        if (bureauGridCredits && bureauGridCredits.length > 0) {
+          const storedCredits = data.credits as Record<string, unknown>[];
+          mergeBureauGrid(storedCredits, bureauGridCredits);
         }
         if (deterministicInquiryCount !== null) {
           const reportData = (data.report ?? {}) as Record<string, unknown>;
@@ -1211,6 +1245,12 @@ export class CreditBureauExtractionService {
     // Gemini. Runs AFTER the layout merge so BAND_MATCH has final say.
     if (coordinateResult) {
       this.mergeCoordinateResults(data, coordinateResult);
+    }
+    if (bureauGridCredits && bureauGridCredits.length > 0) {
+      mergeBureauGrid(
+        data.credits as Record<string, unknown>[],
+        bureauGridCredits,
+      );
     }
 
     // ── 8. Normalize credit bureau fields ──────────────────────────────
@@ -1350,6 +1390,15 @@ export class CreditBureauExtractionService {
     const v =
       this.configService.get<string>('COORDINATE_EXTRACTION_ENABLED') ??
       'true';
+    return String(v).toLowerCase() !== 'false';
+  }
+
+  /**
+   * Python column grid. On unless BUREAU_GRID_ENABLED=false. A refused
+   * connection does not fail the extraction.
+   */
+  private isBureauGridEnabled(): boolean {
+    const v = this.configService.get<string>('BUREAU_GRID_ENABLED') ?? 'true';
     return String(v).toLowerCase() !== 'false';
   }
 
@@ -1917,27 +1966,21 @@ export class CreditBureauExtractionService {
         }
       }
 
-      // ── creditLimit (with maxCredit fallback) ─────────────────────────
-      // Mexican credit bureaus interchange "Crédito Máximo" and "Límite de
-      // Crédito". The coordinate extractor captures the value under whichever
-      // column header the PDF uses. We try creditLimit first, fall back to
-      // maxCredit, and only overwrite Gemini when it returned null/zero.
-      const coordLimitRaw = cc.creditLimit || cc.maxCredit;
-      if (coordLimitRaw) {
-        const parsed = this.parseCoordinateAmount(coordLimitRaw);
-        if (parsed !== null && (credit.creditLimit == null || (credit.creditLimit as number) === 0)) {
+      // ── creditLimit ───────────────────────────────────────────────────
+      // Only the limit column. Máximo stays in maxCredit; the Python grid
+      // overwrites both after this merge.
+      if (cc.creditLimit) {
+        const parsed = this.parseCoordinateAmount(cc.creditLimit);
+        if (
+          parsed !== null &&
+          (credit.creditLimit == null || (credit.creditLimit as number) === 0)
+        ) {
           credit.creditLimit = parsed;
         }
       }
 
-      // ── mopCodes ──────────────────────────────────────────────────────
-      // Gemini often returns empty mopCodes for bottom-half credits where
-      // OCR degrades. The coordinate extractor captures these reliably from
-      // the paymentHistory column grid cells.
-      const gMop = credit.mopCodes as string[] | undefined;
-      if (cc.mopCodes.length > 0 && (!gMop || gMop.length === 0)) {
-        credit.mopCodes = cc.mopCodes;
-      }
+      // mopCodes come from the Python grid. pdfjs payment-history cells
+      // used to fill empty Gemini arrays and could plant a footer digit.
 
       // ── status ────────────────────────────────────────────────────────
       // Summary status from extractSummaryStatuses is authoritative (merged

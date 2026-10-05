@@ -21,6 +21,11 @@ Thumbs.db
 # POC: credit bureau PDF coordinate extraction
 experiments/buro-pdf-coordinate-poc/samples/
 experiments/buro-pdf-coordinate-poc/output/
+# Spike: pdfplumber bureau grid (phase 0)
+experiments/bureau-pdfplumber-spike/samples/
+experiments/bureau-pdfplumber-spike/output/
+experiments/bureau-pdfplumber-spike/.venv/
+experiments/bureau-pdfplumber-spike/__pycache__/
 # PDF files (documents with personal data)
 *.pdf
 

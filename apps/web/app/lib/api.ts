@@ -115,8 +115,11 @@ export async function apiFetch<T>(
     };
   }
 
-  // ---- 401 → session expired / invalid token ----------------------------
-  if (res.status === 401) {
+  // ---- 401 → session expired, except credential checks ------------------
+  // Login and email verification use 401 for a rejected attempt. Those
+  // must stay on the form with the API message. Any other 401 means the
+  // stored token is no longer valid.
+  if (res.status === 401 && !path.startsWith("/auth/")) {
     try {
       await deleteSession();
     } catch {
@@ -148,8 +151,8 @@ export async function apiFetch<T>(
     return { ok: true, data: resBody as T };
   }
 
-  // ---- 400 / 409 → field-level errors ------------------------------------
-  if (res.status === 400 || res.status === 409) {
+  // ---- 400 / 401 / 409 → field-level or form errors ---------------------
+  if (res.status === 400 || res.status === 401 || res.status === 409) {
     const errors = parseNestJSMessage(resBody);
     return { ok: false, errors, status: res.status };
   }

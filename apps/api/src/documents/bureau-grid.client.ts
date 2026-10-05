@@ -1,0 +1,220 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+/** One credit row from the pdfplumber grid service. */
+export interface BureauGridCredit {
+  institution: string;
+  accountNumber: string | null;
+  paymentDueAmount: number | null;
+  lastPaymentAmount: number | null;
+  currentBalance: number | null;
+  creditLimit: number | null;
+  maxCredit: number | null;
+  mopCodes: string[];
+}
+
+/**
+ * Ask the local Python grid for column-accurate bureau figures.
+ * Returns null when the service is down or the body is unusable so the
+ * caller can keep the existing extraction.
+ */
+@Injectable()
+export class BureauGridClient {
+  private readonly logger = new Logger(BureauGridClient.name);
+
+  constructor(private readonly configService: ConfigService) {}
+
+  async extract(pdf: Buffer): Promise<BureauGridCredit[] | null> {
+    const base =
+      this.configService.get<string>('BUREAU_GRID_URL') ??
+      'http://127.0.0.1:8077';
+    const url = `${base.replace(/\/$/, '')}/extract/bureau`;
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([new Uint8Array(pdf)], { type: 'application/pdf' }),
+      'bureau.pdf',
+    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45_000);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        this.logger.warn(
+          `[BureauGrid] HTTP ${response.status} from ${url}`,
+        );
+        return null;
+      }
+      const body = (await response.json()) as { credits?: unknown };
+      if (!body || !Array.isArray(body.credits)) return null;
+      return body.credits as BureauGridCredit[];
+    } catch (err) {
+      this.logger.warn(
+        `[BureauGrid] Unavailable, keeping the current extraction: ${(err as Error).message}`,
+      );
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+function digits(value: unknown): string {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function institutionKey(name: string): string {
+  return name.replace(/[^0-9A-ZÑ]/gi, '').toUpperCase();
+}
+
+function institutionsRelated(left: string, right: string): boolean {
+  const a = institutionKey(left);
+  const b = institutionKey(right);
+  if (!a || !b) return false;
+  const head = 8;
+  return a.startsWith(b.slice(0, head)) || b.startsWith(a.slice(0, head));
+}
+
+function institutionsEqual(left: string, right: string): boolean {
+  const a = institutionKey(left);
+  const b = institutionKey(right);
+  return !!a && a === b;
+}
+
+function accountsMatch(left: string, right: string): boolean {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (
+    left.length >= 4 &&
+    right.length >= 4 &&
+    left.slice(-4) === right.slice(-4)
+  ) {
+    return true;
+  }
+  const [short, long] =
+    left.length <= right.length ? [left, right] : [right, left];
+  const extra = long.length - short.length;
+  return (
+    short.length >= 10 &&
+    extra >= 3 &&
+    extra <= 6 &&
+    long.startsWith(short)
+  );
+}
+
+/**
+ * Gemini often leaves accountNumber empty and puts the digits inside
+ * rawTextReference. OCR may split a long account (`…12100 8542`). The
+ * longest 6+ run is the account; a short tail glued to a long run wins
+ * when it is longer than the pieces.
+ */
+function accountFromCredit(credit: Record<string, unknown>): string {
+  const direct = digits(credit.accountNumber);
+  const raw = String(credit.rawTextReference ?? '');
+  const glued = (raw.match(/\d{10,}\s+\d{3,6}(?!\d)/g) ?? []).map((piece) =>
+    piece.replace(/\s+/g, ''),
+  );
+  const runs: string[] = raw.match(/\d{6,}/g) ?? [];
+  const candidates = [direct, ...glued, ...runs].filter(
+    (value) => value.length >= 6,
+  );
+  if (candidates.length === 0) return '';
+  return candidates.reduce((best, run) =>
+    run.length > best.length ? run : best,
+  );
+}
+
+/**
+ * Copy limit, maximum, payment and payment-history codes from the grid
+ * onto Gemini credits. The limit is never filled with the maximum.
+ */
+export function mergeBureauGrid(
+  credits: Record<string, unknown>[],
+  grid: BureauGridCredit[],
+): void {
+  const claimed = new Set<number>();
+  const assigned = new Set<Record<string, unknown>>();
+
+  const claim = (index: number, credit: Record<string, unknown>): void => {
+    claimed.add(index);
+    assigned.add(credit);
+    const row = grid[index];
+    if (typeof row.creditLimit === 'number') {
+      credit.creditLimit = row.creditLimit;
+    }
+    if (typeof row.maxCredit === 'number') {
+      credit.maxCredit = row.maxCredit;
+    }
+    if (typeof row.paymentDueAmount === 'number') {
+      credit.paymentDueAmount = row.paymentDueAmount;
+      credit.paymentDueAmountSource = 'BAND_MATCH';
+      credit.paymentDueAmountConfirmed = true;
+      credit.candidatePaymentDueAmount = row.paymentDueAmount;
+    }
+    if (typeof row.lastPaymentAmount === 'number') {
+      credit.lastPaymentAmount = row.lastPaymentAmount;
+    }
+    if (typeof row.currentBalance === 'number') {
+      credit.currentBalance = row.currentBalance;
+    }
+    if (Array.isArray(row.mopCodes) && row.mopCodes.length > 0) {
+      credit.mopCodes = row.mopCodes.map((code) => String(code));
+      credit.paymentHistory = row.mopCodes.join('');
+    }
+    if (row.accountNumber && !credit.accountNumber) {
+      credit.accountNumber = row.accountNumber;
+    }
+  };
+
+  for (const credit of credits) {
+    const account = accountFromCredit(credit);
+    const institution = String(credit.institution ?? '');
+    let match = -1;
+
+    if (account) {
+      match = grid.findIndex(
+        (row, index) =>
+          !claimed.has(index) &&
+          accountsMatch(account, digits(row.accountNumber)) &&
+          institutionsRelated(institution, row.institution ?? ''),
+      );
+      if (match === -1) {
+        match = grid.findIndex(
+          (row, index) =>
+            !claimed.has(index) &&
+            digits(row.accountNumber) === account,
+        );
+      }
+    }
+
+    if (match === -1 && account && institution) {
+      match = grid.findIndex(
+        (row, index) =>
+          !claimed.has(index) &&
+          !digits(row.accountNumber) &&
+          institutionsRelated(institution, row.institution ?? ''),
+      );
+    }
+
+    if (match === -1) continue;
+    claim(match, credit);
+  }
+
+  for (const credit of credits) {
+    if (assigned.has(credit)) continue;
+    if (accountFromCredit(credit)) continue;
+    const institution = String(credit.institution ?? '');
+    if (!institution) continue;
+    const match = grid.findIndex(
+      (row, index) =>
+        !claimed.has(index) &&
+        institutionsEqual(institution, row.institution ?? ''),
+    );
+    if (match === -1) continue;
+    claim(match, credit);
+  }
+}

@@ -10,6 +10,7 @@ import { GeminiService } from './gemini.service';
 import { OfficialIdExtractionService } from './official-id-extraction.service';
 import { PayrollExtractionService } from './payroll-extraction.service';
 import { BankStatementExtractionService } from './bank-statement-extraction.service';
+import { BureauGridClient } from './bureau-grid.client';
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { CreditScoreExtractionService } from './credit-score-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
@@ -31,6 +32,7 @@ import { BankStatementCleanerService } from './bank-statement-cleaner.service';
     PayrollExtractionService,
     BankStatementExtractionService,
     BankStatementCleanerService,
+    BureauGridClient,
     CreditBureauExtractionService,
     CreditScoreExtractionService,
     LayoutFinancialExtractorService,

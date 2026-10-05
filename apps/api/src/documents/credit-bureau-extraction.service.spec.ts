@@ -12,6 +12,7 @@ import {
 } from './credit-bureau-extraction.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
+import { BureauGridClient } from './bureau-grid.client';
 import { GcsService } from './gcs.service';
 import {
   CoordinateCredit,
@@ -173,6 +174,7 @@ describe('CreditBureauExtractionService', () => {
   let mockLayoutExtractor: { extract: jest.Mock };
   let mockCoordinateExtractor: { extract: jest.Mock };
   let mockGcs: { downloadFile: jest.Mock };
+  let mockBureauGrid: { extract: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -213,6 +215,7 @@ describe('CreditBureauExtractionService', () => {
         // Coordinate extraction defaults to OFF in existing tests so the
         // Gemini-only flow is preserved unless a test flips it on.
         if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'false';
+        if (key === 'BUREAU_GRID_ENABLED') return 'false';
         return undefined;
       }),
     };
@@ -221,6 +224,7 @@ describe('CreditBureauExtractionService', () => {
 
     mockCoordinateExtractor = { extract: jest.fn() };
     mockGcs = { downloadFile: jest.fn() };
+    mockBureauGrid = { extract: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -237,6 +241,7 @@ describe('CreditBureauExtractionService', () => {
           useValue: mockCoordinateExtractor,
         },
         { provide: GcsService, useValue: mockGcs },
+        { provide: BureauGridClient, useValue: mockBureauGrid },
       ],
     }).compile();
 
@@ -3267,6 +3272,136 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
 
       expect(credits[0].accountNumber).toBe('1234567890');
       expect(credits[0]).not.toHaveProperty('utilization');
+    });
+
+    it('does not copy coordinate maxCredit into creditLimit', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      const coord = makeCoordinateResult(
+        '1710',
+        PaymentDueAmountSource.BAND_MATCH,
+      );
+      coord.credits[0].maxCredit = '48509';
+      coord.credits[0].creditLimit = '';
+      const geminiData = createMockExtractionResult();
+      (geminiData.credits as Record<string, unknown>[])[0].creditLimit = null;
+      mockCoordinateExtractor.extract.mockResolvedValue(coord);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(geminiData),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].creditLimit).not.toBe(48509);
+    });
+
+    it('does not fill empty Gemini mop codes from the coordinate grid', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      const coord = makeCoordinateResult(
+        '0',
+        PaymentDueAmountSource.BAND_MATCH,
+      );
+      coord.credits[0].mopCodes = ['1', '6'];
+      const geminiData = createMockExtractionResult();
+      (geminiData.credits as Record<string, unknown>[])[0].mopCodes = [];
+      mockCoordinateExtractor.extract.mockResolvedValue(coord);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(geminiData),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].mopCodes).not.toEqual(['1', '6']);
+    });
+
+    it('bureau grid limit wins over a maximum stored as the limit, and mop codes are kept', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'BUREAU_GRID_ENABLED') return 'true';
+        if (key === 'COORDINATE_EXTRACTION_ENABLED') return 'false';
+        return 'false';
+      });
+      stubGcsDownload();
+      const geminiData = createMockExtractionResult();
+      const geminiCredit = (geminiData.credits as Record<string, unknown>[])[0];
+      geminiCredit.institution = 'BANAMEX';
+      geminiCredit.accountNumber = '4037070121465753';
+      geminiCredit.creditLimit = 48509;
+      geminiCredit.mopCodes = [];
+      geminiCredit.paymentDueAmount = 1710;
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(geminiData),
+      );
+      mockBureauGrid.extract.mockResolvedValue([
+        {
+          institution: 'BANAMEX TC L',
+          accountNumber: '4037070121465753',
+          paymentDueAmount: 1710,
+          lastPaymentAmount: 19454,
+          currentBalance: 32790,
+          creditLimit: 49600,
+          maxCredit: 48509,
+          mopCodes: ['1', '1', '1'],
+        },
+        {
+          institution: 'HSBC MEXICO',
+          accountNumber: '5221748001881339',
+          paymentDueAmount: 19049,
+          lastPaymentAmount: 387,
+          currentBalance: 434374,
+          creditLimit: 500000,
+          maxCredit: 538439,
+          mopCodes: ['1', '2', '1'],
+        },
+      ]);
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(credits[0].creditLimit).toBe(49600);
+      expect(credits[0].maxCredit).toBe(48509);
+      expect(credits[0].creditLimit).not.toBe(credits[0].maxCredit);
+      expect(credits[0].mopCodes).toEqual(['1']);
+      expect(credits[0].paymentDueAmount).toBe(1710);
+    });
+
+    it('a down bureau grid leaves the Gemini limit in place', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
+      mockPrisma.document.update.mockResolvedValue({});
+      mockConfig.get.mockImplementation((key: string) => {
+        if (key === 'BUREAU_GRID_ENABLED') return 'true';
+        return 'false';
+      });
+      stubGcsDownload();
+      mockBureauGrid.extract.mockResolvedValue(null);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-buro-1');
+      const credits = (result.extractedData as Record<string, unknown>)
+        .credits as Record<string, unknown>[];
+
+      expect(result.success).toBe(true);
+      expect(credits[0].creditLimit).toBe(150000);
+      expect(mockBureauGrid.extract).toHaveBeenCalled();
     });
   });
 });
