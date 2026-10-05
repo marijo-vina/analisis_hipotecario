@@ -120,6 +120,8 @@ export interface Document {
   processingError?: string | null;
   // AI extraction (Task 2.7)
   extractedData?: Record<string, unknown> | null;
+  // Conciliation persistence (HU-12)
+  processingResults?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }

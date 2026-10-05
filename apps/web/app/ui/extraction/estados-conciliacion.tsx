@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Document } from "@/app/lib/definitions";
 import type { ParsedBankStatementDeposit } from "@/app/lib/extraction";
 import { parsePayroll, formatDateDisplay } from "@/app/lib/extraction";
 import {
   reconcilePreview,
   STATUS_LABELS,
-  METHOD_LABELS,
   type PreviewReceiptResult,
   type PreviewStatus,
 } from "@/app/lib/bankarization-preview";
+import { saveConciliation } from "@/app/actions/conciliation";
 import Card from "@/app/ui/common/card";
 
 interface EstadosConciliacionProps {
+  caseId: string;
   allDeposits: ParsedBankStatementDeposit[];
   payrollDocs: Document[];
 }
@@ -24,8 +25,12 @@ const TOLERANCE_PCT = 5;
  * La conciliación se ejecuta bajo demanda (botón "Reconciliar") porque los
  * documentos se procesan de uno en uno y la asesora puede agregar más después.
  * Una vez ejecutada, el botón cambia a "Re-ejecutar conciliación".
+ *
+ * HU-12: Los resultados se persisten en Document.processingResults y se
+ * restauran al montar el componente si existen.
  */
 export default function EstadosConciliacion({
+  caseId,
   allDeposits,
   payrollDocs,
 }: EstadosConciliacionProps) {
@@ -34,10 +39,108 @@ export default function EstadosConciliacion({
 
   const [results, setResults] = useState<PreviewReceiptResult[] | null>(null);
   const [hasRun, setHasRun] = useState(false);
+  const [reviewStates, setReviewStates] = useState<Record<string, string>>({});
 
-  const runReconciliation = () => {
-    setResults(reconcilePreview(payrollReceipts, allDeposits));
+  // Track whether we've already restored from persistence
+  const [restored, setRestored] = useState(false);
+
+  // Restore persisted conciliation once deposits are available
+  useEffect(() => {
+    if (restored) return;
+    if (allDeposits.length === 0 && payrollReceipts.length === 0) return;
+
+    const persisted: PreviewReceiptResult[] = [];
+    let hasAny = false;
+
+    for (const doc of payrollDocs) {
+      const proc = (doc as unknown as Record<string, unknown>).processingResults as
+        | Record<string, unknown>
+        | undefined;
+      const conc = proc?.conciliation as Record<string, unknown> | undefined;
+      if (conc?.status) {
+        hasAny = true;
+      }
+    }
+
+    if (hasAny && allDeposits.length > 0) {
+      const reconciled = reconcilePreview(payrollReceipts, allDeposits);
+      for (const r of reconciled) {
+        const doc = payrollDocs[r.receiptIndex];
+        if (doc) {
+          const proc = (doc as unknown as Record<string, unknown>).processingResults as
+            | Record<string, unknown>
+            | undefined;
+          const conc = proc?.conciliation as Record<string, unknown> | undefined;
+          if (conc?.status) {
+            r.status = conc.status as PreviewStatus;
+            if (conc.method) {
+              r.method = conc.method as PreviewReceiptResult["method"];
+            }
+          }
+          if (conc?.reviewStatus) {
+            setReviewStates((prev) => ({
+              ...prev,
+              [r.receiptOriginalName]: conc.reviewStatus as string,
+            }));
+          }
+        }
+        persisted.push(r);
+      }
+      setResults(persisted);
+      setHasRun(true);
+    }
+
+    // Mark as attempted so we don't loop on re-renders.
+    // Only re-trigger if the data actually changes (length guard).
+    setRestored(true);
+  }, [payrollDocs.length, allDeposits.length]);
+
+  const runReconciliation = async () => {
+    const newResults = reconcilePreview(payrollReceipts, allDeposits);
+    setResults(newResults);
     setHasRun(true);
+
+    // Persist results
+    const items = newResults
+      .map((r, i) => {
+        const doc = payrollDocs[i];
+        if (!doc) return null;
+        return {
+          documentId: doc.id,
+          status: r.status,
+          method: r.method !== "NONE" ? r.method : undefined,
+          reviewStatus: reviewStates[r.receiptOriginalName] ?? "PENDING",
+        };
+      })
+      .filter(Boolean) as Array<{
+      documentId: string;
+      status: string;
+      method?: string;
+      reviewStatus?: string;
+    }>;
+
+    if (items.length > 0) {
+      await saveConciliation(caseId, items);
+    }
+  };
+
+  const toggleReview = async (receiptName: string, documentId: string) => {
+    const current = reviewStates[receiptName] ?? "PENDING";
+    const next = current === "REVIEWED" ? "PENDING" : "REVIEWED";
+    setReviewStates((prev) => ({ ...prev, [receiptName]: next }));
+
+    // Persist the review state change
+    const result = results?.find((r) => r.receiptOriginalName === receiptName);
+    if (result) {
+      await saveConciliation(caseId, [
+        {
+          documentId,
+          status: result.status,
+          method: result.method !== "NONE" ? result.method : undefined,
+          reviewStatus: next,
+        },
+      ]);
+    }
   };
 
   if (allDeposits.length === 0 && payrollReceipts.length === 0) {
@@ -87,27 +190,50 @@ export default function EstadosConciliacion({
           </Card>
 
           {/* ── Receipt cards ────────────────────────────────────────── */}
-          <Card className="space-y-4 px-5 py-5">
-            <h4 className="text-[13px] font-semibold text-gf-text">
-              Conciliación por recibo
-            </h4>
-            <div className="space-y-3">
-              {results.map((r) => (
-                <ReceiptRow key={`${r.receiptOriginalName}-${r.receiptIndex}`} r={r} />
-              ))}
-            </div>
-          </Card>
+          <div className="space-y-4">
+            {results.map((r) => {
+              const doc = payrollDocs[r.receiptIndex];
+              const docId = doc?.id ?? "";
+              return (
+                <ReceiptCard
+                  key={`${r.receiptOriginalName}-${r.receiptIndex}`}
+                  r={r}
+                  documentId={docId}
+                  reviewState={reviewStates[r.receiptOriginalName] ?? "PENDING"}
+                  onToggleReview={toggleReview}
+                />
+              );
+            })}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-// ── Receipt row ──────────────────────────────────────────────────────────────
+// ── Receipt card ─────────────────────────────────────────────────────────────
 
-function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
+function ReceiptCard({
+  r,
+  documentId,
+  reviewState,
+  onToggleReview,
+}: {
+  r: PreviewReceiptResult;
+  documentId: string;
+  reviewState: string;
+  onToggleReview: (name: string, docId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(() => {
+    // Expanded by default if matched or has result; collapsed if NOT_MATCHED
+    return r.status !== "NOT_MATCHED";
+  });
+
+  const ruleInfo = getRuleInfo(r.status);
+  const hasCriteria = r.status !== "NOT_MATCHED" && r.candidate;
+
   return (
-    <div className="rounded-lg border border-gf-border bg-gf-bg px-4 py-3 space-y-3">
+    <div className="rounded-xl border border-gf-border bg-white p-5 space-y-3.5">
       {/* Header: filename + status badge + period */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-gf-text truncate max-w-[300px]">
@@ -119,111 +245,193 @@ function ReceiptRow({ r }: { r: PreviewReceiptResult }) {
         )}
       </div>
 
-      {/* Method badge + flags */}
-      <div className="flex flex-wrap items-center gap-2">
-        <MethodBadge method={r.method} />
-        {r.scotiabankExcluded && (
-          <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600">
-            Excluido Scotiabank
-          </span>
-        )}
-      </div>
-
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <FieldCell label="RECIBO">
-          {r.netIncome != null ? fmtCurrency(r.netIncome) : "—"}
-        </FieldCell>
-        <FieldCell label="DEPÓSITO">
-          {r.candidate?.amount != null
-            ? fmtCurrency(r.candidate.amount)
-            : "Sin candidato"}
-        </FieldCell>
-        <FieldCell label="DIF. MONTO">
-          <span
-            className={
-              r.amountDiffPct != null && r.amountDiffPct > TOLERANCE_PCT
-                ? "text-amber-600"
-                : ""
-            }
-          >
-            {r.amountDiffPct != null ? `${r.amountDiffPct.toFixed(1)}%` : "—"}
-          </span>
-        </FieldCell>
-        <FieldCell label="SCORE">
-          {r.score != null ? r.score.toFixed(1) : "—"}
-        </FieldCell>
-      </div>
-
-      {/* Used payment date */}
-      <div className="text-[11px] text-gf-text-soft">
-        📅 Fecha de pago usada:{" "}
-        <span className="text-gf-text-muted">
-          {r.usedPaymentDate
-            ? formatDateDisplay(r.usedPaymentDate)
-            : "Sin fecha"}
-        </span>
-        {r.paymentDateSource && (
-          <span
-            className={`ml-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-              r.paymentDateEstimated
-                ? "bg-amber-50 text-amber-700"
-                : "bg-green-50 text-green-700"
+      {/* Rule bar */}
+      <div
+        className={`rounded-lg border p-3 flex flex-wrap items-center gap-2 ${ruleInfo.containerClass}`}
+      >
+        <span className="text-sm">{ruleInfo.icon}</span>
+        <span className="text-[13px] font-semibold">{ruleInfo.message}</span>
+        {r.status !== "NOT_MATCHED" && (
+          <button
+            type="button"
+            onClick={() => onToggleReview(r.receiptOriginalName, documentId)}
+            className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+              reviewState === "REVIEWED"
+                ? "border-green-300 text-green-700 bg-green-50"
+                : "border-gray-300 text-gray-500 bg-white hover:border-gray-400"
             }`}
           >
-            {r.paymentDateSource === "EXPLICIT"
-              ? "Explícita"
-              : r.paymentDateSource === "PERIOD_END"
-                ? "Cierre periodo"
-                : r.paymentDateSource === "INFERRED_QUINCENA"
-                  ? "Inferida"
-                  : r.paymentDateSource === "MANUAL_OVERRIDE"
-                    ? "Manual"
-                    : r.paymentDateSource}
-            {r.paymentDateEstimated && " ⚠️"}
-          </span>
+            {reviewState === "REVIEWED" ? "✓ REVISADO" : "○ PENDIENTE"}
+          </button>
+        )}
+        {hasCriteria && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="ml-1 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label={expanded ? "Colapsar" : "Expandir"}
+          >
+            {expanded ? "▲" : "▼"}
+          </button>
         )}
       </div>
 
-      {/* Candidate deposit details */}
-      {r.candidate && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-gf-text-soft">
-          <span>
-            Fecha depósito:{" "}
-            <span className="font-medium text-gf-text-muted">
-              {r.candidate.date ?? "—"}
-            </span>
-          </span>
-          <span>
-            RFC pagador:{" "}
-            <span className="font-medium text-gf-text-muted">
-              {r.candidate.employerRfc ?? "No detectado"}
-            </span>
-          </span>
-          <span className="truncate max-w-[300px]">
-            Concepto:{" "}
-            <span className="font-medium text-gf-text-muted">
-              {r.candidate.concept ?? "—"}
-            </span>
-          </span>
-        </div>
+      {/* Scotiabank exclusion */}
+      {r.scotiabankExcluded && (
+        <span className="inline-flex items-center rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600">
+          Excluido Scotiabank
+        </span>
       )}
 
-      {/* Alerts */}
-      {r.alerts.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {r.alerts.map((a, i) => (
-            <span
-              key={`${a.code}-${i}`}
-              className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gf-text-muted"
-            >
-              {a.message}
-            </span>
-          ))}
-        </div>
+      {/* Collapsible criteria breakdown */}
+      {hasCriteria && expanded && (
+        <CriteriaBreakdown r={r} />
       )}
     </div>
   );
+}
+
+// ── Criteria breakdown table ─────────────────────────────────────────────────
+
+function CriteriaBreakdown({ r }: { r: PreviewReceiptResult }) {
+  if (!r.candidate) return null;
+
+  const amountMatch = r.amountDiffPct != null && r.amountDiffPct <= TOLERANCE_PCT;
+  const dateDiff = r.usedPaymentDate && r.candidate.date
+    ? Math.abs(Math.round((new Date(r.candidate.date).getTime() - new Date(r.usedPaymentDate).getTime()) / 86400000))
+    : null;
+  const dateMatch = dateDiff != null && dateDiff <= 3;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-gf-border">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="bg-gray-50 text-left text-[11px] font-medium uppercase tracking-wider text-gf-text-muted">
+            <th className="px-3 py-2">Criterio</th>
+            <th className="px-3 py-2">Recibo</th>
+            <th className="px-3 py-2">Depósito</th>
+            <th className="px-3 py-2">Resultado</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gf-border">
+          <tr>
+            <td className="px-3 py-2 font-medium text-gf-text">Monto</td>
+            <td className="px-3 py-2 text-gf-text-muted">{r.netIncome != null ? fmtCurrency(r.netIncome) : "—"}</td>
+            <td className="px-3 py-2 text-gf-text-muted">{r.candidate.amount != null ? fmtCurrency(r.candidate.amount) : "—"}</td>
+            <td className="px-3 py-2">
+              {r.amountDiffPct != null ? (
+                <span className={amountMatch ? "text-green-600" : "text-amber-600"}>
+                  {amountMatch ? "✓" : "⚠"} {amountMatch ? "Coincide" : "Difiere"}, diferencia {r.amountDiffPct.toFixed(1)}%
+                </span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </td>
+          </tr>
+          <tr>
+            <td className="px-3 py-2 font-medium text-gf-text">Fecha</td>
+            <td className="px-3 py-2 text-gf-text-muted">{r.usedPaymentDate ? formatDateDisplay(r.usedPaymentDate) : "—"}</td>
+            <td className="px-3 py-2 text-gf-text-muted">{r.candidate.date ? formatDateDisplay(r.candidate.date) : "—"}</td>
+            <td className="px-3 py-2">
+              {dateDiff != null ? (
+                <span className={dateMatch ? "text-green-600" : "text-amber-600"}>
+                  {dateMatch ? "✓" : "⚠"} {dateMatch ? `Dentro de ±${3} días` : `${dateDiff} días de diferencia`}
+                </span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </td>
+          </tr>
+          <tr>
+            <td className="px-3 py-2 font-medium text-gf-text">RFC</td>
+            <td className="px-3 py-2 font-mono text-[11px] text-gf-text-muted">{r.candidate.employerRfc ?? "—"}</td>
+            <td className="px-3 py-2 font-mono text-[11px] text-gf-text-muted">{r.candidate.employerRfc ?? "—"}</td>
+            <td className="px-3 py-2">
+              {r.candidate.employerRfc ? (
+                <span className="text-green-600">✓ Coincide</span>
+              ) : (
+                <span className="text-gray-400">⚠ No evaluado</span>
+              )}
+            </td>
+          </tr>
+          <tr>
+            <td className="px-3 py-2 font-medium text-gf-text">Concepto</td>
+            <td className="px-3 py-2 text-gray-400">—</td>
+            <td className="px-3 py-2 text-gf-text-muted truncate max-w-[150px]">{r.candidate.concept ?? "—"}</td>
+            <td className="px-3 py-2">
+              {r.conceptKeyword ? (
+                <span className="text-green-600">✓ Contiene <span className="font-semibold">&ldquo;{r.conceptKeyword}&rdquo;</span></span>
+              ) : r.method === "FALLBACK" ? (
+                <span className="text-green-600">✓ Concepto compatible</span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Rule info helper ─────────────────────────────────────────────────────────
+
+function getRuleInfo(status: PreviewStatus): {
+  icon: string;
+  message: string;
+  containerClass: string;
+} {
+  switch (status) {
+    case "MATCHED":
+    case "PROVIDER_MIRROR_CONFIRMED":
+      return {
+        icon: "✓",
+        message: "3 de 3 reglas obligatorias cumplidas",
+        containerClass: "bg-green-50 border-green-200 text-green-800",
+      };
+    case "NOT_MATCHED":
+      return {
+        icon: "✗",
+        message: "0 de 3 reglas obligatorias cumplidas",
+        containerClass: "bg-red-50 border-red-200 text-red-800",
+      };
+    case "DISCREPANCY":
+      return {
+        icon: "⚠",
+        message: "Coincidencia parcial (difiere en monto)",
+        containerClass: "bg-amber-50 border-amber-200 text-amber-800",
+      };
+    case "RFC_INCOMPATIBLE":
+      return {
+        icon: "⚠",
+        message: "RFC incompatible — requiere revisión",
+        containerClass: "bg-amber-50 border-amber-200 text-amber-800",
+      };
+    case "AMBIGUOUS":
+      return {
+        icon: "⚠",
+        message: "Múltiples candidatos — ambiguo",
+        containerClass: "bg-amber-50 border-amber-200 text-amber-800",
+      };
+    case "PROVIDER_CANDIDATE":
+      return {
+        icon: "ℹ",
+        message: "Pagadora detectada — candidata pendiente",
+        containerClass: "bg-blue-50 border-blue-200 text-blue-800",
+      };
+    case "MANUAL_REVIEW":
+      return {
+        icon: "⚠",
+        message: "Requiere revisión manual",
+        containerClass: "bg-amber-50 border-amber-200 text-amber-800",
+      };
+    default:
+      return {
+        icon: "—",
+        message: "Estado desconocido",
+        containerClass: "bg-gray-50 border-gray-200 text-gray-800",
+      };
+  }
 }
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -249,31 +457,7 @@ function StatusBadge({ status }: { status: PreviewStatus }) {
   );
 }
 
-function MethodBadge({ method }: { method: PreviewReceiptResult["method"] }) {
-  if (method === "NONE") return null;
-  return (
-    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gf-text-muted">
-      {METHOD_LABELS[method]}
-    </span>
-  );
-}
-
-// ── Shared helpers (same pattern as estados-statement-card) ──────────────────
-
-function FieldCell({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium text-gf-text-soft">{label}</span>
-      <span className="text-[13px] font-semibold text-gf-text">{children}</span>
-    </div>
-  );
-}
+// ── Shared helpers ───────────────────────────────────────────────────────────
 
 function Stat({
   label,

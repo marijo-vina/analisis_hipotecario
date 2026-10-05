@@ -18,6 +18,7 @@ import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
 import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
+import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,7 @@ export default function AnalysisSection({
       {/* ── Contenido del tab ───────────────────────────────────────────── */}
       {activeTab === "validaciones" && (
         <ValidacionesTab
+          caseId={caseId}
           state={state}
           operationalStatus={operationalStatus}
           onAnalyze={handleAnalyze}
@@ -212,7 +214,11 @@ export default function AnalysisSection({
       )}
 
       {activeTab === "motor" && (
-        <LiabilityCalculationSection caseId={caseId} />
+        <>
+          <LiabilityCalculationSection caseId={caseId} />
+          <div className="mt-6" />
+          <IncomeCalculationSection caseId={caseId} />
+        </>
       )}
 
       {activeTab === "bancos" && (
@@ -229,6 +235,7 @@ export default function AnalysisSection({
 // ── Tab Validaciones ──────────────────────────────────────────────────────────
 
 function ValidacionesTab({
+  caseId,
   state,
   operationalStatus,
   onAnalyze,
@@ -238,6 +245,7 @@ function ValidacionesTab({
   allDeposits,
   payrollDocs,
 }: {
+  caseId: string;
   state: UiState;
   operationalStatus: string;
   onAnalyze: () => Promise<void>;
@@ -274,6 +282,7 @@ function ValidacionesTab({
         </h3>
         {allDeposits.length > 0 && payrollDocs.length > 0 ? (
           <EstadosConciliacion
+            caseId={caseId}
             allDeposits={allDeposits}
             payrollDocs={payrollDocs}
           />
