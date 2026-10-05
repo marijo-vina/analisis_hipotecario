@@ -42,6 +42,7 @@ import { DocumentAiService } from './document-ai.service';
 import { GcsService } from './gcs.service';
 import { GeminiService } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
+import { BureauGridClient } from './bureau-grid.client';
 import { CreditBureauExtractionService } from './credit-bureau-extraction.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { OcrLayout } from './document-ai.types';
@@ -164,6 +165,7 @@ async function buildRealModule(seed: SeededDocument): Promise<{
       GcsService,
       GeminiService,
       LayoutFinancialExtractorService,
+      BureauGridClient,
       CreditBureauExtractionService,
       ConfigService,
       { provide: PrismaService, useValue: mockPrisma },

@@ -91,9 +91,9 @@ export function extractMopCodes(paymentHistoryCells: ReadonlyArray<{ text: strin
     if (!trimmed) continue;
     const tokens = trimmed.split(/\s+/);
     for (const tok of tokens) {
-      // MOP codes are non-digit, non-whitespace single-character tokens:
-      // letters (A-Z), dash (-). Digits (0-9) and whitespace are filtered per spec.
-      if (tok.length === 1 && /[A-Za-z\-]/.test(tok)) {
+      // A MOP cell is one character: 0-9 (1 = al corriente), U, or dash.
+      // Longer tokens are amounts or years and stay out of the history.
+      if (tok.length === 1 && /[0-9A-Za-z\-]/.test(tok)) {
         codes.push(tok);
       }
     }
@@ -610,14 +610,8 @@ export function extractBlockValues(block: CreditBlock, bands: ColumnBand[]): { c
     credit.paymentSource = PaymentDueAmountSource.UNCONFIRMED;
   }
 
-  // Mexican credit bureaus use "Crédito Máximo" and "Límite de Crédito"
-  // interchangeably. If the PDF column was detected as maxCredit but not
-  // creditLimit, copy the value so downstream consumers always find it
-  // under creditLimit (the canonical field in bureau credits).
-  if (!credit.creditLimit && credit.maxCredit) {
-    credit.creditLimit = credit.maxCredit;
-  }
-
+  // Limit and maximum stay in their own columns. The Python grid is what
+  // separates them; copying máximo into límite here was the Banamex miss.
   return { credit, warnings };
 }
 

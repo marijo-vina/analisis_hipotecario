@@ -302,9 +302,9 @@ describe('extractFromCoordinateWords', () => {
         expect(extractMopCodes(cells)).toEqual(['N', 'U', '-']);
       });
 
-      it('filters out digits per spec (1, 0 should not appear in mopCodes)', () => {
-        const cells = [{ text: 'N' }, { text: '1' }, { text: '0' }];
-        expect(extractMopCodes(cells)).toEqual(['N']);
+      it('keeps single-digit MOP codes so a history of 1s counts as current', () => {
+        const cells = [{ text: '1' }, { text: '1' }, { text: '0' }, { text: 'U' }];
+        expect(extractMopCodes(cells)).toEqual(['1', '1', '0', 'U']);
       });
 
       it('returns empty array when all cells are empty or whitespace', () => {
