@@ -100,7 +100,7 @@ Extraer datos de domicilio para validación documental y operativa del expedient
       "street": "AV REFORMA",
       "exteriorNumber": "100",
       "interiorNumber": null,
-      "neighborhood": "CENTRO",
+      "neighborhood": "JUAREZ",
       "municipality": "CUAUHTEMOC",
       "city": "CIUDAD DE MEXICO",
       "state": "CIUDAD DE MEXICO",

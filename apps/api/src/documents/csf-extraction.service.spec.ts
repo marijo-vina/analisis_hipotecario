@@ -51,24 +51,24 @@ describe('CsfExtractionService', () => {
   });
 
   describe('postProcessCsf', () => {
-    it('should correctly process real sample CSF and detect mixed regime + tenure', () => {
+    it('should correctly process a synthetic CSF fixture and detect mixed regime + tenure', () => {
       const rawData = {
         issuance: {
           issuanceDateRaw: 'CIUDAD DE MEXICO A 15 DE ENERO DE 2024',
-          issuanceDate: '2025-08-05',
+          issuanceDate: '2024-01-15',
           issuanceLocation: 'CIUDAD DE MEXICO',
           idCIF: '12345678901',
         },
         taxpayer: {
           rfc: 'PEGJ800101AB1',
           curp: 'PEGJ800101HDFRRN09',
-          firstName: 'JUAN PEREZ',
+          firstName: 'JUAN',
           firstLastName: 'PEREZ',
           secondLastName: 'GARCIA',
           fullName: 'JUAN PEREZ GARCIA',
           operationsStartDate: '2010-01-15',
           statusInPadron: 'REACTIVADO',
-          lastStatusChangeDate: '2001-10-01',
+          lastStatusChangeDate: '2016-03-01',
         },
         fiscalAddress: {
           postalCode: '01000',
@@ -84,7 +84,7 @@ describe('CsfExtractionService', () => {
         activities: [
           {
             order: 1,
-            description: 'Consultorios de medicina especializada pertenecientes al sector privado',
+            description: 'Servicios de consultoría en administración de empresas',
             percentage: 70,
             startDate: '2011-03-01',
             endDate: null,
@@ -110,8 +110,8 @@ describe('CsfExtractionService', () => {
           },
         ],
         digitalStamp: {
-          originalChain: '||2025/08/05|PEGJ800101AB1|CONSTANCIA DE SITUACIÓN FISCAL||',
-          digitalStamp: 'SYNTHETICSTAMPEXAMPLE...',
+          originalChain: '||2024/01/15|PEGJ800101AB1|CONSTANCIA DE SITUACIÓN FISCAL||',
+          digitalStamp: 'SYNTHETICSTAMPEXAMPLE',
         },
       };
 

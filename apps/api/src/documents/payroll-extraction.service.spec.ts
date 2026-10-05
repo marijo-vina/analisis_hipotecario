@@ -608,8 +608,8 @@ describe('PayrollExtractionService', () => {
     });
   });
 
-  // ── IMSS receipt: real data extraction ─────────────────────────────
-  describe('extract — IMSS receipt (real data)', () => {
+  // ── IMSS receipt: synthetic fixture ────────────────────────────────
+  describe('extract — IMSS receipt (synthetic fixture)', () => {
     const imssOcrText =
       'INSTITUTO MEXICANO DEL SEGURO SOCIAL\n' +
       'IMS421231I45\n' +
