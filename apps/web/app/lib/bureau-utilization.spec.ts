@@ -20,7 +20,7 @@ type CreditStub = {
   rawTextReference?: string | null;
 };
 
-function credit(overrides: CreditStub = {}): CreditStub {
+function credit(overrides: Partial<CreditStub> = {}): CreditStub {
   return {
     classification: "REVOLVING",
     creditType: "Tarjeta de crédito",
