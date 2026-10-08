@@ -88,6 +88,11 @@ model MortgageCase {
   requestedAmount Decimal?
   propertyValue   Decimal?
   notes           String?
+  sharePercentage Decimal?     @db.Decimal(5, 2)
+  incorporationDate DateTime?  @db.Date
+  shareTenureMonths Int?
+  legalName       String?
+  companyRfc      String?
   documents       Document[]
   analysisRuns    AnalysisRun[]
   liabilitySnapshots LiabilitySnapshot[]
@@ -130,6 +135,12 @@ model IncomeCalculation {
 enum PersonType {
   SALARIED
   PFAE
+  PM
+}
+
+enum DocumentOwner {
+  SHAREHOLDER
+  COMPANY
 }
 
 model Document {
@@ -140,6 +151,7 @@ model Document {
   documentType     DocumentType   @relation(fields: [documentTypeId], references: [id])
   documentStatusId Int
   documentStatus   DocumentStatus @relation(fields: [documentStatusId], references: [id])
+  owner            DocumentOwner  @default(SHAREHOLDER)
   fileUrl          String?
   storagePath      String?
   mimeType         String?

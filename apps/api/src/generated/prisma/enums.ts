@@ -47,10 +47,19 @@ export type ReviewDecisionAction = (typeof ReviewDecisionAction)[keyof typeof Re
 
 export const PersonType = {
   SALARIED: 'SALARIED',
-  PFAE: 'PFAE'
+  PFAE: 'PFAE',
+  PM: 'PM'
 } as const
 
 export type PersonType = (typeof PersonType)[keyof typeof PersonType]
+
+
+export const DocumentOwner = {
+  SHAREHOLDER: 'SHAREHOLDER',
+  COMPANY: 'COMPANY'
+} as const
+
+export type DocumentOwner = (typeof DocumentOwner)[keyof typeof DocumentOwner]
 
 
 export const IncomeCriterion = {
