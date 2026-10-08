@@ -837,6 +837,45 @@ describe('IncomeCalculationService', () => {
     });
   });
 
+  describe('PM calculate()', () => {
+    beforeEach(() => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({
+        personType: 'PM',
+      });
+    });
+
+    it('throws BadRequestException and does not persist a payroll snapshot', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        makePayrollDoc({
+          id: 'doc-1',
+          extractedData: {
+            income: { grossIncome: 18000, netIncome: 15000 },
+            payrollPeriod: { periodLabel: 'Mayo 2025', paymentDate: '2025-05-15' },
+            employer: { legalName: 'ACME', rfc: 'RFC1' },
+          },
+        }),
+      ]);
+
+      await expect(service.calculate('case-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when PM has no payroll documents (not NotFoundException)', async () => {
+      mockPrisma.document.findMany.mockResolvedValue([]);
+
+      await expect(service.calculate('case-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(service.calculate('case-1')).rejects.not.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('switchSource()', () => {
     function stubPfaeLatest(overrides: Record<string, unknown> = {}) {
       mockPrisma.mortgageCase.findUnique.mockResolvedValue({
