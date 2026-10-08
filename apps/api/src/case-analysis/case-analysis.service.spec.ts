@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
+import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -54,6 +55,11 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockPmCsfTaxRule = {
+    ruleId: 'pm-csf-tax',
+    execute: jest.fn(),
+  };
+
   const mockBankViabilityRule = {
     ruleId: 'bank-viability',
     execute: jest.fn(),
@@ -84,6 +90,14 @@ describe('CaseAnalysisService', () => {
     outcome: 'PASS',
     severity: 'INFO',
     detail: { sources: ['csf'], fields: [], pfaeValidation: {} },
+    alerts: [],
+  };
+
+  const mockPmCsfTaxPassResult: RuleResult = {
+    ruleId: 'pm-csf-tax',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: [], fields: [], declarationPathKnockedOut: false },
     alerts: [],
   };
 
@@ -129,6 +143,7 @@ describe('CaseAnalysisService', () => {
     // agregado reciba un RuleResult valido sin que cada test lo configure.
     mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
     mockPfaeValidationRule.execute.mockResolvedValue(mockPfaeValidationPassResult);
+    mockPmCsfTaxRule.execute.mockResolvedValue(mockPmCsfTaxPassResult);
     mockBankViabilityRule.execute.mockResolvedValue(mockBankViabilityPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,6 +152,7 @@ describe('CaseAnalysisService', () => {
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
         { provide: PfaeValidationRule, useValue: mockPfaeValidationRule },
+        { provide: PmCsfTaxRule, useValue: mockPmCsfTaxRule },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
         { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
@@ -359,6 +375,7 @@ describe('CaseAnalysisService', () => {
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
     });
 
@@ -650,6 +667,16 @@ describe('CaseAnalysisService', () => {
       expect(docsArg.map((d) => d.id)).not.toContain('doc-csf-company');
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).toHaveBeenCalledTimes(1);
+      const [, pmDocs] = mockPmCsfTaxRule.execute.mock.calls[0] as [
+        Record<string, unknown>,
+        { id: string }[],
+      ];
+      expect(pmDocs.map((d) => d.id)).toEqual([
+        'doc-ine',
+        'doc-csf-company',
+        'doc-bank-shareholder',
+      ]);
     });
 
     it('skips payroll persist, Phase B, and Phase C; persists no bankViability', async () => {
@@ -684,6 +711,7 @@ describe('CaseAnalysisService', () => {
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockBankarizationRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
       expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();
       expect(mockBankViabilityRule.execute).toHaveBeenCalled();
@@ -705,6 +733,7 @@ describe('CaseAnalysisService', () => {
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
       expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();

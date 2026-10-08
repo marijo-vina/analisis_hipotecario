@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { pickPrimaryIndependentActivity } from './csf-independent-activity';
+import { hasActiveShareholderRegime } from './pm-shareholder-regime';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger CSF extraction
@@ -256,6 +257,7 @@ export interface CsfExtractionPayload {
   hasSalariedRegime: boolean;
   hasIndependentRegime: boolean;
   isSolelySalaried: boolean;
+  hasShareholderRegime: boolean;
   alerts: CsfAlert[];
   extractionTimestamp: string;
 }
@@ -305,7 +307,9 @@ export class CsfExtractionService {
       document.ocrText,
       document.documentType.code,
       CSF_RESPONSE_SCHEMA,
-      CSF_INSTRUCTIONS,
+      document.owner === 'COMPANY'
+        ? `${CSF_INSTRUCTIONS}\n\n─── Persona moral (empresa) ───\nEsta constancia es de una persona moral.\n- taxpayer.rfc: RFC de la empresa (12 caracteres).\n- taxpayer.fullName: razón social.\n- taxpayer.commercialName: nombre comercial, si aparece.`
+        : CSF_INSTRUCTIONS,
     );
 
     if (!result.success || !result.extractedData) {
@@ -393,6 +397,7 @@ export class CsfExtractionService {
     ) || activities.some((a) => !/asalariado|sueldos/i.test(a.description) && !a.endDate);
 
     const isSolelySalaried = hasSalariedRegime && !hasIndependentRegime;
+    const hasShareholderRegime = hasActiveShareholderRegime(regimes);
 
     // 4. Compute Activity Start Date & Tenure (Arraigo)
     // Use the primary independent *economic activity* start date — never the
@@ -519,6 +524,7 @@ export class CsfExtractionService {
       hasSalariedRegime,
       hasIndependentRegime,
       isSolelySalaried,
+      hasShareholderRegime,
       alerts,
       extractionTimestamp: new Date().toISOString(),
     };

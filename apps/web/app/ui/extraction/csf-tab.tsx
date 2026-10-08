@@ -74,6 +74,14 @@ export default function CsfTab({ documents }: CsfTabProps) {
                     Constancia de Situación Fiscal (SAT)
                   </h3>
                   <p className="text-xs text-gf-text-muted">
+                    {doc.owner === "COMPANY"
+                      ? "Empresa"
+                      : doc.owner === "SHAREHOLDER"
+                        ? "Accionista"
+                        : null}
+                    {doc.owner === "COMPANY" || doc.owner === "SHAREHOLDER"
+                      ? " · "
+                      : null}
                     Archivo: <span className="font-semibold text-gf-text">{doc.originalName}</span>
                   </p>
                 </div>

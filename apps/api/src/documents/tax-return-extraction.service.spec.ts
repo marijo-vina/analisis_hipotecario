@@ -178,6 +178,28 @@ describe('TaxReturnExtractionService', () => {
       const lossAlert = result.alerts.find((a) => a.code === 'PERDIDA_FISCAL_KNOCKOUT_DECLARACION');
       expect(lossAlert).toBeDefined();
       expect(lossAlert?.severity).toBe('ERROR');
+      expect(lossAlert?.message).toContain('Estados de Cuenta');
+    });
+
+    it('limits a company fiscal loss to the declaration path', () => {
+      const rawData = {
+        satReceipt: {
+          rfc: 'EMP010101AAA',
+          taxYear: 2025,
+          operationNumber: '230010729999',
+        },
+        fiscalResult: {
+          accumulableIncomeTotal: 500000,
+          fiscalProfit: 0,
+          fiscalLoss: 45000,
+          taxResult: -45000,
+        },
+      };
+
+      const result = service.postProcessTaxReturn(rawData, 'COMPANY');
+      const lossAlert = result.alerts.find((a) => a.code === 'PERDIDA_FISCAL_KNOCKOUT_DECLARACION');
+      expect(lossAlert?.message).toContain('solo el camino de declaración');
+      expect(lossAlert?.message).toContain('estados de cuenta');
     });
 
     it('should trigger EJERCICIO_FISCAL_OBSOLETO for taxYear older than previous year', () => {

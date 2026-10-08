@@ -7,6 +7,7 @@ import type {
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
+import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -57,7 +58,8 @@ export interface AnalysisResultPayload {
  *  Phase B: income calculation + liability calculation (services)
  *  Phase C: bank-viability rule (reads income/liability from DB)
  *
- * PM skips payroll persist, Phase B, and Phase C (no capacity / bankViability).
+ * PM runs identity on shareholder documents plus the CSF/tax-return gates,
+ * and skips payroll persist, Phase B, and Phase C (no capacity / bankViability).
  * Phase failure produces a warning but does not block subsequent phases.
  */
 @Injectable()
@@ -67,6 +69,7 @@ export class CaseAnalysisService {
     private readonly identityMatchRule: IdentityMatchRule,
     private readonly bankarizationValidationRule: BankarizationValidationRule,
     private readonly pfaeValidationRule: PfaeValidationRule,
+    private readonly pmCsfTaxRule: PmCsfTaxRule,
     private readonly bankViabilityRule: BankViabilityRule,
     @Inject(forwardRef(() => IncomeCalculationService))
     private readonly incomeCalcService: IncomeCalculationService,
@@ -76,8 +79,9 @@ export class CaseAnalysisService {
 
   /**
    * Resolves the Phase A rule set per request based on `personType`.
-   * PM runs `identity-match` only (shareholder documents).
    * PFAE runs `identity-match` + `pfae-validation` (CSF/bank gates).
+   * Persona Moral does not use this list: `run` applies identity on
+   * shareholder documents and `pm-csf-tax` before Phase B.
    * SALARIED (or absent/unrecognized `personType`) runs `identity-match` +
    * `bankarization-validation`, matching prior behavior.
    */
@@ -149,7 +153,13 @@ export class CaseAnalysisService {
         context,
         this.shareholderDocuments(docs),
       );
-      return this.persistCompletedRun(caseId, triggeredBy, [identityResult], null);
+      const pmCsfTaxResult = await this.pmCsfTaxRule.execute(context, docs);
+      return this.persistCompletedRun(
+        caseId,
+        triggeredBy,
+        [identityResult, pmCsfTaxResult],
+        null,
+      );
     }
 
     if (mortgageCase.personType !== 'PFAE') {

@@ -125,6 +125,7 @@ describe('CsfExtractionService', () => {
       expect(result.hasSalariedRegime).toBe(true);
       expect(result.hasIndependentRegime).toBe(true);
       expect(result.isSolelySalaried).toBe(false);
+      expect(result.hasShareholderRegime).toBe(false);
       expect(result.tenureMonths).toBeGreaterThan(120);
 
       // Check mixed income alert
