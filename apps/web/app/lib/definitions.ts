@@ -94,6 +94,8 @@ export interface CaseStatus {
   order: number;
 }
 
+export type DocumentOwner = "SHAREHOLDER" | "COMPANY";
+
 export interface MortgageCase {
   id: string;
   clientId: string;
@@ -107,11 +109,17 @@ export interface MortgageCase {
   propertyValue?: number;
   estimatedTermMonths?: number;
   notes?: string;
+  sharePercentage?: string | number | null;
+  incorporationDate?: string | null;
+  shareTenureMonths?: number | null;
+  legalName?: string | null;
+  companyRfc?: string | null;
   documents?: Array<{
     id: string;
     documentStatus: { id: number; code: string; name: string };
     documentType: { id: number; code: string; name: string };
     processingError?: string | null;
+    owner?: DocumentOwner | null;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -168,6 +176,7 @@ export interface Document {
   originalName: string;
   uploadedById: string;
   uploadedBy?: { id: string; name: string };
+  owner?: DocumentOwner | null;
   // OCR fields (HU-07 document processing)
   ocrText?: string;
   processedAt?: string;

@@ -25,6 +25,7 @@ interface CaseDetailDrawerProps {
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
   PFAE: "Persona Física con Actividad Empresarial (PFAE)",
+  PM: "Persona Moral",
 };
 
 function personTypeLabel(code?: string): string {
