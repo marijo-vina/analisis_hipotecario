@@ -1,7 +1,8 @@
-import { BadGatewayException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, NotFoundException, ParseEnumPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DocumentOwner } from '../generated/prisma/client';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
 import { DocumentsController } from './documents.controller';
@@ -288,6 +289,7 @@ describe('DocumentsController', () => {
         'advisor-1',
         mockFile,
         documentTypeId,
+        'SHAREHOLDER',
       );
       expect(result).toEqual({ data: createdDocument });
     });
@@ -316,6 +318,73 @@ describe('DocumentsController', () => {
       await expect(
         controller.upload(caseId, mockFile, documentTypeId, req),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    function getUploadOwnerPipe(): ParseEnumPipe {
+      const args = Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        DocumentsController,
+        'upload',
+      ) as Record<string, { index: number; data?: string; pipes: ParseEnumPipe[] }>;
+      const ownerArg = Object.values(args ?? {}).find((arg) => arg.data === 'owner');
+      expect(ownerArg).toBeDefined();
+      expect(ownerArg!.pipes.length).toBeGreaterThan(0);
+      return ownerArg!.pipes[0];
+    }
+
+    it('should return 400 when owner is not a DocumentOwner value', async () => {
+      const pipe = getUploadOwnerPipe();
+
+      await expect(
+        pipe.transform('CLIENT', { type: 'body', data: 'owner' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('should return 400 when owner is MORAL', async () => {
+      const pipe = getUploadOwnerPipe();
+
+      await expect(
+        pipe.transform('MORAL', { type: 'body', data: 'owner' }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('should allow omitted owner because ParseEnumPipe is optional', async () => {
+      const pipe = getUploadOwnerPipe();
+
+      await expect(
+        pipe.transform(undefined, { type: 'body', data: 'owner' }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should accept COMPANY and SHAREHOLDER owner values', async () => {
+      const pipe = getUploadOwnerPipe();
+
+      await expect(
+        pipe.transform('COMPANY', { type: 'body', data: 'owner' }),
+      ).resolves.toBe(DocumentOwner.COMPANY);
+      await expect(
+        pipe.transform('SHAREHOLDER', { type: 'body', data: 'owner' }),
+      ).resolves.toBe(DocumentOwner.SHAREHOLDER);
+    });
+
+    it('should pass COMPANY owner through to uploadAndCreate', async () => {
+      mockDocumentsService.uploadAndCreate.mockResolvedValue(createdDocument);
+
+      await controller.upload(
+        caseId,
+        mockFile,
+        documentTypeId,
+        req,
+        'COMPANY',
+      );
+
+      expect(mockDocumentsService.uploadAndCreate).toHaveBeenCalledWith(
+        caseId,
+        'advisor-1',
+        mockFile,
+        documentTypeId,
+        'COMPANY',
+      );
     });
   });
 
