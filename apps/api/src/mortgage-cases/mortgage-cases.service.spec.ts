@@ -164,6 +164,87 @@ describe('MortgageCasesService', () => {
 
       await expect(service.create(dto, 'advisor-1')).rejects.toThrow(NotFoundException);
     });
+
+    it('should persist PM personType and the five corporate fields', async () => {
+      const incorporationDate = new Date('2020-01-15');
+      const dto: CreateMortgageCaseDto = {
+        clientId: '9f12fd26-c5f9-4eca-91b8-0235828f6ee4',
+        creditTypeId: 2,
+        personType: 'PM',
+        sharePercentage: 51.5,
+        incorporationDate,
+        shareTenureMonths: 24,
+        legalName: 'Acme SA de CV',
+        companyRfc: 'ACM200115XX1',
+      };
+      const advisorId = 'advisor-pm';
+
+      mockPrismaService.caseStatus.findUnique.mockResolvedValue({ id: 1, code: 'PENDING_DOCUMENTS' });
+      mockPrismaService.client.findUnique.mockResolvedValue({ id: dto.clientId });
+      mockPrismaService.creditType.findUnique.mockResolvedValue({ id: dto.creditTypeId });
+      mockPrismaService.mortgageCase.create.mockResolvedValue({
+        id: 'mc-pm-1',
+        ...dto,
+        advisorId,
+        statusId: 1,
+        personType: 'PM',
+      });
+
+      const result = await service.create(dto, advisorId);
+
+      expect(mockPrismaService.mortgageCase.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            personType: 'PM',
+            sharePercentage: 51.5,
+            incorporationDate,
+            shareTenureMonths: 24,
+            legalName: 'Acme SA de CV',
+            companyRfc: 'ACM200115XX1',
+            advisorId,
+            statusId: 1,
+          }),
+        }),
+      );
+      expect(result.personType).toBe('PM');
+      expect(result.legalName).toBe('Acme SA de CV');
+      expect(result.companyRfc).toBe('ACM200115XX1');
+    });
+
+    it('should persist PM without corporate fields and still default status PENDING_DOCUMENTS', async () => {
+      const dto: CreateMortgageCaseDto = {
+        clientId: '9f12fd26-c5f9-4eca-91b8-0235828f6ee4',
+        creditTypeId: 2,
+        personType: 'PM',
+      };
+      const advisorId = 'advisor-pm-empty';
+
+      mockPrismaService.caseStatus.findUnique.mockResolvedValue({ id: 1, code: 'PENDING_DOCUMENTS' });
+      mockPrismaService.client.findUnique.mockResolvedValue({ id: dto.clientId });
+      mockPrismaService.creditType.findUnique.mockResolvedValue({ id: dto.creditTypeId });
+      mockPrismaService.mortgageCase.create.mockResolvedValue({
+        id: 'mc-pm-2',
+        ...dto,
+        advisorId,
+        statusId: 1,
+        personType: 'PM',
+      });
+
+      await service.create(dto, advisorId);
+
+      expect(mockPrismaService.mortgageCase.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            personType: 'PM',
+            statusId: 1,
+          }),
+        }),
+      );
+      const createData = mockPrismaService.mortgageCase.create.mock.calls[0][0].data;
+      expect(createData).not.toHaveProperty('sharePercentage');
+      expect(createData).not.toHaveProperty('legalName');
+      expect(createData).not.toHaveProperty('companyRfc');
+    });
   });
 
   describe('findAll', () => {
@@ -298,6 +379,48 @@ describe('MortgageCasesService', () => {
       await expect(
         service.update('mc-1', { creditTypeId: 999 }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should persist corporate field subset on update without changing personType', async () => {
+      const caseId = 'mc-pm-1';
+      const dto: UpdateMortgageCaseDto = {
+        legalName: 'Nueva Razon Social SA de CV',
+        companyRfc: 'NRS210315AA1',
+        sharePercentage: 40,
+      };
+      const existingCase = {
+        id: caseId,
+        statusId: 1,
+        personType: 'PM',
+        legalName: null,
+        companyRfc: null,
+        sharePercentage: null,
+      };
+      const updatedCase = {
+        ...existingCase,
+        ...dto,
+        personType: 'PM',
+      };
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(existingCase);
+      mockPrismaService.mortgageCase.update.mockResolvedValue(updatedCase);
+
+      const result = await service.update(caseId, dto);
+
+      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: caseId },
+          data: expect.objectContaining({
+            legalName: 'Nueva Razon Social SA de CV',
+            companyRfc: 'NRS210315AA1',
+            sharePercentage: 40,
+          }),
+        }),
+      );
+      const updateData = mockPrismaService.mortgageCase.update.mock.calls[0][0].data;
+      expect(updateData).not.toHaveProperty('personType');
+      expect(result.personType).toBe('PM');
+      expect(result.legalName).toBe('Nueva Razon Social SA de CV');
     });
   });
 });
