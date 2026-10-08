@@ -39,7 +39,7 @@ const SEVERITY_RANK: Record<Severity, number> = { INFO: 0, WARNING: 1, ERROR: 2 
 const OUTCOME_RANK: Record<AnalysisOutcome, number> = { PASS: 0, PARTIAL: 1, FAIL: 2 };
 
 /** `personType` values the identity-match source matrix branches on. */
-type PersonTypeScope = 'SALARIED' | 'PFAE';
+type PersonTypeScope = 'SALARIED' | 'PFAE' | 'PM';
 
 interface SourceDefinition {
   /** Spec-facing source key used in `detail.sources`. */
@@ -75,7 +75,7 @@ const get = (obj: unknown, path: string[]): string | null => {
 
 const SALARIED_ONLY: PersonTypeScope[] = ['SALARIED'];
 const PFAE_ONLY: PersonTypeScope[] = ['PFAE'];
-const BOTH_PERSON_TYPES: PersonTypeScope[] = ['SALARIED', 'PFAE'];
+const SHARED_PERSON_TYPES: PersonTypeScope[] = ['SALARIED', 'PFAE', 'PM'];
 
 /**
  * Registry of identity sources. Bank Statement structurally lacks `curp`
@@ -85,13 +85,14 @@ const BOTH_PERSON_TYPES: PersonTypeScope[] = ['SALARIED', 'PFAE'];
  *
  * Each source declares which `personType`(s) it applies to (`appliesTo`);
  * `execute()` resolves the active subset once per request. `payroll` is
- * SALARIED-only; `csf`/`tax-return` are PFAE-only; the rest are shared.
+ * SALARIED-only; `csf`/`tax-return` are PFAE-only; PM uses official-id,
+ * bank-statement, credit-bureau, and client (no payroll/csf/tax-return).
  */
 const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'official-id',
     documentTypeCode: 'INE',
-    appliesTo: BOTH_PERSON_TYPES,
+    appliesTo: SHARED_PERSON_TYPES,
     extract: {
       // The spec's identity source matrix lists Official ID as carrying rfc,
       // fullName, and curp. The current INE extraction service does not yet
@@ -136,7 +137,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'bank-statement',
     documentTypeCode: 'BANK_STATEMENT',
-    appliesTo: BOTH_PERSON_TYPES,
+    appliesTo: SHARED_PERSON_TYPES,
     extract: {
       fullName: (d) => get(d, ['accountHolder', 'fullName']),
       rfc: (d) => get(d, ['accountHolder', 'rfc']),
@@ -146,7 +147,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
   {
     sourceKey: 'credit-bureau',
     documentTypeCode: 'CREDIT_BUREAU_REPORT',
-    appliesTo: BOTH_PERSON_TYPES,
+    appliesTo: SHARED_PERSON_TYPES,
     extract: {
       fullName: (d) => get(d, ['borrower', 'fullName']),
       rfc: (d) => get(d, ['borrower', 'rfc']),
@@ -155,7 +156,7 @@ const SOURCE_DEFINITIONS: SourceDefinition[] = [
   },
   {
     sourceKey: 'client',
-    appliesTo: BOTH_PERSON_TYPES,
+    appliesTo: SHARED_PERSON_TYPES,
     optional: true,
     reference: true,
     extract: {
@@ -202,8 +203,15 @@ export class IdentityMatchRule implements AnalysisRule {
     const typedDocs = documents as unknown as PrismaDocumentLike[];
 
     // Resolve the active source set once per request. Unknown/absent
-    // personType falls back to SALARIED (today's fixed behavior).
-    const personType: PersonTypeScope = typedClient.personType === 'PFAE' ? 'PFAE' : 'SALARIED';
+    // personType falls back to SALARIED (today's fixed behavior). PM is an
+    // explicit third branch so it never inherits payroll (SALARIED) or
+    // csf/tax-return (PFAE) sources.
+    const personType: PersonTypeScope =
+      typedClient.personType === 'PFAE'
+        ? 'PFAE'
+        : typedClient.personType === 'PM'
+          ? 'PM'
+          : 'SALARIED';
     const activeDefs = SOURCE_DEFINITIONS.filter((def) => def.appliesTo.includes(personType));
     const referenceDef = activeDefs.find((def) => def.reference);
     const referenceKey = referenceDef?.sourceKey ?? 'client';

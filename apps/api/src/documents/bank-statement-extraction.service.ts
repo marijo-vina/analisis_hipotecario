@@ -635,11 +635,12 @@ export class BankStatementExtractionService {
     timings.cleanerMs = Date.now() - cleanerStart;
     data.financialDepuration = depurationResult;
 
-    const isPfaeCase =
-      (document as { mortgageCase?: { personType?: string | null } }).mortgageCase
-        ?.personType === 'PFAE';
+    const personType = (document as { mortgageCase?: { personType?: string | null } })
+      .mortgageCase?.personType;
+    const skipsSalariedPayroll =
+      personType === 'PFAE' || personType === 'PM';
 
-    if (!isPfaeCase) {
+    if (!skipsSalariedPayroll) {
       const payrollEmployers = employersFromDocuments(
         await this.prisma.document.findMany({
           where: {
@@ -654,7 +655,7 @@ export class BankStatementExtractionService {
     }
 
     // ── 10. Compute alerts from normalized data & depuration ─────────────
-    const alerts = this.computeAlerts(data, isPfaeCase);
+    const alerts = this.computeAlerts(data, skipsSalariedPayroll);
     this.appendDepurationAlerts(alerts, depurationResult);
     const missingFields = this.computeMissingFields(data);
 
@@ -688,8 +689,8 @@ export class BankStatementExtractionService {
       (data.alerts as ExtractionAlert[]) ?? [],
     );
 
-    // If PFAE profile / CSF active, suppress salaried payroll alerts
-    if (isPfaeCase && Array.isArray(data.alerts)) {
+    // If PFAE or PM, suppress salaried payroll alerts
+    if (skipsSalariedPayroll && Array.isArray(data.alerts)) {
       data.alerts = (data.alerts as ExtractionAlert[]).filter(
         (a) =>
           a.code !== 'BANK_NO_PAYROLL_DEPOSITS' &&
@@ -1007,7 +1008,7 @@ export class BankStatementExtractionService {
 
   private computeAlerts(
     data: Record<string, unknown>,
-    isPfaeCase = false,
+    skipsSalariedPayroll = false,
   ): ExtractionAlert[] {
     const alerts: ExtractionAlert[] = [];
 
@@ -1025,7 +1026,7 @@ export class BankStatementExtractionService {
     // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty (salaried only) ────
     const hasPayrollDeposits =
       Array.isArray(payrollDeposits) && payrollDeposits.length > 0;
-    if (!hasPayrollDeposits && !isPfaeCase) {
+    if (!hasPayrollDeposits && !skipsSalariedPayroll) {
       alerts.push({
         code: 'BANK_NO_PAYROLL_DEPOSITS',
         severity: 'WARNING',

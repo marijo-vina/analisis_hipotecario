@@ -146,6 +146,7 @@ export class IncomeCalculationService {
    * Build a fresh income-calculation snapshot for the case.
    * SALARIED (or absent personType) uses payroll receipts.
    * PFAE skips payroll and computes independent bank/tax bases.
+   * PM has no income engine — throws BadRequestException.
    */
   async calculate(
     caseId: string,
@@ -155,6 +156,12 @@ export class IncomeCalculationService {
       where: { id: caseId },
       select: { personType: true },
     });
+
+    if (mortgageCase?.personType === 'PM') {
+      throw new BadRequestException(
+        'Income calculation is not available for PM cases',
+      );
+    }
 
     if (mortgageCase?.personType === 'PFAE') {
       return this.calculatePfae(caseId);

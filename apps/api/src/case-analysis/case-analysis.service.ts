@@ -27,6 +27,7 @@ interface LoadedMortgageCase {
   documents: {
     extractedData: unknown;
     documentType: { code: string };
+    owner?: string | null;
   }[];
   [k: string]: unknown;
 }
@@ -51,10 +52,12 @@ export interface AnalysisResultPayload {
  *
  * 3-phase execution:
  *  Phase A: identity-match + personType-specific validation rules
- *    (SALARIED: bankarization-validation; PFAE: pfae-validation)
+ *    (SALARIED: bankarization-validation; PFAE: pfae-validation;
+ *     PM: identity-match on shareholder documents only)
  *  Phase B: income calculation + liability calculation (services)
  *  Phase C: bank-viability rule (reads income/liability from DB)
  *
+ * PM skips payroll persist, Phase B, and Phase C (no capacity / bankViability).
  * Phase failure produces a warning but does not block subsequent phases.
  */
 @Injectable()
@@ -73,15 +76,26 @@ export class CaseAnalysisService {
 
   /**
    * Resolves the Phase A rule set per request based on `personType`.
+   * PM runs `identity-match` only (shareholder documents).
    * PFAE runs `identity-match` + `pfae-validation` (CSF/bank gates).
    * SALARIED (or absent/unrecognized `personType`) runs `identity-match` +
    * `bankarization-validation`, matching prior behavior.
    */
   private resolvePhaseARules(personType?: string | null): AnalysisRule[] {
+    if (personType === 'PM') {
+      return [this.identityMatchRule];
+    }
     if (personType === 'PFAE') {
       return [this.identityMatchRule, this.pfaeValidationRule];
     }
     return [this.identityMatchRule, this.bankarizationValidationRule];
+  }
+
+  /** Shareholder packet for PM identity: missing owner counts as SHAREHOLDER. */
+  private shareholderDocuments(
+    docs: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    return docs.filter((doc) => (doc.owner ?? 'SHAREHOLDER') !== 'COMPANY');
   }
 
   /**
@@ -129,6 +143,15 @@ export class CaseAnalysisService {
       personType: mortgageCase.personType,
     } as Record<string, unknown>;
     const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+
+    if (mortgageCase.personType === 'PM') {
+      const identityResult = await this.identityMatchRule.execute(
+        context,
+        this.shareholderDocuments(docs),
+      );
+      return this.persistCompletedRun(caseId, triggeredBy, [identityResult], null);
+    }
+
     if (mortgageCase.personType !== 'PFAE') {
       await this.persistEmployerPayrollDeposits(docs);
     }
@@ -254,11 +277,12 @@ export class CaseAnalysisService {
     caseId: string,
     triggeredBy: string,
     ruleResults: RuleResult[],
-    bankViabilityResult: RuleResult,
+    bankViabilityResult: RuleResult | null,
   ): Promise<AnalysisResultPayload> {
     const aggregate = this.aggregate(ruleResults);
-    const bankViability = (bankViabilityResult.detail as Record<string, unknown>)
-      .bankViability;
+    const bankViability = bankViabilityResult
+      ? (bankViabilityResult.detail as Record<string, unknown>).bankViability
+      : null;
 
     const createdRun = await this.prisma.analysisRun.create({
       data: {

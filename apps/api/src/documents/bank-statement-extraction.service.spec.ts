@@ -1737,4 +1737,81 @@ describe('BankStatementExtractionService', () => {
       });
     });
   });
+
+  describe('PM skips salaried payroll depuration and alerts (HU-22)', () => {
+    it('does not fire BANK_NO_PAYROLL_DEPOSITS when payrollDeposits is empty', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'PM' },
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({ payrollDeposits: [], allTransactions: [] }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(result.success).toBe(true);
+      expect(
+        result.alerts.find((a) => a.code === 'BANK_NO_PAYROLL_DEPOSITS'),
+      ).toBeUndefined();
+      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
+    });
+
+    it('does not set salaried PAYROLL incomeMode on mixed deposits', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'PM' },
+      });
+      mockPrisma.document.findMany.mockResolvedValue([
+        {
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: {
+            employer: {
+              legalName: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBLICIDAD SA DE CV',
+              rfc: 'LST230905G7A',
+            },
+          },
+        },
+      ]);
+
+      const extractionData = createMockExtractionResult({
+        payrollDeposits: [],
+        statementSummary: { totalDepositsAmount: 300000 },
+        allTransactions: [
+          {
+            date: '2026-06-01',
+            amount: 190000,
+            movementType: 'DEPOSIT',
+            originalConcept:
+              'SPEI RECIBIDO DEL CLIENTE LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL CON RFC LST230905G7A CONCEPTO: PAGO',
+          },
+          {
+            date: '2026-06-02',
+            amount: 61000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'DEP.EFECTIVO',
+          },
+          {
+            date: '2026-06-03',
+            amount: 10000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'PAGO NOMINA QUINCENA',
+          },
+        ],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(extractionData),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(result.success).toBe(true);
+      const depuration = result.extractedData?.financialDepuration as Record<
+        string,
+        any
+      >;
+      expect(depuration.incomeMode).not.toBe('PAYROLL');
+      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
+    });
+  });
 });
