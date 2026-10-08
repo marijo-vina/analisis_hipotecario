@@ -58,5 +58,44 @@ describe('StoragePathService', () => {
         '550e8400-e29b-41d4-a716-446655440000/PROOF_OF_ADDRESS/comprobante.pdf',
       );
     });
+
+    it('should insert COMPANY segment when owner is COMPANY', () => {
+      const result = service.buildPath(
+        'case-pm-1',
+        'CSF',
+        'csf-empresa.pdf',
+        'COMPANY',
+      );
+
+      expect(result).toBe('case-pm-1/COMPANY/CSF/csf-empresa.pdf');
+    });
+
+    it('should keep SHAREHOLDER path without extra segment when owner is omitted', () => {
+      const result = service.buildPath('case-pm-1', 'CSF', 'csf-socio.pdf');
+
+      expect(result).toBe('case-pm-1/CSF/csf-socio.pdf');
+    });
+
+    it('should keep SHAREHOLDER path without extra segment when owner is SHAREHOLDER', () => {
+      const result = service.buildPath(
+        'case-pm-1',
+        'TAX_RETURN',
+        'isr-socio.pdf',
+        'SHAREHOLDER',
+      );
+
+      expect(result).toBe('case-pm-1/TAX_RETURN/isr-socio.pdf');
+    });
+
+    it('should insert COMPANY segment for articles of incorporation', () => {
+      const result = service.buildPath(
+        'abc-123',
+        'ARTICLES_OF_INCORPORATION',
+        'acta.pdf',
+        'COMPANY',
+      );
+
+      expect(result).toBe('abc-123/COMPANY/ARTICLES_OF_INCORPORATION/acta.pdf');
+    });
   });
 });

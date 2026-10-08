@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseEnumPipe,
   ParseIntPipe,
   Patch,
   Post,
@@ -30,6 +31,7 @@ import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
 import { GcsService } from './gcs.service';
+import { DocumentOwner } from '../generated/prisma/client';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
@@ -83,6 +85,8 @@ export class DocumentsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('documentTypeId', ParseIntPipe) documentTypeId: number,
     @Req() req: { user: { id: string } },
+    @Body('owner', new ParseEnumPipe(DocumentOwner, { optional: true }))
+    owner?: DocumentOwner,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -92,6 +96,7 @@ export class DocumentsController {
       req.user.id,
       file,
       documentTypeId,
+      owner ?? 'SHAREHOLDER',
     );
     return { data };
   }
