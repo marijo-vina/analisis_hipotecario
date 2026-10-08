@@ -43,7 +43,7 @@ describe('CreateMortgageCaseDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('should reject personType different from SALARIED and PFAE', async () => {
+  it('should reject personType different from SALARIED, PFAE and PM', async () => {
     const dto = plainToInstance(CreateMortgageCaseDto, {
       ...validPayload,
       personType: 'INDEPENDENT',
@@ -53,6 +53,175 @@ describe('CreateMortgageCaseDto', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0].property).toBe('personType');
+  });
+
+  it('should accept PM personType without corporate fields', async () => {
+    const dto = plainToInstance(CreateMortgageCaseDto, {
+      ...validPayload,
+      personType: 'PM',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.personType).toBe('PM');
+  });
+
+  it('should reject personType MORAL', async () => {
+    const dto = plainToInstance(CreateMortgageCaseDto, {
+      ...validPayload,
+      personType: 'MORAL',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('personType');
+  });
+
+  it('should accept optional corporate fields with PM', async () => {
+    const dto = plainToInstance(CreateMortgageCaseDto, {
+      ...validPayload,
+      personType: 'PM',
+      sharePercentage: '51.50',
+      incorporationDate: '2020-01-15',
+      shareTenureMonths: '24',
+      legalName: 'Acme SA de CV',
+      companyRfc: 'ACM200115XX1',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.sharePercentage).toBe(51.5);
+    expect(dto.incorporationDate).toBeInstanceOf(Date);
+    expect(dto.shareTenureMonths).toBe(24);
+    expect(dto.legalName).toBe('Acme SA de CV');
+    expect(dto.companyRfc).toBe('ACM200115XX1');
+  });
+
+  describe('corporate fields validation', () => {
+    it('should accept sharePercentage of 100 and shareTenureMonths of 0', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        sharePercentage: 100,
+        shareTenureMonths: 0,
+      });
+
+      const errors = await validate(dto);
+
+      expect(errors).toHaveLength(0);
+      expect(dto.sharePercentage).toBe(100);
+      expect(dto.shareTenureMonths).toBe(0);
+    });
+
+    it('should reject sharePercentage of 0', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        sharePercentage: 0,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'sharePercentage');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject sharePercentage above 100', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        sharePercentage: 101,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'sharePercentage');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject sharePercentage with more than 2 decimal places', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        sharePercentage: 51.555,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'sharePercentage');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject invalid incorporationDate', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        incorporationDate: 'not-a-date',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'incorporationDate');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject negative shareTenureMonths', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        shareTenureMonths: -1,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'shareTenureMonths');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject non-integer shareTenureMonths', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        shareTenureMonths: 1.5,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'shareTenureMonths');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject empty legalName', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        legalName: '',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'legalName');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject 13-character person RFC as companyRfc', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        companyRfc: 'GARM920604ABC',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'companyRfc');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject lowercase companyRfc', async () => {
+      const dto = plainToInstance(CreateMortgageCaseDto, {
+        ...validPayload,
+        companyRfc: 'acm200115xx1',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'companyRfc');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
   });
 
   it('should reject requestedAmount <= 0', async () => {
