@@ -8,6 +8,7 @@ import type { ActionState, Client, CreditType } from "@/app/lib/definitions";
 import {
   FolderOpen,
   User,
+  Building2,
   CreditCard,
   MapPin,
   FileText,
@@ -59,6 +60,7 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
 
   // Currency formatted values
   const [propValueFormatted, setPropValueFormatted] = useState<string>("");
+  const [personType, setPersonType] = useState<string>("SALARIED");
 
   // Calculate final term in months
   const termInYears =
@@ -149,16 +151,122 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
                 <select
                   id="personType"
                   name="personType"
-                  defaultValue="SALARIED"
+                  value={personType}
+                  onChange={(e) => setPersonType(e.target.value)}
                   className={INPUT_CLASS}
                 >
                   <option value="SALARIED">Asalariado</option>
                   <option value="PFAE">Persona Física con Actividad Empresarial (PFAE)</option>
-                  <option value="MORAL">Persona Moral</option>
+                  <option value="PM">Persona Moral</option>
                 </select>
               </div>
             </div>
           </section>
+
+          {personType === "PM" && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-3 border-b border-gf-border-variant pb-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gf-red/10 flex items-center justify-center text-gf-red shrink-0">
+                  <Building2 className="w-4 h-4" strokeWidth={2} />
+                </div>
+                <h3 className="text-sm font-semibold text-gf-text uppercase tracking-wider">
+                  Datos de la persona moral
+                </h3>
+              </div>
+              <p className="text-[11px] text-gf-text-muted">
+                Campos opcionales. Puede completarlos ahora o más adelante.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="sharePercentage" className="text-xs font-semibold text-gf-text">
+                    Porcentaje de participación
+                  </label>
+                  <input
+                    id="sharePercentage"
+                    name="sharePercentage"
+                    type="number"
+                    min="0.01"
+                    max="100"
+                    step="0.01"
+                    className={INPUT_CLASS}
+                    placeholder="25.50"
+                  />
+                  {state?.errors?.sharePercentage && (
+                    <p className="text-xs text-red-600 mt-0.5">{state.errors.sharePercentage}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="incorporationDate" className="text-xs font-semibold text-gf-text">
+                    Fecha de constitución
+                  </label>
+                  <input
+                    id="incorporationDate"
+                    name="incorporationDate"
+                    type="date"
+                    className={INPUT_CLASS}
+                  />
+                  {state?.errors?.incorporationDate && (
+                    <p className="text-xs text-red-600 mt-0.5">{state.errors.incorporationDate}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="shareTenureMonths" className="text-xs font-semibold text-gf-text">
+                    Antigüedad de participación (meses)
+                  </label>
+                  <input
+                    id="shareTenureMonths"
+                    name="shareTenureMonths"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className={INPUT_CLASS}
+                    placeholder="24"
+                  />
+                  {state?.errors?.shareTenureMonths && (
+                    <p className="text-xs text-red-600 mt-0.5">{state.errors.shareTenureMonths}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="legalName" className="text-xs font-semibold text-gf-text">
+                    Razón social
+                  </label>
+                  <input
+                    id="legalName"
+                    name="legalName"
+                    type="text"
+                    maxLength={255}
+                    className={INPUT_CLASS}
+                    placeholder="Empresa Ejemplo, S.A. de C.V."
+                  />
+                  {state?.errors?.legalName && (
+                    <p className="text-xs text-red-600 mt-0.5">{state.errors.legalName}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label htmlFor="companyRfc" className="text-xs font-semibold text-gf-text">
+                    RFC de la empresa
+                  </label>
+                  <input
+                    id="companyRfc"
+                    name="companyRfc"
+                    type="text"
+                    maxLength={12}
+                    className={`${INPUT_CLASS} uppercase`}
+                    placeholder="EME850101XX1"
+                    autoComplete="off"
+                  />
+                  {state?.errors?.companyRfc && (
+                    <p className="text-xs text-red-600 mt-0.5">{state.errors.companyRfc}</p>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* ── Sección 2: Información del crédito ──────────────────── */}
           <section className="space-y-4">

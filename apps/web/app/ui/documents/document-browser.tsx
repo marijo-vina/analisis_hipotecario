@@ -13,31 +13,26 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import type { Document, DocumentType } from "@/app/lib/definitions";
+import {
+  getDocumentCategories,
+  type DocumentCategory,
+} from "@/app/lib/required-documents";
 import StatusBadge from "@/app/ui/common/badge";
 import DocumentActions from "@/app/ui/documents/document-actions";
 import DocumentUpload from "@/app/ui/documents/document-upload";
 import BankStatementBatchActions from "@/app/ui/documents/bank-statement-batch-actions";
 
-interface CategoryDef {
-  key: string;
-  label: string;
-  codes: string[];
+function categoryDisplayLabel(cat: DocumentCategory): string {
+  if (cat.owner === "SHAREHOLDER") return `Accionista · ${cat.label}`;
+  if (cat.owner === "COMPANY") return `Empresa · ${cat.label}`;
+  return cat.label;
 }
 
-const CATEGORIES_SALARIED: CategoryDef[] = [
-  { key: "identificacion", label: "Identificación", codes: ["INE", "PASSPORT"] },
-  { key: "nomina", label: "Nómina", codes: ["PAYROLL_RECEIPT"] },
-  { key: "estados-cuenta", label: "Estados de cuenta", codes: ["BANK_STATEMENT"] },
-  { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"] },
-];
-
-const CATEGORIES_PFAE: CategoryDef[] = [
-  { key: "identificacion", label: "Identificación", codes: ["INE", "PASSPORT"] },
-  { key: "csf", label: "CSF", codes: ["CSF"] },
-  { key: "declaracion", label: "Declaración anual", codes: ["TAX_RETURN"] },
-  { key: "estados-cuenta", label: "Estados de cuenta", codes: ["BANK_STATEMENT"] },
-  { key: "buro", label: "Buró", codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"] },
-];
+function matchesCategory(doc: Document, cat: DocumentCategory): boolean {
+  if (!cat.codes.includes(doc.documentType.code)) return false;
+  if (!cat.owner) return true;
+  return (doc.owner ?? "SHAREHOLDER") === cat.owner;
+}
 
 interface DocumentBrowserProps {
   caseId: string;
@@ -58,14 +53,15 @@ export default function DocumentBrowser({
 }: DocumentBrowserProps) {
   const router = useRouter();
 
-  const categories = useMemo(() => {
-    return personType === "PFAE" ? CATEGORIES_PFAE : CATEGORIES_SALARIED;
-  }, [personType]);
+  const categories = useMemo(
+    () => getDocumentCategories(personType),
+    [personType],
+  );
 
   // Category -> documents map
   const categoryData = useMemo(() => {
     return categories.map((cat) => {
-      const docs = documents.filter((d) => cat.codes.includes(d.documentType.code));
+      const docs = documents.filter((d) => matchesCategory(d, cat));
       return { ...cat, documents: docs, count: docs.length };
     });
   }, [documents, categories]);
@@ -124,7 +120,7 @@ export default function DocumentBrowser({
                     ? "bg-gf-red text-white shadow-2xs"
                     : "bg-gf-surface-dim/50 text-gf-text-muted hover:bg-gf-surface-dim hover:text-gf-text"
                 }`}
-                title={`${cat.label} (${cat.count})`}
+                title={`${categoryDisplayLabel(cat)} (${cat.count})`}
               >
                 <FileText className="w-4 h-4" />
                 {cat.count > 0 && (
@@ -193,7 +189,7 @@ export default function DocumentBrowser({
                   : "bg-white border-gf-border text-gf-text hover:bg-gf-surface-dim/40"
               }`}
             >
-              <span>{cat.label}</span>
+              <span>{categoryDisplayLabel(cat)}</span>
               <span
                 className={`w-5 h-5 text-[10px] rounded-full flex items-center justify-center font-bold ${
                   active
@@ -211,10 +207,13 @@ export default function DocumentBrowser({
       {/* Active Category Documents List */}
       <div className="space-y-3 flex-1 overflow-y-auto max-h-[420px] pr-1">
         <h3 className="text-xs font-semibold text-gf-text-muted uppercase tracking-wider mb-2">
-          {selectedCategory?.label} ({selectedCategory?.documents.length ?? 0})
+          {selectedCategory
+            ? categoryDisplayLabel(selectedCategory)
+            : ""}{" "}
+          ({selectedCategory?.documents.length ?? 0})
         </h3>
 
-        {selectedCategoryKey === "estados-cuenta" && selectedCategory && (
+        {selectedCategory?.codes.includes("BANK_STATEMENT") && (
           <BankStatementBatchActions
             caseId={caseId}
             documents={selectedCategory.documents}
@@ -304,6 +303,7 @@ export default function DocumentBrowser({
               onSuccess={handleUploadSuccess}
               defaultDocumentTypeId={preselectedDocumentTypeId}
               personType={personType}
+              defaultOwner={selectedCategory?.owner}
             />
           </div>
         </div>
