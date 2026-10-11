@@ -58,6 +58,36 @@ describe('Mortgage Cases + Catalogs (e2e)', () => {
       .expect(status);
   };
 
+  const updateMortgageCase = async (
+    token: string,
+    id: string,
+    body: Record<string, unknown>,
+    status = 200,
+  ) => {
+    return request(app.getHttpServer())
+      .put(`/mortgage-cases/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(status);
+  };
+
+  const getMortgageCase = async (token: string, id: string, status = 200) => {
+    return request(app.getHttpServer())
+      .get(`/mortgage-cases/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(status);
+  };
+
+  const getMortgageCaseTotal = async (token: string) => {
+    const response = await request(app.getHttpServer())
+      .get('/mortgage-cases')
+      .query({ limit: 1 })
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    return response.body.meta.total as number;
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -205,6 +235,135 @@ describe('Mortgage Cases + Catalogs (e2e)', () => {
         400,
       );
     });
+
+    it('should create a PM case with empty corporate fields and return personType PM', async () => {
+      const response = await createMortgageCase(authToken, {
+        clientId,
+        creditTypeId,
+        personType: 'PM',
+      });
+
+      expect(response.body.id).toBeDefined();
+      expect(response.body.personType).toBe('PM');
+      expect(response.body.status.code).toBe('PENDING_DOCUMENTS');
+      expect(response.body.sharePercentage).toBeNull();
+      expect(response.body.incorporationDate).toBeNull();
+      expect(response.body.shareTenureMonths).toBeNull();
+      expect(response.body.legalName).toBeNull();
+      expect(response.body.companyRfc).toBeNull();
+    });
+
+    it('should persist the five corporate fields on a PM create', async () => {
+      const response = await createMortgageCase(authToken, {
+        clientId,
+        creditTypeId,
+        personType: 'PM',
+        sharePercentage: 51.5,
+        incorporationDate: '2020-01-15',
+        shareTenureMonths: 24,
+        legalName: 'Acme SA de CV',
+        companyRfc: 'ACM200115XX1',
+      });
+
+      expect(response.body.personType).toBe('PM');
+      expect(Number(response.body.sharePercentage)).toBe(51.5);
+      expect(new Date(response.body.incorporationDate).toISOString().slice(0, 10)).toBe(
+        '2020-01-15',
+      );
+      expect(response.body.shareTenureMonths).toBe(24);
+      expect(response.body.legalName).toBe('Acme SA de CV');
+      expect(response.body.companyRfc).toBe('ACM200115XX1');
+    });
+
+    it('should return 400 for personType MORAL and not create the case', async () => {
+      const totalBefore = await getMortgageCaseTotal(authToken);
+      const notes = `hu22-moral-reject-${Date.now()}`;
+
+      const response = await createMortgageCase(
+        authToken,
+        {
+          clientId,
+          creditTypeId,
+          personType: 'MORAL',
+          notes,
+        },
+        400,
+      );
+
+      expect(response.body.id).toBeUndefined();
+      expect(response.body.personType).not.toBe('MORAL');
+      expect(response.body.personType).not.toBe('SALARIED');
+      expect(response.body.personType).not.toBe('PM');
+      expect(JSON.stringify(response.body.message)).toEqual(
+        expect.stringMatching(/personType/i),
+      );
+
+      const totalAfter = await getMortgageCaseTotal(authToken);
+      expect(totalAfter).toBe(totalBefore);
+    });
+  });
+
+  describe('PUT /mortgage-cases/:id (PM)', () => {
+    it('should update corporate fields on an existing PM case and keep personType PM', async () => {
+      const created = await createMortgageCase(authToken, {
+        clientId,
+        creditTypeId,
+        personType: 'PM',
+      });
+
+      expect(created.body.personType).toBe('PM');
+      expect(created.body.legalName).toBeNull();
+      expect(created.body.companyRfc).toBeNull();
+
+      const updated = await updateMortgageCase(authToken, created.body.id, {
+        sharePercentage: 40,
+        incorporationDate: '2018-06-01',
+        shareTenureMonths: 12,
+        legalName: 'Nueva Razon Social SA de CV',
+        companyRfc: 'NRS210315AA1',
+      });
+
+      expect(updated.body.personType).toBe('PM');
+      expect(Number(updated.body.sharePercentage)).toBe(40);
+      expect(new Date(updated.body.incorporationDate).toISOString().slice(0, 10)).toBe(
+        '2018-06-01',
+      );
+      expect(updated.body.shareTenureMonths).toBe(12);
+      expect(updated.body.legalName).toBe('Nueva Razon Social SA de CV');
+      expect(updated.body.companyRfc).toBe('NRS210315AA1');
+
+      const fetched = await getMortgageCase(authToken, created.body.id);
+      expect(fetched.body.personType).toBe('PM');
+      expect(fetched.body.legalName).toBe('Nueva Razon Social SA de CV');
+      expect(fetched.body.companyRfc).toBe('NRS210315AA1');
+    });
+
+    it('should return 400 when PUT sends personType and leave the case unchanged', async () => {
+      const created = await createMortgageCase(authToken, {
+        clientId,
+        creditTypeId,
+        personType: 'PM',
+        legalName: 'Acme SA de CV',
+      });
+
+      await updateMortgageCase(
+        authToken,
+        created.body.id,
+        { personType: 'SALARIED' },
+        400,
+      );
+
+      await updateMortgageCase(
+        authToken,
+        created.body.id,
+        { personType: 'MORAL' },
+        400,
+      );
+
+      const fetched = await getMortgageCase(authToken, created.body.id);
+      expect(fetched.body.personType).toBe('PM');
+      expect(fetched.body.legalName).toBe('Acme SA de CV');
+    });
   });
 
   describe('GET /mortgage-cases', () => {
@@ -259,15 +418,15 @@ describe('Mortgage Cases + Catalogs (e2e)', () => {
     });
   });
 
-  describe('PATCH /mortgage-cases/:id (removed)', () => {
-    it('should return 404 because the PATCH route has been removed', async () => {
+  describe('PATCH /mortgage-cases/:id', () => {
+    it('should return 400 when an unknown field is sent', async () => {
       const created = await createMortgageCase(authToken, { clientId, creditTypeId });
 
       await request(app.getHttpServer())
         .patch(`/mortgage-cases/${created.body.id}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ statusCode: 'DOCUMENTS_UPLOADED' })
-        .expect(404);
+        .expect(400);
     });
   });
 

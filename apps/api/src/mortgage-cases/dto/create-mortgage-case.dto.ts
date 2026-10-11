@@ -8,8 +8,9 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
+import { MortgageCaseCorporateFieldsDto } from './mortgage-case-corporate-fields.dto';
 
-export class CreateMortgageCaseDto {
+export class CreateMortgageCaseDto extends MortgageCaseCorporateFieldsDto {
   @IsUUID()
   clientId!: string;
 
@@ -19,8 +20,8 @@ export class CreateMortgageCaseDto {
   creditTypeId!: number;
 
   @IsOptional()
-  @IsIn(['SALARIED', 'PFAE'])
-  personType?: 'SALARIED' | 'PFAE';
+  @IsIn(['SALARIED', 'PFAE', 'PM'])
+  personType?: 'SALARIED' | 'PFAE' | 'PM';
 
   @IsOptional()
   @IsString()

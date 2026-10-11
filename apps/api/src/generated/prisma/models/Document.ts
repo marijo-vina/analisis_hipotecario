@@ -43,6 +43,7 @@ export type DocumentMinAggregateOutputType = {
   mortgageCaseId: string | null
   documentTypeId: number | null
   documentStatusId: number | null
+  owner: $Enums.DocumentOwner | null
   fileUrl: string | null
   storagePath: string | null
   mimeType: string | null
@@ -61,6 +62,7 @@ export type DocumentMaxAggregateOutputType = {
   mortgageCaseId: string | null
   documentTypeId: number | null
   documentStatusId: number | null
+  owner: $Enums.DocumentOwner | null
   fileUrl: string | null
   storagePath: string | null
   mimeType: string | null
@@ -79,6 +81,7 @@ export type DocumentCountAggregateOutputType = {
   mortgageCaseId: number
   documentTypeId: number
   documentStatusId: number
+  owner: number
   fileUrl: number
   storagePath: number
   mimeType: number
@@ -114,6 +117,7 @@ export type DocumentMinAggregateInputType = {
   mortgageCaseId?: true
   documentTypeId?: true
   documentStatusId?: true
+  owner?: true
   fileUrl?: true
   storagePath?: true
   mimeType?: true
@@ -132,6 +136,7 @@ export type DocumentMaxAggregateInputType = {
   mortgageCaseId?: true
   documentTypeId?: true
   documentStatusId?: true
+  owner?: true
   fileUrl?: true
   storagePath?: true
   mimeType?: true
@@ -150,6 +155,7 @@ export type DocumentCountAggregateInputType = {
   mortgageCaseId?: true
   documentTypeId?: true
   documentStatusId?: true
+  owner?: true
   fileUrl?: true
   storagePath?: true
   mimeType?: true
@@ -258,6 +264,7 @@ export type DocumentGroupByOutputType = {
   mortgageCaseId: string
   documentTypeId: number
   documentStatusId: number
+  owner: $Enums.DocumentOwner
   fileUrl: string | null
   storagePath: string | null
   mimeType: string | null
@@ -302,6 +309,7 @@ export type DocumentWhereInput = {
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
   documentTypeId?: Prisma.IntFilter<"Document"> | number
   documentStatusId?: Prisma.IntFilter<"Document"> | number
+  owner?: Prisma.EnumDocumentOwnerFilter<"Document"> | $Enums.DocumentOwner
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
@@ -327,6 +335,7 @@ export type DocumentOrderByWithRelationInput = {
   mortgageCaseId?: Prisma.SortOrder
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  owner?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
   mimeType?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -355,6 +364,7 @@ export type DocumentWhereUniqueInput = Prisma.AtLeast<{
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
   documentTypeId?: Prisma.IntFilter<"Document"> | number
   documentStatusId?: Prisma.IntFilter<"Document"> | number
+  owner?: Prisma.EnumDocumentOwnerFilter<"Document"> | $Enums.DocumentOwner
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
@@ -380,6 +390,7 @@ export type DocumentOrderByWithAggregationInput = {
   mortgageCaseId?: Prisma.SortOrder
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  owner?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   storagePath?: Prisma.SortOrderInput | Prisma.SortOrder
   mimeType?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -409,6 +420,7 @@ export type DocumentScalarWhereWithAggregatesInput = {
   mortgageCaseId?: Prisma.StringWithAggregatesFilter<"Document"> | string
   documentTypeId?: Prisma.IntWithAggregatesFilter<"Document"> | number
   documentStatusId?: Prisma.IntWithAggregatesFilter<"Document"> | number
+  owner?: Prisma.EnumDocumentOwnerWithAggregatesFilter<"Document"> | $Enums.DocumentOwner
   fileUrl?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
   mimeType?: Prisma.StringNullableWithAggregatesFilter<"Document"> | string | null
@@ -427,6 +439,7 @@ export type DocumentScalarWhereWithAggregatesInput = {
 
 export type DocumentCreateInput = {
   id?: string
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -451,6 +464,7 @@ export type DocumentUncheckedCreateInput = {
   mortgageCaseId: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -469,6 +483,7 @@ export type DocumentUncheckedCreateInput = {
 
 export type DocumentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -493,6 +508,7 @@ export type DocumentUncheckedUpdateInput = {
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -514,6 +530,7 @@ export type DocumentCreateManyInput = {
   mortgageCaseId: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -532,6 +549,7 @@ export type DocumentCreateManyInput = {
 
 export type DocumentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -552,6 +570,7 @@ export type DocumentUncheckedUpdateManyInput = {
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -583,6 +602,7 @@ export type DocumentCountOrderByAggregateInput = {
   mortgageCaseId?: Prisma.SortOrder
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  owner?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
   mimeType?: Prisma.SortOrder
@@ -610,6 +630,7 @@ export type DocumentMaxOrderByAggregateInput = {
   mortgageCaseId?: Prisma.SortOrder
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  owner?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
   mimeType?: Prisma.SortOrder
@@ -628,6 +649,7 @@ export type DocumentMinOrderByAggregateInput = {
   mortgageCaseId?: Prisma.SortOrder
   documentTypeId?: Prisma.SortOrder
   documentStatusId?: Prisma.SortOrder
+  owner?: Prisma.SortOrder
   fileUrl?: Prisma.SortOrder
   storagePath?: Prisma.SortOrder
   mimeType?: Prisma.SortOrder
@@ -731,6 +753,10 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput = {
   deleteMany?: Prisma.DocumentScalarWhereInput | Prisma.DocumentScalarWhereInput[]
 }
 
+export type EnumDocumentOwnerFieldUpdateOperationsInput = {
+  set?: $Enums.DocumentOwner
+}
+
 export type DocumentCreateNestedManyWithoutDocumentTypeInput = {
   create?: Prisma.XOR<Prisma.DocumentCreateWithoutDocumentTypeInput, Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput> | Prisma.DocumentCreateWithoutDocumentTypeInput[] | Prisma.DocumentUncheckedCreateWithoutDocumentTypeInput[]
   connectOrCreate?: Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput | Prisma.DocumentCreateOrConnectWithoutDocumentTypeInput[]
@@ -817,6 +843,7 @@ export type DocumentUncheckedUpdateManyWithoutDocumentStatusNestedInput = {
 
 export type DocumentCreateWithoutUploadedByInput = {
   id?: string
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -840,6 +867,7 @@ export type DocumentUncheckedCreateWithoutUploadedByInput = {
   mortgageCaseId: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -889,6 +917,7 @@ export type DocumentScalarWhereInput = {
   mortgageCaseId?: Prisma.StringFilter<"Document"> | string
   documentTypeId?: Prisma.IntFilter<"Document"> | number
   documentStatusId?: Prisma.IntFilter<"Document"> | number
+  owner?: Prisma.EnumDocumentOwnerFilter<"Document"> | $Enums.DocumentOwner
   fileUrl?: Prisma.StringNullableFilter<"Document"> | string | null
   storagePath?: Prisma.StringNullableFilter<"Document"> | string | null
   mimeType?: Prisma.StringNullableFilter<"Document"> | string | null
@@ -907,6 +936,7 @@ export type DocumentScalarWhereInput = {
 
 export type DocumentCreateWithoutMortgageCaseInput = {
   id?: string
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -929,6 +959,7 @@ export type DocumentUncheckedCreateWithoutMortgageCaseInput = {
   id?: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -973,6 +1004,7 @@ export type DocumentUpdateManyWithWhereWithoutMortgageCaseInput = {
 
 export type DocumentCreateWithoutDocumentTypeInput = {
   id?: string
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -995,6 +1027,7 @@ export type DocumentUncheckedCreateWithoutDocumentTypeInput = {
   id?: string
   mortgageCaseId: string
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1039,6 +1072,7 @@ export type DocumentUpdateManyWithWhereWithoutDocumentTypeInput = {
 
 export type DocumentCreateWithoutDocumentStatusInput = {
   id?: string
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1061,6 +1095,7 @@ export type DocumentUncheckedCreateWithoutDocumentStatusInput = {
   id?: string
   mortgageCaseId: string
   documentTypeId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1108,6 +1143,7 @@ export type DocumentCreateManyUploadedByInput = {
   mortgageCaseId: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1125,6 +1161,7 @@ export type DocumentCreateManyUploadedByInput = {
 
 export type DocumentUpdateWithoutUploadedByInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1148,6 +1185,7 @@ export type DocumentUncheckedUpdateWithoutUploadedByInput = {
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1168,6 +1206,7 @@ export type DocumentUncheckedUpdateManyWithoutUploadedByInput = {
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1187,6 +1226,7 @@ export type DocumentCreateManyMortgageCaseInput = {
   id?: string
   documentTypeId: number
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1205,6 +1245,7 @@ export type DocumentCreateManyMortgageCaseInput = {
 
 export type DocumentUpdateWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1227,6 +1268,7 @@ export type DocumentUncheckedUpdateWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1247,6 +1289,7 @@ export type DocumentUncheckedUpdateManyWithoutMortgageCaseInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1267,6 +1310,7 @@ export type DocumentCreateManyDocumentTypeInput = {
   id?: string
   mortgageCaseId: string
   documentStatusId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1285,6 +1329,7 @@ export type DocumentCreateManyDocumentTypeInput = {
 
 export type DocumentUpdateWithoutDocumentTypeInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1307,6 +1352,7 @@ export type DocumentUncheckedUpdateWithoutDocumentTypeInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1327,6 +1373,7 @@ export type DocumentUncheckedUpdateManyWithoutDocumentTypeInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentStatusId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1347,6 +1394,7 @@ export type DocumentCreateManyDocumentStatusInput = {
   id?: string
   mortgageCaseId: string
   documentTypeId: number
+  owner?: $Enums.DocumentOwner
   fileUrl?: string | null
   storagePath?: string | null
   mimeType?: string | null
@@ -1365,6 +1413,7 @@ export type DocumentCreateManyDocumentStatusInput = {
 
 export type DocumentUpdateWithoutDocumentStatusInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1387,6 +1436,7 @@ export type DocumentUncheckedUpdateWithoutDocumentStatusInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1407,6 +1457,7 @@ export type DocumentUncheckedUpdateManyWithoutDocumentStatusInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   mortgageCaseId?: Prisma.StringFieldUpdateOperationsInput | string
   documentTypeId?: Prisma.IntFieldUpdateOperationsInput | number
+  owner?: Prisma.EnumDocumentOwnerFieldUpdateOperationsInput | $Enums.DocumentOwner
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   storagePath?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   mimeType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1430,6 +1481,7 @@ export type DocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   mortgageCaseId?: boolean
   documentTypeId?: boolean
   documentStatusId?: boolean
+  owner?: boolean
   fileUrl?: boolean
   storagePath?: boolean
   mimeType?: boolean
@@ -1455,6 +1507,7 @@ export type DocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   mortgageCaseId?: boolean
   documentTypeId?: boolean
   documentStatusId?: boolean
+  owner?: boolean
   fileUrl?: boolean
   storagePath?: boolean
   mimeType?: boolean
@@ -1480,6 +1533,7 @@ export type DocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   mortgageCaseId?: boolean
   documentTypeId?: boolean
   documentStatusId?: boolean
+  owner?: boolean
   fileUrl?: boolean
   storagePath?: boolean
   mimeType?: boolean
@@ -1505,6 +1559,7 @@ export type DocumentSelectScalar = {
   mortgageCaseId?: boolean
   documentTypeId?: boolean
   documentStatusId?: boolean
+  owner?: boolean
   fileUrl?: boolean
   storagePath?: boolean
   mimeType?: boolean
@@ -1521,7 +1576,7 @@ export type DocumentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "ocrText" | "ocrLayout" | "extractedData" | "processingResults" | "processedAt" | "processingError" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
+export type DocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "mortgageCaseId" | "documentTypeId" | "documentStatusId" | "owner" | "fileUrl" | "storagePath" | "mimeType" | "sizeBytes" | "originalName" | "uploadedById" | "ocrText" | "ocrLayout" | "extractedData" | "processingResults" | "processedAt" | "processingError" | "createdAt" | "updatedAt", ExtArgs["result"]["document"]>
 export type DocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mortgageCase?: boolean | Prisma.MortgageCaseDefaultArgs<ExtArgs>
   documentType?: boolean | Prisma.DocumentTypeDefaultArgs<ExtArgs>
@@ -1554,6 +1609,7 @@ export type $DocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     mortgageCaseId: string
     documentTypeId: number
     documentStatusId: number
+    owner: $Enums.DocumentOwner
     fileUrl: string | null
     storagePath: string | null
     mimeType: string | null
@@ -2004,6 +2060,7 @@ export interface DocumentFieldRefs {
   readonly mortgageCaseId: Prisma.FieldRef<"Document", 'String'>
   readonly documentTypeId: Prisma.FieldRef<"Document", 'Int'>
   readonly documentStatusId: Prisma.FieldRef<"Document", 'Int'>
+  readonly owner: Prisma.FieldRef<"Document", 'DocumentOwner'>
   readonly fileUrl: Prisma.FieldRef<"Document", 'String'>
   readonly storagePath: Prisma.FieldRef<"Document", 'String'>
   readonly mimeType: Prisma.FieldRef<"Document", 'String'>

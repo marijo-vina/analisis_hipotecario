@@ -35,7 +35,7 @@ export default function ExtractionSection({
 }: ExtractionSectionProps) {
   // Determine relevant tabs for this profile
   const availableTabs = useMemo<ExtractionCategory[]>(() => {
-    if (personType === "PFAE") {
+    if (personType === "PFAE" || personType === "PM") {
       return ["identidad", "csf", "declaracion", "estados", "buro"];
     }
     // For SALARIED or default, include CSF/declaracion if they exist in documents

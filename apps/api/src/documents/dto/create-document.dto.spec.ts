@@ -76,6 +76,63 @@ describe('CreateDocumentDto', () => {
     expect(errors[0].property).toBe('originalName');
   });
 
+  it('should accept omitted owner (defaults to SHAREHOLDER at persistence)', async () => {
+    const dto = plainToInstance(CreateDocumentDto, validPayload);
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.owner).toBeUndefined();
+  });
+
+  it('should accept owner SHAREHOLDER', async () => {
+    const dto = plainToInstance(CreateDocumentDto, {
+      ...validPayload,
+      owner: 'SHAREHOLDER',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.owner).toBe('SHAREHOLDER');
+  });
+
+  it('should accept owner COMPANY', async () => {
+    const dto = plainToInstance(CreateDocumentDto, {
+      ...validPayload,
+      owner: 'COMPANY',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.owner).toBe('COMPANY');
+  });
+
+  it('should reject invalid owner values', async () => {
+    const dto = plainToInstance(CreateDocumentDto, {
+      ...validPayload,
+      owner: 'CLIENT',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('owner');
+  });
+
+  it('should reject lowercase owner', async () => {
+    const dto = plainToInstance(CreateDocumentDto, {
+      ...validPayload,
+      owner: 'company',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('owner');
+  });
+
   it('should reject non-whitelisted properties', async () => {
     const pipe = new ValidationPipe({
       whitelist: true,

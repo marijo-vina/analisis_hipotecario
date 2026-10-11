@@ -7,8 +7,9 @@ import {
   IsString,
   Min,
 } from 'class-validator';
+import { MortgageCaseCorporateFieldsDto } from './mortgage-case-corporate-fields.dto';
 
-export class UpdateMortgageCaseDto {
+export class UpdateMortgageCaseDto extends MortgageCaseCorporateFieldsDto {
   @Type(() => Number)
   @IsInt({ message: 'El tipo de crédito debe ser un número válido' })
   @IsPositive({ message: 'El tipo de crédito es obligatorio' })

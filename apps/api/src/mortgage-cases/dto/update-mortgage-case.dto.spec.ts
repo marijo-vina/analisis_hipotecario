@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UpdateMortgageCaseDto } from './update-mortgage-case.dto';
@@ -185,6 +186,110 @@ describe('UpdateMortgageCaseDto', () => {
       const errors = await validate(dto);
 
       expect(errors).toHaveLength(0);
+    });
+  });
+
+  describe('corporate fields', () => {
+    it('should accept a subset of corporate fields', async () => {
+      const dto = plainToInstance(UpdateMortgageCaseDto, {
+        legalName: 'Acme SA de CV',
+        companyRfc: 'ACM200115XX1',
+      });
+
+      const errors = await validate(dto);
+
+      expect(errors).toHaveLength(0);
+      expect(dto.legalName).toBe('Acme SA de CV');
+      expect(dto.companyRfc).toBe('ACM200115XX1');
+    });
+
+    it('should accept all five corporate fields', async () => {
+      const dto = plainToInstance(UpdateMortgageCaseDto, {
+        sharePercentage: '33.25',
+        incorporationDate: '2018-06-01',
+        shareTenureMonths: '12',
+        legalName: 'Holding Norte SA de CV',
+        companyRfc: 'HNO180601XX9',
+      });
+
+      const errors = await validate(dto);
+
+      expect(errors).toHaveLength(0);
+      expect(dto.sharePercentage).toBe(33.25);
+      expect(dto.incorporationDate).toBeInstanceOf(Date);
+      expect(dto.shareTenureMonths).toBe(12);
+      expect(dto.legalName).toBe('Holding Norte SA de CV');
+      expect(dto.companyRfc).toBe('HNO180601XX9');
+    });
+
+    it('should reject invalid sharePercentage', async () => {
+      const dto = plainToInstance(UpdateMortgageCaseDto, {
+        sharePercentage: 0,
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'sharePercentage');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject invalid companyRfc', async () => {
+      const dto = plainToInstance(UpdateMortgageCaseDto, {
+        companyRfc: 'GARM920604ABC',
+      });
+
+      const errors = await validate(dto);
+      const fieldErrors = errors.filter((e) => e.property === 'companyRfc');
+
+      expect(fieldErrors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('personType is create-only', () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
+
+    it('should reject personType PM with forbidNonWhitelisted', async () => {
+      await expect(
+        pipe.transform(
+          {
+            ...validPayload,
+            personType: 'PM',
+          },
+          {
+            type: 'body',
+            metatype: UpdateMortgageCaseDto,
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 400,
+          message: expect.arrayContaining(['property personType should not exist']),
+        },
+      });
+    });
+
+    it('should reject personType MORAL with forbidNonWhitelisted', async () => {
+      await expect(
+        pipe.transform(
+          {
+            ...validPayload,
+            personType: 'MORAL',
+          },
+          {
+            type: 'body',
+            metatype: UpdateMortgageCaseDto,
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 400,
+          message: expect.arrayContaining(['property personType should not exist']),
+        },
+      });
     });
   });
 });

@@ -140,6 +140,11 @@ export const MortgageCaseScalarFieldEnum = {
   requestedAmount: 'requestedAmount',
   propertyValue: 'propertyValue',
   notes: 'notes',
+  sharePercentage: 'sharePercentage',
+  incorporationDate: 'incorporationDate',
+  shareTenureMonths: 'shareTenureMonths',
+  legalName: 'legalName',
+  companyRfc: 'companyRfc',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -187,6 +192,7 @@ export const DocumentScalarFieldEnum = {
   mortgageCaseId: 'mortgageCaseId',
   documentTypeId: 'documentTypeId',
   documentStatusId: 'documentStatusId',
+  owner: 'owner',
   fileUrl: 'fileUrl',
   storagePath: 'storagePath',
   mimeType: 'mimeType',
