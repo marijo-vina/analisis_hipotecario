@@ -256,5 +256,26 @@ describe('DocumentAiService', () => {
         }),
       );
     });
+
+    it('should split a PDF that exceeds the synchronous page limit and join the text', async () => {
+      mockProcessDocument
+        .mockRejectedValueOnce(
+          new Error('3 INVALID_ARGUMENT: Document pages exceed the limit: 30 got 35'),
+        )
+        .mockResolvedValueOnce([{ document: { text: 'paginas 1-30', pages: [] } }])
+        .mockResolvedValueOnce([{ document: { text: 'paginas 31-35', pages: [] } }]);
+
+      const { ocrText } = await service.extractTextWithLayout(gcsUri, mimeType);
+
+      expect(ocrText).toBe('paginas 1-30\npaginas 31-35');
+      expect(mockProcessDocument).toHaveBeenCalledTimes(3);
+      const secondPages =
+        mockProcessDocument.mock.calls[1][0].processOptions.individualPageSelector.pages;
+      const thirdPages =
+        mockProcessDocument.mock.calls[2][0].processOptions.individualPageSelector.pages;
+      expect(secondPages).toHaveLength(30);
+      expect(secondPages[0]).toBe(1);
+      expect(thirdPages).toEqual([31, 32, 33, 34, 35]);
+    });
   });
 });
