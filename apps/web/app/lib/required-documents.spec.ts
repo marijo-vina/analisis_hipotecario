@@ -36,6 +36,7 @@ const CATALOG = [
   { id: 8, code: "TAX_RETURN", name: "Declaración anual" },
   { id: 9, code: "PROOF_OF_ADDRESS", name: "Comprobante de domicilio" },
   { id: 10, code: "ARTICLES_OF_INCORPORATION", name: "Acta constitutiva" },
+  { id: 11, code: "CORPORATE_AMENDMENT", name: "Acta de modificación de poderes" },
 ];
 
 describe("getRequiredDocChecks", () => {
@@ -340,6 +341,12 @@ describe("getDocumentCategories", () => {
         codes: ["ARTICLES_OF_INCORPORATION"],
         owner: "COMPANY",
       },
+      {
+        key: "company-amendment",
+        label: "Modificación de poderes",
+        codes: ["CORPORATE_AMENDMENT"],
+        owner: "COMPANY",
+      },
     ]);
   });
 });
@@ -352,6 +359,7 @@ describe("filterUploadableDocumentTypes", () => {
     expect(codes).toContain("PAYROLL_RECEIPT");
     expect(codes).toContain("PASSPORT");
     expect(codes).not.toContain("ARTICLES_OF_INCORPORATION");
+    expect(codes).not.toContain("CORPORATE_AMENDMENT");
     expect(codes).not.toContain("CSF");
     expect(codes).not.toContain("TAX_RETURN");
     expect(codes).not.toContain("PROOF_OF_ADDRESS");
@@ -364,6 +372,7 @@ describe("filterUploadableDocumentTypes", () => {
     expect(codes).toContain("CSF");
     expect(codes).toContain("TAX_RETURN");
     expect(codes).not.toContain("ARTICLES_OF_INCORPORATION");
+    expect(codes).not.toContain("CORPORATE_AMENDMENT");
     expect(codes).not.toContain("PAYROLL_RECEIPT");
     expect(codes).not.toContain("PROOF_OF_ADDRESS");
   });
@@ -373,6 +382,7 @@ describe("filterUploadableDocumentTypes", () => {
       (type) => type.code,
     );
     expect(codes).toContain("ARTICLES_OF_INCORPORATION");
+    expect(codes).toContain("CORPORATE_AMENDMENT");
     expect(codes).toContain("CSF");
     expect(codes).toContain("TAX_RETURN");
     expect(codes).toContain("PASSPORT");
@@ -407,6 +417,9 @@ describe("resolveUploadOwner", () => {
     expect(resolveUploadOwner("PM", "CSF", "COMPANY")).toBe("COMPANY");
     expect(
       resolveUploadOwner("PM", "ARTICLES_OF_INCORPORATION", "SHAREHOLDER"),
+    ).toBe("COMPANY");
+    expect(
+      resolveUploadOwner("PM", "CORPORATE_AMENDMENT", "SHAREHOLDER"),
     ).toBe("COMPANY");
   });
 });

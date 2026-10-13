@@ -1,10 +1,17 @@
 # Plan de desarrollo — Perfil Persona Moral (socio accionista)
 
-Documento pre-SDD. Cada HU pasa por su ciclo SDD. Ajustar el alcance de la HU
-**antes** de lanzarla.
+Documento de producto. Cada HU se implementa con **ODD** (Organic Driven
+Development): trabajo directo o delegado con evidencia acotada, commits por
+unidad de trabajo, y review RDD antes de cada commit. No hay ciclo SDD ni
+change OpenSpec nuevo por HU. Ajustar el alcance **antes** de implementarla.
+
+HU-22 ya está en `feature/perfil-pm` (misma punta que
+`feature/hu-22-perfil-pm-foundation`). HU-23 a HU-30 siguen este plan con ODD.
 
 **Entrega usable:** 28 de noviembre de 2026 (buffer 5 de diciembre).
-**Rama base (cuando se abra):** `feature/perfil-pm`.
+**Rama de integración:** `feature/perfil-pm`. Cada HU se desarrolla en su rama
+y, al cerrarla, se mergea ahí. No se mergea a `main` hasta que el perfil
+persona moral esté completo y el usuario lo pida.
 **Fixture de aceptación:** caso real del Excel `PM-ejemplo` (números abajo; sin PII).
 
 **Control (GitHub):**
@@ -101,6 +108,8 @@ Mismo principio que PFAE: `personType` como discriminador. No hay segundo pipeli
 ## Historias
 
 Numeración sigue a PFAE (HU-21). Una HU a la vez, rama hija de `feature/perfil-pm`.
+Este archivo es el documento de feature ODD; cada HU cierra con commits de unidad
+de trabajo en su rama, no con `sdd-*` ni `openspec/changes/`.
 
 ### Fase A — Fundación
 
@@ -119,9 +128,9 @@ Numeración sigue a PFAE (HU-21). Una HU a la vez, rama hija de `feature/perfil-
 
 Reusar extractores PFAE con dueño socio/empresa. Gate: CSF socio sin régimen socio/accionista → no es camino PM. Pérdida fiscal empresa → knockout solo de declaración.
 
-#### HU-24 — Acta constitutiva
+#### HU-24 — Acta constitutiva y modificaciones
 
-Campos: razón social, RFC, fecha de constitución, socios, % (fijo + variable), boleta RPP. Sumar familia directa solo como dato; la regla Banamex `>50%` se aplica en HU-28/29.
+Acta constitutiva (`ARTICLES_OF_INCORPORATION`, obligatoria) y acta de modificación de poderes o asamblea (`CORPORATE_AMENDMENT`, solo si se sube). Campos: razón social, RFC si viene (si no, vacío con aviso), fecha de constitución, escritura, cuadro accionario con series como vengan rotuladas, % del solicitante, órgano de administración, apoderados y facultades, inscripción RPP. El % vigente es el de la última acta inscrita que traiga cuadro. Familia directa solo como dato. Asociación sin fines de lucro: aviso rojo de descarte, sin bloquear la extracción. Candados de banco en HU-28/29.
 
 #### HU-25 — Estados de la empresa + peinado
 

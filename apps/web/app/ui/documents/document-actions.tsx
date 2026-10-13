@@ -14,6 +14,7 @@ import {
   extractCreditScore,
   extractCsf,
   extractTaxReturn,
+  extractArticles,
 } from "@/app/actions/documents";
 import { Eye, RotateCw, Play, Trash2, Loader2 } from "lucide-react";
 import ConfirmDialog from "@/app/ui/common/confirm-dialog";
@@ -191,6 +192,19 @@ export default function DocumentActions({
         } catch {
           setProcessError(
             "OCR completado, pero la extracción de la Declaración Anual falló. Puede intentar reprocesar.",
+          );
+        }
+      }
+
+      if (
+        document.documentType.code === "ARTICLES_OF_INCORPORATION" ||
+        document.documentType.code === "CORPORATE_AMENDMENT"
+      ) {
+        try {
+          await extractArticles(caseId, document.id);
+        } catch {
+          setProcessError(
+            "OCR completado, pero la extracción del acta falló. Puede intentar reprocesar.",
           );
         }
       }

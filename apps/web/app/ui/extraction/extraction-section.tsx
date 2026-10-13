@@ -12,6 +12,7 @@ import EmptyState from "@/app/ui/common/empty-state";
 import IdentidadTab from "@/app/ui/extraction/identidad-tab";
 import CsfTab from "@/app/ui/extraction/csf-tab";
 import DeclaracionTab from "@/app/ui/extraction/declaracion-tab";
+import ActaTab from "@/app/ui/extraction/acta-tab";
 import NominaTab from "@/app/ui/extraction/nomina-tab";
 import EstadosTab from "@/app/ui/extraction/estados-tab";
 import BuroTab from "@/app/ui/extraction/buro-tab";
@@ -36,7 +37,15 @@ export default function ExtractionSection({
   // Determine relevant tabs for this profile
   const availableTabs = useMemo<ExtractionCategory[]>(() => {
     if (personType === "PFAE" || personType === "PM") {
-      return ["identidad", "csf", "declaracion", "estados", "buro"];
+      const tabs: ExtractionCategory[] = [
+        "identidad",
+        "csf",
+        "declaracion",
+        "estados",
+        "buro",
+      ];
+      if (personType === "PM") tabs.splice(3, 0, "acta");
+      return tabs;
     }
     // For SALARIED or default, include CSF/declaracion if they exist in documents
     const tabs: ExtractionCategory[] = ["identidad"];
@@ -67,6 +76,7 @@ export default function ExtractionSection({
       "identidad",
       "csf",
       "declaracion",
+      "acta",
       "nomina",
       "estados",
       "buro",
@@ -106,6 +116,9 @@ export default function ExtractionSection({
           )}
           {activeTab === "declaracion" && (
             <DeclaracionTab documents={docsByCategory.get("declaracion") ?? []} />
+          )}
+          {activeTab === "acta" && (
+            <ActaTab documents={docsByCategory.get("acta") ?? []} />
           )}
           {activeTab === "nomina" && (
             <NominaTab documents={docsByCategory.get("nomina") ?? []} />

@@ -196,6 +196,12 @@ const PM_CATEGORIES: DocumentCategory[] = [
     ["ARTICLES_OF_INCORPORATION"],
     "COMPANY",
   ),
+  ownedCategory(
+    "company-amendment",
+    "Modificación de poderes",
+    ["CORPORATE_AMENDMENT"],
+    "COMPANY",
+  ),
 ];
 
 function resolveDocOwner(owner?: string | null): DocumentOwner {
@@ -241,7 +247,11 @@ export function filterUploadableDocumentTypes<T extends { code: string }>(
   }
 
   if (personType !== "PM") {
-    filtered = filtered.filter((dt) => dt.code !== "ARTICLES_OF_INCORPORATION");
+    filtered = filtered.filter(
+      (dt) =>
+        dt.code !== "ARTICLES_OF_INCORPORATION" &&
+        dt.code !== "CORPORATE_AMENDMENT",
+    );
   }
 
   const hasPassport = filtered.some((dt) => dt.code === "PASSPORT");
@@ -258,6 +268,8 @@ export function resolveUploadOwner(
   selected: DocumentOwner = "SHAREHOLDER",
 ): DocumentOwner | undefined {
   if (personType !== "PM") return undefined;
-  if (code === "ARTICLES_OF_INCORPORATION") return "COMPANY";
+  if (code === "ARTICLES_OF_INCORPORATION" || code === "CORPORATE_AMENDMENT") {
+    return "COMPANY";
+  }
   return selected;
 }

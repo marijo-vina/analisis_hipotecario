@@ -19,6 +19,7 @@ export type ExtractionCategory =
   | "identidad"
   | "csf"
   | "declaracion"
+  | "acta"
   | "nomina"
   | "estados"
   | "buro";
@@ -27,6 +28,7 @@ export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
   identidad: "Identidad",
   csf: "Constancia fiscal (CSF)",
   declaracion: "Declaración anual",
+  acta: "Acta",
   nomina: "Recibos de nómina",
   estados: "Estados de cuenta",
   buro: "Buró de crédito",
@@ -65,6 +67,9 @@ export function docCategory(
       return "csf";
     case "TAX_RETURN":
       return "declaracion";
+    case "ARTICLES_OF_INCORPORATION":
+    case "CORPORATE_AMENDMENT":
+      return "acta";
     case "PAYROLL_RECEIPT":
       return "nomina";
     case "BANK_STATEMENT":

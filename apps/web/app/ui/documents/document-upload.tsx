@@ -233,15 +233,20 @@ export default function DocumentUpload({
               onChange={(e) =>
                 setSelectedOwner(e.target.value as DocumentOwner)
               }
-              disabled={loading || selectedTypeCode === "ARTICLES_OF_INCORPORATION"}
+              disabled={
+                loading ||
+                selectedTypeCode === "ARTICLES_OF_INCORPORATION" ||
+                selectedTypeCode === "CORPORATE_AMENDMENT"
+              }
               className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
             >
               <option value="SHAREHOLDER">Accionista</option>
               <option value="COMPANY">Empresa</option>
             </select>
-            {selectedTypeCode === "ARTICLES_OF_INCORPORATION" && (
+            {(selectedTypeCode === "ARTICLES_OF_INCORPORATION" ||
+              selectedTypeCode === "CORPORATE_AMENDMENT") && (
               <p className="mt-1 text-[11px] text-gf-text-muted">
-                El acta constitutiva se guarda como documento de la empresa.
+                Este documento se guarda como documento de la empresa.
               </p>
             )}
           </div>
