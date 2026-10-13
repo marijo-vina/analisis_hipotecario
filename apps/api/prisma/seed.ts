@@ -21,6 +21,7 @@ const DOCUMENT_TYPES = [
   { code: 'CSF', name: 'Constancia de Situación Fiscal', isActive: true },
   { code: 'TAX_RETURN', name: 'Declaración anual', isActive: true },
   { code: 'ARTICLES_OF_INCORPORATION', name: 'Acta constitutiva', isActive: true },
+  { code: 'CORPORATE_AMENDMENT', name: 'Acta de modificación de poderes', isActive: true },
   { code: 'PROOF_OF_ADDRESS', name: 'Comprobante de domicilio', isActive: false },
 ];
 

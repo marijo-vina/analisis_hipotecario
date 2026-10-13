@@ -30,6 +30,7 @@ import { CreditScoreExtractionService } from './credit-score-extraction.service'
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { ArticlesExtractionService } from './articles-extraction.service';
 import { GcsService } from './gcs.service';
 import { DocumentOwner } from '../generated/prisma/client';
 
@@ -45,6 +46,7 @@ export class DocumentsController {
     private readonly creditScoreExtractionService: CreditScoreExtractionService,
     private readonly csfExtractionService: CsfExtractionService,
     private readonly taxReturnExtractionService: TaxReturnExtractionService,
+    private readonly articlesExtractionService: ArticlesExtractionService,
     private readonly coordinateExtractionService: CoordinateExtractionService,
     private readonly gcsService: GcsService,
   ) {}
@@ -325,6 +327,16 @@ export class DocumentsController {
     @Param('documentId') documentId: string,
   ) {
     const data = await this.taxReturnExtractionService.extract(caseId, documentId);
+    return { data };
+  }
+
+  @Post(':documentId/extract-articles')
+  @HttpCode(200)
+  async extractArticles(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.articlesExtractionService.extract(caseId, documentId);
     return { data };
   }
 

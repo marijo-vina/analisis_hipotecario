@@ -15,6 +15,7 @@ import { CreditScoreExtractionService } from './credit-score-extraction.service'
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { ArticlesExtractionService } from './articles-extraction.service';
 import { GcsService } from './gcs.service';
 
 describe('DocumentsController', () => {
@@ -55,6 +56,10 @@ describe('DocumentsController', () => {
   };
 
   const mockTaxReturnExtractionService = {
+    extract: jest.fn(),
+  };
+
+  const mockArticlesExtractionService = {
     extract: jest.fn(),
   };
 
@@ -103,6 +108,10 @@ describe('DocumentsController', () => {
         {
           provide: TaxReturnExtractionService,
           useValue: mockTaxReturnExtractionService,
+        },
+        {
+          provide: ArticlesExtractionService,
+          useValue: mockArticlesExtractionService,
         },
         {
           provide: CoordinateExtractionService,
@@ -737,6 +746,25 @@ describe('DocumentsController', () => {
       const result = await controller.extractTaxReturn(caseId, documentId);
 
       expect(mockTaxReturnExtractionService.extract).toHaveBeenCalledWith(caseId, documentId);
+      expect(result).toEqual({ data: successfulExtraction });
+    });
+  });
+
+  describe('extractArticles', () => {
+    const caseId = 'case-uuid-1';
+    const documentId = 'doc-acta-uuid-1';
+
+    it('should return the corporate act extraction in the data envelope', async () => {
+      const successfulExtraction = {
+        documentType: 'CORPORATE_AMENDMENT',
+        applicantSharePercentage: 51,
+        alerts: [],
+      };
+      mockArticlesExtractionService.extract.mockResolvedValue(successfulExtraction);
+
+      const result = await controller.extractArticles(caseId, documentId);
+
+      expect(mockArticlesExtractionService.extract).toHaveBeenCalledWith(caseId, documentId);
       expect(result).toEqual({ data: successfulExtraction });
     });
   });
