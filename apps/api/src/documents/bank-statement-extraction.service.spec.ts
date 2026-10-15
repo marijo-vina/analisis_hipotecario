@@ -14,6 +14,7 @@ import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 interface MockDocument {
   id: string;
   mortgageCaseId: string;
+  owner?: 'SHAREHOLDER' | 'COMPANY';
   documentType: { id: number; code: string; name: string; isActive: boolean };
   documentStatus: { id: number; code: string; name: string; order: number };
   ocrText: string | null;
@@ -1293,6 +1294,47 @@ describe('BankStatementExtractionService', () => {
       const ed = result.extractedData as Record<string, unknown>;
       const accountHolder = ed.accountHolder as Record<string, unknown>;
       expect(accountHolder.rfc).toBe('DICA690402RZ4');
+    });
+
+    it('uses the company CSF when the statement owner is COMPANY', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ owner: 'COMPANY' }),
+      );
+      mockPrisma.document.findFirst.mockImplementation(
+        async (args: {
+          where?: { owner?: string };
+          orderBy?: unknown;
+        }) => {
+          expect(args.where?.owner).toBe('COMPANY');
+          expect(args.orderBy).toEqual([
+            { processedAt: 'desc' },
+            { createdAt: 'desc' },
+          ]);
+          return {
+            id: 'doc-csf-company',
+            extractedData: {
+              taxpayer: { rfc: 'EMP800101ABC', fullName: 'EMPRESA SA DE CV' },
+              activities: [{ description: 'Servicios' }],
+            },
+          };
+        },
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            accountHolder: {
+              fullName: 'EMPRESA SA DE CV',
+              rfc: 'XAXX010101000',
+              isJointAccount: false,
+            },
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const accountHolder = (result.extractedData as Record<string, unknown>)
+        .accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBe('EMP800101ABC');
     });
 
     it('nulls a generic placeholder RFC when no CSF fallback exists', async () => {

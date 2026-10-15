@@ -434,13 +434,19 @@ export class BankStatementExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Query CSF context if available ──────────────────────────────
+    // ── 6. Query CSF context for the same document owner ───────────────
+    // Company statements use the company CSF (RFC, name, giro). Shareholder
+    // statements keep the shareholder CSF. A missing owner is shareholder.
+    const statementOwner = document.owner === 'COMPANY' ? 'COMPANY' : 'SHAREHOLDER';
     const csfDoc = await this.prisma.document.findFirst({
       where: {
         mortgageCaseId: caseId,
+        owner: statementOwner,
         documentType: { code: { in: ['CSF', 'TAX_SITUATION_PROOF'] } },
         documentStatus: { code: 'PROCESSED' },
       },
+      // Same choice as selectLatestProcessedFiscal: newest processed constancia.
+      orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }],
     });
     const csfData = csfDoc?.extractedData as Record<string, any> | null;
     const clientContext: ClientFiscalContext = {

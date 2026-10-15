@@ -25,6 +25,12 @@ import {
   type CsfActivityInput,
   type TaxReturnExtract,
 } from './pfae-income.helpers';
+import {
+  rollupCompanyStatements,
+  selectLatestProcessedFiscal,
+  type CompanyStatementInput,
+  type CompanyStatementRollup,
+} from './pm-company-statements';
 
 const PFAE_DOCUMENT_CODES = ['CSF', 'BANK_STATEMENT', 'TAX_RETURN'] as const;
 const ZERO = new Prisma.Decimal(0);
@@ -168,6 +174,52 @@ export class IncomeCalculationService {
     }
 
     return this.calculateFromPayroll(caseId, excludedDocumentIds);
+  }
+
+  /**
+   * Groups cleaned company bank statements and evaluates the Santander
+   * minimum of 5 valid deposits per month. Does not smooth the average
+   * or compute capacity.
+   */
+  async evaluateCompanyStatements(
+    caseId: string,
+  ): Promise<CompanyStatementRollup> {
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      select: { id: true },
+    });
+    if (!mortgageCase) {
+      throw new NotFoundException('Mortgage case not found');
+    }
+
+    const docs = await this.prisma.document.findMany({
+      where: {
+        mortgageCaseId: caseId,
+        owner: 'COMPANY',
+        documentType: {
+          code: { in: ['CSF', 'TAX_SITUATION_PROOF', 'BANK_STATEMENT'] },
+        },
+      },
+      include: { documentType: true, documentStatus: true },
+    });
+
+    const fiscal = selectLatestProcessedFiscal(
+      docs.map((doc) => ({
+        typeCode: doc.documentType.code,
+        statusCode: doc.documentStatus?.code ?? '',
+        processedAt: doc.processedAt,
+        createdAt: doc.createdAt,
+        value: doc.extractedData,
+      })),
+    );
+    const activities = (
+      (fiscal ?? {}) as { activities?: CsfActivityInput[] }
+    ).activities ?? [];
+    const statements = docs
+      .filter((doc) => doc.documentType.code === 'BANK_STATEMENT')
+      .map((doc) => (doc.extractedData ?? {}) as CompanyStatementInput);
+
+    return rollupCompanyStatements(statements, activities);
   }
 
   /**

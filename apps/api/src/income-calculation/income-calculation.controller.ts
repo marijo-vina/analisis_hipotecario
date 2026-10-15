@@ -54,6 +54,7 @@ interface ToggleReceiptBody {
  *
  * Endpoints:
  *   POST   /calculate                          → 201 (new snapshot)
+ *   GET    /company-statements                  → 200 (PM company month rollup)
  *   GET    /latest                              → 200 (most recent snapshot)
  *   PATCH  /receipts/:receiptIndex              → 200 (toggle + new snapshot)
  *   PATCH  /source                              → 200 (PFAE source switch + Phase C)
@@ -93,6 +94,18 @@ export class IncomeCalculationController {
    * Returns the most recent snapshot for the case, or 404 when none
    * has been created yet.
    */
+  /**
+   * GET /cases/:caseId/income/company-statements
+   *
+   * Groups cleaned company bank statements and reports whether each
+   * month in the window has at least 5 valid deposits. Does not
+   * persist a snapshot and does not compute capacity.
+   */
+  @Get('company-statements')
+  async companyStatements(@Param('caseId') caseId: string) {
+    return this.incomeService.evaluateCompanyStatements(caseId);
+  }
+
   @Get('latest')
   async getLatest(@Param('caseId') caseId: string) {
     return this.incomeService.getLatest(caseId);
