@@ -393,8 +393,6 @@ describe('CaseStatusCalculatorService', () => {
       { documentTypeCode: 'INE', documentStatusCode: 'PROCESSED', owner: 'SHAREHOLDER' },
       { documentTypeCode: 'CREDIT_BUREAU_REPORT', documentStatusCode: 'PROCESSED', owner: 'SHAREHOLDER' },
       { documentTypeCode: 'CSF', documentStatusCode: 'PROCESSED', owner: 'SHAREHOLDER' },
-      { documentTypeCode: 'BANK_STATEMENT', documentStatusCode: 'PROCESSED', owner: 'SHAREHOLDER' },
-      { documentTypeCode: 'TAX_RETURN', documentStatusCode: 'PROCESSED', owner: 'SHAREHOLDER' },
     ];
 
     const processedCompanyPacket = [
@@ -447,6 +445,26 @@ describe('CaseStatusCalculatorService', () => {
       expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { statusId: statusIds.PENDING_DOCUMENTS },
+        }),
+      );
+    });
+
+    it('should return DOCUMENTS_PROCESSED for PM without personal bank statements or a personal tax return', async () => {
+      const mortgageCase = buildCaseWithDocs(
+        [...processedShareholderPacket, ...processedCompanyPacket],
+        statusIds.PENDING_DOCUMENTS,
+        'PM',
+      );
+
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(mortgageCase);
+      mockPrismaService.analysisRun.findFirst.mockResolvedValue(null);
+      mockStatusIds();
+
+      await service.recalculate(caseId);
+
+      expect(mockPrismaService.mortgageCase.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { statusId: statusIds.DOCUMENTS_PROCESSED },
         }),
       );
     });

@@ -140,6 +140,8 @@ export class CaseStatusCalculatorService {
   /**
    * PM dual checklist: shareholder and company packets are independent
    * (code + owner). A missing Document.owner counts as SHAREHOLDER.
+   * The shareholder packet is INE, personal CSF, and personal bureau.
+   * Personal bank statements and the personal tax return are not required.
    */
   private evaluatePm(
     documents: Array<{
@@ -153,8 +155,6 @@ export class CaseStatusCalculatorService {
       { codes: ['INE', 'PASSPORT'], owner: 'SHAREHOLDER' },
       { codes: ['CREDIT_BUREAU_REPORT'], owner: 'SHAREHOLDER' },
       { codes: ['CSF'], owner: 'SHAREHOLDER' },
-      { codes: ['BANK_STATEMENT'], owner: 'SHAREHOLDER' },
-      { codes: ['TAX_RETURN'], owner: 'SHAREHOLDER' },
       { codes: ['CREDIT_BUREAU_REPORT'], owner: 'COMPANY' },
       { codes: ['CSF'], owner: 'COMPANY' },
       { codes: ['BANK_STATEMENT'], owner: 'COMPANY' },

@@ -83,18 +83,6 @@ const PM_CHECKS: RequiredDocCheck[] = [
     "SHAREHOLDER",
   ),
   ownedCheck(
-    "shareholder-bank-statement",
-    "Estado de cuenta bancario",
-    ["BANK_STATEMENT"],
-    "SHAREHOLDER",
-  ),
-  ownedCheck(
-    "shareholder-tax-return",
-    "Declaración anual",
-    ["TAX_RETURN"],
-    "SHAREHOLDER",
-  ),
-  ownedCheck(
     "company-credit-bureau",
     "Buró de crédito",
     ["CREDIT_BUREAU_REPORT"],
@@ -164,18 +152,6 @@ const PM_CATEGORIES: DocumentCategory[] = [
     "SHAREHOLDER",
   ),
   ownedCategory("shareholder-csf", "CSF", ["CSF"], "SHAREHOLDER"),
-  ownedCategory(
-    "shareholder-estados-cuenta",
-    "Estados de cuenta",
-    ["BANK_STATEMENT"],
-    "SHAREHOLDER",
-  ),
-  ownedCategory(
-    "shareholder-declaracion",
-    "Declaración anual",
-    ["TAX_RETURN"],
-    "SHAREHOLDER",
-  ),
   ownedCategory("company-buro", "Buró", ["CREDIT_BUREAU_REPORT"], "COMPANY"),
   ownedCategory("company-csf", "CSF", ["CSF"], "COMPANY"),
   ownedCategory(

@@ -124,20 +124,6 @@ describe("getRequiredDocChecks", () => {
         group: "SHAREHOLDER",
       },
       {
-        key: "shareholder-bank-statement",
-        label: "Estado de cuenta bancario",
-        codes: ["BANK_STATEMENT"],
-        owner: "SHAREHOLDER",
-        group: "SHAREHOLDER",
-      },
-      {
-        key: "shareholder-tax-return",
-        label: "Declaración anual",
-        codes: ["TAX_RETURN"],
-        owner: "SHAREHOLDER",
-        group: "SHAREHOLDER",
-      },
-      {
         key: "company-credit-bureau",
         label: "Buró de crédito",
         codes: ["CREDIT_BUREAU_REPORT"],
@@ -297,18 +283,6 @@ describe("getDocumentCategories", () => {
         key: "shareholder-csf",
         label: "CSF",
         codes: ["CSF"],
-        owner: "SHAREHOLDER",
-      },
-      {
-        key: "shareholder-estados-cuenta",
-        label: "Estados de cuenta",
-        codes: ["BANK_STATEMENT"],
-        owner: "SHAREHOLDER",
-      },
-      {
-        key: "shareholder-declaracion",
-        label: "Declaración anual",
-        codes: ["TAX_RETURN"],
         owner: "SHAREHOLDER",
       },
       {
