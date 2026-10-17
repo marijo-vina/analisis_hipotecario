@@ -110,6 +110,7 @@ model LiabilitySnapshot {
   credits                 Json
   globalStatus            String
   grossCurrentMonthlyDebt Decimal
+  pmMonthlyDebt           Decimal?
   totalCurrentBalance     Decimal
   calculatedAt            DateTime @default(now())
 }

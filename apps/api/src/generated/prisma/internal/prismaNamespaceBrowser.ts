@@ -160,6 +160,7 @@ export const LiabilitySnapshotScalarFieldEnum = {
   credits: 'credits',
   globalStatus: 'globalStatus',
   grossCurrentMonthlyDebt: 'grossCurrentMonthlyDebt',
+  pmMonthlyDebt: 'pmMonthlyDebt',
   totalCurrentBalance: 'totalCurrentBalance',
   calculatedAt: 'calculatedAt'
 } as const

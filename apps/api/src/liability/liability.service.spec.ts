@@ -103,6 +103,73 @@ describe('LiabilityCalculationService', () => {
       expect(result.factorUsed).toBe(0.06);
     });
 
+    it('PM revolving uses 6%, not the PFAE 7%', async () => {
+      mockPrisma.mortgageCase.findUnique.mockResolvedValue({ personType: 'PM' });
+
+      const result = await service.calculate('case-1', [
+        makeCredit({
+          creditType: 'TARJETA DE CREDITO',
+          classification: 'REVOLVING',
+          currentBalance: 100000,
+          paymentDueAmountEffective: 2000,
+        }),
+      ]);
+
+      expect(result.factorUsed).toBe(0.06);
+      expect(result.credits[0].monthlyDebtContribution).toBe(6000);
+    });
+
+    it('persona moral keeps the shareholder bag at 6% and the company fixture at 17,971.92', async () => {
+      const result = await service.calculatePersonaMoral(
+        'case-1',
+        [
+          makeCredit({
+            classification: 'REVOLVING',
+            currentBalance: 100000,
+            paymentDueAmountEffective: 2000,
+          }),
+        ],
+        [
+          {
+            creditReference: 'simple-1460',
+            institution: 'BANCO',
+            creditType: 'CREDITO SIMPLE',
+            classification: 'FIXED_PAYMENT',
+            isClosed: false,
+            originalAmount: 445_000,
+            currentBalance: 445_000,
+            termDays: 1460,
+          },
+          {
+            creditReference: 'simple-30',
+            institution: 'BANCO',
+            creditType: 'CREDITO SIMPLE',
+            classification: 'FIXED_PAYMENT',
+            isClosed: false,
+            originalAmount: 24_000,
+            currentBalance: 24_000,
+            termDays: 30,
+          },
+          {
+            creditReference: 'revolving',
+            institution: 'BANCO',
+            creditType: 'LINEA REVOLVENTE',
+            classification: 'REVOLVING',
+            isClosed: false,
+            originalAmount: 28_000,
+            currentBalance: 28_000,
+            termDays: null,
+          },
+        ],
+        50,
+      );
+
+      expect(result.factorUsed).toBe(0.06);
+      expect(result.grossCurrentMonthlyDebt).toBe(6000);
+      expect(result.pmMonthlyDebt).toBe(17971.92);
+      expect(result.credits).toHaveLength(4);
+    });
+
     it('PFAE UNKNOWN: MAX(100000 × 0.07, 0) = 7000, not 6000', async () => {
       mockPrisma.mortgageCase.findUnique.mockResolvedValue({ personType: 'PFAE' });
 

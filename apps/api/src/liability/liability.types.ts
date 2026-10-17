@@ -46,6 +46,8 @@ export enum RuleApplied {
   UNKNOWN_PROVISIONAL = 'UNKNOWN_PROVISIONAL',
   CLOSED_ZERO = 'CLOSED_ZERO',
   INCOMPLETE_DATA = 'INCOMPLETE_DATA',
+  PM_SIMPLE = 'PM_SIMPLE',
+  PM_REVOLVING = 'PM_REVOLVING',
 }
 
 // ── Interfaces ───────────────────────────────────────────────────────────
@@ -85,6 +87,12 @@ export interface LiabilityCreditResult extends LiabilityCreditInput {
   classificationSource: ClassificationSource;
   /** Human-readable reason for classification choices (collisions, fallbacks, etc.) */
   classificationReason: string | null;
+  /** PF = shareholder bureau. PM = company bureau prorated by share %. */
+  liabilityBag?: 'PF' | 'PM';
+  originalAmount?: number | null;
+  termDays?: number | null;
+  /** Share percentage points stored on the case, e.g. 50 means 50%. */
+  sharePercentage?: number | null;
 }
 
 /**
@@ -100,6 +108,12 @@ export interface LiabilityCalculationResult {
   globalStatus: GlobalLiabilityStatus;
   /** Sum of monthlyDebtContribution across all credits, in pesos. */
   grossCurrentMonthlyDebt: number;
+  /**
+   * Company-bureau debt prorated by share percentage.
+   * Null on salaried and PFAE snapshots, and when the company bag
+   * cannot be totaled.
+   */
+  pmMonthlyDebt?: number | null;
   /** Simple arithmetic sum of currentBalance across non-closed credits, in pesos. */
   totalCurrentBalance: number;
 }

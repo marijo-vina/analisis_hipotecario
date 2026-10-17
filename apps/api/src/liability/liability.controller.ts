@@ -16,8 +16,7 @@ import { LiabilityCalculationService } from './liability.service';
 // Local DTO interface (service-level) — distinct from the HTTP DTO
 import type { OverrideCreditDto as ServiceOverrideDto } from './liability.service';
 import { OverrideCreditDto } from './dto/override-credit.dto';
-import { mapBureauCreditToInput } from './credit-mapper';
-import type { LiabilityCreditInput } from './liability.types';
+import { mapBureauCreditToInput, mapCompanyBureauCredit } from './credit-mapper';
 
 @UseGuards(JwtAuthGuard)
 @Controller('cases/:caseId/liability')
@@ -38,7 +37,33 @@ export class LiabilityController {
   @Post('calculate')
   @HttpCode(201)
   async calculate(@Param('caseId') caseId: string) {
-    const credits = await this.extractCreditsFromCase(caseId);
+    const mortgageCase = await this.loadBureauCase(caseId);
+
+    if (mortgageCase.personType === 'PM') {
+      const shareholder = this.creditsForOwner(mortgageCase.documents, 'SHAREHOLDER').map(
+        mapBureauCreditToInput,
+      );
+      const company = this.creditsForOwner(mortgageCase.documents, 'COMPANY').map(
+        mapCompanyBureauCredit,
+      );
+      if (shareholder.length === 0 && company.length === 0) {
+        throw new NotFoundException(
+          'No se encontraron créditos extraídos del reporte de buró para este caso',
+        );
+      }
+      const share =
+        mortgageCase.sharePercentage == null
+          ? null
+          : Number(mortgageCase.sharePercentage);
+      return this.liabilityService.calculatePersonaMoral(
+        caseId,
+        shareholder,
+        company,
+        Number.isFinite(share) ? share : null,
+      );
+    }
+
+    const credits = this.creditsFromLatest(mortgageCase.documents).map(mapBureauCreditToInput);
 
     if (credits.length === 0) {
       throw new NotFoundException(
@@ -101,13 +126,7 @@ export class LiabilityController {
 
   // ── Private helpers ─────────────────────────────────────────────────
 
-  /**
-   * Fetch the case's CREDIT_BUREAU_REPORT documents and extract the
-   * `credits` array from the most recent one's `extractedData`.
-   */
-  private async extractCreditsFromCase(
-    caseId: string,
-  ): Promise<LiabilityCreditInput[]> {
+  private async loadBureauCase(caseId: string) {
     const mortgageCase = await this.prisma.mortgageCase.findUnique({
       where: { id: caseId },
       include: {
@@ -127,27 +146,35 @@ export class LiabilityController {
       throw new NotFoundException(`Caso hipotecario ${caseId} no encontrado`);
     }
 
-    if (mortgageCase.documents.length === 0) {
-      return [];
-    }
+    return mortgageCase;
+  }
 
-    const latestBureauDoc = mortgageCase.documents[0];
-    const extractedData = latestBureauDoc.extractedData as Record<
-      string,
-      unknown
-    > | null;
+  /** Latest bureau for one owner. A missing owner counts as SHAREHOLDER. */
+  private creditsForOwner(
+    documents: Array<{
+      owner?: string | null;
+      extractedData: unknown;
+    }>,
+    owner: 'SHAREHOLDER' | 'COMPANY',
+  ): Record<string, unknown>[] {
+    const match = documents.find((doc) => {
+      const docOwner = doc.owner === 'COMPANY' ? 'COMPANY' : 'SHAREHOLDER';
+      return docOwner === owner;
+    });
+    return this.readCredits(match?.extractedData);
+  }
 
-    if (!extractedData) {
-      return [];
-    }
+  /** Documents are ordered newest first. */
+  private creditsFromLatest(
+    documents: Array<{ extractedData: unknown }>,
+  ): Record<string, unknown>[] {
+    return this.readCredits(documents[0]?.extractedData);
+  }
 
-    const rawCredits = (extractedData.credits ??
-      []) as unknown as Record<string, unknown>[];
-
-    if (!Array.isArray(rawCredits)) {
-      return [];
-    }
-
-    return rawCredits.map(mapBureauCreditToInput);
+  private readCredits(extractedData: unknown): Record<string, unknown>[] {
+    const data = extractedData as { credits?: unknown } | null | undefined;
+    return Array.isArray(data?.credits)
+      ? (data.credits as Record<string, unknown>[])
+      : [];
   }
 }

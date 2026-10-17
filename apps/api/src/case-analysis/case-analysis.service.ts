@@ -11,7 +11,10 @@ import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
-import { mapBureauCreditToInput } from '../liability/credit-mapper';
+import {
+  mapBureauCreditToInput,
+  mapCompanyBureauCredit,
+} from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
 import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 import {
@@ -25,10 +28,12 @@ interface LoadedMortgageCase {
   id: string;
   client: Record<string, unknown>;
   personType?: string | null;
+  sharePercentage?: unknown;
   documents: {
     extractedData: unknown;
     documentType: { code: string };
     owner?: string | null;
+    createdAt?: Date | string | null;
   }[];
   [k: string]: unknown;
 }
@@ -95,6 +100,46 @@ export class CaseAnalysisService {
     return [this.identityMatchRule, this.bankarizationValidationRule];
   }
 
+  /**
+   * Shareholder bureau uses the 6% engine. Company bureau uses the
+   * simple / revolving formulas. Capacity subtraction stays in HU-27.
+   */
+  private async calculatePmLiabilities(mortgageCase: LoadedMortgageCase): Promise<void> {
+    const share =
+      mortgageCase.sharePercentage == null
+        ? null
+        : Number(mortgageCase.sharePercentage);
+    await this.liabilityCalcService.calculatePersonaMoral(
+      mortgageCase.id,
+      this.bureauCredits(mortgageCase, 'SHAREHOLDER').map(mapBureauCreditToInput),
+      this.bureauCredits(mortgageCase, 'COMPANY').map(mapCompanyBureauCredit),
+      Number.isFinite(share) ? share : null,
+    );
+  }
+
+  /** Latest bureau report for one owner. A missing owner counts as SHAREHOLDER. */
+  private bureauCredits(
+    mortgageCase: LoadedMortgageCase,
+    owner: 'SHAREHOLDER' | 'COMPANY',
+  ): Record<string, unknown>[] {
+    const matches = mortgageCase.documents.filter((doc) => {
+      if (doc.documentType?.code !== 'CREDIT_BUREAU_REPORT') return false;
+      const docOwner = doc.owner === 'COMPANY' ? 'COMPANY' : 'SHAREHOLDER';
+      return docOwner === owner;
+    });
+    if (matches.length === 0) return [];
+
+    const latest = matches.reduce((best, doc) => {
+      const bestTime = best.createdAt ? new Date(best.createdAt).getTime() : 0;
+      const docTime = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+      return docTime >= bestTime ? doc : best;
+    });
+    const extracted = latest.extractedData as { credits?: unknown } | null;
+    return Array.isArray(extracted?.credits)
+      ? (extracted.credits as Record<string, unknown>[])
+      : [];
+  }
+
   /** Shareholder packet for PM identity: missing owner counts as SHAREHOLDER. */
   private shareholderDocuments(
     docs: Record<string, unknown>[],
@@ -154,6 +199,14 @@ export class CaseAnalysisService {
         this.shareholderDocuments(docs),
       );
       const pmCsfTaxResult = await this.pmCsfTaxRule.execute(context, docs);
+      try {
+        await this.calculatePmLiabilities(mortgageCase);
+      } catch (err) {
+        console.warn(
+          `[CaseAnalysis] Phase B persona moral liability warning for case ${caseId}:`,
+          (err as Error).message,
+        );
+      }
       return this.persistCompletedRun(
         caseId,
         triggeredBy,

@@ -176,7 +176,7 @@ export default function LiabilityTable({
                 {/* Card: Deuda total mensual */}
                 <div className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5">
                   <span className="text-xs font-semibold text-gf-text-muted">
-                    Deuda total mensual
+                    {snapshot.pmMonthlyDebt != null ? "Deuda persona física" : "Deuda total mensual"}
                   </span>
                   <span className="inline-flex items-center gap-2">
                     {status !== GlobalLiabilityStatus.CALCULATED && (
@@ -193,6 +193,11 @@ export default function LiabilityTable({
                     <span className="text-sm font-bold text-gf-text">
                       {formatMXN(snapshot.grossCurrentMonthlyDebt)}
                     </span>
+                    {snapshot.pmMonthlyDebt != null && (
+                      <span className="text-sm font-bold text-gf-text">
+                        Empresa {formatMXN(snapshot.pmMonthlyDebt)}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -221,7 +226,18 @@ function CreditRow({
 
   // ── "Monto a considerar" column logic ──────────────────────────────────
   let montoConsiderar: ReactNode;
-  if (nature === LiabilityCreditNature.REVOLVING) {
+  if (credit.liabilityBag === "PM") {
+    montoConsiderar = (
+      <span>
+        {formatMXN(credit.monthlyDebtContribution)}{" "}
+        <span className="text-[10px] text-gf-text-soft">
+          {nature === LiabilityCreditNature.REVOLVING
+            ? "(10% × % acciones)"
+            : "(simple × % acciones)"}
+        </span>
+      </span>
+    );
+  } else if (nature === LiabilityCreditNature.REVOLVING) {
     const rev = credit.currentBalance !== null
       ? credit.currentBalance * 0.06
       : null;

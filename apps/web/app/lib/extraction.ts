@@ -1672,6 +1672,8 @@ export enum LiabilityRuleApplied {
   UNKNOWN_PROVISIONAL = "UNKNOWN_PROVISIONAL",
   CLOSED_ZERO = "CLOSED_ZERO",
   INCOMPLETE_DATA = "INCOMPLETE_DATA",
+  PM_SIMPLE = "PM_SIMPLE",
+  PM_REVOLVING = "PM_REVOLVING",
 }
 
 /** Enriched credit result from the liability calculation engine (HU-11). */
@@ -1692,6 +1694,10 @@ export interface LiabilityCreditResult {
   liabilityStatus: LiabilityStatus;
   classificationSource: LiabilityClassificationSource;
   classificationReason: string | null;
+  liabilityBag?: "PF" | "PM";
+  originalAmount?: number | null;
+  termDays?: number | null;
+  sharePercentage?: number | null;
 }
 
 /** Full liability calculation result returned by the API (HU-11). */
@@ -1704,6 +1710,7 @@ export interface LiabilityCalculationResult {
   credits: LiabilityCreditResult[];
   globalStatus: GlobalLiabilityStatus;
   grossCurrentMonthlyDebt: number;
+  pmMonthlyDebt?: number | null;
   totalCurrentBalance: number;
 }
 

@@ -1102,11 +1102,23 @@ export class CreditBureauExtractionService {
     const schema = useLayoutPath
       ? { ...CREDIT_BUREAU_SCHEMA_REDUCED }
       : { ...CREDIT_BUREAU_SCHEMA_LEAN };
+    const isCompanyBureau = document.owner === 'COMPANY';
+    if (isCompanyBureau && Array.isArray(schema.credits) && schema.credits[0]) {
+      const companyCredit = {
+        ...(schema.credits[0] as Record<string, unknown>),
+        originalAmount: 'number | null — monto original del crédito',
+        termDays:
+          'number | null — plazo en días. Si el documento trae meses, multiplica por 30.',
+      };
+      (schema as { credits: unknown[] }).credits = [companyCredit];
+    }
     const geminiResult = await this.geminiService.extractStructuredData(
       ocrText,
       document.documentType.code,
       schema,
-      CREDIT_BUREAU_INSTRUCTIONS_LEAN,
+      isCompanyBureau
+        ? `${CREDIT_BUREAU_INSTRUCTIONS_LEAN}\n\n─── Persona moral (empresa) ───\nEste reporte es de una persona moral.\n- originalAmount: monto original o monto del crédito al inicio.\n- currentBalance: saldo vigente.\n- termDays: plazo en días. Si viene en meses, conviértelo a días × 30.\n- classification: REVOLVING si es línea revolvente o tarjeta. FIXED_PAYMENT si es crédito simple o arrendamiento.`
+        : CREDIT_BUREAU_INSTRUCTIONS_LEAN,
     );
 
     if (!geminiResult.success) {

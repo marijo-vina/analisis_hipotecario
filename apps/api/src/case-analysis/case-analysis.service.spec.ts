@@ -71,6 +71,7 @@ describe('CaseAnalysisService', () => {
 
   const mockLiabilityCalcService = {
     calculate: jest.fn(),
+    calculatePersonaMoral: jest.fn(),
   };
 
   const mockCaseStatusCalculatorService = {
@@ -689,6 +690,12 @@ describe('CaseAnalysisService', () => {
       expect(mockPrismaService.document.update).not.toHaveBeenCalled();
       expect(mockIncomeCalcService.calculate).not.toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).not.toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculatePersonaMoral).toHaveBeenCalledWith(
+        'case-1',
+        [],
+        [],
+        null,
+      );
       expect(mockBankViabilityRule.execute).not.toHaveBeenCalled();
       expect(result.detail).not.toHaveProperty('bankViability');
       const persistedDetail = mockPrismaService.analysisRun.create.mock.calls[0][0]
