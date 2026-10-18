@@ -1,4 +1,9 @@
-import { mergeBureauGrid, type BureauGridCredit } from './bureau-grid.client';
+import {
+  mergeBureauGrid,
+  mergeCompanyBureauGrid,
+  type BureauGridCredit,
+  type CompanyBureauGridCredit,
+} from './bureau-grid.client';
 
 const banamexGrid: BureauGridCredit = {
   institution: 'BANAMEX TC L',
@@ -180,5 +185,49 @@ describe('mergeBureauGrid', () => {
     expect(credits[0].paymentDueAmount).toBe(1875);
     expect(credits[1].mopCodes).toEqual(['1', '1', '3']);
     expect(credits[1].accountNumber).toBe('376702569371005');
+  });
+});
+
+describe('mergeCompanyBureauGrid', () => {
+  const cemex: CompanyBureauGridCredit = {
+    institution: 'CEMEX SAB',
+    accountNumber: '0050017615',
+    creditType: 'LINEA DE CREDITO',
+    classification: 'REVOLVING',
+    originalAmount: 3_850_000,
+    currentBalance: 0,
+    pastDueAmount: 0,
+    termDays: 30,
+  };
+
+  it('writes granted amount, balance and term onto the matching account', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'CEMEX',
+        accountNumber: '0050017615',
+        originalAmount: null,
+        currentBalance: 0,
+        classification: 'UNKNOWN',
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [cemex]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].originalAmount).toBe(3_850_000);
+    expect(credits[0].currentBalance).toBe(0);
+    expect(credits[0].termDays).toBe(30);
+    expect(credits[0].classification).toBe('REVOLVING');
+  });
+
+  it('appends a company credit Gemini did not return', () => {
+    const credits: Record<string, unknown>[] = [];
+
+    mergeCompanyBureauGrid(credits, [cemex]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].accountNumber).toBe('0050017615');
+    expect(credits[0].originalAmount).toBe(3_850_000);
+    expect(credits[0].status).toBe('ACTIVE');
   });
 });

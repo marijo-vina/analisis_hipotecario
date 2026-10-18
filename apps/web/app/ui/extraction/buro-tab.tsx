@@ -695,6 +695,16 @@ function RiskChips({ parsed }: { parsed: ParsedCreditBureau }) {
 // 5. Credits Table Component (Bancarios vs No Bancarios)
 // ---------------------------------------------------------------------------
 
+function companyTypeLabel(value: string | null): string {
+  if (!value) return "—";
+  return value.replaceAll("L?NEA", "LÍNEA").replaceAll("CR?DITO", "CRÉDITO");
+}
+
+function formatTermDays(days: number | null | undefined): string {
+  if (days == null) return "—";
+  return `${days.toLocaleString("es-MX")} días`;
+}
+
 function CreditRow({
   credit,
   creditNumber,
@@ -702,6 +712,7 @@ function CreditRow({
   caseId,
   documentId,
   onPaymentDueUpdate,
+  company = false,
 }: {
   credit: ParsedCreditBureauCredit;
   creditNumber: number;
@@ -709,6 +720,7 @@ function CreditRow({
   caseId: string;
   documentId: string;
   onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
+  company?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -784,9 +796,20 @@ function CreditRow({
 
       {/* Tipo de crédito */}
       <td className="px-2.5 py-2.5">
-        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${classificationChipColor(credit.classification)}`}>
-          {CLASSIFICATION_LABELS[credit.classification] ?? credit.classification}
-        </span>
+        {company ? (
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-gf-text">
+              {companyTypeLabel(credit.creditType)}
+            </div>
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${classificationChipColor(credit.classification)}`}>
+              {CLASSIFICATION_LABELS[credit.classification] ?? credit.classification}
+            </span>
+          </div>
+        ) : (
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${classificationChipColor(credit.classification)}`}>
+            {CLASSIFICATION_LABELS[credit.classification] ?? credit.classification}
+          </span>
+        )}
       </td>
 
       {/* Estado */}
@@ -801,6 +824,17 @@ function CreditRow({
         {formatMxn(credit.currentBalance)}
       </td>
 
+      {company ? (
+        <>
+          <td className="px-2.5 py-2.5 text-right font-mono text-xs font-semibold text-gf-text">
+            {formatMxn(credit.originalAmount ?? null)}
+          </td>
+          <td className="px-2.5 py-2.5 text-right font-mono text-xs text-gf-text">
+            {formatTermDays(credit.termDays)}
+          </td>
+        </>
+      ) : (
+        <>
       {/* Monto a pagar */}
       <td className="px-2.5 py-2.5 text-right">
         {isClosed ? (
@@ -876,6 +910,8 @@ function CreditRow({
       <td className="px-2.5 py-2.5 text-center">
         <MopBehaviorBadge credit={credit} />
       </td>
+        </>
+      )}
     </tr>
   );
 }
@@ -891,6 +927,7 @@ function CreditTableSection({
   caseId,
   documentId,
   onPaymentDueUpdate,
+  company = false,
 }: {
   title: string;
   credits: { credit: ParsedCreditBureauCredit; idx: number }[];
@@ -898,6 +935,7 @@ function CreditTableSection({
   caseId: string;
   documentId: string;
   onPaymentDueUpdate: (creditIndex: number, manualValue: number | null) => void;
+  company?: boolean;
 }) {
   if (credits.length === 0) return null;
 
@@ -925,10 +963,19 @@ function CreditTableSection({
               <th className="px-2.5 py-2.5">Tipo de crédito</th>
               <th className="px-2.5 py-2.5">Estado</th>
               <th className="px-2.5 py-2.5 text-right">Saldo actual</th>
+              {company ? (
+                <>
+                  <th className="px-2.5 py-2.5 text-right">Crédito otorgado</th>
+                  <th className="px-2.5 py-2.5 text-right">Plazo</th>
+                </>
+              ) : (
+                <>
               <th className="px-2.5 py-2.5 text-right">Monto a pagar</th>
               <th className="px-2.5 py-2.5 text-right">Límite / crédito</th>
               <th className="px-2.5 py-2.5 text-right">Utilización</th>
               <th className="px-2.5 py-2.5 text-center">Comportamiento</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -941,6 +988,7 @@ function CreditTableSection({
                 caseId={caseId}
                 documentId={documentId}
                 onPaymentDueUpdate={onPaymentDueUpdate}
+                company={company}
               />
             ))}
           </tbody>
@@ -974,6 +1022,7 @@ function CreditsTable({
         caseId={caseId}
         documentId={parsed.documentId}
         onPaymentDueUpdate={onPaymentDueUpdate}
+        company={parsed.owner === "COMPANY"}
       />
       <CreditTableSection
         title="Créditos No Bancarios"
@@ -982,6 +1031,7 @@ function CreditsTable({
         caseId={caseId}
         documentId={parsed.documentId}
         onPaymentDueUpdate={onPaymentDueUpdate}
+        company={parsed.owner === "COMPANY"}
       />
     </div>
   );

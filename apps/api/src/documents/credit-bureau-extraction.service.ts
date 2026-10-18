@@ -6,7 +6,9 @@ import { LayoutFinancialExtractorService } from './layout-financial-extractor.se
 import {
   BureauGridClient,
   BureauGridCredit,
+  CompanyBureauGridCredit,
   mergeBureauGrid,
+  mergeCompanyBureauGrid,
 } from './bureau-grid.client';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { GcsService } from './gcs.service';
@@ -1023,8 +1025,9 @@ export class CreditBureauExtractionService {
     // returns (see mergeCoordinateResults below) so they overwrite Gemini's
     // paymentDueAmount. Any error → log warning + fall through to the
     // Gemini-only pipeline (never break the flow).
+    const isCompanyBureau = document.owner === 'COMPANY';
     let coordinateResult: CoordinateExtractionResult | null = null;
-    if (this.isCoordinateExtractionEnabled()) {
+    if (!isCompanyBureau && this.isCoordinateExtractionEnabled()) {
       try {
         if (document.storagePath) {
           const pdfBuffer =
@@ -1052,22 +1055,33 @@ export class CreditBureauExtractionService {
     // Máximo and keeps digit MOP codes. A down service leaves the
     // extraction that already ran.
     let bureauGridCredits: BureauGridCredit[] | null = null;
+    let companyGridCredits: CompanyBureauGridCredit[] | null = null;
     if (this.isBureauGridEnabled() && document.storagePath) {
       try {
         const pdfBuffer = await this.gcsService.downloadFile(
           document.storagePath,
         );
-        bureauGridCredits = await this.bureauGrid.extract(pdfBuffer);
-        if (bureauGridCredits) {
-          this.logger.log(
-            `[CreditBureau] Bureau grid: ${bureauGridCredits.length} credits for doc ${documentId}`,
-          );
+        if (isCompanyBureau) {
+          companyGridCredits = await this.bureauGrid.extractCompany(pdfBuffer);
+          if (companyGridCredits) {
+            this.logger.log(
+              `[CreditBureau] Company bureau grid: ${companyGridCredits.length} credits for doc ${documentId}`,
+            );
+          }
+        } else {
+          bureauGridCredits = await this.bureauGrid.extract(pdfBuffer);
+          if (bureauGridCredits) {
+            this.logger.log(
+              `[CreditBureau] Bureau grid: ${bureauGridCredits.length} credits for doc ${documentId}`,
+            );
+          }
         }
       } catch (err) {
         this.logger.warn(
           `[CreditBureau] Bureau grid failed — keeping the current extraction: ${(err as Error).message}`,
         );
         bureauGridCredits = null;
+        companyGridCredits = null;
       }
     }
 
@@ -1102,7 +1116,6 @@ export class CreditBureauExtractionService {
     const schema = useLayoutPath
       ? { ...CREDIT_BUREAU_SCHEMA_REDUCED }
       : { ...CREDIT_BUREAU_SCHEMA_LEAN };
-    const isCompanyBureau = document.owner === 'COMPANY';
     if (isCompanyBureau && Array.isArray(schema.credits) && schema.credits[0]) {
       const companyCredit = {
         ...(schema.credits[0] as Record<string, unknown>),
@@ -1155,6 +1168,7 @@ export class CreditBureauExtractionService {
           data.report = reportData;
         }
         this.normalizeCreditBureau(data);
+        this.applyCompanyGrid(data, companyGridCredits);
         data.alerts = this.computeAlerts(data);
         const missingFields = this.computeMissingFields(data);
         data.alerts = this.normalizeAlerts(
@@ -1267,6 +1281,7 @@ export class CreditBureauExtractionService {
 
     // ── 8. Normalize credit bureau fields ──────────────────────────────
     this.normalizeCreditBureau(data);
+    this.applyCompanyGrid(data, companyGridCredits);
 
     // ── 9. Compute alerts deterministically from normalized data ─────────
     // Alerts are computed entirely in the backend. Gemini extracts raw data only.
@@ -1403,6 +1418,15 @@ export class CreditBureauExtractionService {
       this.configService.get<string>('COORDINATE_EXTRACTION_ENABLED') ??
       'true';
     return String(v).toLowerCase() !== 'false';
+  }
+
+  private applyCompanyGrid(
+    data: Record<string, unknown>,
+    rows: CompanyBureauGridCredit[] | null,
+  ): void {
+    if (!rows || rows.length === 0) return;
+    if (!Array.isArray(data.credits)) data.credits = [];
+    mergeCompanyBureauGrid(data.credits as Record<string, unknown>[], rows);
   }
 
   /**

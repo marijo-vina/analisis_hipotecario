@@ -1176,6 +1176,10 @@ export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueG
   paymentDueAmount: number | null;
   lastPaymentAmount: number | null;
   creditLimit: number | null;
+  /** Crédito otorgado on a Personas Morales report, in pesos. */
+  originalAmount?: number | null;
+  /** Plazo in days on a Personas Morales report. */
+  termDays?: number | null;
   currency: string;
   paymentHistory: string | null;
   mopCodes: string[];
@@ -1211,6 +1215,7 @@ export interface ParsedCreditBureauSummary {
 export interface ParsedCreditBureau {
   documentId: string;
   originalName: string;
+  owner?: "SHAREHOLDER" | "COMPANY" | null;
   statusCode: string;
   statusName: string;
   hasData: boolean;
@@ -1277,6 +1282,7 @@ function emptyBuro(doc: Document): ParsedCreditBureau {
   return {
     documentId: doc.id,
     originalName: doc.originalName,
+    owner: doc.owner ?? null,
     statusCode: doc.documentStatus.code,
     statusName: doc.documentStatus.name,
     hasData: false,
@@ -1473,6 +1479,8 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
       paymentDueAmount,
       lastPaymentAmount,
       creditLimit: (credit.creditLimit as number) ?? null,
+      originalAmount: (credit.originalAmount as number) ?? null,
+      termDays: (credit.termDays as number) ?? null,
       currency: (credit.currency as string) ?? "MXN",
       paymentHistory: (credit.paymentHistory as string) ?? null,
       mopCodes: (credit.mopCodes as string[]) ?? [],
@@ -1603,6 +1611,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
   return {
     documentId: doc.id,
     originalName: doc.originalName,
+    owner: doc.owner ?? null,
     statusCode: doc.documentStatus.code,
     statusName: doc.documentStatus.name,
     hasData: true,
