@@ -6,6 +6,7 @@ import {
   IncomeCalculationStatus,
   type IncomeReceiptResult,
   type PfaeIncomeBases,
+  type PmIncomeBases,
 } from './income-calculation.types';
 
 // ── Test helpers ──────────────────────────────────────────────────────────
@@ -118,6 +119,9 @@ function makeMockPrisma() {
             ...args.data,
           }),
         ),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    liabilitySnapshot: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
   };
@@ -840,39 +844,91 @@ describe('IncomeCalculationService', () => {
   describe('PM calculate()', () => {
     beforeEach(() => {
       mockPrisma.mortgageCase.findUnique.mockResolvedValue({
+        id: 'case-1',
         personType: 'PM',
+        sharePercentage: 50,
+      });
+      mockPrisma.liabilitySnapshot.findFirst.mockResolvedValue({
+        pmMonthlyDebt: 17971.92,
+        grossCurrentMonthlyDebt: 157423.88,
       });
     });
 
-    it('throws BadRequestException and does not persist a payroll snapshot', async () => {
-      mockPrisma.document.findMany.mockResolvedValue([
-        makePayrollDoc({
-          id: 'doc-1',
-          extractedData: {
-            income: { grossIncome: 18000, netIncome: 15000 },
-            payrollPeriod: { periodLabel: 'Mayo 2025', paymentDate: '2025-05-15' },
-            employer: { legalName: 'ACME', rfc: 'RFC1' },
+    it('persists the Santander fixture capacities from company documents', async () => {
+      const processed = {
+        code: 'PROCESSED',
+      };
+      const companyMonth = (monthKey: string, income: number) => ({
+        id: `bank-${monthKey}`,
+        owner: 'COMPANY',
+        createdAt: new Date('2026-06-01'),
+        processedAt: new Date('2026-06-02'),
+        documentStatus: processed,
+        documentType: { code: 'BANK_STATEMENT' },
+        extractedData: {
+          statementPeriod: {
+            periodStartDate: `${monthKey}-01`,
+            periodEndDate: `${monthKey}-28`,
+            isCurrentIncompleteMonth: false,
           },
-        }),
+          financialDepuration: {
+            depurationSummary: {
+              totalValidIncome: income,
+              validDepositsCount: 5,
+            },
+          },
+        },
+      });
+
+      mockPrisma.document.findMany.mockResolvedValue([
+        {
+          id: 'csf',
+          owner: 'COMPANY',
+          createdAt: new Date('2026-06-01'),
+          processedAt: new Date('2026-06-01'),
+          documentStatus: processed,
+          documentType: { code: 'CSF' },
+          extractedData: {
+            activities: [{ description: 'Servicios', percentage: 100, order: 1 }],
+          },
+        },
+        companyMonth('2026-01', 11_940_000),
+        companyMonth('2026-02', 12_710_000),
+        companyMonth('2026-03', 7_800_000),
+        companyMonth('2026-04', 9_480_000),
+        companyMonth('2026-05', 14_780_000),
+        companyMonth('2026-06', 10_602_813.68),
+        {
+          id: 'tax',
+          owner: 'COMPANY',
+          createdAt: new Date('2026-06-01'),
+          processedAt: new Date('2026-06-03'),
+          documentStatus: processed,
+          documentType: { code: 'TAX_RETURN' },
+          extractedData: {
+            fiscalResult: { accumulableIncomeTotal: 99_791_348.16 },
+            hasTaxLoss: false,
+          },
+        },
       ]);
 
-      await expect(service.calculate('case-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
-      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
-      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
-    });
+      const result = await service.calculate('case-1');
+      const bases = result.bases as PmIncomeBases;
 
-    it('throws BadRequestException when PM has no payroll documents (not NotFoundException)', async () => {
-      mockPrisma.document.findMany.mockResolvedValue([]);
-
-      await expect(service.calculate('case-1')).rejects.toBeInstanceOf(
-        BadRequestException,
+      expect(mockPrisma.document.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ owner: 'COMPANY' }),
+        }),
       );
-      await expect(service.calculate('case-1')).rejects.not.toBeInstanceOf(
-        NotFoundException,
-      );
-      expect(mockPrisma.incomeCalculation.create).not.toHaveBeenCalled();
+      expect(result.status).toBe(IncomeCalculationStatus.CALCULATED);
+      expect(result.source).toBe('BANK_STATEMENTS');
+      expect(result.averageGrossIncome).toBe(11_183_203.42);
+      expect(bases.profile).toBe('PM');
+      expect(bases.capacities.santanderStatements.capacity).toBe(1_231_490.59);
+      expect(bases.capacities.santanderTaxReturn.capacity).toBe(873_083.37);
+      expect(bases.capacities.scotiabank.status).toBe('CALCULATED');
+      expect(bases.capacities.banorte.status).toBe('REQUIRES_REVIEW');
+      expect(bases.capacities.hsbc.status).toBe('REQUIRES_REVIEW');
     });
   });
 

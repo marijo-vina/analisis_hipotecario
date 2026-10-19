@@ -102,7 +102,7 @@ export class CaseAnalysisService {
 
   /**
    * Shareholder bureau uses the 6% engine. Company bureau uses the
-   * simple / revolving formulas. Capacity subtraction stays in HU-27.
+   * simple / revolving formulas. Income reads the snapshot afterwards.
    */
   private async calculatePmLiabilities(mortgageCase: LoadedMortgageCase): Promise<void> {
     const share =
@@ -204,6 +204,14 @@ export class CaseAnalysisService {
       } catch (err) {
         console.warn(
           `[CaseAnalysis] Phase B persona moral liability warning for case ${caseId}:`,
+          (err as Error).message,
+        );
+      }
+      try {
+        await this.incomeCalcService.calculate(caseId, []);
+      } catch (err) {
+        console.warn(
+          `[CaseAnalysis] Phase B persona moral income warning for case ${caseId}:`,
           (err as Error).message,
         );
       }

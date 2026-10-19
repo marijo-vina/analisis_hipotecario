@@ -44,6 +44,32 @@ export interface PfaeIncomeBases {
   activity: ActivityResolution;
 }
 
+export interface PmBankCapacity {
+  status: 'CALCULATED' | 'NOT_VIABLE' | 'REQUIRES_REVIEW';
+  reason: string | null;
+  admissibleIncome: number | null;
+  incomeToConsider: number | null;
+  maximumDebt: number | null;
+  capacity: number | null;
+}
+
+/** Capacities for the closed PM formulas. Banorte and HSBC stay in review. */
+export interface PmIncomeBases {
+  profile: 'PM';
+  sharePercentage: number | null;
+  activityFactor: number | null;
+  bank: BankIncomeBase;
+  taxReturn: IncomeBase;
+  activity: ActivityResolution;
+  capacities: {
+    santanderStatements: PmBankCapacity;
+    santanderTaxReturn: PmBankCapacity;
+    scotiabank: PmBankCapacity;
+    banorte: PmBankCapacity;
+    hsbc: PmBankCapacity;
+  };
+}
+
 // ── Interfaces ───────────────────────────────────────────────────────────
 
 /**
@@ -87,5 +113,5 @@ export interface IncomeCalculationResult {
   confirmedAt: string | null;
   observations: string | null;
   source?: IncomeSource;
-  bases?: PfaeIncomeBases | null;
+  bases?: PfaeIncomeBases | PmIncomeBases | null;
 }

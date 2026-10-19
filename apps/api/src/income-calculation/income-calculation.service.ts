@@ -13,6 +13,7 @@ import {
   type IncomeReceiptResult,
   type IncomeSource,
   type PfaeIncomeBases,
+  type PmIncomeBases,
 } from './income-calculation.types';
 import type { SaveConciliationDto } from './dto/save-conciliation.dto';
 import {
@@ -26,11 +27,18 @@ import {
   type TaxReturnExtract,
 } from './pfae-income.helpers';
 import {
+  evaluateSantanderDepositGate,
+  groupCompanyStatementMonths,
   rollupCompanyStatements,
   selectLatestProcessedFiscal,
   type CompanyStatementInput,
   type CompanyStatementRollup,
 } from './pm-company-statements';
+import {
+  calculatePmCapacities,
+  pmTaxBase,
+  smoothCompanyDeposits,
+} from './pm-capacity';
 
 const PFAE_DOCUMENT_CODES = ['CSF', 'BANK_STATEMENT', 'TAX_RETURN'] as const;
 const ZERO = new Prisma.Decimal(0);
@@ -133,6 +141,85 @@ function projectChosenBase(
   };
 }
 
+function decimalToNumber(
+  value: { toString(): string } | number | null | undefined,
+): number | null {
+  if (value == null) return null;
+  const parsed = typeof value === 'number' ? value : Number(value.toString());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function timestamp(value: Date | null | undefined): number {
+  if (value == null) return Number.NEGATIVE_INFINITY;
+  const time = value.getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function latestProcessedCompanyTax(
+  docs: Array<{
+    documentType: { code: string };
+    documentStatus?: { code: string } | null;
+    processedAt?: Date | null;
+    createdAt?: Date | null;
+    extractedData: unknown;
+  }>,
+): TaxReturnExtract | null {
+  const processed = docs.filter(
+    (doc) =>
+      doc.documentType.code === 'TAX_RETURN' &&
+      doc.documentStatus?.code === 'PROCESSED',
+  );
+  processed.sort((left, right) => {
+    const byProcessed = timestamp(right.processedAt) - timestamp(left.processedAt);
+    if (byProcessed !== 0) return byProcessed;
+    return timestamp(right.createdAt) - timestamp(left.createdAt);
+  });
+  return (processed[0]?.extractedData as TaxReturnExtract | undefined) ?? null;
+}
+
+function projectPmSnapshot(
+  bank: BankIncomeBase,
+  tax: IncomeBase,
+  capacities: {
+    santanderStatements: { status: string };
+    santanderTaxReturn: { status: string };
+  },
+): {
+  source: IncomeSource;
+  gross: Prisma.Decimal;
+  net: Prisma.Decimal;
+  status: IncomeCalculationStatus;
+} {
+  if (
+    capacities.santanderStatements.status === 'CALCULATED' &&
+    bank.monthlyGross != null
+  ) {
+    return {
+      source: 'BANK_STATEMENTS',
+      gross: new Prisma.Decimal(bank.monthlyGross),
+      net: new Prisma.Decimal(bank.monthlyNet ?? bank.monthlyGross),
+      status: IncomeCalculationStatus.CALCULATED,
+    };
+  }
+  if (
+    capacities.santanderTaxReturn.status === 'CALCULATED' &&
+    tax.monthlyGross != null
+  ) {
+    return {
+      source: 'TAX_RETURN',
+      gross: new Prisma.Decimal(tax.monthlyGross),
+      net: new Prisma.Decimal(tax.monthlyNet ?? tax.monthlyGross),
+      status: IncomeCalculationStatus.CALCULATED,
+    };
+  }
+  return {
+    source: 'BANK_STATEMENTS',
+    gross: ZERO,
+    net: ZERO,
+    status: IncomeCalculationStatus.REQUIRES_REVIEW,
+  };
+}
+
 // ── Service ────────────────────────────────────────────────────────────────
 
 /**
@@ -152,7 +239,7 @@ export class IncomeCalculationService {
    * Build a fresh income-calculation snapshot for the case.
    * SALARIED (or absent personType) uses payroll receipts.
    * PFAE skips payroll and computes independent bank/tax bases.
-   * PM has no income engine — throws BadRequestException.
+   * PM computes Santander and Scotiabank capacity from company documents.
    */
   async calculate(
     caseId: string,
@@ -164,9 +251,7 @@ export class IncomeCalculationService {
     });
 
     if (mortgageCase?.personType === 'PM') {
-      throw new BadRequestException(
-        'Income calculation is not available for PM cases',
-      );
+      return this.calculatePm(caseId);
     }
 
     if (mortgageCase?.personType === 'PFAE') {
@@ -220,6 +305,105 @@ export class IncomeCalculationService {
       .map((doc) => (doc.extractedData ?? {}) as CompanyStatementInput);
 
     return rollupCompanyStatements(statements, activities);
+  }
+
+  /**
+   * Company deposits and the company tax return, priced with the closed
+   * Santander and Scotiabank formulas. Shareholder payroll is not read.
+   * Average columns stay unfactored; capacities live on `bases`.
+   */
+  private async calculatePm(caseId: string): Promise<IncomeCalculationResult> {
+    const mortgageCase = await this.prisma.mortgageCase.findUnique({
+      where: { id: caseId },
+      select: { id: true, sharePercentage: true },
+    });
+    if (!mortgageCase) {
+      throw new NotFoundException('Mortgage case not found');
+    }
+
+    const docs = await this.prisma.document.findMany({
+      where: {
+        mortgageCaseId: caseId,
+        owner: 'COMPANY',
+        documentType: {
+          code: {
+            in: ['CSF', 'TAX_SITUATION_PROOF', 'BANK_STATEMENT', 'TAX_RETURN'],
+          },
+        },
+      },
+      include: { documentType: true, documentStatus: true },
+    });
+
+    const fiscal = selectLatestProcessedFiscal(
+      docs.map((doc) => ({
+        typeCode: doc.documentType.code,
+        statusCode: doc.documentStatus?.code ?? '',
+        processedAt: doc.processedAt,
+        createdAt: doc.createdAt,
+        value: doc.extractedData,
+      })),
+    );
+    const activities = (
+      (fiscal ?? {}) as { activities?: CsfActivityInput[] }
+    ).activities ?? [];
+    const activity = resolveActivity(activities);
+    const statements = docs
+      .filter((doc) => doc.documentType.code === 'BANK_STATEMENT')
+      .map((doc) => (doc.extractedData ?? {}) as CompanyStatementInput);
+    const months = groupCompanyStatementMonths(statements);
+    const gate = evaluateSantanderDepositGate(months, activity.windowMonths);
+    const bank = smoothCompanyDeposits(months, activity.windowMonths);
+    const tax = pmTaxBase(latestProcessedCompanyTax(docs));
+
+    const liability = await this.prisma.liabilitySnapshot.findFirst({
+      where: { mortgageCaseId: caseId },
+      orderBy: { calculatedAt: 'desc' },
+      select: { pmMonthlyDebt: true, grossCurrentMonthlyDebt: true },
+    });
+    const sharePercentage =
+      mortgageCase.sharePercentage == null
+        ? null
+        : Number(mortgageCase.sharePercentage);
+    const capacities = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: gate.viable,
+      activityDescription: activity.description,
+      sharePercentage,
+      pmMonthlyDebt: decimalToNumber(liability?.pmMonthlyDebt),
+      pfMonthlyDebt: decimalToNumber(liability?.grossCurrentMonthlyDebt),
+    });
+
+    const projected = projectPmSnapshot(bank, tax, capacities);
+    const bases: PmIncomeBases = {
+      profile: 'PM',
+      sharePercentage,
+      activityFactor: capacities.activityFactor,
+      bank,
+      taxReturn: tax,
+      activity,
+      capacities: {
+        santanderStatements: capacities.santanderStatements,
+        santanderTaxReturn: capacities.santanderTaxReturn,
+        scotiabank: capacities.scotiabank,
+        banorte: capacities.banorte,
+        hsbc: capacities.hsbc,
+      },
+    };
+
+    const snapshot = await this.prisma.incomeCalculation.create({
+      data: {
+        mortgageCaseId: caseId,
+        receiptResults: [] as unknown as never,
+        averageGrossIncome: projected.gross.toFixed(2),
+        averageNetIncome: projected.net.toFixed(2),
+        status: projected.status,
+        source: projected.source,
+        bases: bases as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.snapshotToResult(snapshot, caseId);
   }
 
   /**
@@ -525,7 +709,7 @@ export class IncomeCalculationService {
       confirmedAt,
       observations: (snapshot.observations as string | null) ?? null,
       source: (snapshot.source as IncomeSource | undefined) ?? 'PAYROLL',
-      bases: (snapshot.bases as PfaeIncomeBases | null) ?? null,
+      bases: (snapshot.bases as PfaeIncomeBases | PmIncomeBases | null) ?? null,
     };
   }
 }

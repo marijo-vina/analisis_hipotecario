@@ -680,7 +680,7 @@ describe('CaseAnalysisService', () => {
       ]);
     });
 
-    it('skips payroll persist, Phase B, and Phase C; persists no bankViability', async () => {
+    it('runs persona moral liabilities then income, and persists no bankViability', async () => {
       mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildPmCase());
       mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
       mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-pm-2' });
@@ -688,7 +688,6 @@ describe('CaseAnalysisService', () => {
       const result = await service.run('case-1', 'advisor-1');
 
       expect(mockPrismaService.document.update).not.toHaveBeenCalled();
-      expect(mockIncomeCalcService.calculate).not.toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).not.toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculatePersonaMoral).toHaveBeenCalledWith(
         'case-1',
@@ -696,6 +695,11 @@ describe('CaseAnalysisService', () => {
         [],
         null,
       );
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledWith('case-1', []);
+      const liabilityOrder =
+        mockLiabilityCalcService.calculatePersonaMoral.mock.invocationCallOrder[0];
+      const incomeOrder = mockIncomeCalcService.calculate.mock.invocationCallOrder[0];
+      expect(liabilityOrder).toBeLessThan(incomeOrder);
       expect(mockBankViabilityRule.execute).not.toHaveBeenCalled();
       expect(result.detail).not.toHaveProperty('bankViability');
       const persistedDetail = mockPrismaService.analysisRun.create.mock.calls[0][0]
