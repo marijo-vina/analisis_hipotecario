@@ -11,7 +11,7 @@ from typing import BinaryIO
 
 import pdfplumber
 
-from grid import MARKER_RE, Token, fold, nearest
+from grid import MARKER_RE, Token, collect_mop_codes, fold, nearest
 
 DATE_RE = re.compile(r"^[A-Z]{3}-\d{2}$", re.IGNORECASE)
 
@@ -124,6 +124,7 @@ def _credits_on_page(
                 "currentBalance": pesos_from_thousands(balance),
                 "pastDueAmount": pesos_from_thousands(overdue),
                 "termDays": int(round(term)) if term is not None else None,
+                "mopCodes": collect_mop_codes(block),
             }
         )
     return rows

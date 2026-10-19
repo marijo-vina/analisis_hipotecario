@@ -84,6 +84,7 @@ export interface CompanyBureauGridCredit {
   currentBalance: number | null;
   pastDueAmount: number | null;
   termDays: number | null;
+  mopCodes?: string[];
 }
 
 function digits(value: unknown): string {
@@ -264,6 +265,10 @@ function applyCompanyRow(
   if (row.currentBalance != null) credit.currentBalance = row.currentBalance;
   if (row.pastDueAmount != null) credit.pastDueAmount = row.pastDueAmount;
   if (row.termDays != null) credit.termDays = row.termDays;
+  if (Array.isArray(row.mopCodes) && row.mopCodes.length > 0) {
+    credit.mopCodes = row.mopCodes.map((code) => String(code));
+    credit.paymentHistory = row.mopCodes.join('');
+  }
 }
 
 /**

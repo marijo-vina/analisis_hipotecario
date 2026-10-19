@@ -56,6 +56,14 @@ class CompanyGridTest(unittest.TestCase):
         self.assertEqual(card["termDays"], 0)
         self.assertEqual(card["classification"], "REVOLVING")
 
+    def test_payment_history_digits_feed_the_face(self):
+        arrend = self.by_account["165928"]
+        self.assertIn("2", arrend["mopCodes"])
+        self.assertGreaterEqual(len(arrend["mopCodes"]), 12)
+
+        late = self.by_account["776080405497"]
+        self.assertIn("3", late["mopCodes"])
+
 
 if __name__ == "__main__":
     unittest.main()

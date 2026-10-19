@@ -832,6 +832,9 @@ function CreditRow({
           <td className="px-2.5 py-2.5 text-right font-mono text-xs text-gf-text">
             {formatTermDays(credit.termDays)}
           </td>
+          <td className="px-2.5 py-2.5 text-center">
+            <MopBehaviorBadge credit={credit} />
+          </td>
         </>
       ) : (
         <>
@@ -967,6 +970,7 @@ function CreditTableSection({
                 <>
                   <th className="px-2.5 py-2.5 text-right">Crédito otorgado</th>
                   <th className="px-2.5 py-2.5 text-right">Plazo</th>
+                  <th className="px-2.5 py-2.5 text-center">Comportamiento</th>
                 </>
               ) : (
                 <>

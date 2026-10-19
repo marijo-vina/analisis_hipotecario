@@ -198,6 +198,7 @@ describe('mergeCompanyBureauGrid', () => {
     currentBalance: 0,
     pastDueAmount: 0,
     termDays: 30,
+    mopCodes: ['1', '1', '2'],
   };
 
   it('writes granted amount, balance and term onto the matching account', () => {
@@ -218,6 +219,7 @@ describe('mergeCompanyBureauGrid', () => {
     expect(credits[0].currentBalance).toBe(0);
     expect(credits[0].termDays).toBe(30);
     expect(credits[0].classification).toBe('REVOLVING');
+    expect(credits[0].mopCodes).toEqual(['1', '1', '2']);
   });
 
   it('appends a company credit Gemini did not return', () => {
