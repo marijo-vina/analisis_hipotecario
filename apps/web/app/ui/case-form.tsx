@@ -213,24 +213,6 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="shareTenureMonths" className="text-xs font-semibold text-gf-text">
-                    Antigüedad de participación (meses)
-                  </label>
-                  <input
-                    id="shareTenureMonths"
-                    name="shareTenureMonths"
-                    type="number"
-                    min="0"
-                    step="1"
-                    className={INPUT_CLASS}
-                    placeholder="24"
-                  />
-                  {state?.errors?.shareTenureMonths && (
-                    <p className="text-xs text-red-600 mt-0.5">{state.errors.shareTenureMonths}</p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
                   <label htmlFor="legalName" className="text-xs font-semibold text-gf-text">
                     Razón social
                   </label>

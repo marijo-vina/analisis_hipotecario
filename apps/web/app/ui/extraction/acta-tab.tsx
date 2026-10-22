@@ -3,6 +3,8 @@
 import type { Document } from "@/app/lib/definitions";
 import { formatDateDisplay } from "@/app/lib/extraction";
 import {
+  completedShareTenureMonths,
+  formatShareTenure,
   parseArticlesDocument,
   resolveVigentArticles,
   type ArticlesDocumentView,
@@ -33,6 +35,9 @@ export default function ActaTab({ documents }: ActaTabProps) {
     .map(parseArticlesDocument)
     .filter((doc): doc is ArticlesDocumentView => doc != null);
   const vigent = resolveVigentArticles(parsed);
+  const tenureMonths = vigent.applicantShareEntryDate
+    ? completedShareTenureMonths(vigent.applicantShareEntryDate, new Date())
+    : null;
 
   if (parsed.length === 0) {
     return (
@@ -57,6 +62,11 @@ export default function ActaTab({ documents }: ActaTabProps) {
           {vigent.sourceLabel
             ? `Tomada de ${vigent.sourceLabel}.`
             : "Sin cuadro accionario."}
+        </p>
+        <p className="mt-2 text-sm text-gf-text">
+          {vigent.applicantShareEntryDate
+            ? `Ingreso como socio: ${formatDateDisplay(vigent.applicantShareEntryDate)}. Antigüedad: ${formatShareTenure(tenureMonths ?? 0)}.`
+            : "El acta no fija la fecha de ingreso del solicitante, así que la antigüedad no se puede calcular."}
         </p>
         {vigent.displacedByUnregisteredAmendment && (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

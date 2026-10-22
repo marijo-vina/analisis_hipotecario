@@ -45,7 +45,7 @@ El Word de proceso documenta a la asesora. Si choca con un PDF de banco, manda e
 |------|----------|
 | Promedio Santander / camino estados | 6 meses de depósitos válidos; quitar mayor y menor; promedio de 4. Varias cuentas se suman al mismo mes. |
 | 12 meses | Primario / restaurante / alta estacionalidad (igual que PFAE). |
-| Factor Santander | Giro de la matriz (SERVICIOS = 0.50 en el caso). No es el 15% Banamex. |
+| Factor Santander | El caso de ejemplo usó servicios 0.50. El 22 oct 2026 llegó la lámina nueva de no asalariados: socios accionistas 90%, servicios y comercio 50%, profesionistas 90%, resto de sectores 30%, gasolineros 10%. No está aplicada: el 90% de socio cambiaría la capacidad de ejemplo 1,231,490.59. |
 | Declaración Santander | `(ingresos acumulables / 12) × factor × % PA`. Ventas es columna auxiliar. Pérdida fiscal tumba **solo** este camino. |
 | Orden Santander / mayoría | `Ingreso = promedio × factor × %PA` → `A considerar = Ingreso − DeudaPM` → `Máx = A considerar × CE` → `Capacidad = Máx − DeudaPF`. |
 | CE Santander | 0.50 |
@@ -61,10 +61,12 @@ El Word de proceso documenta a la asesora. Si choca con un PDF de banco, manda e
 | Paquete del socio | INE, CSF personal y buró personal. Estados de cuenta y declaración del socio no son obligatorios. |
 | Paquete de la empresa | CSF, estados 6/12, declaración anual con acuse, buró y acta (más asambleas si hay). Banorte exige el buró de la empresa; el checklist ya lo pide a todos. |
 | Antigüedad de la empresa | De 2 a 4 años según el banco. Banorte: mínimo 2. Scotiabank: 4. Banamex: 4 (PDF de taller). |
-| Antigüedad del socio | Distinta de la de la empresa. Santander: más de 2 años como accionista. Empresa de 20 años con socio de menos de 1 año: no viable. Hoy `shareTenureMonths` se captura a mano. Antes de HU-28 hay que extraer del acta la fecha de ingreso del solicitante. |
+| Antigüedad del socio | Distinta de la de la empresa. Santander: más de 2 años como accionista. Empresa de 20 años con socio de menos de 1 año: no viable. La fecha de ingreso sale del acta: constitución si ya era socio, asamblea de admisión si el cuadro constitutivo no lo trae, o la fecha explícita de cesión. Los meses se calculan de esa fecha al día de la consulta y no se capturan. Si solo hay una modificación, la fecha queda vacía y no hay antigüedad. |
 | % Santander | No pide mínimo de acciones. Viable con más de 1%. El candado es la antigüedad como accionista. |
 | % Banorte | Mínimo 10%. |
 | Pasivos HSBC | No resta pasivos de la empresa. Solo deuda de la persona física, igual que Scotiabank. |
+| Banorte ingreso | Promedio simple de 6 meses × 50% (ya es cliente) o 40% (no cliente). Se restan pasivos PM y después se multiplica por % PA. CE 0.60. Al final se resta la deuda del socio. Declaración: utilidad neta × 85% × % PA. |
+| HSBC ingreso | `(ventas o flujos × factor de giro) × % PA`, luego × CE 0.50. Solo se resta la deuda del socio. |
 | Identidad empresa | Razón social + RFC iguales en acta, CSF, estados y declaración. Socio: INE, buró, acta. |
 | Banamex (PDF taller) | 4 años de operación; acta `> 50%` del solicitante **o familia directa**; estados financieros SAT sin pérdidas ni capital negativo; factor PDF 15% compañía / 50% profesionistas asociados. |
 
@@ -92,10 +94,10 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 
 | Tema | Qué hacer |
 |------|-----------|
-| Banorte PM ingreso | La plantilla usa promedio de **6** meses (no suavizado), factor cliente/no cliente, y el % **después** de restar deuda — además está rota (`#REF!`). El Word dice suavizado + 50% fijo. El % mínimo (10%) y la antigüedad de la empresa (2 años) ya cerraron en la junta. **Sigue abierto el cálculo de ingreso y si Banorte resta la deuda de la empresa.** Confirmar en HU-27. |
-| Scotiabank 50% vs 51% | El plan deja fuera al 50% (`< 51%`). En la junta dijo “mínimo 50% o 51%” y que 48% o 49% se rechazan. Falta una frase: ¿50.00% pasa? |
-| HSBC y 2 años de acciones | El plan tumba HSBC con `< 25%` o `< 2 años` con esas acciones. La junta repitió el 25% y no repitió los 2 años. Se mantiene hasta que lo confirme. |
-| HSBC ingreso | En el caso pegaron 467,377.85 de “Calculadora HSBC”, no el promedio de 11M. Automatizar o marcar `REQUIRES_REVIEW` hasta tener la regla. |
+| Banorte PM ingreso | Cerrado el 22 oct 2026. Estados: promedio simple de 6 meses × 50% si la empresa ya es cliente Banorte, o 40% si no lo es. A eso se le restan los pasivos PM y el remanente se multiplica por % PA. CE 0.60. La capacidad final resta solo la deuda del socio. Declaración: utilidad neta × 85% × % PA. Falta capturar si la empresa ya es cliente Banorte, y la utilidad neta en la declaración. |
+| Scotiabank 50% vs 51% | Cerrado el 22 oct 2026: `< 51%` no es viable. 50.00% queda fuera. |
+| HSBC y 2 años de acciones | Cerrado el 22 oct 2026: `< 25%` o `< 2 años` con esas acciones no es viable. |
+| HSBC ingreso | Cerrado el 22 oct 2026 en deuda y CE: `(ventas o flujos × factor de giro) × % PA`, luego × CE 0.50, y solo se resta la deuda del socio. No resta pasivos de la empresa. Sigue sin tabla de factor de giro ni el número que usa el Visor cuando no hay estados. |
 | Scotiabank 6 vs 4 meses | PDF: promedio 6 meses. Santander en el mismo archivo suaviza 4. Default de producto: **suavizado 4** salvo que la asesora pida 6 para Scotia. |
 | Factor Banamex 15% vs 30% | PDF taller = 15% compañía. La matriz interna decía 30%. **Manda el PDF** hasta nueva captura. |
 | Estados financieros SAT | Extra Banamex; no está en el checklist GF. HU-23 puede dejarlo opcional / warning, no bloquea el MVP. |
@@ -141,7 +143,7 @@ Reusar extractores PFAE con dueño socio/empresa. Gate: CSF socio sin régimen s
 
 #### HU-24 — Acta constitutiva y modificaciones
 
-Acta constitutiva (`ARTICLES_OF_INCORPORATION`, obligatoria) y acta de modificación de poderes o asamblea (`CORPORATE_AMENDMENT`, solo si se sube). Campos: razón social, RFC si viene (si no, vacío con aviso), fecha de constitución, escritura, cuadro accionario con series como vengan rotuladas, % del solicitante, órgano de administración, apoderados y facultades, inscripción RPP. El % vigente es el de la última acta inscrita que traiga cuadro. Familia directa solo como dato. Asociación sin fines de lucro: aviso rojo de descarte, sin bloquear la extracción. Candados de banco en HU-28/29. Pendiente antes de HU-28: fecha de ingreso del solicitante como socio, para la antigüedad accionaria.
+Acta constitutiva (`ARTICLES_OF_INCORPORATION`, obligatoria) y acta de modificación de poderes o asamblea (`CORPORATE_AMENDMENT`, solo si se sube). Campos: razón social, RFC si viene (si no, vacío con aviso), fecha de constitución, escritura, cuadro accionario con series como vengan rotuladas, % del solicitante, órgano de administración, apoderados y facultades, inscripción RPP. El % vigente es el de la última acta inscrita que traiga cuadro. La fecha de ingreso del solicitante se resuelve aparte de ese cuadro. Familia directa solo como dato. Asociación sin fines de lucro: aviso rojo de descarte, sin bloquear la extracción. Candados de banco en HU-28/29.
 
 #### HU-25 — Estados de la empresa + peinado
 
@@ -163,7 +165,7 @@ Implementar el fixture Santander (estados y declaración) al peso. Scotiabank: �
 
 #### HU-28 — Gates PM
 
-Identidad dual. Antigüedad de la empresa por banco (Banorte 2, Scotiabank 4, Banamex 4). Antigüedad del socio (Santander más de 2 años; hace falta la fecha de ingreso extraída del acta). Edad + plazo ≤ 80a6m. CSF socio con régimen socio/accionista. Candados % (Scotia pendiente 50 vs 51, HSBC 25 y los 2 años si se confirman, Banorte 10, Santander solo más de 1%). Giros prohibidos (casino, joyería) se leen de la CSF de la empresa. Pérdida fiscal solo tumba declaración. Si falta el buró de la empresa, Banorte no es viable.
+Identidad dual. Antigüedad de la empresa por banco (Banorte 2, Scotiabank 4, Banamex 4). Antigüedad del socio (Santander más de 2 años, calculada desde la fecha de ingreso del acta; si la fecha queda vacía, no hay antigüedad). Edad + plazo ≤ 80a6m. CSF socio con régimen socio/accionista. Candados % (Scotia pendiente 50 vs 51, HSBC 25 y los 2 años si se confirman, Banorte 10, Santander solo más de 1%). Giros prohibidos (casino, joyería) se leen de la CSF de la empresa. Pérdida fiscal solo tumba declaración. Si falta el buró de la empresa, Banorte no es viable.
 
 ### Fase E — Comparativa
 

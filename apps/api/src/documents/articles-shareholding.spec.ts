@@ -1,5 +1,7 @@
 import {
+  completedShareTenureMonths,
   postProcessArticles,
+  resolveApplicantShareEntry,
   resolveVigentShareholding,
   type ArticlesExtractionPayload,
   type CorporateActSnapshot,
@@ -16,6 +18,7 @@ const edgardoTable = [
     totalValue: 1938000,
     percentage: 51,
     relationshipToApplicant: null,
+    entryDate: null,
   },
   {
     name: 'JOSÉ RICARDO BORBOA QUINTERO',
@@ -27,6 +30,7 @@ const edgardoTable = [
     totalValue: 1862000,
     percentage: 49,
     relationshipToApplicant: null,
+    entryDate: null,
   },
 ];
 
@@ -50,6 +54,7 @@ function snapshot(
       shareholders: [],
       applicantShareholderName: null,
       applicantSharePercentage: null,
+      applicantShareEntryDate: null,
       administrationType: 'UNKNOWN',
       administration: [],
       powers: [],
@@ -165,6 +170,8 @@ describe('resolveVigentShareholding', () => {
     expect(resolved.documentId).toBe('amendment');
     expect(resolved.source).toBe('AMENDMENT');
     expect(resolved.applicantSharePercentage).toBe(51);
+    expect(resolved.applicantShareEntryDate).toBe('1997-04-28');
+    expect(resolved.applicantShareEntrySource).toBe('CONSTITUTIVE');
     expect(resolved.displacedByUnregisteredAmendment).toBe(false);
   });
 
@@ -202,5 +209,130 @@ describe('resolveVigentShareholding', () => {
 
     expect(resolved.documentId).toBe('amendment');
     expect(resolved.applicantSharePercentage).toBe(51);
+    expect(resolved.applicantShareEntryDate).toBeNull();
+    expect(resolved.applicantShareEntrySource).toBe('UNKNOWN');
+  });
+});
+
+describe('resolveApplicantShareEntry', () => {
+  it('keeps the constitutive date when a later amendment only changes the percentage', () => {
+    const entry = resolveApplicantShareEntry([
+      snapshot('constitutive', {
+        shareholders: edgardoTable,
+        applicantShareholderName: 'EDGARDO GONZÁLEZ HIGUERA',
+        applicantSharePercentage: 50,
+        incorporationDate: '1997-04-28',
+      }),
+      snapshot('amendment', {
+        documentType: 'CORPORATE_AMENDMENT',
+        actKind: 'AMENDMENT',
+        shareholders: edgardoTable,
+        applicantShareholderName: 'EDGARDO GONZÁLEZ HIGUERA',
+        applicantSharePercentage: 51,
+        incorporationDate: null,
+        assemblyDate: '2011-06-30',
+      }),
+    ]);
+
+    expect(entry).toEqual({ entryDate: '1997-04-28', source: 'CONSTITUTIVE' });
+  });
+
+  it('uses the assembly date when the constitutive table does not include the applicant', () => {
+    const entry = resolveApplicantShareEntry([
+      snapshot('constitutive', {
+        shareholders: [edgardoTable[1]],
+        applicantShareholderName: null,
+        incorporationDate: '1997-04-28',
+      }),
+      snapshot('admission', {
+        documentType: 'CORPORATE_AMENDMENT',
+        actKind: 'AMENDMENT',
+        shareholders: edgardoTable,
+        applicantShareholderName: 'EDGARDO GONZÁLEZ HIGUERA',
+        assemblyDate: '2018-03-01',
+        incorporationDate: null,
+      }),
+    ]);
+
+    expect(entry).toEqual({ entryDate: '2018-03-01', source: 'ADMISSION' });
+  });
+
+  it('uses an explicit acquisition date when no constitutive table proves an earlier entry', () => {
+    const entry = resolveApplicantShareEntry([
+      snapshot('amendment', {
+        documentType: 'CORPORATE_AMENDMENT',
+        actKind: 'AMENDMENT',
+        shareholders: [{ ...edgardoTable[0], entryDate: '2015-01-10' }],
+        applicantShareholderName: 'EDGARDO GONZÁLEZ HIGUERA',
+        assemblyDate: '2016-08-01',
+        incorporationDate: null,
+      }),
+    ]);
+
+    expect(entry).toEqual({ entryDate: '2015-01-10', source: 'EXPLICIT' });
+  });
+
+  it('does not treat a lone amendment date as the entry date', () => {
+    const entry = resolveApplicantShareEntry([
+      snapshot('amendment', {
+        documentType: 'CORPORATE_AMENDMENT',
+        actKind: 'AMENDMENT',
+        shareholders: edgardoTable,
+        applicantShareholderName: 'EDGARDO GONZÁLEZ HIGUERA',
+        assemblyDate: '2011-06-30',
+        incorporationDate: null,
+      }),
+    ]);
+
+    expect(entry).toEqual({ entryDate: null, source: 'UNKNOWN' });
+  });
+});
+
+describe('completedShareTenureMonths', () => {
+  const on = (year: number, month: number, day: number) => new Date(year, month - 1, day);
+
+  it('counts completed months and withholds the current month until the entry day', () => {
+    expect(completedShareTenureMonths('1997-04-28', on(2026, 10, 22))).toBe(353);
+    expect(completedShareTenureMonths('1997-04-28', on(2026, 10, 28))).toBe(354);
+  });
+
+  it('counts an exact two-year anniversary as 24 months', () => {
+    expect(completedShareTenureMonths('2024-10-22', on(2026, 10, 22))).toBe(24);
+    expect(completedShareTenureMonths('2024-10-22', on(2026, 10, 21))).toBe(23);
+  });
+
+  it('returns zero when the entry date is still ahead', () => {
+    expect(completedShareTenureMonths('2026-11-01', on(2026, 10, 22))).toBe(0);
+    expect(completedShareTenureMonths('no-es-fecha', on(2026, 10, 22))).toBeNull();
+  });
+});
+
+describe('founder entry dates', () => {
+  it('stamps the incorporation date on constitutive shareholders and leaves an amendment untouched', () => {
+    const constitutive = postProcessArticles(
+      {
+        incorporationDate: '1997-04-28',
+        shareholders: [{ name: 'EDGARDO GONZALEZ HIGUERA', percentage: 50 }],
+      },
+      {
+        documentType: 'ARTICLES_OF_INCORPORATION',
+        applicantName: 'Edgardo González Higuera',
+      },
+    );
+    const amendment = postProcessArticles(
+      {
+        assemblyDate: '2011-06-30',
+        shareholders: [{ name: 'EDGARDO GONZALEZ HIGUERA', percentage: 51 }],
+      },
+      {
+        documentType: 'CORPORATE_AMENDMENT',
+        applicantName: 'Edgardo González Higuera',
+      },
+    );
+
+    expect(constitutive.applicantShareEntryDate).toBe('1997-04-28');
+    expect(constitutive.shareholders[0].entryDate).toBe('1997-04-28');
+    expect(amendment.applicantShareEntryDate).toBeNull();
+    expect(amendment.shareholders[0].entryDate).toBeNull();
   });
 });

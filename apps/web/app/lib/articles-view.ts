@@ -8,6 +8,7 @@ export interface ArticlesShareholderView {
   totalValue: number | null;
   percentage: number | null;
   relationshipToApplicant: string | null;
+  entryDate: string | null;
 }
 
 export interface ArticlesPowerView {
@@ -41,10 +42,14 @@ export interface ArticlesDocumentView {
   alerts: ExtractionAlert[];
 }
 
+export type ShareEntrySource = "CONSTITUTIVE" | "EXPLICIT" | "ADMISSION" | "UNKNOWN";
+
 export interface VigentArticlesView {
   documentId: string | null;
   applicantSharePercentage: number | null;
   applicantShareholderName: string | null;
+  applicantShareEntryDate: string | null;
+  applicantShareEntrySource: ShareEntrySource;
   legalName: string | null;
   sourceLabel: string | null;
   displacedByUnregisteredAmendment: boolean;
@@ -108,11 +113,15 @@ export function resolveVigentArticles(documents: ArticlesDocumentView[]): Vigent
     : withTable.find((doc) => doc.actKind === "CONSTITUTIVE") ??
       [...unregisteredAmendments].sort(byAssemblyDesc)[0];
 
+  const entry = resolveApplicantShareEntry(documents);
+
   if (!winner) {
     return {
       documentId: null,
       applicantSharePercentage: null,
       applicantShareholderName: null,
+      applicantShareEntryDate: entry.entryDate,
+      applicantShareEntrySource: entry.source,
       legalName: null,
       sourceLabel: null,
       displacedByUnregisteredAmendment: false,
@@ -123,12 +132,91 @@ export function resolveVigentArticles(documents: ArticlesDocumentView[]): Vigent
     documentId: winner.documentId,
     applicantSharePercentage: winner.applicantSharePercentage,
     applicantShareholderName: winner.applicantShareholderName,
+    applicantShareEntryDate: entry.entryDate,
+    applicantShareEntrySource: entry.source,
     legalName: winner.legalName,
     sourceLabel: winner.title,
     displacedByUnregisteredAmendment:
       inscribed.length > 0 &&
       unregisteredAmendments.some((doc) => doc.documentId !== winner.documentId),
   };
+}
+
+function resolveApplicantShareEntry(documents: ArticlesDocumentView[]): {
+  entryDate: string | null;
+  source: ShareEntrySource;
+} {
+  const present = documents.filter(
+    (doc) => doc.applicantShareholderName != null && doc.shareholders.length > 0,
+  );
+  const constitutiveDates = present
+    .filter((doc) => doc.actKind === "CONSTITUTIVE")
+    .map(actDate)
+    .filter((date): date is string => date != null);
+  if (constitutiveDates.length > 0) {
+    return { entryDate: earliestDate(constitutiveDates), source: "CONSTITUTIVE" };
+  }
+
+  const explicitDates = present
+    .map(explicitEntryDate)
+    .filter((date): date is string => date != null);
+  if (explicitDates.length > 0) {
+    return { entryDate: earliestDate(explicitDates), source: "EXPLICIT" };
+  }
+
+  const constitutiveTables = documents.filter(
+    (doc) => doc.actKind === "CONSTITUTIVE" && doc.shareholders.length > 0,
+  );
+  const absentFromConstitutive =
+    constitutiveTables.length > 0 &&
+    constitutiveTables.every((doc) => doc.applicantShareholderName == null);
+  if (absentFromConstitutive) {
+    const admissionDates = present
+      .filter((doc) => doc.actKind === "AMENDMENT")
+      .map(actDate)
+      .filter((date): date is string => date != null);
+    if (admissionDates.length > 0) {
+      return { entryDate: earliestDate(admissionDates), source: "ADMISSION" };
+    }
+  }
+
+  return { entryDate: null, source: "UNKNOWN" };
+}
+
+function actDate(doc: ArticlesDocumentView): string | null {
+  if (doc.actKind === "CONSTITUTIVE") return doc.incorporationDate ?? doc.deedDate;
+  return doc.assemblyDate ?? doc.deedDate;
+}
+
+function explicitEntryDate(doc: ArticlesDocumentView): string | null {
+  if (doc.actKind === "CONSTITUTIVE" || !doc.applicantShareholderName) return null;
+  const row = doc.shareholders.find((shareholder) => shareholder.name === doc.applicantShareholderName);
+  return row?.entryDate ?? null;
+}
+
+function earliestDate(dates: string[]): string {
+  return [...dates].sort()[0];
+}
+
+export function completedShareTenureMonths(entryDate: string, asOf: Date): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(entryDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  let months = (asOf.getFullYear() - year) * 12 + (asOf.getMonth() + 1 - month);
+  if (asOf.getDate() < day) months -= 1;
+  return Math.max(0, months);
+}
+
+export function formatShareTenure(months: number): string {
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const yearLabel = years === 1 ? "1 año" : years > 1 ? `${years} años` : null;
+  const monthLabel = rest === 1 ? "1 mes" : rest > 1 ? `${rest} meses` : null;
+  if (yearLabel && monthLabel) return `${yearLabel} y ${monthLabel}`;
+  return yearLabel ?? monthLabel ?? "menos de 1 mes";
 }
 
 function byInscriptionDesc(a: ArticlesDocumentView, b: ArticlesDocumentView): number {
@@ -166,6 +254,7 @@ function parseShareholders(value: unknown): ArticlesShareholderView[] {
       totalValue: asNumber(row.totalValue),
       percentage: asNumber(row.percentage),
       relationshipToApplicant: asText(row.relationshipToApplicant),
+      entryDate: asText(row.entryDate),
     }];
   });
 }

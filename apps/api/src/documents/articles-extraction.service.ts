@@ -35,6 +35,7 @@ const ARTICLES_INSTRUCTIONS = [
   '  - totalValue: valor total de las acciones de ese socio.',
   '  - percentage: porcentaje de participación de ese socio, ya sumadas sus series.',
   '  - relationshipToApplicant: parentesco con el solicitante solo si el texto lo dice (cónyuge, hijo, padre, madre, hermano). Si no lo dice, null.',
+  '  - entryDate: fecha en que esa persona adquirió o suscribió las acciones, solo si el texto la dice (admisión, cesión o suscripción). Si el cuadro solo la lista y no dice cuándo entró, null. No copies la fecha de constitución ni la de la asamblea.',
   '',
   '─── Administración y poderes ───',
   '  - administrationType: SOLE si es administrador único, BOARD si es consejo de administración, UNKNOWN si no se identifica.',
@@ -70,6 +71,7 @@ const ARTICLES_RESPONSE_SCHEMA: Record<string, unknown> = {
           totalValue: { type: 'number', nullable: true },
           percentage: { type: 'number', nullable: true },
           relationshipToApplicant: { type: 'string', nullable: true },
+          entryDate: { type: 'string', nullable: true },
           series: {
             type: 'array',
             items: {

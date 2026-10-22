@@ -21,6 +21,8 @@ export interface ShareholderRow {
   totalValue: number | null;
   percentage: number | null;
   relationshipToApplicant: string | null;
+  /** Fecha en que este documento dice que la persona adquirió las acciones. */
+  entryDate: string | null;
 }
 
 export interface AdministrationMember {
@@ -63,6 +65,8 @@ export interface ArticlesExtractionPayload {
   shareholders: ShareholderRow[];
   applicantShareholderName: string | null;
   applicantSharePercentage: number | null;
+  /** Fecha de ingreso que este documento alcanza a fijar por sí solo. */
+  applicantShareEntryDate: string | null;
   administrationType: AdministrationType;
   administration: AdministrationMember[];
   powers: PowerGrant[];
@@ -78,11 +82,15 @@ export interface CorporateActSnapshot {
   payload: ArticlesExtractionPayload;
 }
 
+export type ShareEntrySource = 'CONSTITUTIVE' | 'EXPLICIT' | 'ADMISSION' | 'UNKNOWN';
+
 export interface VigentShareholding {
   documentId: string | null;
   shareholders: ShareholderRow[];
   applicantSharePercentage: number | null;
   applicantShareholderName: string | null;
+  applicantShareEntryDate: string | null;
+  applicantShareEntrySource: ShareEntrySource;
   legalName: string | null;
   source: 'AMENDMENT' | 'CONSTITUTIVE' | 'NONE';
   displacedByUnregisteredAmendment: boolean;
@@ -114,10 +122,17 @@ export function postProcessArticles(
   const legalName = cleanText(rawData.legalName);
   const legalForm = cleanText(rawData.legalForm);
   const rfc = cleanRfc(rawData.rfc);
-  const shareholders = parseShareholders(rawData.shareholders);
+  const incorporationDate = cleanIsoDate(rawData.incorporationDate);
+  const deedDate = cleanIsoDate(rawData.deedDate);
+  const shareholders = stampFounderEntryDates(
+    parseShareholders(rawData.shareholders),
+    actKind,
+    incorporationDate ?? deedDate,
+  );
   const registry = parseRegistry(rawData.registry);
   const isNonProfit = detectNonProfit(rawData, legalName, legalForm);
   const match = matchApplicant(options.applicantName, shareholders);
+  const applicantShareEntryDate = entryDateForMatchedShareholder(shareholders, match.name);
   const alerts: ArticlesAlert[] = [];
 
   if (!rfc) {
@@ -176,13 +191,14 @@ export function postProcessArticles(
     legalForm,
     rfc,
     deedNumber: cleanText(rawData.deedNumber),
-    deedDate: cleanIsoDate(rawData.deedDate),
+    deedDate,
     notary: cleanText(rawData.notary),
-    incorporationDate: cleanIsoDate(rawData.incorporationDate),
+    incorporationDate,
     assemblyDate: cleanIsoDate(rawData.assemblyDate),
     shareholders,
     applicantShareholderName: match.name,
     applicantSharePercentage: match.percentage,
+    applicantShareEntryDate,
     administrationType: parseAdministrationType(rawData.administrationType),
     administration: parseAdministration(rawData.administration),
     powers: parsePowers(rawData.powers),
@@ -198,11 +214,14 @@ export function postProcessArticles(
 export function resolveVigentShareholding(
   acts: CorporateActSnapshot[],
 ): VigentShareholding {
+  const entry = resolveApplicantShareEntry(acts);
   const empty: VigentShareholding = {
     documentId: null,
     shareholders: [],
     applicantSharePercentage: null,
     applicantShareholderName: null,
+    applicantShareEntryDate: entry.entryDate,
+    applicantShareEntrySource: entry.source,
     legalName: null,
     source: 'NONE',
     displacedByUnregisteredAmendment: false,
@@ -228,6 +247,8 @@ export function resolveVigentShareholding(
     shareholders: winner.payload.shareholders,
     applicantSharePercentage: winner.payload.applicantSharePercentage,
     applicantShareholderName: winner.payload.applicantShareholderName,
+    applicantShareEntryDate: entry.entryDate,
+    applicantShareEntrySource: entry.source,
     legalName: winner.payload.legalName,
     source: winner.payload.actKind === 'AMENDMENT' ? 'AMENDMENT' : 'CONSTITUTIVE',
     displacedByUnregisteredAmendment:
@@ -246,6 +267,101 @@ function compareInscribed(a: CorporateActSnapshot, b: CorporateActSnapshot): num
 
 function compareAssemblyDate(a: CorporateActSnapshot, b: CorporateActSnapshot): number {
   return (dateTime(b.payload.assemblyDate) ?? 0) - (dateTime(a.payload.assemblyDate) ?? 0);
+}
+
+/**
+ * La antigüedad del socio no sale del cuadro vigente.
+ * Si ya está en el acta constitutiva, ingresó en la constitución.
+ * Si el cuadro constitutivo existe y no lo trae, ingresó en la primera asamblea que sí lo trae.
+ * Una modificación sola no alcanza: podría estar repitiendo a un socio anterior.
+ */
+export function resolveApplicantShareEntry(
+  acts: CorporateActSnapshot[],
+): { entryDate: string | null; source: ShareEntrySource } {
+  const present = acts.filter(
+    (act) =>
+      act.payload.applicantShareholderName != null && act.payload.shareholders.length > 0,
+  );
+  const constitutiveDates = present
+    .filter((act) => act.payload.actKind === 'CONSTITUTIVE')
+    .map(actDate)
+    .filter((date): date is string => date != null);
+  if (constitutiveDates.length > 0) {
+    return { entryDate: earliestDate(constitutiveDates), source: 'CONSTITUTIVE' };
+  }
+
+  const explicitDates = present
+    .map(explicitEntryDate)
+    .filter((date): date is string => date != null);
+  if (explicitDates.length > 0) {
+    return { entryDate: earliestDate(explicitDates), source: 'EXPLICIT' };
+  }
+
+  const constitutiveTables = acts.filter(
+    (act) => act.payload.actKind === 'CONSTITUTIVE' && act.payload.shareholders.length > 0,
+  );
+  const absentFromConstitutive =
+    constitutiveTables.length > 0 &&
+    constitutiveTables.every((act) => act.payload.applicantShareholderName == null);
+  if (absentFromConstitutive) {
+    const admissionDates = present
+      .filter((act) => act.payload.actKind === 'AMENDMENT')
+      .map(actDate)
+      .filter((date): date is string => date != null);
+    if (admissionDates.length > 0) {
+      return { entryDate: earliestDate(admissionDates), source: 'ADMISSION' };
+    }
+  }
+
+  return { entryDate: null, source: 'UNKNOWN' };
+}
+
+/** Meses cumplidos entre la fecha de ingreso y el día de consulta. No se persiste. */
+export function completedShareTenureMonths(entryDate: string, asOf: Date): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(entryDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  let months = (asOf.getFullYear() - year) * 12 + (asOf.getMonth() + 1 - month);
+  if (asOf.getDate() < day) months -= 1;
+  return Math.max(0, months);
+}
+
+function actDate(act: CorporateActSnapshot): string | null {
+  if (act.payload.actKind === 'CONSTITUTIVE') {
+    return act.payload.incorporationDate ?? act.payload.deedDate;
+  }
+  return act.payload.assemblyDate ?? act.payload.deedDate;
+}
+
+function explicitEntryDate(act: CorporateActSnapshot): string | null {
+  const name = act.payload.applicantShareholderName;
+  if (!name || act.payload.actKind === 'CONSTITUTIVE') return null;
+  const row = act.payload.shareholders.find((shareholder) => shareholder.name === name);
+  return row?.entryDate ?? null;
+}
+
+function earliestDate(dates: string[]): string {
+  return [...dates].sort()[0];
+}
+
+function stampFounderEntryDates(
+  shareholders: ShareholderRow[],
+  actKind: CorporateActKind,
+  foundedOn: string | null,
+): ShareholderRow[] {
+  if (actKind !== 'CONSTITUTIVE' || !foundedOn) return shareholders;
+  return shareholders.map((row) => ({ ...row, entryDate: row.entryDate ?? foundedOn }));
+}
+
+function entryDateForMatchedShareholder(
+  shareholders: ShareholderRow[],
+  applicantName: string | null,
+): string | null {
+  if (!applicantName) return null;
+  return shareholders.find((row) => row.name === applicantName)?.entryDate ?? null;
 }
 
 function inscriptionTime(act: CorporateActSnapshot): number | null {
@@ -272,6 +388,7 @@ function parseShareholders(value: unknown): ShareholderRow[] {
         totalValue: asNumber(row.totalValue),
         percentage: asNumber(row.percentage),
         relationshipToApplicant: cleanText(row.relationshipToApplicant),
+        entryDate: cleanIsoDate(row.entryDate),
       };
     })
     .filter((row): row is ShareholderRow => row != null);
