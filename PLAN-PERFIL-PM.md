@@ -97,7 +97,7 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 | Banorte PM ingreso | Cerrado el 22 oct 2026. Estados: promedio simple de 6 meses × 50% si la empresa ya es cliente Banorte, o 40% si no lo es. A eso se le restan los pasivos PM y el remanente se multiplica por % PA. CE 0.60. La capacidad final resta solo la deuda del socio. Declaración: utilidad neta × 85% × % PA. Falta capturar si la empresa ya es cliente Banorte, y la utilidad neta en la declaración. |
 | Scotiabank 50% vs 51% | Cerrado el 22 oct 2026: `< 51%` no es viable. 50.00% queda fuera. |
 | HSBC y 2 años de acciones | Cerrado el 22 oct 2026: `< 25%` o `< 2 años` con esas acciones no es viable. |
-| HSBC ingreso | Cerrado el 22 oct 2026 en deuda y CE: `(ventas o flujos × factor de giro) × % PA`, luego × CE 0.50, y solo se resta la deuda del socio. No resta pasivos de la empresa. Sigue sin tabla de factor de giro ni el número que usa el Visor cuando no hay estados. |
+| HSBC ingreso | Cerrado el 22 oct 2026. No hay tabla pública. Con Visor Financiero el factor es 30% sobre flujos o ventas. Sin Visor, manual: servicios 20% de depósitos válidos, comercio 15%. Luego × % PA y × CE 0.50. Solo se resta la deuda del socio. La proyección por defecto usa el Visor al 30%. Liquidez de HSBC no está disponible para PFAE ni para PM. |
 | Scotiabank 6 vs 4 meses | PDF: promedio 6 meses. Santander en el mismo archivo suaviza 4. Default de producto: **suavizado 4** salvo que la asesora pida 6 para Scotia. |
 | Factor Banamex 15% vs 30% | PDF taller = 15% compañía. La matriz interna decía 30%. **Manda el PDF** hasta nueva captura. |
 | Estados financieros SAT | Extra Banamex; no está en el checklist GF. HU-23 puede dejarlo opcional / warning, no bloquea el MVP. |
@@ -165,7 +165,7 @@ Implementar el fixture Santander (estados y declaración) al peso. Scotiabank: �
 
 #### HU-28 — Gates PM
 
-Identidad dual. Antigüedad de la empresa por banco (Banorte 2, Scotiabank 4, Banamex 4). Antigüedad del socio (Santander más de 2 años, calculada desde la fecha de ingreso del acta; si la fecha queda vacía, no hay antigüedad). Edad + plazo ≤ 80a6m. CSF socio con régimen socio/accionista. Candados % (Scotia pendiente 50 vs 51, HSBC 25 y los 2 años si se confirman, Banorte 10, Santander solo más de 1%). Giros prohibidos (casino, joyería) se leen de la CSF de la empresa. Pérdida fiscal solo tumba declaración. Si falta el buró de la empresa, Banorte no es viable.
+Identidad dual. Antigüedad de la empresa por banco (Banorte 2, Scotiabank 4, Banamex 4). Antigüedad del socio (Santander más de 2 años, calculada desde la fecha de ingreso del acta; si la fecha queda vacía, no hay antigüedad). Edad + plazo ≤ 80a6m. CSF socio con régimen socio/accionista. Candados % (Scotiabank menor de 51%, HSBC menor de 25% o menos de 2 años con esas acciones, Banorte menor de 10%, Santander solo más de 1%). Liquidez de HSBC no se ofrece. Giros prohibidos (casino, joyería) se leen de la CSF de la empresa. Pérdida fiscal solo tumba declaración. Si falta el buró de la empresa, Banorte no es viable.
 
 ### Fase E — Comparativa
 
