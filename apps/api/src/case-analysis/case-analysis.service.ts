@@ -8,6 +8,7 @@ import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
+import { PmGatesRule } from './rules/pm-gates.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -75,6 +76,7 @@ export class CaseAnalysisService {
     private readonly bankarizationValidationRule: BankarizationValidationRule,
     private readonly pfaeValidationRule: PfaeValidationRule,
     private readonly pmCsfTaxRule: PmCsfTaxRule,
+    private readonly pmGatesRule: PmGatesRule,
     private readonly bankViabilityRule: BankViabilityRule,
     @Inject(forwardRef(() => IncomeCalculationService))
     private readonly incomeCalcService: IncomeCalculationService,
@@ -199,6 +201,7 @@ export class CaseAnalysisService {
         this.shareholderDocuments(docs),
       );
       const pmCsfTaxResult = await this.pmCsfTaxRule.execute(context, docs);
+      const pmGatesResult = await this.pmGatesRule.execute(context, docs);
       try {
         await this.calculatePmLiabilities(mortgageCase);
       } catch (err) {
@@ -218,7 +221,7 @@ export class CaseAnalysisService {
       return this.persistCompletedRun(
         caseId,
         triggeredBy,
-        [identityResult, pmCsfTaxResult],
+        [identityResult, pmCsfTaxResult, pmGatesResult],
         null,
       );
     }

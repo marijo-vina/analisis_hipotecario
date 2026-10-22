@@ -23,6 +23,7 @@ import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
+import PmGatesCard from "@/app/ui/expedientes/pm-gates-card";
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
@@ -510,6 +511,18 @@ function ValidacionesTab({
       </section>
 
       {/* ── B) Conciliación nómina vs banco — no aplica para PFAE/PM (sin nómina) ── */}
+      {personType === "PM" && (
+        <section>
+          <PmGatesCard
+            run={
+              state.phase === "result" || state.phase === "observations"
+                ? state.run
+                : null
+            }
+          />
+        </section>
+      )}
+
       {!hideConciliation && (
         <section>
           <h3 className="text-sm font-semibold text-gf-text mb-3">

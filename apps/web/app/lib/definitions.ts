@@ -227,6 +227,20 @@ export interface PfaeValidationSnapshot {
   coherence: { rentWithoutRegimeCount: number; outcome: "PASS" | "WARNING" } | null;
 }
 
+export type PmBankGateStatus = "VIABLE" | "NOT_VIABLE" | "INCOMPLETE";
+
+export interface PmGatesSnapshot {
+  banks: Array<{
+    bankCode: string;
+    status: PmBankGateStatus;
+    locks: Array<{ code: string; message: string }>;
+  }>;
+  companyIdentity: "PASS" | "FAIL";
+  identityLocks: Array<{ code: string; message: string }>;
+  prohibitedActivity: string | null;
+  ageExceeded: boolean;
+}
+
 export interface AnalysisRuleResult {
   ruleId: string;
   outcome: "PASS" | "PARTIAL" | "FAIL";
@@ -236,6 +250,7 @@ export interface AnalysisRuleResult {
     fields: FieldComparison[];
     pfaeValidation?: PfaeValidationSnapshot;
     bankViability?: BankViabilitySnapshot;
+    pmGates?: PmGatesSnapshot;
   };
   alerts: Array<{
     ruleCode: string;

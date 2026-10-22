@@ -8,6 +8,8 @@ import { BankarizationValidationRule } from '../case-analysis/rules/bankarizatio
 import { BankViabilityRule } from '../case-analysis/rules/bank-viability.rule';
 import { IdentityMatchRule } from '../case-analysis/rules/identity-match.rule';
 import { PfaeValidationRule } from '../case-analysis/rules/pfae-validation.rule';
+import { PmCsfTaxRule } from '../case-analysis/rules/pm-csf-tax.rule';
+import { PmGatesRule } from '../case-analysis/rules/pm-gates.rule';
 import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -189,6 +191,8 @@ describe('PATCH income source → Phase C (integration)', () => {
           useValue: mockBankarizationRule,
         },
         { provide: PfaeValidationRule, useValue: mockPfaeValidationRule },
+        { provide: PmCsfTaxRule, useValue: { ruleId: 'pm-csf-tax', execute: jest.fn() } },
+        { provide: PmGatesRule, useValue: { ruleId: 'pm-gates', execute: jest.fn() } },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         {
           provide: LiabilityCalculationService,

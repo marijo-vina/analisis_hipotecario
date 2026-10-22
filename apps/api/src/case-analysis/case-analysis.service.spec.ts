@@ -5,6 +5,7 @@ import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
 import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
+import { PmGatesRule } from './rules/pm-gates.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -60,6 +61,11 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockPmGatesRule = {
+    ruleId: 'pm-gates',
+    execute: jest.fn(),
+  };
+
   const mockBankViabilityRule = {
     ruleId: 'bank-viability',
     execute: jest.fn(),
@@ -99,6 +105,14 @@ describe('CaseAnalysisService', () => {
     outcome: 'PASS',
     severity: 'INFO',
     detail: { sources: [], fields: [], declarationPathKnockedOut: false },
+    alerts: [],
+  };
+
+  const mockPmGatesPassResult: RuleResult = {
+    ruleId: 'pm-gates',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: [], fields: [], pmGates: { banks: [] } },
     alerts: [],
   };
 
@@ -145,6 +159,7 @@ describe('CaseAnalysisService', () => {
     mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
     mockPfaeValidationRule.execute.mockResolvedValue(mockPfaeValidationPassResult);
     mockPmCsfTaxRule.execute.mockResolvedValue(mockPmCsfTaxPassResult);
+    mockPmGatesRule.execute.mockResolvedValue(mockPmGatesPassResult);
     mockBankViabilityRule.execute.mockResolvedValue(mockBankViabilityPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -154,6 +169,7 @@ describe('CaseAnalysisService', () => {
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
         { provide: PfaeValidationRule, useValue: mockPfaeValidationRule },
         { provide: PmCsfTaxRule, useValue: mockPmCsfTaxRule },
+        { provide: PmGatesRule, useValue: mockPmGatesRule },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
         { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
@@ -377,6 +393,7 @@ describe('CaseAnalysisService', () => {
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
       expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
     });
 
@@ -669,6 +686,7 @@ describe('CaseAnalysisService', () => {
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
       expect(mockPmCsfTaxRule.execute).toHaveBeenCalledTimes(1);
+      expect(mockPmGatesRule.execute).toHaveBeenCalledTimes(1);
       const [, pmDocs] = mockPmCsfTaxRule.execute.mock.calls[0] as [
         Record<string, unknown>,
         { id: string }[],
@@ -723,6 +741,7 @@ describe('CaseAnalysisService', () => {
       expect(mockBankarizationRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
       expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
       expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();
       expect(mockBankViabilityRule.execute).toHaveBeenCalled();
@@ -745,6 +764,7 @@ describe('CaseAnalysisService', () => {
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
       expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
       expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
       expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();
