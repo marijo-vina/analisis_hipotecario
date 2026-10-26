@@ -27,7 +27,15 @@ import {
   matchGlobalNonSusceptibleActivity,
 } from '../non-susceptible-activities';
 import { pickPrimaryIndependentActivity } from '../../documents/csf-independent-activity';
-import type { PfaeIncomeBases } from '../../income-calculation/income-calculation.types';
+import type { PfaeIncomeBases, PmIncomeBases } from '../../income-calculation/income-calculation.types';
+import { decidePmBank, foldPmStatus, type PmBankDecision } from '../pm-comparison';
+import {
+  collectPmGatesInput,
+  companyLegalForm,
+  companyTenureMonths,
+  type OwnedPmDocument,
+} from '../pm-gates-input';
+import { evaluatePmGates, type PmGatesResult } from '../pm-gates';
 
 const WARNING_LEGEND =
   'Evaluación preliminar basada en la información disponible y en políticas internas registradas. No constituye una aprobación o autorización de crédito por parte del banco.';
@@ -93,6 +101,13 @@ interface PfaeBranch {
   activityStartDate: string | null;
 }
 
+interface PmComparisonContext {
+  bases: PmIncomeBases | null;
+  gates: PmGatesResult;
+  legalForm: string | null;
+  companyTenureMonths: number | null;
+}
+
 /** Round a Decimal to 2 decimal places (financial precision). */
 function d2(v: Prisma.Decimal): string {
   return v.toFixed(2);
@@ -121,6 +136,10 @@ export class BankViabilityRule implements AnalysisRule {
         estimatedTermMonths: true,
         creditTypeId: true,
         personType: true,
+        sharePercentage: true,
+        incorporationDate: true,
+        legalName: true,
+        companyRfc: true,
       },
     });
 
@@ -327,6 +346,16 @@ export class BankViabilityRule implements AnalysisRule {
       independentDescription: csfFields.independentDescription,
       activityStartDate: csfFields.activityStartDate,
     };
+    const pmContext =
+      personType === 'PM'
+        ? this.pmComparisonContext(
+            mortgageCase,
+            documents,
+            incomeBases,
+            destination,
+            calculatedAt,
+          )
+        : null;
 
     for (const policy of policies) {
       const result = this.evaluateBank(
@@ -340,6 +369,7 @@ export class BankViabilityRule implements AnalysisRule {
         bureauData,
         propertyValue,
         pfaeBranch,
+        pmContext,
       );
       bankResults.push(result);
     }
@@ -688,6 +718,46 @@ export class BankViabilityRule implements AnalysisRule {
     return { incomeUsed: chosen.mul(factor), unmapped: false };
   }
 
+  private pmComparisonContext(
+    mortgageCase: {
+      sharePercentage?: { toString(): string } | null;
+      incorporationDate?: Date | null;
+      estimatedTermMonths?: number | null;
+      legalName?: string | null;
+      companyRfc?: string | null;
+    } | null,
+    documents: Record<string, unknown>[],
+    incomeBases: PfaeIncomeBases | null,
+    destination: string | null,
+    calculatedAt: Date,
+  ): PmComparisonContext {
+    const shareRaw = mortgageCase?.sharePercentage;
+    const sharePercentage = shareRaw == null ? null : Number(shareRaw.toString());
+    const docs = documents as OwnedPmDocument[];
+    const facts = collectPmGatesInput(
+      {
+        asOf: calculatedAt,
+        sharePercentage: Number.isFinite(sharePercentage) ? sharePercentage : null,
+        incorporationDate: mortgageCase?.incorporationDate ?? null,
+        estimatedTermMonths: mortgageCase?.estimatedTermMonths ?? null,
+        destination,
+        legalName: mortgageCase?.legalName ?? null,
+        companyRfc: mortgageCase?.companyRfc ?? null,
+      },
+      docs,
+    );
+    const bases =
+      incomeBases && (incomeBases as { profile?: string }).profile === 'PM'
+        ? (incomeBases as unknown as PmIncomeBases)
+        : null;
+    return {
+      bases,
+      gates: evaluatePmGates(facts),
+      legalForm: companyLegalForm(docs),
+      companyTenureMonths: companyTenureMonths(facts.incorporationDate, calculatedAt),
+    };
+  }
+
   // ── Bank Evaluation ────────────────────────────────────────────────
 
   private evaluateBank(
@@ -701,58 +771,89 @@ export class BankViabilityRule implements AnalysisRule {
     bureauData: BureauData | null,
     propertyValue: Prisma.Decimal | null,
     pfae: PfaeBranch,
+    pm: PmComparisonContext | null,
   ): BankResult {
     const reasons: string[] = [];
     const checks: Record<string, CheckResult> = {};
     const isPfae = pfae.personType === 'PFAE';
+    const pmDecision: PmBankDecision | null =
+      pfae.personType === 'PM' && pm != null
+        ? decidePmBank({
+            bankCode: policy.bank.code,
+            incomeSource: pfae.source,
+            bases: pm.bases,
+            gate: pm.gates.banks.find((bank) => bank.bankCode === policy.bank.code) ?? null,
+            legalForm: pm.legalForm,
+            companyTenureMonths: pm.companyTenureMonths,
+          })
+        : null;
 
     const incomeCriterion = policy.bank.incomeCriterion as 'NET' | 'GROSS';
-    const debtCommitmentFactor = new Prisma.Decimal(policy.bank.debtCommitmentFactor.toString());
-
-    // ── Income Selection (giro AFTER chosen base on both PFAE paths) ─
-    const { incomeUsed, unmapped } = this.resolveIncomeUsed(
-      isPfae,
-      incomeCriterion,
-      inputs,
-      pfae,
-      policy,
+    const debtCommitmentFactor = new Prisma.Decimal(
+      pmDecision?.debtCommitmentFactor ?? policy.bank.debtCommitmentFactor.toString(),
     );
 
-    if (unmapped) {
-      reasons.push('ACTIVITY_UNMAPPED');
-    } else if (!incomeUsed) {
-      reasons.push('UNCONFIRMED_INCOME');
-    }
-
-    if (isPfae && pfae.source === 'TAX_RETURN') {
-      if (policy.bank.taxReturnPolicy === 'REJECTED') {
-        reasons.push('TAX_RETURN_REJECTED');
-      } else if (policy.bank.taxReturnPolicy === 'NOT_PREFERRED') {
-        reasons.push('TAX_RETURN_NOT_PREFERRED');
-      }
-    }
-
-    // ── Capacity Control ─────────────────────────────────────────────
+    // ── Income Selection (giro AFTER chosen base on both PFAE paths) ─
+    let incomeUsed: Prisma.Decimal | null;
     let maximumDebt: Prisma.Decimal | null = null;
     let availableCapacity: Prisma.Decimal | null = null;
-    const liabilities = inputs.totalMonthlyLiabilities
-      ? new Prisma.Decimal(inputs.totalMonthlyLiabilities)
-      : new Prisma.Decimal(0);
 
-    if (incomeUsed) {
-      maximumDebt = incomeUsed.mul(debtCommitmentFactor);
-      availableCapacity = maximumDebt.minus(liabilities);
-    }
+    if (pmDecision) {
+      reasons.push(...pmDecision.reasons);
+      incomeUsed =
+        pmDecision.incomeUsed == null ? null : new Prisma.Decimal(pmDecision.incomeUsed);
+      maximumDebt =
+        pmDecision.maximumDebt == null ? null : new Prisma.Decimal(pmDecision.maximumDebt);
+      availableCapacity =
+        pmDecision.availableCapacity == null
+          ? null
+          : new Prisma.Decimal(pmDecision.availableCapacity);
+      checks.capacity = {
+        status: pmDecision.capacityStatus,
+        availableCapacity: availableCapacity ? d2(availableCapacity) : null,
+      };
+    } else {
+      const resolved = this.resolveIncomeUsed(
+        isPfae,
+        incomeCriterion,
+        inputs,
+        pfae,
+        policy,
+      );
+      incomeUsed = resolved.incomeUsed;
 
-    const capacityPass = incomeUsed && availableCapacity && availableCapacity.gt(0);
-    checks.capacity = {
-      status: capacityPass ? 'PASS' : incomeUsed ? 'FAIL' : 'REQUIRES_REVIEW',
-      availableCapacity: availableCapacity ? d2(availableCapacity) : null,
-    };
+      if (resolved.unmapped) {
+        reasons.push('ACTIVITY_UNMAPPED');
+      } else if (!incomeUsed) {
+        reasons.push('UNCONFIRMED_INCOME');
+      }
 
-    // Add NEGATIVE_CAPACITY reason when capacity check fails
-    if (!capacityPass && incomeUsed) {
-      reasons.push('NEGATIVE_CAPACITY');
+      if (isPfae && pfae.source === 'TAX_RETURN') {
+        if (policy.bank.taxReturnPolicy === 'REJECTED') {
+          reasons.push('TAX_RETURN_REJECTED');
+        } else if (policy.bank.taxReturnPolicy === 'NOT_PREFERRED') {
+          reasons.push('TAX_RETURN_NOT_PREFERRED');
+        }
+      }
+
+      const liabilities = inputs.totalMonthlyLiabilities
+        ? new Prisma.Decimal(inputs.totalMonthlyLiabilities)
+        : new Prisma.Decimal(0);
+
+      if (incomeUsed) {
+        maximumDebt = incomeUsed.mul(debtCommitmentFactor);
+        availableCapacity = maximumDebt.minus(liabilities);
+      }
+
+      const capacityPass = incomeUsed && availableCapacity && availableCapacity.gt(0);
+      checks.capacity = {
+        status: capacityPass ? 'PASS' : incomeUsed ? 'FAIL' : 'REQUIRES_REVIEW',
+        availableCapacity: availableCapacity ? d2(availableCapacity) : null,
+      };
+
+      if (!capacityPass && incomeUsed) {
+        reasons.push('NEGATIVE_CAPACITY');
+      }
     }
 
     // ── Minimum Applicant Age Control ────────────────────────────────
@@ -806,7 +907,10 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Employment / activity tenure ──────────────────────────────────
-    if (isPfae) {
+    if (pmDecision) {
+      checks.employmentTenure = { status: 'NOT_APPLICABLE' };
+      checks.activityTenure = pmDecision.activityTenure;
+    } else if (isPfae) {
       checks.employmentTenure = { status: 'NOT_APPLICABLE' };
       if (pfae.activityStartDate !== null && policy.minimumActivityTenureMonths !== null) {
         const tenureMonths = completeMonthsBetween(pfae.activityStartDate, calculatedAt);
@@ -855,7 +959,7 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Scotiabank Pagadora Exclusion ────────────────────────────────
-    if (policy.bank.code === 'SCOTIABANK' && hasPagadoraIncome && scotiabankExcluded) {
+    if (!pmDecision && policy.bank.code === 'SCOTIABANK' && hasPagadoraIncome && scotiabankExcluded) {
       reasons.push('SCOTIABANK_PAGADORA_EXCLUSION');
     }
 
@@ -966,7 +1070,9 @@ export class BankViabilityRule implements AnalysisRule {
     }
 
     // ── Status Precedence ────────────────────────────────────────────
-    const status = this.resolveProductStatus(checks, reasons, !incomeUsed, currentAgeMonths === null);
+    const status = pmDecision
+      ? foldPmStatus(pmDecision.status, reasons, checks)
+      : this.resolveProductStatus(checks, reasons, !incomeUsed, currentAgeMonths === null);
 
     // ── Calculation ──────────────────────────────────────────────────
     const ageAtMaturityMonths =
@@ -975,21 +1081,24 @@ export class BankViabilityRule implements AnalysisRule {
     const calculation: BankResultCalculation = {
       incomeUsed: incomeUsed ? d2(incomeUsed) : null,
       maximumDebt: maximumDebt ? d2(maximumDebt) : null,
-      totalMonthlyLiabilities: inputs.totalMonthlyLiabilities,
+      totalMonthlyLiabilities:
+        pmDecision?.liabilityForDisplay != null
+          ? pmDecision.liabilityForDisplay.toFixed(2)
+          : inputs.totalMonthlyLiabilities,
       availableCapacity: availableCapacity ? d2(availableCapacity) : null,
       currentAgeMonths,
       ageAtMaturityMonths,
       employmentTenureMonths:
-        employmentStartDate !== null
-          ? completeMonthsBetween(employmentStartDate, calculatedAt)
-          : null,
+        pmDecision || employmentStartDate === null
+          ? null
+          : completeMonthsBetween(employmentStartDate, calculatedAt),
     };
 
     // ── Policy Snapshot ──────────────────────────────────────────────
     const policySnapshot: BankPolicySnapshot = {
       bankName: policy.bank.name,
       incomeCriterion: policy.bank.incomeCriterion,
-      debtCommitmentFactor: d2(new Prisma.Decimal(policy.bank.debtCommitmentFactor.toString())),
+      debtCommitmentFactor: d2(debtCommitmentFactor),
       minimumEmploymentTenureMonths: policy.minimumEmploymentTenureMonths,
       minimumApplicantAgeMonths: policy.minimumApplicantAgeMonths,
       maximumApplicationAgeMonths: policy.maximumApplicationAgeMonths,
@@ -1010,10 +1119,18 @@ export class BankViabilityRule implements AnalysisRule {
       policySnapshot,
       calculation,
       checks,
-      appliedFactor: pfaeFactor?.factor != null ? d2(pfaeFactor.factor) : null,
-      factorMode: pfaeFactor?.factorMode ?? null,
-      matchedNativeLabel: pfaeFactor?.matchedNativeLabel ?? null,
-      satDescription: isPfae ? pfae.satDescription : null,
+      appliedFactor: pmDecision
+        ? pmDecision.appliedFactor
+        : pfaeFactor?.factor != null
+          ? d2(pfaeFactor.factor)
+          : null,
+      factorMode: pmDecision ? pmDecision.factorMode : (pfaeFactor?.factorMode ?? null),
+      matchedNativeLabel: pmDecision
+        ? pmDecision.matchedNativeLabel
+        : (pfaeFactor?.matchedNativeLabel ?? null),
+      satDescription: isPfae
+        ? pfae.satDescription
+        : (pmDecision ? (pm?.bases?.activity.description ?? null) : null),
       taxReturnPolicy: isPfae ? (policy.bank.taxReturnPolicy as TaxReturnPolicy) : null,
       ...(scopedExclusion.kind === 'excluded'
         ? { matchedExclusionLabel: scopedExclusion.label }

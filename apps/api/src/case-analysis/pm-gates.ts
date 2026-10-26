@@ -53,6 +53,13 @@ export interface PmGatesResult {
 }
 
 const AGE_LIMIT_MONTHS = 80 * 12 + 6;
+
+/** PDF company-operation months. The CMA activity column stays the PFAE arraigo. */
+export const PM_COMPANY_TENURE_MONTHS: Partial<Record<PmGateBankCode, number>> = {
+  SCOTIABANK: 48,
+  BANORTE: 24,
+  CITIBANAMEX: 48,
+};
 const FAMILY =
   /c[oó]nyuge|espos[oa]|hijo|hija|padre|madre|herman[oa]/i;
 
@@ -140,7 +147,13 @@ function locksForBank(
         message: 'Scotiabank pide al menos 51% de las acciones.',
       });
     }
-    pushCompanyAge(locks, companyMonths, 48, 'ANTIGUEDAD_EMPRESA_SCOTIABANK', 'Scotiabank pide 4 años de constitución.');
+    pushCompanyAge(
+      locks,
+      companyMonths,
+      PM_COMPANY_TENURE_MONTHS.SCOTIABANK ?? 48,
+      'ANTIGUEDAD_EMPRESA_SCOTIABANK',
+      'Scotiabank pide 4 años de constitución.',
+    );
   }
 
   if (bank === 'BANORTE') {
@@ -151,7 +164,13 @@ function locksForBank(
         message: 'Banorte pide al menos 10% de las acciones.',
       });
     }
-    pushCompanyAge(locks, companyMonths, 24, 'ANTIGUEDAD_EMPRESA_BANORTE', 'Banorte pide 2 años de constitución.');
+    pushCompanyAge(
+      locks,
+      companyMonths,
+      PM_COMPANY_TENURE_MONTHS.BANORTE ?? 24,
+      'ANTIGUEDAD_EMPRESA_BANORTE',
+      'Banorte pide 2 años de constitución.',
+    );
     if (!input.companyBureauPresent) {
       locks.push({
         code: 'BURO_EMPRESA_BANORTE',
@@ -191,7 +210,13 @@ function locksForBank(
         message: 'Banamex pide más de 50% del solicitante o de su familia directa.',
       });
     }
-    pushCompanyAge(locks, companyMonths, 48, 'ANTIGUEDAD_EMPRESA_BANAMEX', 'Banamex pide 4 años de constitución.');
+    pushCompanyAge(
+      locks,
+      companyMonths,
+      PM_COMPANY_TENURE_MONTHS.CITIBANAMEX ?? 48,
+      'ANTIGUEDAD_EMPRESA_BANAMEX',
+      'Banamex pide 4 años de constitución.',
+    );
   }
 
   return locks;
