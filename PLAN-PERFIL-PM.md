@@ -105,6 +105,24 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 
 ---
 
+## Correcciones de la prueba Alimentos Rápidos (23 oct 2026)
+
+Caso real, solo documentos de la empresa: CSF, buró PM y seis estados BBVA (abril–septiembre 2026). La carátula y la CSF salieron bien. El peinado y el buró no. El motor se detuvo por restaurante con 6 meses y por falta de % de acciones; esos dos frenos están bien y no se tocan.
+
+Orden acordado: corregir el peinado BBVA y el buró de la empresa antes de HU-29. La comparativa y la UI leen esas cifras. Lo demás no frena la siguiente historia.
+
+| # | Corrección | Por qué | Cuándo |
+|---|------------|---------|--------|
+| 1 | Peinado BBVA. Si la suma de movimientos no cuadra con la carátula, ese mes no entra al promedio. Hoy el ingreso usa `totalValidIncome` aunque el chequeo marque discrepancia crítica. En la prueba el abono leído quedó ~43% arriba (abril 6.50 millones contra 9.74). | HU-25 / HU-27. Base del ingreso. | Primero, antes de HU-29 |
+| 2 | Buró PM: una fila por crédito, con cuenta, otorgado, saldo, vencido y plazo. Python omite contratos con letras (`MPM00080`, el arrendamiento de 29.3 millones). Gemini no trae la cuenta y el merge agrega otra vez las filas de Python (10 créditos en el PDF, 15 guardados). El vencido cayó en el campo de pago. | HU-26 | Junto con el peinado, antes de HU-29 |
+| 3 | Un crédito comercial (Soriana) no deja incompleto el pasivo de los créditos financieros. Se informa aparte. | HU-26 | Con el buró |
+| 4 | Fecha de consulta del buró PM. En este reporte la fecha está antes de la etiqueta y el lector la busca después. Consultas de 12 meses: 18 en el PDF, 17 guardadas. | Extracción de buró | Después de 1–3. No frena HU-29 |
+| 5 | Guardar el cuadro de accionistas que trae el buró de la empresa. El % oficial sigue saliendo del acta. En la prueba era el único cuadro (51% / 49%) y no se guardó. | HU-26, sin cambiar la fuente del % | Después. No frena HU-29 |
+| 6 | Unir denominación y régimen de capital de la CSF (S.A. de C.V.) antes de comparar la razón social con buró y estados. | HU-23 / HU-28 | Después. No frenó esta prueba |
+| 7 | `emptyGates` no existía y la API no arrancaba. La función ya está definida y los expedientes que no son persona moral siguen en PASS. | HU-28 | Incluido en el commit previo al peinado |
+
+---
+
 ## Arquitectura
 
 Mismo principio que PFAE: `personType` como discriminador. No hay segundo pipeline.

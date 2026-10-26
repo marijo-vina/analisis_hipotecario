@@ -16,6 +16,16 @@ import type { AnalysisOutcome } from '../../generated/prisma/client';
 
 const RULE_ID = 'pm-gates';
 
+function emptyGates(): PmGatesResult {
+  return {
+    banks: [],
+    companyIdentity: 'PASS',
+    identityLocks: [],
+    prohibitedActivity: null,
+    ageExceeded: false,
+  };
+}
+
 interface OwnedDocument {
   owner?: string | null;
   extractedData?: unknown;
