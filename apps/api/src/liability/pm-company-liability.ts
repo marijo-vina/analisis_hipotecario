@@ -33,6 +33,18 @@ export interface PmCompanyLiabilityResult {
 
 const REVOLVING_MARKERS = ['REVOLVING', 'REVOLVENTE', 'TARJETA'];
 
+const COMMERCIAL_MARKERS = [
+  'COMERCIAL',
+  'DEPARTMENT_STORE',
+  'SORIANA',
+  'TELCEL',
+  'LIVERPOOL',
+  'COPPEL',
+  'ELEKTRA',
+  'WALMART',
+  'SUBURBIA',
+];
+
 /**
  * Simple: (monto original / (plazo días / 30)) × %PA
  * Revolving: MAX(monto original, monto vigente) × 10% × %PA
@@ -90,6 +102,18 @@ export function calculatePmCompanyCredit(
       ruleApplied: RuleApplied.CLOSED_ZERO,
       liabilityStatus: LiabilityStatus.CALCULATED,
       classificationReason: null,
+    };
+  }
+
+  if (isCommercialCompanyCredit(credit)) {
+    return {
+      ...base,
+      monthlyDebtContribution: 0,
+      creditNature: CreditNature.UNKNOWN,
+      ruleApplied: RuleApplied.PM_COMMERCIAL,
+      liabilityStatus: LiabilityStatus.CALCULATED,
+      classificationReason:
+        'Crédito comercial. Se informa aparte y no entra al pasivo financiero de la empresa.',
     };
   }
 
@@ -186,6 +210,14 @@ function incomplete(
     liabilityStatus: LiabilityStatus.INCOMPLETE,
     classificationReason: reason,
   };
+}
+
+export function isCommercialCompanyCredit(
+  credit: Pick<PmCompanyCreditInput, 'institution' | 'creditType' | 'classification'>,
+): boolean {
+  const text = `${credit.institution} ${credit.creditType} ${credit.classification}`
+    .toUpperCase();
+  return COMMERCIAL_MARKERS.some((marker) => text.includes(marker));
 }
 
 export function isRevolving(credit: Pick<PmCompanyCreditInput, 'classification' | 'creditType'>): boolean {

@@ -48,6 +48,8 @@ export enum RuleApplied {
   INCOMPLETE_DATA = 'INCOMPLETE_DATA',
   PM_SIMPLE = 'PM_SIMPLE',
   PM_REVOLVING = 'PM_REVOLVING',
+  /** Shown on the company list and kept out of the financial total. */
+  PM_COMMERCIAL = 'PM_COMMERCIAL',
 }
 
 // ── Interfaces ───────────────────────────────────────────────────────────

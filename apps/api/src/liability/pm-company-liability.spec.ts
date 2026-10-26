@@ -89,4 +89,37 @@ describe('calculatePmCompanyLiabilities', () => {
     expect(result.pmMonthlyDebt).toBe(0);
     expect(result.credits[0].monthlyDebtContribution).toBe(0);
   });
+
+  it('keeps a commercial credit out of the financial total', () => {
+    const result = calculatePmCompanyLiabilities(
+      [
+        {
+          creditReference: 'simple-30',
+          institution: 'BANCO',
+          creditType: 'CREDITO SIMPLE',
+          classification: 'FIXED_PAYMENT',
+          isClosed: false,
+          originalAmount: 24_000,
+          currentBalance: 24_000,
+          termDays: 30,
+        },
+        {
+          creditReference: 'soriana',
+          institution: 'SORIANA',
+          creditType: 'COMERCIAL',
+          classification: 'DEPARTMENT_STORE',
+          isClosed: false,
+          originalAmount: null,
+          currentBalance: null,
+          termDays: null,
+        },
+      ],
+      50,
+    );
+
+    expect(result.hasIncomplete).toBe(false);
+    expect(result.pmMonthlyDebt).toBe(12000);
+    expect(result.credits[1].monthlyDebtContribution).toBe(0);
+    expect(result.credits[1].ruleApplied).toBe('PM_COMMERCIAL');
+  });
 });

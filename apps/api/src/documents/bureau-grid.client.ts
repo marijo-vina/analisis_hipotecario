@@ -284,12 +284,60 @@ export function mergeBureauGrid(
   }
 }
 
+function companyAccountKey(value: unknown): string {
+  return String(value ?? '')
+    .replace(/[^0-9A-Za-z]/g, '')
+    .toUpperCase();
+}
+
 function sameCompanyAccount(left: string, right: string): boolean {
   if (!left || !right) return false;
   if (left === right) return true;
-  const short = left.length <= right.length ? left : right;
-  const long = left.length < right.length ? right : left;
+  if (/[A-Z]/.test(left) || /[A-Z]/.test(right)) return false;
+  const leftDigits = left.replace(/\D/g, '');
+  const rightDigits = right.replace(/\D/g, '');
+  if (!leftDigits || !rightDigits) return false;
+  if (leftDigits === rightDigits) return true;
+  const short = leftDigits.length <= rightDigits.length ? leftDigits : rightDigits;
+  const long = leftDigits.length < rightDigits.length ? rightDigits : leftDigits;
   return short.length >= 6 && long.endsWith(short);
+}
+
+function moneyEqual(left: unknown, right: number | null): boolean {
+  return (
+    typeof left === 'number' &&
+    right != null &&
+    Number.isFinite(left) &&
+    Math.abs(left - right) < 1
+  );
+}
+
+/**
+ * Two agreeing figures, and at least one of them is not zero.
+ * A zero balance alone is not enough to call two credits the same.
+ */
+function companyAmountScore(
+  credit: Record<string, unknown>,
+  row: CompanyBureauGridCredit,
+): number {
+  let hits = 0;
+  let nonzero = false;
+  if (moneyEqual(credit.originalAmount, row.originalAmount)) {
+    hits += 1;
+    if (row.originalAmount) nonzero = true;
+  }
+  if (moneyEqual(credit.currentBalance, row.currentBalance)) {
+    hits += 1;
+    if (row.currentBalance) nonzero = true;
+  }
+  const overdue =
+    moneyEqual(credit.pastDueAmount, row.pastDueAmount) ||
+    moneyEqual(credit.paymentDueAmount, row.pastDueAmount);
+  if (overdue) {
+    hits += 1;
+    if (row.pastDueAmount) nonzero = true;
+  }
+  return nonzero && hits >= 2 ? hits : 0;
 }
 
 function applyCompanyRow(
@@ -304,7 +352,15 @@ function applyCompanyRow(
   }
   if (row.originalAmount != null) credit.originalAmount = row.originalAmount;
   if (row.currentBalance != null) credit.currentBalance = row.currentBalance;
-  if (row.pastDueAmount != null) credit.pastDueAmount = row.pastDueAmount;
+  if (row.pastDueAmount != null) {
+    credit.pastDueAmount = row.pastDueAmount;
+    if (
+      row.pastDueAmount !== 0 &&
+      credit.paymentDueAmount === row.pastDueAmount
+    ) {
+      credit.paymentDueAmount = null;
+    }
+  }
   if (row.termDays != null) credit.termDays = row.termDays;
   if (Array.isArray(row.mopCodes) && row.mopCodes.length > 0) {
     credit.mopCodes = row.mopCodes.map((code) => String(code));
@@ -322,22 +378,69 @@ export function mergeCompanyBureauGrid(
   grid: CompanyBureauGridCredit[],
 ): void {
   const claimed = new Set<number>();
+  const used = new Set<Record<string, unknown>>();
+
+  const take = (credit: Record<string, unknown>, index: number): void => {
+    claimed.add(index);
+    used.add(credit);
+    applyCompanyRow(credit, grid[index]);
+  };
+
   for (const credit of credits) {
-    const account = accountFromCredit(credit);
+    const account = companyAccountKey(credit.accountNumber);
     if (!account) continue;
     const match = grid.findIndex(
       (row, index) =>
         !claimed.has(index) &&
-        sameCompanyAccount(account, digits(row.accountNumber)),
+        sameCompanyAccount(account, companyAccountKey(row.accountNumber)),
     );
     if (match === -1) continue;
-    claimed.add(match);
-    applyCompanyRow(credit, grid[match]);
+    take(credit, match);
   }
+
   for (const [index, row] of grid.entries()) {
     if (claimed.has(index)) continue;
+    const candidates = credits.filter(
+      (credit) => !used.has(credit) && companyAmountScore(credit, row) > 0,
+    );
+    if (candidates.length === 1) {
+      take(candidates[0], index);
+      continue;
+    }
     const credit: Record<string, unknown> = { status: 'ACTIVE' };
     applyCompanyRow(credit, row);
     credits.push(credit);
+  }
+
+  moveCommercialOverdueOutOfPayment(credits);
+}
+
+const COMMERCIAL_CREDIT_MARKERS = [
+  'COMERCIAL',
+  'DEPARTMENT_STORE',
+  'SORIANA',
+  'TELCEL',
+  'LIVERPOOL',
+  'COPPEL',
+];
+
+function moveCommercialOverdueOutOfPayment(
+  credits: Record<string, unknown>[],
+): void {
+  for (const credit of credits) {
+    const text = `${credit.institution ?? ''} ${credit.creditType ?? ''} ${credit.classification ?? ''}`
+      .toUpperCase();
+    if (!COMMERCIAL_CREDIT_MARKERS.some((marker) => text.includes(marker))) {
+      continue;
+    }
+    const payment = credit.paymentDueAmount;
+    if (
+      (credit.pastDueAmount == null || credit.pastDueAmount === '') &&
+      typeof payment === 'number' &&
+      payment !== 0
+    ) {
+      credit.pastDueAmount = payment;
+      credit.paymentDueAmount = null;
+    }
   }
 }

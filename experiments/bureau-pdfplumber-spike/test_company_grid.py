@@ -65,5 +65,20 @@ class CompanyGridTest(unittest.TestCase):
         self.assertIn("3", late["mopCodes"])
 
 
+class AccountTokenTest(unittest.TestCase):
+    def test_letter_contract_is_an_account_and_a_short_code_is_not(self):
+        from company_grid import Token, choose_account
+
+        chosen = choose_account(
+            [
+                Token("N5", 40, 10),
+                Token("CIB2323", 40, 20),
+                Token("MPM00080", 40, 30),
+            ]
+        )
+        self.assertIsNotNone(chosen)
+        self.assertEqual(chosen.text, "MPM00080")
+
+
 if __name__ == "__main__":
     unittest.main()

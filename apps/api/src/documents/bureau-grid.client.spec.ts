@@ -232,4 +232,80 @@ describe('mergeCompanyBureauGrid', () => {
     expect(credits[0].originalAmount).toBe(3_850_000);
     expect(credits[0].status).toBe('ACTIVE');
   });
+
+  it('fills the account on the existing row instead of appending a second copy', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'ARRENDADORA',
+        accountNumber: null,
+        originalAmount: 29_311_000,
+        currentBalance: 26_610_000,
+        paymentDueAmount: null,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [
+      {
+        institution: 'ARRENDADORA',
+        accountNumber: 'MPM00080',
+        creditType: 'ARRENDAMIENTO PURO',
+        classification: 'FIXED_PAYMENT',
+        originalAmount: 29_311_000,
+        currentBalance: 26_610_000,
+        pastDueAmount: 0,
+        termDays: 7296,
+      },
+    ]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].accountNumber).toBe('MPM00080');
+    expect(credits[0].termDays).toBe(7296);
+  });
+
+  it('moves a past-due amount out of the payment field', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'BANCA MIFEL',
+        accountNumber: null,
+        originalAmount: 3_750_000,
+        currentBalance: 0,
+        paymentDueAmount: 679_000,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [
+      {
+        institution: 'BANCA MIFEL',
+        accountNumber: '03000459980',
+        creditType: 'SIMPLE',
+        classification: 'FIXED_PAYMENT',
+        originalAmount: 3_750_000,
+        currentBalance: 0,
+        pastDueAmount: 679_000,
+        termDays: 1095,
+      },
+    ]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].pastDueAmount).toBe(679_000);
+    expect(credits[0].paymentDueAmount).toBeNull();
+    expect(credits[0].accountNumber).toBe('03000459980');
+  });
+
+  it('keeps a commercial overdue amount out of the payment field', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'SORIANA',
+        classification: 'DEPARTMENT_STORE',
+        paymentDueAmount: 58_000,
+        currentBalance: 0,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, []);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].pastDueAmount).toBe(58_000);
+    expect(credits[0].paymentDueAmount).toBeNull();
+  });
 });

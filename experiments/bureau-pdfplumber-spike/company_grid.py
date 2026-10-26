@@ -14,6 +14,7 @@ import pdfplumber
 from grid import MARKER_RE, Token, collect_mop_codes, fold, nearest
 
 DATE_RE = re.compile(r"^[A-Z]{3}-\d{2}$", re.IGNORECASE)
+ACCOUNT_NOISE = re.compile(r"[^0-9A-Za-z]")
 
 
 def is_company_report(text: str) -> bool:
@@ -47,6 +48,27 @@ def active_header_centers(words: list[dict]) -> dict[str, float] | None:
     return {key: value[1] for key, value in chosen.items()}
 
 
+def is_account_token(text: str) -> bool:
+    """A contract may include letters (MPM00080). It needs at least five digits."""
+    compact = ACCOUNT_NOISE.sub("", text)
+    if len(compact) < 5 or DATE_RE.match(compact):
+        return False
+    return sum(character.isdigit() for character in compact) >= 5
+
+
+def choose_account(tokens: list[Token]) -> Token | None:
+    candidates = [token for token in tokens if is_account_token(token.text)]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda token: (
+            sum(character.isdigit() for character in token.text),
+            len(token.text),
+        ),
+    )
+
+
 def pesos_from_thousands(value: float | None) -> int | None:
     if value is None:
         return None
@@ -58,7 +80,7 @@ def classification_for(credit_type: str | None) -> str:
     folded = fold(credit_type or "").replace("?", "")
     if any(token in folded for token in ("REVOLV", "LINEA", "LNEA", "TARJETA", "T. CRED", "T CRED")):
         return "REVOLVING"
-    if "SIMPLE" in folded or "ARREND" in folded:
+    if "SIMPLE" in folded or "ARREND" in folded or "ARREN" in folded:
         return "FIXED_PAYMENT"
     return "UNKNOWN"
 
@@ -93,10 +115,7 @@ def _credits_on_page(
         bottom = markers[index + 1].y if index + 1 < len(markers) else marker.y + 80
         block = [token for token in tokens if marker.y - 2 <= token.y < bottom - 1]
         left = [token for token in block if token.x < 160 and token is not marker]
-        account = next(
-            (token for token in left if token.text.isdigit() and len(token.text) >= 5),
-            None,
-        )
+        account = choose_account(left)
         if account is None:
             continue
         name_tokens = [token for token in left if token.y < account.y - 1]
