@@ -35,7 +35,39 @@ export class BureauGridClient {
     return credits as CompanyBureauGridCredit[] | null;
   }
 
+  /** BBVA movement rows whose amount sits in the ABONOS column. */
+  async extractBbvaDeposits(pdf: Buffer): Promise<BbvaGridDeposit[] | null> {
+    const body = await this.postJson('/extract/bbva-statement', pdf);
+    const rows = body?.deposits;
+    if (!Array.isArray(rows)) return null;
+    const deposits: BbvaGridDeposit[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const amount = (row as { amount?: unknown }).amount;
+      const concept = (row as { concept?: unknown }).concept;
+      const date = (row as { date?: unknown }).date;
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+        continue;
+      }
+      deposits.push({
+        date: typeof date === 'string' && date.trim() !== '' ? date : null,
+        amount,
+        concept: typeof concept === 'string' ? concept : '',
+      });
+    }
+    return deposits.length > 0 ? deposits : null;
+  }
+
   private async post(path: string, pdf: Buffer): Promise<unknown[] | null> {
+    const body = await this.postJson(path, pdf);
+    if (!body || !Array.isArray(body.credits)) return null;
+    return body.credits;
+  }
+
+  private async postJson(
+    path: string,
+    pdf: Buffer,
+  ): Promise<{ credits?: unknown; deposits?: unknown } | null> {
     const base =
       this.configService.get<string>('BUREAU_GRID_URL') ??
       'http://127.0.0.1:8077';
@@ -60,9 +92,11 @@ export class BureauGridClient {
         );
         return null;
       }
-      const body = (await response.json()) as { credits?: unknown };
-      if (!body || !Array.isArray(body.credits)) return null;
-      return body.credits;
+      const body = (await response.json()) as {
+        credits?: unknown;
+        deposits?: unknown;
+      };
+      return body ?? null;
     } catch (err) {
       this.logger.warn(
         `[BureauGrid] Unavailable, keeping the current extraction: ${(err as Error).message}`,
@@ -72,6 +106,13 @@ export class BureauGridClient {
       clearTimeout(timer);
     }
   }
+}
+
+/** One BBVA deposit taken from the ABONOS column. */
+export interface BbvaGridDeposit {
+  date: string | null;
+  amount: number;
+  concept: string;
 }
 
 /** One active credit from a Personas Morales report, already in pesos. */

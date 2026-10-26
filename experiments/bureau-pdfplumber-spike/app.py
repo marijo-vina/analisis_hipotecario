@@ -8,6 +8,7 @@ from io import BytesIO
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
+from bbva_statement import extract_bbva_bytes
 from company_grid import company_payload
 from grid import extract_bytes, grid_payload
 
@@ -34,3 +35,13 @@ async def extract_bureau_company(file: UploadFile = File(...)) -> dict:
     if not data.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Se esperaba un PDF")
     return company_payload(BytesIO(data))
+
+
+@app.post("/extract/bbva-statement")
+async def extract_bbva_statement(file: UploadFile = File(...)) -> dict:
+    data = await file.read()
+    if not data.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Se esperaba un PDF")
+    deposits = extract_bbva_bytes(data)
+    total = round(sum(row["amount"] for row in deposits), 2)
+    return {"deposits": deposits, "count": len(deposits), "total": total}

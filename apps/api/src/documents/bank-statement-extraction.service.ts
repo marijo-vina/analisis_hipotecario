@@ -12,6 +12,9 @@ import {
   GridDiagnostics,
 } from './bank-statement-grid.extractor';
 import { OcrLayout } from './document-ai.types';
+import { bbvaDepositsMatchCover } from './bbva-statement';
+import { BureauGridClient } from './bureau-grid.client';
+import { GcsService } from './gcs.service';
 import {
   employersFromDocuments,
   promoteEmployerPayrollDeposits,
@@ -298,7 +301,7 @@ export interface BankStatementDiagnostics {
   };
   grid: GridDiagnostics | null;
   transactions: {
-    source: 'grid' | 'gemini-fallback' | 'none';
+    source: 'grid' | 'gemini-fallback' | 'bbva-pdf' | 'none';
     count: number;
   };
   coverTextChars: number;
@@ -337,6 +340,8 @@ export class BankStatementExtractionService {
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
     private readonly cleanerService: BankStatementCleanerService,
+    private readonly gcsService: GcsService,
+    private readonly bureauGrid: BureauGridClient,
   ) {}
 
   static isBankStatementDocument(documentTypeCode: string): boolean {
@@ -604,7 +609,8 @@ export class BankStatementExtractionService {
 
     let rawTransactions: RawTransaction[] = [];
     let gridDiagnostics: GridDiagnostics | null = null;
-    let transactionSource: 'grid' | 'gemini-fallback' | 'none' = 'none';
+    let transactionSource: 'grid' | 'gemini-fallback' | 'bbva-pdf' | 'none' =
+      'none';
     const gridStart = Date.now();
     if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
       const gridOutput = BankStatementGridExtractor.extractWithDiagnostics(
@@ -631,6 +637,17 @@ export class BankStatementExtractionService {
     const statementSummary = (data.statementSummary ||
       data.statementPeriod ||
       {}) as StatementSummary;
+
+    const bbvaDeposits = await this.readBbvaDeposits(
+      document,
+      data,
+      statementSummary,
+    );
+    if (bbvaDeposits) {
+      rawTransactions = bbvaDeposits;
+      data.allTransactions = bbvaDeposits;
+      transactionSource = 'bbva-pdf';
+    }
 
     const cleanerStart = Date.now();
     const depurationResult = this.cleanerService.clean(
@@ -756,6 +773,42 @@ export class BankStatementExtractionService {
       missingFields,
       diagnostics: collectDiagnostics ? diagnostics : undefined,
     };
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: BBVA deposits from the PDF column, when they match the cover
+  // -----------------------------------------------------------------------
+  private async readBbvaDeposits(
+    document: { storagePath?: string | null },
+    data: Record<string, unknown>,
+    summary: StatementSummary,
+  ): Promise<RawTransaction[] | null> {
+    const bank = (data.bank ?? {}) as { institutionName?: string | null };
+    const institution = bank.institutionName ?? '';
+    if (!/BBVA/i.test(institution) || !document.storagePath) return null;
+    try {
+      const pdf = await this.gcsService.downloadFile(document.storagePath);
+      const deposits = await this.bureauGrid.extractBbvaDeposits(pdf);
+      if (!deposits) return null;
+      if (!bbvaDepositsMatchCover(deposits, summary.totalDepositsAmount)) {
+        this.logger.warn(
+          '[BankStatement] BBVA column read did not match the cover; keeping the OCR movements',
+        );
+        return null;
+      }
+      return deposits.map((row) => ({
+        date: row.date,
+        amount: row.amount,
+        currency: 'MXN',
+        movementType: 'DEPOSIT',
+        originalConcept: row.concept,
+      }));
+    } catch (err) {
+      this.logger.warn(
+        `[BankStatement] BBVA column read failed; keeping the OCR movements: ${(err as Error).message}`,
+      );
+      return null;
+    }
   }
 
   // -----------------------------------------------------------------------

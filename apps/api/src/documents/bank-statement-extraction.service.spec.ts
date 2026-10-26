@@ -6,6 +6,8 @@ import {
   BankStatementExtractionResult,
 } from './bank-statement-extraction.service';
 import { BankStatementCleanerService } from './bank-statement-cleaner.service';
+import { BureauGridClient } from './bureau-grid.client';
+import { GcsService } from './gcs.service';
 
 // ---------------------------------------------------------------------------
 // Helpers — mock document builder
@@ -166,6 +168,8 @@ describe('BankStatementExtractionService', () => {
     documentStatus: { findUnique: jest.Mock };
   };
   let mockGemini: { extractStructuredData: jest.Mock };
+  let mockGcs: { downloadFile: jest.Mock };
+  let mockBbva: { extractBbvaDeposits: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -196,6 +200,8 @@ describe('BankStatementExtractionService', () => {
       },
     };
     mockGemini = { extractStructuredData: jest.fn() };
+    mockGcs = { downloadFile: jest.fn() };
+    mockBbva = { extractBbvaDeposits: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -203,6 +209,8 @@ describe('BankStatementExtractionService', () => {
         BankStatementCleanerService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GeminiService, useValue: mockGemini },
+        { provide: GcsService, useValue: mockGcs },
+        { provide: BureauGridClient, useValue: mockBbva },
       ],
     }).compile();
 
@@ -380,6 +388,58 @@ describe('BankStatementExtractionService', () => {
           documentStatusId: 4,
         }),
       });
+    });
+
+    it('uses the BBVA abonos column when the sum matches the cover', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        storagePath: 'case-1/statement.pdf',
+      });
+      mockGcs.downloadFile.mockResolvedValue(Buffer.from('%PDF'));
+      mockBbva.extractBbvaDeposits.mockResolvedValue([
+        {
+          date: '2026-05-06',
+          amount: 15500,
+          concept: 'T20 SPEI RECIBIDO TRASPASO ENTRE CUENTAS PROPIAS',
+        },
+      ]);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const data = result.extractedData as {
+        allTransactions: Array<{ originalConcept: string; amount: number }>;
+        financialDepuration: { integrityCheck: { status: string } };
+      };
+      expect(data.allTransactions).toEqual([
+        expect.objectContaining({
+          amount: 15500,
+          originalConcept: 'T20 SPEI RECIBIDO TRASPASO ENTRE CUENTAS PROPIAS',
+          movementType: 'DEPOSIT',
+        }),
+      ]);
+      expect(data.financialDepuration.integrityCheck.status).toBe('MATCHED');
+    });
+
+    it('keeps the OCR movements when the BBVA column sum does not match the cover', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        storagePath: 'case-1/statement.pdf',
+      });
+      mockGcs.downloadFile.mockResolvedValue(Buffer.from('%PDF'));
+      mockBbva.extractBbvaDeposits.mockResolvedValue([
+        { date: '2026-05-06', amount: 1, concept: 'SALDO MAL LEIDO' },
+      ]);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const data = result.extractedData as {
+        allTransactions: Array<{ originalConcept: string }>;
+      };
+      expect(data.allTransactions[0].originalConcept).toBe('NOMINA MAYO');
     });
   });
 
