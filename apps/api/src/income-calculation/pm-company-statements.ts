@@ -1,6 +1,7 @@
 import { Prisma } from '../generated/prisma/client';
 import type { ActivityResolution } from './income-calculation.types';
 import {
+  hasCriticalCoverDiscrepancy,
   resolveActivity,
   type CsfActivityInput,
 } from './pfae-income.helpers';
@@ -21,6 +22,9 @@ export interface CompanyStatementInput {
     isCurrentIncompleteMonth?: boolean | null;
   };
   financialDepuration?: {
+    integrityCheck?: {
+      status?: string | null;
+    } | null;
     depurationSummary?: {
       totalValidIncome?: number | null;
       validDepositsCount?: number | null;
@@ -76,7 +80,8 @@ function money(value: Prisma.Decimal): number {
 
 /**
  * Sums valid income and valid deposit counts of company statements that share
- * a YYYY-MM period. Skips the incomplete current month.
+ * a YYYY-MM period. Skips the incomplete current month and any statement
+ * whose movements do not match the cover.
  */
 export function groupCompanyStatementMonths(
   statements: CompanyStatementInput[],
@@ -85,6 +90,7 @@ export function groupCompanyStatementMonths(
   for (const statement of statements) {
     const period = statement.statementPeriod ?? {};
     if (period.isCurrentIncompleteMonth === true) continue;
+    if (hasCriticalCoverDiscrepancy(statement)) continue;
     const monthKey =
       monthKeyFromDate(period.periodStartDate) ??
       monthKeyFromDate(period.periodEndDate);

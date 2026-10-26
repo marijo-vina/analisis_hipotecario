@@ -12,6 +12,7 @@ function statement(
   validIncome: number,
   validDepositCount: number,
   incomplete = false,
+  integrityStatus?: string,
 ): CompanyStatementInput {
   return {
     statementPeriod: {
@@ -20,6 +21,7 @@ function statement(
       isCurrentIncompleteMonth: incomplete,
     },
     financialDepuration: {
+      integrityCheck: integrityStatus ? { status: integrityStatus } : undefined,
       depurationSummary: {
         totalValidIncome: validIncome,
         validDepositsCount: validDepositCount,
@@ -59,6 +61,36 @@ describe('groupCompanyStatementMonths', () => {
     ]);
 
     expect(months.map((month) => month.monthKey)).toEqual(['2026-06']);
+  });
+
+  it('leaves out a month whose movements do not match the cover', () => {
+    const months = groupCompanyStatementMonths([
+      statement('2026-04', 9_737_732.26, 45, false, 'CRITICAL_DISCREPANCY'),
+      statement('2026-05', 1_640_304.67, 40, false, 'MATCHED'),
+      statement('2026-06', 100, 5, false, 'MINOR_DIFFERENCE'),
+    ]);
+
+    expect(months.map((month) => month.monthKey)).toEqual([
+      '2026-05',
+      '2026-06',
+    ]);
+    expect(months[0].validIncome).toBe(1_640_304.67);
+  });
+
+  it('keeps a matching account when another account in the same month does not match the cover', () => {
+    const months = groupCompanyStatementMonths([
+      statement('2026-05', 9_000_000, 40, false, 'CRITICAL_DISCREPANCY'),
+      statement('2026-05', 80, 5, false, 'MATCHED'),
+    ]);
+
+    expect(months).toEqual([
+      {
+        monthKey: '2026-05',
+        validIncome: 80,
+        validDepositCount: 5,
+        statementCount: 1,
+      },
+    ]);
   });
 });
 

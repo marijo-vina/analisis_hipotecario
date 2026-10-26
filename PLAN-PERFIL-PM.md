@@ -113,7 +113,7 @@ Orden acordado: corregir el peinado BBVA y el buró de la empresa antes de HU-29
 
 | # | Corrección | Por qué | Cuándo |
 |---|------------|---------|--------|
-| 1 | Peinado BBVA. Si la suma de movimientos no cuadra con la carátula, ese mes no entra al promedio. Hoy el ingreso usa `totalValidIncome` aunque el chequeo marque discrepancia crítica. En la prueba el abono leído quedó ~43% arriba (abril 6.50 millones contra 9.74). | HU-25 / HU-27. Base del ingreso. | Primero, antes de HU-29 |
+| 1 | Peinado BBVA. Si la suma de movimientos no cuadra con la carátula, ese mes no entra al promedio. El ingreso de PM y PFAE ya no usa `totalValidIncome` cuando el chequeo es `CRITICAL_DISCREPANCY`. Una diferencia menor y un estado sin chequeo siguen entrando. El lector de columnas BBVA sigue inflando el abono; por eso estos meses quedan fuera hasta que el renglón cuadre. | HU-25 / HU-27. Base del ingreso. | Hecho en código, sin commit |
 | 2 | Buró PM: una fila por crédito, con cuenta, otorgado, saldo, vencido y plazo. Python omite contratos con letras (`MPM00080`, el arrendamiento de 29.3 millones). Gemini no trae la cuenta y el merge agrega otra vez las filas de Python (10 créditos en el PDF, 15 guardados). El vencido cayó en el campo de pago. | HU-26 | Junto con el peinado, antes de HU-29 |
 | 3 | Un crédito comercial (Soriana) no deja incompleto el pasivo de los créditos financieros. Se informa aparte. | HU-26 | Con el buró |
 | 4 | Fecha de consulta del buró PM. En este reporte la fecha está antes de la etiqueta y el lector la busca después. Consultas de 12 meses: 18 en el PDF, 17 guardadas. | Extracción de buró | Después de 1–3. No frena HU-29 |
