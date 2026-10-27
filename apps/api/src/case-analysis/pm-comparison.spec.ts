@@ -82,6 +82,8 @@ function bases(share = 50): PmIncomeBases {
       banorteTaxReturn: priced(800),
       hsbcStatements: priced(900),
       hsbcTaxReturn: priced(700),
+      banregioStatements: priced(400),
+      banregioTaxReturn: priced(300),
     },
   };
 }
@@ -213,5 +215,34 @@ describe('PM bank comparison', () => {
     });
     expect(civil.appliedFactor).toBe('0.50');
     expect(civil.matchedNativeLabel).toBe('profesionistas asociados');
+  });
+
+  it('prices Banregio as an accionista without the other banks locks', () => {
+    const pricedBases = bases();
+    pricedBases.capacities.banregioStatements = {
+      status: 'CALCULATED',
+      reason: null,
+      admissibleIncome: 100_000,
+      incomeToConsider: 50_000,
+      maximumDebt: 50_000,
+      capacity: 40_000,
+    };
+
+    const decision = decidePmBank({
+      bankCode: 'BANREGIO',
+      incomeSource: 'BANK_STATEMENTS',
+      bases: pricedBases,
+      gate: null,
+      legalForm: 'S.A. de C.V.',
+      companyTenureMonths: null,
+    });
+
+    expect(decision.status).toBe('PRELIMINARY_VIABLE');
+    expect(decision.availableCapacity).toBe(40_000);
+    expect(decision.incomeUsed).toBe(50_000);
+    expect(decision.appliedFactor).toBe('1.00');
+    expect(decision.matchedNativeLabel).toBe('Accionista');
+    expect(decision.debtCommitmentFactor).toBe('0.50');
+    expect(decision.reasons).not.toContain('PM_SIN_POLITICA');
   });
 });

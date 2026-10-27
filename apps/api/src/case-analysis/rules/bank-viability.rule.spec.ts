@@ -2112,6 +2112,22 @@ describe('BankViabilityRule', () => {
             maximumDebt: 350,
             capacity: 200,
           },
+          banregioStatements: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 100000,
+            incomeToConsider: 50000,
+            maximumDebt: 50000,
+            capacity: 40000,
+          },
+          banregioTaxReturn: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 80000,
+            incomeToConsider: 40000,
+            maximumDebt: 40000,
+            capacity: 30000,
+          },
         },
       };
     }

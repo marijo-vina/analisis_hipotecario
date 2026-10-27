@@ -395,6 +395,8 @@ export class IncomeCalculationService {
         banorteTaxReturn: capacities.banorteTaxReturn,
         hsbcStatements: capacities.hsbcStatements,
         hsbcTaxReturn: capacities.hsbcTaxReturn,
+        banregioStatements: capacities.banregioStatements,
+        banregioTaxReturn: capacities.banregioTaxReturn,
       },
     };
 

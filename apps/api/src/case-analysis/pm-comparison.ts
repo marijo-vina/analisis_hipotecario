@@ -86,6 +86,8 @@ export function resolveBanamexPmFactor(
 }
 
 export function decidePmBank(input: DecidePmBankInput): PmBankDecision {
+  if (input.bankCode === 'BANREGIO') return decideBanregio(input);
+
   const known = (PM_GATE_BANKS as readonly string[]).includes(input.bankCode);
   if (!known || input.gate == null) {
     return emptyDecision('NOT_COMPATIBLE', ['PM_SIN_POLITICA']);
@@ -143,6 +145,38 @@ export function decidePmBank(input: DecidePmBankInput): PmBankDecision {
   };
 }
 
+function decideBanregio(input: DecidePmBankInput): PmBankDecision {
+  const engine = engineCapacity(input);
+  const reasons = engine?.reason ? [engine.reason] : [];
+  const capacity = engine?.capacity ?? null;
+  const negative = capacity != null && capacity <= 0;
+  if (negative) reasons.push('NEGATIVE_CAPACITY');
+
+  let status: ProductMatchStatus = 'PRELIMINARY_VIABLE';
+  if (engine?.status === 'NOT_VIABLE' || negative) status = 'NOT_COMPATIBLE';
+  else if (engine?.status === 'REQUIRES_REVIEW' || engine == null) status = 'REQUIRES_REVIEW';
+
+  const incomeUsed = engine?.incomeToConsider ?? engine?.admissibleIncome ?? null;
+  const maximumDebt = engine?.maximumDebt ?? null;
+  const liability =
+    maximumDebt != null && capacity != null ? round2(maximumDebt - capacity) : null;
+
+  return {
+    status,
+    reasons,
+    incomeUsed,
+    maximumDebt,
+    availableCapacity: capacity,
+    liabilityForDisplay: liability,
+    appliedFactor: '1.00',
+    factorMode: 'FLAT',
+    matchedNativeLabel: 'Accionista',
+    debtCommitmentFactor: '0.50',
+    capacityStatus: capacityStatus(engine?.status ?? null, capacity),
+    activityTenure: { status: 'NOT_APPLICABLE' },
+  };
+}
+
 function appliedFactor(
   input: DecidePmBankInput,
   banamex: BanamexPmFactor | null,
@@ -185,6 +219,11 @@ function engineCapacity(input: DecidePmBankInput) {
     return input.incomeSource === 'TAX_RETURN'
       ? capacities.hsbcTaxReturn
       : capacities.hsbcStatements;
+  }
+  if (input.bankCode === 'BANREGIO') {
+    return input.incomeSource === 'TAX_RETURN'
+      ? capacities.banregioTaxReturn
+      : capacities.banregioStatements;
   }
   return null;
 }

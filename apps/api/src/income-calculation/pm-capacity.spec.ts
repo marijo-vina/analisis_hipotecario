@@ -187,6 +187,33 @@ describe('PM capacity fixture', () => {
     });
   });
 
+  it('prices Banregio from the latest three months at 100% then 50%', () => {
+    const result = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Restaurantes',
+      sharePercentage: null,
+      pmMonthlyDebt: 4_000,
+      pfMonthlyDebt: 6_000,
+      statementMonths: [
+        month('2026-04', 80_000),
+        month('2026-05', 100_000),
+        month('2026-06', 120_000),
+        month('2026-03', 10_000),
+      ],
+    });
+
+    expect(result.banregioStatements).toEqual({
+      status: 'CALCULATED',
+      reason: null,
+      admissibleIncome: 100_000,
+      incomeToConsider: 50_000,
+      maximumDebt: 50_000,
+      capacity: 40_000,
+    });
+  });
+
   it('lets a 50% shareholder through Scotiabank', () => {
     const result = calculatePmCapacities({
       bank,

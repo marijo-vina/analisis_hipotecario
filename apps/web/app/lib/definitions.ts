@@ -437,6 +437,7 @@ export const REASON_LABELS: Record<string, string> = {
   HSBC_LIQUIDITY_ACTIVITY_RESTRICTED: "Giro restringido para liquidez HSBC",
   INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
   MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
+  BANREGIO_MENOS_DE_3_MESES: "Banregio pide 3 meses de estados. El promedio usa los que hay.",
 };
 
 export function getReasonLabel(reason: string): string {

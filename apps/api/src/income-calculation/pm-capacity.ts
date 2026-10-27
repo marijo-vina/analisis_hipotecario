@@ -19,9 +19,12 @@ const BANORTE_CLIENT_FACTOR = new Prisma.Decimal('0.50');
 const BANORTE_PROSPECT_FACTOR = new Prisma.Decimal('0.40');
 const BANORTE_CE = new Prisma.Decimal('0.60');
 const BANORTE_TAX_FACTOR = new Prisma.Decimal('0.85');
+const BANORTE_SIMPLE_MONTHS = 6;
 const HSBC_VISOR_FACTOR = new Prisma.Decimal('0.30');
 const HSBC_CE = new Prisma.Decimal('0.50');
-const BANORTE_SIMPLE_MONTHS = 6;
+const BANREGIO_ACCIONISTA = new Prisma.Decimal('1.00');
+const BANREGIO_ADJUSTMENT = new Prisma.Decimal('0.50');
+const BANREGIO_MONTHS = 3;
 
 export type PmCapacityStatus = 'CALCULATED' | 'NOT_VIABLE' | 'REQUIRES_REVIEW';
 
@@ -62,6 +65,8 @@ export interface PmCapacityResult {
   banorteTaxReturn: PmBankCapacity;
   hsbcStatements: PmBankCapacity;
   hsbcTaxReturn: PmBankCapacity;
+  banregioStatements: PmBankCapacity;
+  banregioTaxReturn: PmBankCapacity;
 }
 
 function pesos(value: Prisma.Decimal): number {
@@ -230,6 +235,8 @@ export function calculatePmCapacities(input: PmCapacityInput): PmCapacityResult 
     banorteTaxReturn: banorteFromTax(input),
     hsbcStatements: hsbcFromBase(input.bank, input),
     hsbcTaxReturn: hsbcFromBase(input.tax, input),
+    banregioStatements: banregioFromStatements(input),
+    banregioTaxReturn: banregioFromBase(input.tax, input),
   };
 }
 
@@ -324,6 +331,54 @@ function banorteFromTax(input: PmCapacityInput): PmBankCapacity {
     admissibleIncome: pesos(capacity),
     incomeToConsider: pesos(capacity),
     maximumDebt: pesos(capacity),
+    capacity: pesos(capacity),
+  };
+}
+
+function banregioFromStatements(input: PmCapacityInput): PmBankCapacity {
+  const months = input.statementMonths ?? [];
+  const average = simpleRecentAverage(months, BANREGIO_MONTHS);
+  const used = Math.min(months.length, BANREGIO_MONTHS);
+  return banregioFromAverage(average, used, input);
+}
+
+function banregioFromBase(base: IncomeBase, input: PmCapacityInput): PmBankCapacity {
+  if (!base.valid || base.monthlyGross == null) {
+    return emptyCapacity('NOT_VIABLE', base.invalidReason ?? 'MISSING_DOCUMENT');
+  }
+  return banregioFromAverage(base.monthlyGross, BANREGIO_MONTHS, input);
+}
+
+function banregioFromAverage(
+  average: number | null,
+  monthsUsed: number,
+  input: PmCapacityInput,
+): PmBankCapacity {
+  if (average == null) {
+    return emptyCapacity('NOT_VIABLE', 'INSUFFICIENT_MONTHS');
+  }
+  if (input.pmMonthlyDebt == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_COMPANY_DEBT');
+  }
+  if (input.pfMonthlyDebt == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_SHAREHOLDER_DEBT');
+  }
+
+  const admissible = new Prisma.Decimal(average)
+    .mul(BANREGIO_ACCIONISTA)
+    .toDecimalPlaces(2);
+  const adjusted = admissible.mul(BANREGIO_ADJUSTMENT).toDecimalPlaces(2);
+  const commitments = new Prisma.Decimal(input.pmMonthlyDebt ?? 0)
+    .plus(input.pfMonthlyDebt ?? 0)
+    .toDecimalPlaces(2);
+  const capacity = adjusted.minus(commitments).toDecimalPlaces(2);
+
+  return {
+    status: 'CALCULATED',
+    reason: monthsUsed < BANREGIO_MONTHS ? 'BANREGIO_MENOS_DE_3_MESES' : null,
+    admissibleIncome: pesos(admissible),
+    incomeToConsider: pesos(adjusted),
+    maximumDebt: pesos(adjusted),
     capacity: pesos(capacity),
   };
 }

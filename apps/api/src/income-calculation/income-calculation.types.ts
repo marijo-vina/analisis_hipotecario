@@ -73,6 +73,8 @@ export interface PmIncomeBases {
     banorteTaxReturn: PmBankCapacity;
     hsbcStatements: PmBankCapacity;
     hsbcTaxReturn: PmBankCapacity;
+    banregioStatements: PmBankCapacity;
+    banregioTaxReturn: PmBankCapacity;
   };
 }
 
