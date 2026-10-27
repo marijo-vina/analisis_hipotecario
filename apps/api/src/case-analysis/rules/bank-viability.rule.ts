@@ -909,7 +909,7 @@ export class BankViabilityRule implements AnalysisRule {
     // ── Employment / activity tenure ──────────────────────────────────
     if (pmDecision) {
       checks.employmentTenure = { status: 'NOT_APPLICABLE' };
-      checks.activityTenure = pmDecision.activityTenure;
+      checks.activityTenure = pmDecision.activityTenure as CheckResult;
     } else if (isPfae) {
       checks.employmentTenure = { status: 'NOT_APPLICABLE' };
       if (pfae.activityStartDate !== null && policy.minimumActivityTenureMonths !== null) {
