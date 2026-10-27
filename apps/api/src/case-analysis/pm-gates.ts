@@ -289,13 +289,26 @@ function distinct(values: string[]): string[] {
 }
 
 function normalizeName(value: string): string {
-  return value
+  const folded = value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  const suffixes = [
+    'S A P I DE C V',
+    'SAPI DE CV',
+    'S DE R L DE C V',
+    'S DE RL DE CV',
+    'S A DE C V',
+    'SA DE CV',
+  ];
+  for (const suffix of suffixes) {
+    if (folded === suffix) return folded;
+    if (folded.endsWith(` ${suffix}`)) return folded.slice(0, -suffix.length).trim();
+  }
+  return folded;
 }
 
 function normalizeRfc(value: string): string {

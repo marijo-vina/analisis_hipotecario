@@ -133,6 +133,12 @@ function companyNames(docs: OwnedPmDocument[], caseName: string | null): string[
     if (doc.documentType?.code === 'TAX_RETURN' && doc.owner === 'COMPANY') {
       names.push(text(data.taxpayerName));
     }
+    if (doc.documentType?.code === 'CREDIT_BUREAU_REPORT' && doc.owner === 'COMPANY') {
+      names.push(text(record(data.borrower).fullName));
+    }
+    if (doc.documentType?.code === 'BANK_STATEMENT' && doc.owner === 'COMPANY') {
+      names.push(text(record(data.accountHolder).fullName));
+    }
   }
   return names.filter((name): name is string => Boolean(name));
 }

@@ -109,7 +109,7 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 
 Caso real, solo documentos de la empresa: CSF, buró PM y seis estados BBVA (abril–septiembre 2026). La carátula, la CSF, el peinado de abonos y la lista de créditos ya cuadran. El motor se detuvo por restaurante con 6 meses y por falta de % de acciones; esos dos frenos están bien y no se tocan.
 
-Orden acordado: el peinado BBVA y el buró de la empresa ya están en `feature/perfil-pm`. HU-29 arranca con esas cifras. Lo que sigue no se mete dentro de la comparativa: se corrige después de HU-29 y antes de HU-30, porque la UI del expediente sí los muestra.
+Orden acordado: el peinado BBVA, el buró de la empresa y las tres correcciones de pantalla (accionistas, razón social y traspaso de abril) ya están en el expediente. HU-30 puede arrancar con eso.
 
 | # | Corrección | Por qué | Cuándo |
 |---|------------|---------|--------|
@@ -117,10 +117,10 @@ Orden acordado: el peinado BBVA y el buró de la empresa ya están en `feature/p
 | 2 | Buró PM: una fila por crédito, con cuenta, otorgado, saldo, vencido y plazo. El contrato con letras (`MPM00080`) ya cuenta como cuenta. Si Gemini ya trae el crédito, no se agrega otra fila. El vencido que cayó en el pago se regresa a vencido. | HU-26 | Hecho. Commit `29e9034`. Reproceso: 10 créditos, los del PDF |
 | 3 | Un crédito comercial (Soriana) no deja incompleto el pasivo de los créditos financieros. Se informa aparte y suma cero en la fórmula. | HU-26 | Hecho. Commit `29e9034`. Soriana y Telcel en cero |
 | 4 | Fecha de consulta del buró PM. En este reporte la fecha está sola en la línea anterior a la etiqueta; la siguiente fecha es la de registro. Consultas de 12 meses: 18. La de julio 2025 queda fuera. | Extracción de buró | Hecho. Expediente reprocesado: fecha `2026-10-20` y 18 consultas guardadas. Enero 2026 venía como `ΕΝΕ` en el OCR |
-| 5 | Guardar el cuadro de accionistas que trae el buró de la empresa. El % oficial sigue saliendo del acta. En la prueba era el único cuadro (51% / 49%) y no se guardó. | HU-26, sin cambiar la fuente del % | Después de HU-29, antes de HU-30 |
-| 6 | Unir denominación y régimen de capital de la CSF (S.A. de C.V.) antes de comparar la razón social con buró y estados. | HU-23 / HU-28 | Después de HU-29, antes de HU-30. No frenó esta prueba |
+| 5 | Guardar el cuadro de accionistas que trae el buró de la empresa. El % oficial sigue saliendo del acta. En la prueba era el único cuadro (51% / 49%) y no se guardó. | HU-26, sin cambiar la fuente del % | Hecho. Expediente: Ingrid Verónica Frías Fuentes 49% y Juan Antonio Frías Fuentes 51%. El % de la comparativa sigue saliendo del acta |
+| 6 | Unir denominación y régimen de capital de la CSF (S.A. de C.V.) antes de comparar la razón social con buró y estados. | HU-23 / HU-28 | Hecho. La constancia quedó `ALIMENTOS RAPIDOS PENINSULARES SA DE CV`. La comparación ignora el sufijo si un documento no lo trae |
 | 7 | `emptyGates` no existía y la API no arrancaba. La función ya está definida y los expedientes que no son persona moral siguen en PASS. | HU-28 | Hecho. Commit `86e668c` |
-| 8 | El traspaso de abril por 182,000 se leyó con el monto correcto y quedó en revisión: el número de referencia va pegado a la palabra traspaso. No cambia la suma de la carátula. | Peinado | Después de HU-29, antes de HU-30 |
+| 8 | El traspaso de abril por 182,000 se leyó con el monto correcto y quedó en revisión: el número de referencia va pegado a la palabra traspaso. No cambia la suma de la carátula. | Peinado | Hecho. Quedó como traspaso entre cuentas propias. El ingreso válido de abril sigue en 1,141,353.11 |
 
 ---
 

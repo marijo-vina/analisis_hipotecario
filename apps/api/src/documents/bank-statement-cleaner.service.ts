@@ -496,7 +496,7 @@ export class BankStatementCleanerService {
   ): boolean {
     // 1. Generic own-transfer phrases
     if (
-      /\b(MIS\s+CUENTAS|TRASPASO\s+(ENTRE\s+)?CUENTAS|TRASPASO\s+PROPIO|MISMO\s+TITULAR|SPEI\s+A\s+MI\s+NOMBRE|RETIRO\/DEPOSITO\s+PROPIO|CUENTA\s+PROPIA)\b/i.test(
+      /\b(MIS\s+CUENTAS|MISMO\s+TITULAR|SPEI\s+A\s+MI\s+NOMBRE|RETIRO\/DEPOSITO\s+PROPIO|CUENTA\s+PROPIA)\b|(?:^|[^A-Z])TRASPASO\s+(?:ENTRE\s+)?CUENTAS|(?:^|[^A-Z])TRASPASO\s+PROPIO/i.test(
         fullText,
       )
     ) {

@@ -84,6 +84,30 @@ describe('evaluatePmGates', () => {
     expect(result.banks.every((item) => item.status === 'NOT_VIABLE')).toBe(true);
   });
 
+  it('treats the denomination and the same name with SA de CV as one company', () => {
+    const result = evaluatePmGates(
+      input({
+        companyNames: [
+          'ALIMENTOS RAPIDOS PENINSULARES',
+          'ALIMENTOS RAPIDOS PENINSULARES SA DE CV',
+          'ALIMENTOS RAPIDOS PENINSULARES S.A. DE C.V.',
+        ],
+      }),
+    );
+
+    expect(result.identityLocks.map((lock) => lock.code)).not.toContain('IDENTIDAD_RAZON_SOCIAL');
+  });
+
+  it('fails company identity when the legal names differ', () => {
+    const result = evaluatePmGates(
+      input({
+        companyNames: ['ALIMENTOS RAPIDOS PENINSULARES', 'OTRA EMPRESA SA DE CV'],
+      }),
+    );
+
+    expect(result.identityLocks.map((lock) => lock.code)).toContain('IDENTIDAD_RAZON_SOCIAL');
+  });
+
   it('fails company identity when the RFC differs and the name does not', () => {
     const result = evaluatePmGates(
       input({ companyRfcs: ['MOD970428AAA', 'XXX010101AAA'] }),

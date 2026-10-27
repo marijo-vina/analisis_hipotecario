@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { extractCompanyShareholders } from './bureau-shareholders';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import {
@@ -829,6 +830,12 @@ export class CreditBureauExtractionService {
     return this.parseBureauDate(after);
   }
 
+  private applyCompanyShareholders(data: Record<string, unknown>, ocrText: string): void {
+    const rows = extractCompanyShareholders(ocrText);
+    if (rows.length === 0) return;
+    data.shareholders = rows;
+  }
+
   private foldLatinLookalikes(text: string): string {
     const greekToLatin: Record<string, string> = {
       '\u0391': 'A', '\u0392': 'B', '\u0395': 'E', '\u0397': 'H',
@@ -1184,6 +1191,7 @@ export class CreditBureauExtractionService {
           }
           data.report = reportData;
         }
+        this.applyCompanyShareholders(data, document.ocrText);
         this.normalizeCreditBureau(data);
         this.applyCompanyGrid(data, companyGridCredits);
         data.alerts = this.computeAlerts(data);
@@ -1264,6 +1272,7 @@ export class CreditBureauExtractionService {
       }
       data.report = reportData;
     }
+    this.applyCompanyShareholders(data, document.ocrText);
 
     // ── 9. Disambiguate payment fields using OCR text (Layer 1 only) ──
     // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount. This

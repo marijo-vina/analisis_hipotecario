@@ -134,6 +134,20 @@ describe('CsfExtractionService', () => {
       expect(mixedAlert?.severity).toBe('INFO');
     });
 
+    it('joins the company denomination with the capital regime', () => {
+      const result = service.postProcessCsf(
+        {
+          taxpayer: { rfc: 'ARP210212GC6', fullName: 'ALIMENTOS RAPIDOS PENINSULARES' },
+          regimes: [],
+          activities: [],
+        },
+        'RégimenCapital: SOCIEDADANONIMADECAPITALVARIABLE',
+      );
+
+      expect(result.taxpayer.capitalRegime).toBe('SA DE CV');
+      expect(result.taxpayer.fullName).toBe('ALIMENTOS RAPIDOS PENINSULARES SA DE CV');
+    });
+
     it('does not use the independent tax-regime start date for arraigo', () => {
       const rawData = {
         taxpayer: { rfc: 'TEST900101XYZ', fullName: 'JUAN PEREZ' },
