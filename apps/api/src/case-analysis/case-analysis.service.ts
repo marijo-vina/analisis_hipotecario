@@ -218,11 +218,12 @@ export class CaseAnalysisService {
           (err as Error).message,
         );
       }
+      const bankViabilityResult = await this.bankViabilityRule.execute(context, docs);
       return this.persistCompletedRun(
         caseId,
         triggeredBy,
-        [identityResult, pmCsfTaxResult, pmGatesResult],
-        null,
+        [identityResult, pmCsfTaxResult, pmGatesResult, bankViabilityResult],
+        bankViabilityResult,
       );
     }
 

@@ -2038,4 +2038,149 @@ describe('BankViabilityRule', () => {
       expect(br.calculation.incomeUsed).toBe('56976.33');
     });
   });
+
+  describe('PM Phase C', () => {
+    function pmBases() {
+      return {
+        profile: 'PM',
+        sharePercentage: 50,
+        activityFactor: 0.5,
+        activity: {
+          description: 'Servicios',
+          percentage: 100,
+          order: 1,
+          matchedKeyword: 'servicio',
+          windowMonths: 6,
+        },
+        bank: { valid: true, monthlyGross: 11183203.42, monthlyNet: 11183203.42 },
+        taxReturn: { valid: true, monthlyGross: 8315945.68, monthlyNet: 8315945.68 },
+        capacities: {
+          santanderStatements: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 2795800.86,
+            incomeToConsider: 2777828.94,
+            maximumDebt: 1388914.47,
+            capacity: 1231490.59,
+          },
+          santanderTaxReturn: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 2078986.42,
+            incomeToConsider: 2061014.5,
+            maximumDebt: 1030507.25,
+            capacity: 873083.37,
+          },
+          scotiabank: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 5591601.71,
+            incomeToConsider: 5591601.71,
+            maximumDebt: 2236640.68,
+            capacity: 2079216.8,
+          },
+          banorte: {
+            status: 'REQUIRES_REVIEW',
+            reason: 'BANORTE_PM_INCOME_OPEN',
+            admissibleIncome: null,
+            incomeToConsider: null,
+            maximumDebt: null,
+            capacity: null,
+          },
+          hsbc: {
+            status: 'REQUIRES_REVIEW',
+            reason: 'HSBC_PM_INCOME_OPEN',
+            admissibleIncome: null,
+            incomeToConsider: null,
+            maximumDebt: null,
+            capacity: null,
+          },
+        },
+      };
+    }
+
+    function acta(legalForm: string) {
+      return {
+        owner: 'COMPANY',
+        documentType: { code: 'ARTICLES_OF_INCORPORATION' },
+        extractedData: {
+          documentType: 'ARTICLES_OF_INCORPORATION',
+          actKind: 'CONSTITUTIVE',
+          legalName: 'EMPRESA SA',
+          legalForm,
+          rfc: 'EMP010101AAA',
+          incorporationDate: '2010-01-15',
+          deedDate: '2010-01-15',
+          applicantShareholderName: 'SOCIO',
+          applicantSharePercentage: 50,
+          shareholders: [{ name: 'SOCIO', percentage: 50, relationshipToApplicant: null }],
+          registry: { folio: '1', date: '2010-02-01', place: 'CDMX' },
+        },
+      };
+    }
+
+    it('prices Santander from the engine and blocks Scotiabank at 50%', async () => {
+      const { rule, prisma } = makeRuleAndMock();
+      prisma.mortgageCase.findUnique.mockResolvedValue({
+        ...defaultCase(),
+        personType: 'PM',
+        sharePercentage: { toString: () => '50.00' },
+        incorporationDate: new Date('2010-01-15T00:00:00Z'),
+        legalName: 'EMPRESA SA',
+        companyRfc: 'EMP010101AAA',
+      });
+      prisma.incomeCalculation.findFirst.mockResolvedValue({
+        ...defaultIncomeCalculation(),
+        source: 'BANK_STATEMENTS',
+        bases: pmBases(),
+      });
+      prisma.bankPolicy.findMany.mockResolvedValue([
+        makePolicy({
+          code: 'SANTANDER_ADQ',
+          bank: makeBank({
+            code: 'SANTANDER',
+            name: 'Santander',
+            debtCommitmentFactor: { toString: () => '0.50' },
+          }),
+        }),
+        makePolicy({
+          code: 'SCOTIABANK_ADQ',
+          bank: makeBank({
+            code: 'SCOTIABANK',
+            name: 'Scotiabank',
+            debtCommitmentFactor: { toString: () => '0.55' },
+          }),
+        }),
+        makePolicy({
+          code: 'CITIBANAMEX_ADQ',
+          bank: makeBank({
+            code: 'CITIBANAMEX',
+            name: 'Citibanamex',
+            debtCommitmentFactor: { toString: () => '0.50' },
+          }),
+        }),
+      ]);
+
+      const result = await rule.execute(defaultContext(), [
+        ...defaultDocuments(),
+        acta('S.A. de C.V.'),
+      ]);
+      const rows = getBv(result).bankResults;
+      const santander = rows.find((row) => row.bankCode === 'SANTANDER');
+      const scotia = rows.find((row) => row.bankCode === 'SCOTIABANK');
+      const banamex = rows.find((row) => row.bankCode === 'CITIBANAMEX');
+
+      expect(santander?.status).toBe('PRELIMINARY_VIABLE');
+      expect(santander?.calculation.availableCapacity).toBe('1231490.59');
+      expect(santander?.policySnapshot.debtCommitmentFactor).toBe('0.50');
+      expect(santander?.appliedFactor).toBe('0.50');
+
+      expect(scotia?.status).toBe('NOT_COMPATIBLE');
+      expect(scotia?.reasons).toContain('PORCENTAJE_SCOTIABANK');
+      expect(scotia?.policySnapshot.debtCommitmentFactor).toBe('0.40');
+
+      expect(banamex?.appliedFactor).toBe('0.15');
+      expect(banamex?.matchedNativeLabel).toBe('compañía');
+    });
+  });
 });

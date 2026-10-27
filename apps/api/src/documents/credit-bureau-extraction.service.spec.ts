@@ -2578,6 +2578,51 @@ describe('CreditBureauExtractionService', () => {
       expect(result.consultationDate).toBe('2026-06-01');
     });
 
+    it('reads the company consultation date when it sits before the label', () => {
+      const ocr = [
+        '20-OCT-2026',
+        'Fecha de Consulta',
+        '10-NOV-2021',
+        'Fecha de Registro',
+      ].join('\n');
+      expect((service as any).extractConsultationDateFromOcr(ocr)).toBe('2026-10-20');
+    });
+
+    it('counts the 18 company inquiries inside twelve months of 20 Oct 2026', () => {
+      const inquiries = [
+        'KONFIO 11-OCT-2026',
+        'BBV 06-OCT-2026',
+        'ENGENIUM 09-SEP-2026',
+        'KONFIO 30-AGO-2026',
+        'BBV 27-AGO-2026',
+        'BANAMEX 25-AGO-2026',
+        'KONFIO 21-JUL-2026',
+        'Bepensa 07-JUL-2026',
+        'Bepensa 26-JUN-2026',
+        'ENGENIUM 15-JUN-2026',
+        'ENGENIUM 13-MAY-2026',
+        'BBV 14-ABR-2026',
+        'BBV 07-ABR-2026',
+        'BANAMEX 26-MAR-2026',
+        'BBV 09-MAR-2026',
+        'AMERICAN EXPRESS 21-ENE-2026',
+        'TIP AUTO 19-NOV-2025',
+        'CIRCULO CREDITO 31-OCT-2025',
+        'BBV 08-JUL-2025',
+      ].join('\n');
+      const ocr = `20-OCT-2026\nFecha de Consulta\nDETALLE DE CONSULTAS\n${inquiries}`;
+      const date = (service as any).extractConsultationDateFromOcr(ocr);
+      expect(date).toBe('2026-10-20');
+      expect((service as any).countInquiriesFromOcr(ocr, date)).toBe(18);
+    });
+
+    it('counts the January inquiry when the month is Greek lookalikes', () => {
+      const ocr = 'Fecha de Consulta\n20-OCT-2026\nDETALLE DE CONSULTAS\n21-\u0395\u039D\u0395-2026\n';
+      const date = (service as any).extractConsultationDateFromOcr(ocr);
+      expect(date).toBe('2026-10-20');
+      expect((service as any).countInquiriesFromOcr(ocr, date)).toBe(1);
+    });
+
     it('derives birthDate from RFC embedded date when Fecha de Nacimiento absent', () => {
       const ocrNoBirth = [
         'Nombre: CARLOS RAMIREZ SOTO',

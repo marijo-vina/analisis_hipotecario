@@ -32,6 +32,22 @@ describe('BankStatementCleanerService', () => {
       clientFullName: 'Juan Carlos Pérez Álvarez',
     };
 
+    it('should discard an own transfer when the reference number is glued to traspaso', () => {
+      const tx: RawTransaction = {
+        date: '2026-04-06',
+        amount: 182000,
+        originalConcept:
+          '06/ABR T20 SPEI RECIBIDOBANAMEX 0020426TRASPASO ENTRE CUENTAS PROPIAS Ref. 0130125830',
+        movementType: 'DEPOSIT',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 182000 }, clientContext);
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('OWN_TRANSFER');
+      expect(result.depurationSummary.totalValidIncome).toBe(0);
+      expect(result.depurationSummary.needsReviewCount).toBe(0);
+    });
+
     it('should discard transfer with generic own transfer concept', () => {
       const tx: RawTransaction = {
         date: '2026-05-10',

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { capitalSuffixFromOcr, joinCompanyLegalName } from './csf-capital-regime';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { pickPrimaryIndependentActivity } from './csf-independent-activity';
 import { hasActiveShareholderRegime } from './pm-shareholder-regime';
@@ -205,6 +206,7 @@ export interface CsfExtractionPayload {
     firstLastName: string | null;
     secondLastName: string | null;
     fullName: string | null;
+    capitalRegime: string | null;
     operationsStartDate: string | null;
     statusInPadron: string | null;
     lastStatusChangeDate: string | null;
@@ -322,7 +324,7 @@ export class CsfExtractionService {
     const rawData = result.extractedData;
 
     // Post-process and compute business rules & alerts
-    const payload = this.postProcessCsf(rawData);
+    const payload = this.postProcessCsf(rawData, document.ocrText);
 
     // Save extractedData to database
     const extractionReadyStatus = await this.prisma.documentStatus.findUnique({
@@ -344,7 +346,7 @@ export class CsfExtractionService {
   /**
    * Post-processes raw Gemini output: normalizes fields, computes tenure and generates business alerts.
    */
-  postProcessCsf(rawData: Record<string, unknown>): CsfExtractionPayload {
+  postProcessCsf(rawData: Record<string, unknown>, ocrText = ''): CsfExtractionPayload {
     const taxpayer = (rawData.taxpayer ?? {}) as Record<string, unknown>;
     const issuance = (rawData.issuance ?? {}) as Record<string, unknown>;
     const fiscalAddress = (rawData.fiscalAddress ?? {}) as Record<string, unknown>;
@@ -367,6 +369,10 @@ export class CsfExtractionService {
     }
 
     const rfc = (taxpayer.rfc as string)?.toUpperCase()?.replace(/[^A-Z0-9&Ñ]/g, '') ?? null;
+    const capitalRegime = rfc?.length === 12 ? capitalSuffixFromOcr(ocrText) : null;
+    if (fullName && capitalRegime) {
+      fullName = joinCompanyLegalName(fullName, capitalRegime);
+    }
     const curp = (taxpayer.curp as string)?.toUpperCase()?.replace(/[^A-Z0-9]/g, '') ?? null;
     const operationsStartDate = (taxpayer.operationsStartDate as string) ?? null;
 
@@ -483,6 +489,7 @@ export class CsfExtractionService {
         firstLastName,
         secondLastName,
         fullName,
+        capitalRegime,
         operationsStartDate,
         statusInPadron: (taxpayer.statusInPadron as string) ?? null,
         lastStatusChangeDate: (taxpayer.lastStatusChangeDate as string) ?? null,
