@@ -68,6 +68,18 @@ describe('PM capacity fixture', () => {
     hasTaxLoss: false,
   });
 
+  it('keeps a short 12-month window valid and names the missing statements', () => {
+    const partial = smoothCompanyDeposits(FIXTURE_MONTHS, 12);
+
+    expect(partial.valid).toBe(true);
+    expect(partial.invalidReason).toBeNull();
+    expect(partial.windowMonths).toBe(12);
+    expect(partial.monthlyGross).toBe(11_183_203.42);
+    expect(partial.statementNotice).toBe(
+      'Faltan estados de cuenta para completar 12 meses. Hay 6 de 12.',
+    );
+  });
+
   it('smooths the company deposits to 11,183,203.42', () => {
     expect(bank.valid).toBe(true);
     expect(bank.monthlyGross).toBe(11_183_203.42);
@@ -105,15 +117,73 @@ describe('PM capacity fixture', () => {
     });
     expect(result.scotiabank.status).toBe('CALCULATED');
     expect(result.scotiabank.capacity).toBe(2_079_216.8);
-    expect(result.banorte).toMatchObject({
-      status: 'REQUIRES_REVIEW',
-      reason: 'BANORTE_PM_INCOME_OPEN',
-      capacity: null,
+    expect(result.banorteStatements).toMatchObject({
+      status: 'NOT_VIABLE',
+      reason: 'INSUFFICIENT_MONTHS',
     });
-    expect(result.hsbc).toMatchObject({
+    expect(result.banorteTaxReturn).toMatchObject({
       status: 'REQUIRES_REVIEW',
-      reason: 'HSBC_PM_INCOME_OPEN',
-      capacity: null,
+      reason: 'MISSING_NET_PROFIT',
+    });
+    expect(result.hsbcStatements.status).toBe('CALCULATED');
+    expect(result.hsbcTaxReturn.status).toBe('CALCULATED');
+  });
+
+  it('prices Banorte at 40% and switches to 50% for an existing client', () => {
+    const shared = {
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Servicios',
+      sharePercentage: 50,
+      pmMonthlyDebt: PM_DEBT,
+      pfMonthlyDebt: PF_DEBT,
+      statementMonths: FIXTURE_MONTHS,
+      fiscalProfit: 1_200_000,
+    };
+    const prospect = calculatePmCapacities({
+      ...shared,
+      companyIsBanorteClient: false,
+    });
+    const client = calculatePmCapacities({
+      ...shared,
+      companyIsBanorteClient: true,
+    });
+
+    expect(prospect.banorteClientFactor).toBe(0.4);
+    expect(prospect.banorteStatements).toEqual({
+      status: 'CALCULATED',
+      reason: null,
+      admissibleIncome: 4_487_520.91,
+      incomeToConsider: 2_234_774.5,
+      maximumDebt: 1_340_864.7,
+      capacity: 1_183_440.82,
+    });
+    expect(client.banorteClientFactor).toBe(0.5);
+    expect(client.banorteStatements.admissibleIncome).toBe(5_609_401.14);
+    expect(client.banorteStatements.capacity).toBe(1_520_004.89);
+    expect(prospect.banorteTaxReturn.capacity).toBe(42_500);
+  });
+
+  it('prices HSBC at 30% and leaves company debt out', () => {
+    const result = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Servicios',
+      sharePercentage: 50,
+      pmMonthlyDebt: PM_DEBT,
+      pfMonthlyDebt: PF_DEBT,
+      statementMonths: FIXTURE_MONTHS,
+    });
+
+    expect(result.hsbcStatements).toEqual({
+      status: 'CALCULATED',
+      reason: null,
+      admissibleIncome: 1_677_480.51,
+      incomeToConsider: 1_677_480.51,
+      maximumDebt: 838_740.26,
+      capacity: 681_316.38,
     });
   });
 

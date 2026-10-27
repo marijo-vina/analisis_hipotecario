@@ -28,6 +28,8 @@ export interface BankIncomeBase extends IncomeBase {
   monthsUsed: string[];
   droppedMax: string | null;
   droppedMin: string | null;
+  /** Set when the average used fewer months than the activity window. */
+  statementNotice?: string | null;
 }
 
 export interface ActivityResolution {
@@ -58,6 +60,8 @@ export interface PmIncomeBases {
   profile: 'PM';
   sharePercentage: number | null;
   activityFactor: number | null;
+  /** 0.50 when the company is already a Banorte client, otherwise 0.40. */
+  banorteClientFactor: number | null;
   bank: BankIncomeBase;
   taxReturn: IncomeBase;
   activity: ActivityResolution;
@@ -65,8 +69,10 @@ export interface PmIncomeBases {
     santanderStatements: PmBankCapacity;
     santanderTaxReturn: PmBankCapacity;
     scotiabank: PmBankCapacity;
-    banorte: PmBankCapacity;
-    hsbc: PmBankCapacity;
+    banorteStatements: PmBankCapacity;
+    banorteTaxReturn: PmBankCapacity;
+    hsbcStatements: PmBankCapacity;
+    hsbcTaxReturn: PmBankCapacity;
   };
 }
 

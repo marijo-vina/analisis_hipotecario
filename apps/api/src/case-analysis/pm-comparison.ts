@@ -148,6 +148,11 @@ function appliedFactor(
   banamex: BanamexPmFactor | null,
 ): string | null {
   if (banamex?.factor != null) return banamex.factor.toFixed(2);
+  if (input.bankCode === 'BANORTE') {
+    const factor = input.bases?.banorteClientFactor;
+    return factor == null ? null : factor.toFixed(2);
+  }
+  if (input.bankCode === 'HSBC') return '0.30';
   if (input.bankCode !== 'SANTANDER') return null;
   const factor = input.bases?.activityFactor;
   return factor == null ? null : factor.toFixed(2);
@@ -171,8 +176,16 @@ function engineCapacity(input: DecidePmBankInput) {
       : capacities.santanderStatements;
   }
   if (input.bankCode === 'SCOTIABANK') return capacities.scotiabank;
-  if (input.bankCode === 'BANORTE') return capacities.banorte;
-  if (input.bankCode === 'HSBC') return capacities.hsbc;
+  if (input.bankCode === 'BANORTE') {
+    return input.incomeSource === 'TAX_RETURN'
+      ? capacities.banorteTaxReturn
+      : capacities.banorteStatements;
+  }
+  if (input.bankCode === 'HSBC') {
+    return input.incomeSource === 'TAX_RETURN'
+      ? capacities.hsbcTaxReturn
+      : capacities.hsbcStatements;
+  }
   return null;
 }
 

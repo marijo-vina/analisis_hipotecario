@@ -145,6 +145,7 @@ export const MortgageCaseScalarFieldEnum = {
   shareTenureMonths: 'shareTenureMonths',
   legalName: 'legalName',
   companyRfc: 'companyRfc',
+  companyIsBanorteClient: 'companyIsBanorteClient',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

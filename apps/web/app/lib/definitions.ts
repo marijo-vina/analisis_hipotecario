@@ -114,6 +114,7 @@ export interface MortgageCase {
   shareTenureMonths?: number | null;
   legalName?: string | null;
   companyRfc?: string | null;
+  companyIsBanorteClient?: boolean | null;
   documents?: Array<{
     id: string;
     documentStatus: { id: number; code: string; name: string };
@@ -392,6 +393,7 @@ export interface BankViabilitySnapshot {
   destination: string | null;
   calculatedAt: string;
   warningLegend: string;
+  statementNotice?: string | null;
   reasons: string[];
   inputs: BankViabilityInputs;
   bankResults: BankResult[];

@@ -36,6 +36,7 @@ export interface BankIncomeBase extends IncomeBase {
   monthsUsed: string[];
   droppedMax: string | null;
   droppedMin: string | null;
+  statementNotice?: string | null;
 }
 
 export interface ActivityResolution {

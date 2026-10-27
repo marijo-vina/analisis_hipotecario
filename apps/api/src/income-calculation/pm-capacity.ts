@@ -15,6 +15,13 @@ const PM_SANTANDER_GIRO_FACTORS = [{ alias: 'servicio', factor: 0.5 }] as const;
 
 const SANTANDER_CE = new Prisma.Decimal('0.50');
 const SCOTIABANK_CE = new Prisma.Decimal('0.40');
+const BANORTE_CLIENT_FACTOR = new Prisma.Decimal('0.50');
+const BANORTE_PROSPECT_FACTOR = new Prisma.Decimal('0.40');
+const BANORTE_CE = new Prisma.Decimal('0.60');
+const BANORTE_TAX_FACTOR = new Prisma.Decimal('0.85');
+const HSBC_VISOR_FACTOR = new Prisma.Decimal('0.30');
+const HSBC_CE = new Prisma.Decimal('0.50');
+const BANORTE_SIMPLE_MONTHS = 6;
 
 export type PmCapacityStatus = 'CALCULATED' | 'NOT_VIABLE' | 'REQUIRES_REVIEW';
 
@@ -37,15 +44,24 @@ export interface PmCapacityInput {
   sharePercentage: number | null;
   pmMonthlyDebt: number | null;
   pfMonthlyDebt: number | null;
+  /** Company statement months. Banorte averages the latest six, without dropping extremes. */
+  statementMonths?: CompanyStatementMonth[];
+  /** True when the company already banks with Banorte. */
+  companyIsBanorteClient?: boolean;
+  /** Annual utilidad fiscal from the company tax return. */
+  fiscalProfit?: number | null;
 }
 
 export interface PmCapacityResult {
   activityFactor: number | null;
+  banorteClientFactor: number;
   santanderStatements: PmBankCapacity;
   santanderTaxReturn: PmBankCapacity;
   scotiabank: PmBankCapacity;
-  banorte: PmBankCapacity;
-  hsbc: PmBankCapacity;
+  banorteStatements: PmBankCapacity;
+  banorteTaxReturn: PmBankCapacity;
+  hsbcStatements: PmBankCapacity;
+  hsbcTaxReturn: PmBankCapacity;
 }
 
 function pesos(value: Prisma.Decimal): number {
@@ -94,13 +110,84 @@ export function smoothCompanyDeposits(
   months: CompanyStatementMonth[],
   windowMonths: 6 | 12,
 ): BankIncomeBase {
-  return smooth(
-    months.map((month) => ({
-      monthKey: month.monthKey,
-      total: new Prisma.Decimal(month.validIncome),
-    })),
-    windowMonths,
+  if (months.length === 0) {
+    return {
+      valid: false,
+      invalidReason: 'INSUFFICIENT_MONTHS',
+      monthlyGross: null,
+      monthlyNet: null,
+      windowMonths,
+      monthsUsed: [],
+      droppedMax: null,
+      droppedMin: null,
+      statementNotice: null,
+    };
+  }
+  if (months.length < windowMonths) {
+    return {
+      ...averageAvailableMonths(months),
+      windowMonths,
+      statementNotice: `Faltan estados de cuenta para completar ${windowMonths} meses. Hay ${months.length} de ${windowMonths}.`,
+    };
+  }
+  return {
+    ...smooth(
+      months.map((month) => ({
+        monthKey: month.monthKey,
+        total: new Prisma.Decimal(month.validIncome),
+      })),
+      windowMonths,
+    ),
+    statementNotice: null,
+  };
+}
+
+/**
+ * Averages the months on file. Three or more months drop the highest and
+ * the lowest, the same way a complete window does.
+ */
+function averageAvailableMonths(
+  months: CompanyStatementMonth[],
+): Omit<BankIncomeBase, 'windowMonths' | 'statementNotice'> {
+  const recent = [...months].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  if (recent.length < 3) {
+    const sum = recent.reduce(
+      (acc, month) => acc.plus(month.validIncome),
+      new Prisma.Decimal(0),
+    );
+    const monthly = pesos(sum.div(recent.length));
+    return {
+      valid: true,
+      invalidReason: null,
+      monthlyGross: monthly,
+      monthlyNet: monthly,
+      monthsUsed: recent.map((month) => month.monthKey).sort(),
+      droppedMax: null,
+      droppedMin: null,
+    };
+  }
+  const ranked = [...recent].sort((a, b) => {
+    const totalCmp = new Prisma.Decimal(a.validIncome).comparedTo(b.validIncome);
+    if (totalCmp !== 0) return totalCmp;
+    return a.monthKey.localeCompare(b.monthKey);
+  });
+  const droppedMin = ranked[0];
+  const droppedMax = ranked[ranked.length - 1];
+  const kept = ranked.slice(1, -1);
+  const sum = kept.reduce(
+    (acc, month) => acc.plus(month.validIncome),
+    new Prisma.Decimal(0),
   );
+  const monthly = pesos(sum.div(kept.length));
+  return {
+    valid: true,
+    invalidReason: null,
+    monthlyGross: monthly,
+    monthlyNet: monthly,
+    monthsUsed: kept.map((month) => month.monthKey).sort(),
+    droppedMax: droppedMax.monthKey,
+    droppedMin: droppedMin.monthKey,
+  };
 }
 
 function emptyCapacity(status: PmCapacityStatus, reason: string): PmBankCapacity {
@@ -114,10 +201,6 @@ function emptyCapacity(status: PmCapacityStatus, reason: string): PmBankCapacity
   };
 }
 
-function openBank(reason: string): PmBankCapacity {
-  return emptyCapacity('REQUIRES_REVIEW', reason);
-}
-
 function shareRatio(sharePercentage: number): Prisma.Decimal {
   return new Prisma.Decimal(sharePercentage).div(100);
 }
@@ -125,12 +208,16 @@ function shareRatio(sharePercentage: number): Prisma.Decimal {
 /**
  * Santander: ingreso = promedio × factor × % → − deuda PM → × CE 0.50 → − deuda PF.
  * Scotiabank: promedio × % × 0.40, then − deuda PF. The 0.40 is the CE.
- * Banorte and HSBC stay open until the advisor closes the formula.
+ * Banorte statements: promedio simple de 6 × 50% o 40% − deuda PM, luego × % × CE 0.60 − deuda PF.
+ * Banorte tax: utilidad mensual × 85% × %.
+ * HSBC: flujos o ventas × 30% × % × CE 0.50 − deuda PF.
  */
 export function calculatePmCapacities(input: PmCapacityInput): PmCapacityResult {
   const activityFactor = resolvePmSantanderFactor(input.activityDescription);
+  const banorteClientFactor = input.companyIsBanorteClient ? 0.5 : 0.4;
   return {
     activityFactor,
+    banorteClientFactor,
     santanderStatements: santanderFromBase(
       input.bank,
       input.depositGateViable,
@@ -139,8 +226,131 @@ export function calculatePmCapacities(input: PmCapacityInput): PmCapacityResult 
     ),
     santanderTaxReturn: santanderFromBase(input.tax, true, activityFactor, input),
     scotiabank: scotiabankFromBank(input),
-    banorte: openBank('BANORTE_PM_INCOME_OPEN'),
-    hsbc: openBank('HSBC_PM_INCOME_OPEN'),
+    banorteStatements: banorteFromStatements(input, banorteClientFactor),
+    banorteTaxReturn: banorteFromTax(input),
+    hsbcStatements: hsbcFromBase(input.bank, input),
+    hsbcTaxReturn: hsbcFromBase(input.tax, input),
+  };
+}
+
+export function simpleRecentAverage(
+  months: CompanyStatementMonth[],
+  count: number,
+): number | null {
+  if (months.length === 0 || count < 1) return null;
+  const recent = [...months]
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey))
+    .slice(0, count);
+  const sum = recent.reduce(
+    (acc, month) => acc.plus(month.validIncome),
+    new Prisma.Decimal(0),
+  );
+  return pesos(sum.div(recent.length));
+}
+
+function missingShareOrDebts(
+  input: PmCapacityInput,
+  debts: Array<'pm' | 'pf'>,
+): PmBankCapacity | null {
+  if (input.sharePercentage == null || !Number.isFinite(input.sharePercentage)) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_SHARE_PERCENTAGE');
+  }
+  if (debts.includes('pm') && input.pmMonthlyDebt == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_COMPANY_DEBT');
+  }
+  if (debts.includes('pf') && input.pfMonthlyDebt == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_SHAREHOLDER_DEBT');
+  }
+  return null;
+}
+
+function banorteFromStatements(
+  input: PmCapacityInput,
+  clientFactor: number,
+): PmBankCapacity {
+  const average = simpleRecentAverage(
+    input.statementMonths ?? [],
+    BANORTE_SIMPLE_MONTHS,
+  );
+  if (average == null) {
+    return emptyCapacity('NOT_VIABLE', 'INSUFFICIENT_MONTHS');
+  }
+  const blocked = missingShareOrDebts(input, ['pm', 'pf']);
+  if (blocked) return blocked;
+
+  const factored = new Prisma.Decimal(average)
+    .mul(clientFactor === 0.5 ? BANORTE_CLIENT_FACTOR : BANORTE_PROSPECT_FACTOR)
+    .toDecimalPlaces(2);
+  const afterCompanyDebt = factored
+    .minus(input.pmMonthlyDebt ?? 0)
+    .toDecimalPlaces(2);
+  const shared = afterCompanyDebt
+    .mul(shareRatio(input.sharePercentage ?? 0))
+    .toDecimalPlaces(2);
+  const maximumDebt = shared.mul(BANORTE_CE).toDecimalPlaces(2);
+  const capacity = maximumDebt
+    .minus(input.pfMonthlyDebt ?? 0)
+    .toDecimalPlaces(2);
+
+  return {
+    status: 'CALCULATED',
+    reason: null,
+    admissibleIncome: pesos(factored),
+    incomeToConsider: pesos(shared),
+    maximumDebt: pesos(maximumDebt),
+    capacity: pesos(capacity),
+  };
+}
+
+function banorteFromTax(input: PmCapacityInput): PmBankCapacity {
+  if (input.fiscalProfit == null || !Number.isFinite(input.fiscalProfit)) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_NET_PROFIT');
+  }
+  if (input.fiscalProfit < 0) {
+    return emptyCapacity('NOT_VIABLE', 'TAX_LOSS');
+  }
+  const blocked = missingShareOrDebts(input, []);
+  if (blocked) return blocked;
+
+  const monthly = new Prisma.Decimal(input.fiscalProfit).div(12);
+  const capacity = monthly
+    .mul(BANORTE_TAX_FACTOR)
+    .mul(shareRatio(input.sharePercentage ?? 0))
+    .toDecimalPlaces(2);
+
+  return {
+    status: 'CALCULATED',
+    reason: null,
+    admissibleIncome: pesos(capacity),
+    incomeToConsider: pesos(capacity),
+    maximumDebt: pesos(capacity),
+    capacity: pesos(capacity),
+  };
+}
+
+function hsbcFromBase(base: IncomeBase, input: PmCapacityInput): PmBankCapacity {
+  if (!base.valid) {
+    return emptyCapacity('NOT_VIABLE', base.invalidReason ?? 'MISSING_DOCUMENT');
+  }
+  const blocked = missingShareOrDebts(input, ['pf']);
+  if (blocked) return blocked;
+
+  const admissible = new Prisma.Decimal(base.monthlyGross ?? 0)
+    .mul(HSBC_VISOR_FACTOR)
+    .mul(shareRatio(input.sharePercentage ?? 0))
+    .toDecimalPlaces(2);
+  const maximumDebt = admissible.mul(HSBC_CE).toDecimalPlaces(2);
+  const capacity = maximumDebt
+    .minus(input.pfMonthlyDebt ?? 0)
+    .toDecimalPlaces(2);
+
+  return {
+    status: 'CALCULATED',
+    reason: null,
+    admissibleIncome: pesos(admissible),
+    incomeToConsider: pesos(admissible),
+    maximumDebt: pesos(maximumDebt),
+    capacity: pesos(capacity),
   };
 }
 

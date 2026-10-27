@@ -94,10 +94,10 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 
 | Tema | Qué hacer |
 |------|-----------|
-| Banorte PM ingreso | Cerrado el 22 oct 2026. Estados: promedio simple de 6 meses × 50% si la empresa ya es cliente Banorte, o 40% si no lo es. A eso se le restan los pasivos PM y el remanente se multiplica por % PA. CE 0.60. La capacidad final resta solo la deuda del socio. Declaración: utilidad neta × 85% × % PA. Falta capturar si la empresa ya es cliente Banorte, y la utilidad neta en la declaración. |
+| Banorte PM ingreso | Cerrado el 22 oct 2026 y aplicado en el motor. Estados: promedio simple de 6 meses × 50% si la casilla «ya es cliente Banorte» está marcada, o 40% si no. Se restan los pasivos PM y el remanente se multiplica por % PA y por CE 0.60. Al final se resta la deuda del socio. Declaración: utilidad fiscal / 12 × 85% × % PA. Si la declaración no trae utilidad, ese camino queda en revisión. |
 | Scotiabank 50% vs 51% | Cerrado el 22 oct 2026: `< 51%` no es viable. 50.00% queda fuera. |
 | HSBC y 2 años de acciones | Cerrado el 22 oct 2026: `< 25%` o `< 2 años` con esas acciones no es viable. |
-| HSBC ingreso | Cerrado el 22 oct 2026. No hay tabla pública. Con Visor Financiero el factor es 30% sobre flujos o ventas. Sin Visor, manual: servicios 20% de depósitos válidos, comercio 15%. Luego × % PA y × CE 0.50. Solo se resta la deuda del socio. La proyección por defecto usa el Visor al 30%. Liquidez de HSBC no está disponible para PFAE ni para PM. |
+| HSBC ingreso | Cerrado el 22 oct 2026 y aplicado en el motor con el Visor al 30% sobre flujos o ventas. Luego × % PA y × CE 0.50. Solo se resta la deuda del socio. El 20% de servicios y el 15% de comercio quedan para un cálculo manual, sin Visor. Liquidez de HSBC no está disponible para PFAE ni para PM. |
 | Scotiabank 6 vs 4 meses | PDF: promedio 6 meses. Santander en el mismo archivo suaviza 4. Default de producto: **suavizado 4** salvo que la asesora pida 6 para Scotia. |
 | Factor Banamex 15% vs 30% | PDF taller = 15% compañía. La matriz interna decía 30%. **Manda el PDF** hasta nueva captura. |
 | Estados financieros SAT | Extra Banamex; no está en el checklist GF. HU-23 puede dejarlo opcional / warning, no bloquea el MVP. |
@@ -107,7 +107,7 @@ Pasivos PM del fixture: simple 445,000 / 1,460 días × 50% = 4,571.92; otro sim
 
 ## Correcciones de la prueba Alimentos Rápidos (23 oct 2026)
 
-Caso real, solo documentos de la empresa: CSF, buró PM y seis estados BBVA (abril–septiembre 2026). La carátula, la CSF, el peinado de abonos y la lista de créditos ya cuadran. El motor se detuvo por restaurante con 6 meses y por falta de % de acciones; esos dos frenos están bien y no se tocan.
+Caso real, solo documentos de la empresa: CSF, buró PM y seis estados BBVA (abril–septiembre 2026). La carátula, la CSF, el peinado de abonos y la lista de créditos ya cuadran. Restaurante pide 12 meses: con menos estados el promedio se calcula con los que hay y aparece un aviso, sin invalidar el ingreso por meses. La falta de % de acciones sigue siendo un freno y no se toca.
 
 Orden acordado: el peinado BBVA, el buró de la empresa y las tres correcciones de pantalla (accionistas, razón social y traspaso de abril) ya están en el expediente. HU-30 puede arrancar con eso.
 

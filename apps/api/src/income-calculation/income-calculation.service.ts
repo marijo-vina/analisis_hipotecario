@@ -315,7 +315,7 @@ export class IncomeCalculationService {
   private async calculatePm(caseId: string): Promise<IncomeCalculationResult> {
     const mortgageCase = await this.prisma.mortgageCase.findUnique({
       where: { id: caseId },
-      select: { id: true, sharePercentage: true },
+      select: { id: true, sharePercentage: true, companyIsBanorteClient: true },
     });
     if (!mortgageCase) {
       throw new NotFoundException('Mortgage case not found');
@@ -353,7 +353,8 @@ export class IncomeCalculationService {
     const months = groupCompanyStatementMonths(statements);
     const gate = evaluateSantanderDepositGate(months, activity.windowMonths);
     const bank = smoothCompanyDeposits(months, activity.windowMonths);
-    const tax = pmTaxBase(latestProcessedCompanyTax(docs));
+    const taxExtract = latestProcessedCompanyTax(docs);
+    const tax = pmTaxBase(taxExtract);
 
     const liability = await this.prisma.liabilitySnapshot.findFirst({
       where: { mortgageCaseId: caseId },
@@ -372,6 +373,9 @@ export class IncomeCalculationService {
       sharePercentage,
       pmMonthlyDebt: decimalToNumber(liability?.pmMonthlyDebt),
       pfMonthlyDebt: decimalToNumber(liability?.grossCurrentMonthlyDebt),
+      statementMonths: months,
+      companyIsBanorteClient: mortgageCase.companyIsBanorteClient,
+      fiscalProfit: taxExtract?.fiscalResult?.fiscalProfit ?? null,
     });
 
     const projected = projectPmSnapshot(bank, tax, capacities);
@@ -379,6 +383,7 @@ export class IncomeCalculationService {
       profile: 'PM',
       sharePercentage,
       activityFactor: capacities.activityFactor,
+      banorteClientFactor: capacities.banorteClientFactor,
       bank,
       taxReturn: tax,
       activity,
@@ -386,8 +391,10 @@ export class IncomeCalculationService {
         santanderStatements: capacities.santanderStatements,
         santanderTaxReturn: capacities.santanderTaxReturn,
         scotiabank: capacities.scotiabank,
-        banorte: capacities.banorte,
-        hsbc: capacities.hsbc,
+        banorteStatements: capacities.banorteStatements,
+        banorteTaxReturn: capacities.banorteTaxReturn,
+        hsbcStatements: capacities.hsbcStatements,
+        hsbcTaxReturn: capacities.hsbcTaxReturn,
       },
     };
 

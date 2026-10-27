@@ -97,6 +97,9 @@ export async function simulatePmOcrCase(
     sharePercentage: fixture.case.sharePercentage,
     pmMonthlyDebt: liabilities.pmMonthlyDebt ?? null,
     pfMonthlyDebt: liabilities.grossCurrentMonthlyDebt,
+    statementMonths: months,
+    companyIsBanorteClient: false,
+    fiscalProfit: latestTax(companyDocs)?.fiscalResult?.fiscalProfit ?? null,
   });
 
   return {
@@ -165,8 +168,8 @@ async function main(): Promise<void> {
   console.log(`Santander estados:       ${money(santander.capacity)} (${santander.status})`);
   console.log(`Santander declaración:   ${money(tax.capacity)} (${tax.status})`);
   console.log(`Scotiabank:              ${money(scotia.capacity)} (${scotia.status})`);
-  console.log(`Banorte:                 ${result.capacities.banorte.reason}`);
-  console.log(`HSBC:                    ${result.capacities.hsbc.reason}`);
+  console.log(`Banorte estados:         ${money(result.capacities.banorteStatements.capacity)} (${result.capacities.banorteStatements.status})`);
+  console.log(`HSBC estados:            ${money(result.capacities.hsbcStatements.capacity)} (${result.capacities.hsbcStatements.status})`);
 }
 
 if (require.main === module) {

@@ -384,6 +384,7 @@ export class BankViabilityRule implements AnalysisRule {
       destination,
       calculatedAt: calculatedAt.toISOString(),
       warningLegend: WARNING_LEGEND,
+      statementNotice: pmContext?.bases?.bank.statementNotice ?? null,
       reasons: globalReasons,
       inputs,
       bankResults,

@@ -279,6 +279,18 @@ export default function IncomeCalculationSection({
         </div>
       )}
 
+      {personType === "PM" && snapshot?.bases?.bank.statementNotice && (
+        <div
+          className="flex items-start gap-2.5 rounded-lg border px-4 py-3"
+          style={{ backgroundColor: "#FFFBEB", borderColor: "#FDE68A" }}
+        >
+          <span className="mt-px text-sm">⚠</span>
+          <p className="text-sm leading-relaxed text-gf-text">
+            {snapshot.bases.bank.statementNotice}
+          </p>
+        </div>
+      )}
+
       {/* ── Empty state: no snapshot yet ─────────────────────────────────── */}
       {!snapshot && !error && (
         <Card className="text-center">

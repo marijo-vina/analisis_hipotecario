@@ -63,6 +63,7 @@ export type MortgageCaseMinAggregateOutputType = {
   shareTenureMonths: number | null
   legalName: string | null
   companyRfc: string | null
+  companyIsBanorteClient: boolean | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -84,6 +85,7 @@ export type MortgageCaseMaxAggregateOutputType = {
   shareTenureMonths: number | null
   legalName: string | null
   companyRfc: string | null
+  companyIsBanorteClient: boolean | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -105,6 +107,7 @@ export type MortgageCaseCountAggregateOutputType = {
   shareTenureMonths: number
   legalName: number
   companyRfc: number
+  companyIsBanorteClient: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -148,6 +151,7 @@ export type MortgageCaseMinAggregateInputType = {
   shareTenureMonths?: true
   legalName?: true
   companyRfc?: true
+  companyIsBanorteClient?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -169,6 +173,7 @@ export type MortgageCaseMaxAggregateInputType = {
   shareTenureMonths?: true
   legalName?: true
   companyRfc?: true
+  companyIsBanorteClient?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -190,6 +195,7 @@ export type MortgageCaseCountAggregateInputType = {
   shareTenureMonths?: true
   legalName?: true
   companyRfc?: true
+  companyIsBanorteClient?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -298,6 +304,7 @@ export type MortgageCaseGroupByOutputType = {
   shareTenureMonths: number | null
   legalName: string | null
   companyRfc: string | null
+  companyIsBanorteClient: boolean
   createdAt: Date
   updatedAt: Date
   _count: MortgageCaseCountAggregateOutputType | null
@@ -342,6 +349,7 @@ export type MortgageCaseWhereInput = {
   shareTenureMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
   legalName?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   companyRfc?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  companyIsBanorteClient?: Prisma.BoolFilter<"MortgageCase"> | boolean
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
@@ -371,6 +379,7 @@ export type MortgageCaseOrderByWithRelationInput = {
   shareTenureMonths?: Prisma.SortOrderInput | Prisma.SortOrder
   legalName?: Prisma.SortOrderInput | Prisma.SortOrder
   companyRfc?: Prisma.SortOrderInput | Prisma.SortOrder
+  companyIsBanorteClient?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   client?: Prisma.ClientOrderByWithRelationInput
@@ -403,6 +412,7 @@ export type MortgageCaseWhereUniqueInput = Prisma.AtLeast<{
   shareTenureMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
   legalName?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   companyRfc?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  companyIsBanorteClient?: Prisma.BoolFilter<"MortgageCase"> | boolean
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
@@ -432,6 +442,7 @@ export type MortgageCaseOrderByWithAggregationInput = {
   shareTenureMonths?: Prisma.SortOrderInput | Prisma.SortOrder
   legalName?: Prisma.SortOrderInput | Prisma.SortOrder
   companyRfc?: Prisma.SortOrderInput | Prisma.SortOrder
+  companyIsBanorteClient?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.MortgageCaseCountOrderByAggregateInput
@@ -461,6 +472,7 @@ export type MortgageCaseScalarWhereWithAggregatesInput = {
   shareTenureMonths?: Prisma.IntNullableWithAggregatesFilter<"MortgageCase"> | number | null
   legalName?: Prisma.StringNullableWithAggregatesFilter<"MortgageCase"> | string | null
   companyRfc?: Prisma.StringNullableWithAggregatesFilter<"MortgageCase"> | string | null
+  companyIsBanorteClient?: Prisma.BoolWithAggregatesFilter<"MortgageCase"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"MortgageCase"> | Date | string
 }
@@ -478,6 +490,7 @@ export type MortgageCaseCreateInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -507,6 +520,7 @@ export type MortgageCaseUncheckedCreateInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -528,6 +542,7 @@ export type MortgageCaseUpdateInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -557,6 +572,7 @@ export type MortgageCaseUncheckedUpdateInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -582,6 +598,7 @@ export type MortgageCaseCreateManyInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -599,6 +616,7 @@ export type MortgageCaseUpdateManyMutationInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -620,6 +638,7 @@ export type MortgageCaseUncheckedUpdateManyInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -651,6 +670,7 @@ export type MortgageCaseCountOrderByAggregateInput = {
   shareTenureMonths?: Prisma.SortOrder
   legalName?: Prisma.SortOrder
   companyRfc?: Prisma.SortOrder
+  companyIsBanorteClient?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -682,6 +702,7 @@ export type MortgageCaseMaxOrderByAggregateInput = {
   shareTenureMonths?: Prisma.SortOrder
   legalName?: Prisma.SortOrder
   companyRfc?: Prisma.SortOrder
+  companyIsBanorteClient?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -703,6 +724,7 @@ export type MortgageCaseMinOrderByAggregateInput = {
   shareTenureMonths?: Prisma.SortOrder
   legalName?: Prisma.SortOrder
   companyRfc?: Prisma.SortOrder
+  companyIsBanorteClient?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -991,6 +1013,7 @@ export type MortgageCaseCreateWithoutAdvisorInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1018,6 +1041,7 @@ export type MortgageCaseUncheckedCreateWithoutAdvisorInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1072,6 +1096,7 @@ export type MortgageCaseScalarWhereInput = {
   shareTenureMonths?: Prisma.IntNullableFilter<"MortgageCase"> | number | null
   legalName?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
   companyRfc?: Prisma.StringNullableFilter<"MortgageCase"> | string | null
+  companyIsBanorteClient?: Prisma.BoolFilter<"MortgageCase"> | boolean
   createdAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MortgageCase"> | Date | string
 }
@@ -1089,6 +1114,7 @@ export type MortgageCaseCreateWithoutClientInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   advisor: Prisma.UserCreateNestedOneWithoutCasesInput
@@ -1116,6 +1142,7 @@ export type MortgageCaseUncheckedCreateWithoutClientInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1163,6 +1190,7 @@ export type MortgageCaseCreateWithoutLiabilitySnapshotsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1191,6 +1219,7 @@ export type MortgageCaseUncheckedCreateWithoutLiabilitySnapshotsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1227,6 +1256,7 @@ export type MortgageCaseUpdateWithoutLiabilitySnapshotsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1255,6 +1285,7 @@ export type MortgageCaseUncheckedUpdateWithoutLiabilitySnapshotsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1275,6 +1306,7 @@ export type MortgageCaseCreateWithoutIncomeCalculationsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1303,6 +1335,7 @@ export type MortgageCaseUncheckedCreateWithoutIncomeCalculationsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1339,6 +1372,7 @@ export type MortgageCaseUpdateWithoutIncomeCalculationsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1367,6 +1401,7 @@ export type MortgageCaseUncheckedUpdateWithoutIncomeCalculationsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1387,6 +1422,7 @@ export type MortgageCaseCreateWithoutDocumentsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1415,6 +1451,7 @@ export type MortgageCaseUncheckedCreateWithoutDocumentsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   analysisRuns?: Prisma.AnalysisRunUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1451,6 +1488,7 @@ export type MortgageCaseUpdateWithoutDocumentsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1479,6 +1517,7 @@ export type MortgageCaseUncheckedUpdateWithoutDocumentsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   analysisRuns?: Prisma.AnalysisRunUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1499,6 +1538,7 @@ export type MortgageCaseCreateWithoutAnalysisRunsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1527,6 +1567,7 @@ export type MortgageCaseUncheckedCreateWithoutAnalysisRunsInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1563,6 +1604,7 @@ export type MortgageCaseUpdateWithoutAnalysisRunsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1591,6 +1633,7 @@ export type MortgageCaseUncheckedUpdateWithoutAnalysisRunsInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1611,6 +1654,7 @@ export type MortgageCaseCreateWithoutCreditTypeInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1638,6 +1682,7 @@ export type MortgageCaseUncheckedCreateWithoutCreditTypeInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1685,6 +1730,7 @@ export type MortgageCaseCreateWithoutStatusInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   client: Prisma.ClientCreateNestedOneWithoutCasesInput
@@ -1712,6 +1758,7 @@ export type MortgageCaseUncheckedCreateWithoutStatusInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   documents?: Prisma.DocumentUncheckedCreateNestedManyWithoutMortgageCaseInput
@@ -1762,6 +1809,7 @@ export type MortgageCaseCreateManyAdvisorInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1779,6 +1827,7 @@ export type MortgageCaseUpdateWithoutAdvisorInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1806,6 +1855,7 @@ export type MortgageCaseUncheckedUpdateWithoutAdvisorInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1830,6 +1880,7 @@ export type MortgageCaseUncheckedUpdateManyWithoutAdvisorInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1850,6 +1901,7 @@ export type MortgageCaseCreateManyClientInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1867,6 +1919,7 @@ export type MortgageCaseUpdateWithoutClientInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   advisor?: Prisma.UserUpdateOneRequiredWithoutCasesNestedInput
@@ -1894,6 +1947,7 @@ export type MortgageCaseUncheckedUpdateWithoutClientInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -1918,6 +1972,7 @@ export type MortgageCaseUncheckedUpdateManyWithoutClientInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1938,6 +1993,7 @@ export type MortgageCaseCreateManyCreditTypeInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1955,6 +2011,7 @@ export type MortgageCaseUpdateWithoutCreditTypeInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -1982,6 +2039,7 @@ export type MortgageCaseUncheckedUpdateWithoutCreditTypeInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -2006,6 +2064,7 @@ export type MortgageCaseUncheckedUpdateManyWithoutCreditTypeInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2026,6 +2085,7 @@ export type MortgageCaseCreateManyStatusInput = {
   shareTenureMonths?: number | null
   legalName?: string | null
   companyRfc?: string | null
+  companyIsBanorteClient?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2043,6 +2103,7 @@ export type MortgageCaseUpdateWithoutStatusInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   client?: Prisma.ClientUpdateOneRequiredWithoutCasesNestedInput
@@ -2070,6 +2131,7 @@ export type MortgageCaseUncheckedUpdateWithoutStatusInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   documents?: Prisma.DocumentUncheckedUpdateManyWithoutMortgageCaseNestedInput
@@ -2094,6 +2156,7 @@ export type MortgageCaseUncheckedUpdateManyWithoutStatusInput = {
   shareTenureMonths?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   legalName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   companyRfc?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyIsBanorteClient?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2173,6 +2236,7 @@ export type MortgageCaseSelect<ExtArgs extends runtime.Types.Extensions.Internal
   shareTenureMonths?: boolean
   legalName?: boolean
   companyRfc?: boolean
+  companyIsBanorteClient?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
@@ -2203,6 +2267,7 @@ export type MortgageCaseSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   shareTenureMonths?: boolean
   legalName?: boolean
   companyRfc?: boolean
+  companyIsBanorteClient?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
@@ -2228,6 +2293,7 @@ export type MortgageCaseSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   shareTenureMonths?: boolean
   legalName?: boolean
   companyRfc?: boolean
+  companyIsBanorteClient?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
@@ -2253,11 +2319,12 @@ export type MortgageCaseSelectScalar = {
   shareTenureMonths?: boolean
   legalName?: boolean
   companyRfc?: boolean
+  companyIsBanorteClient?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MortgageCaseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "advisorId" | "creditTypeId" | "statusId" | "personType" | "propertyLocation" | "estimatedTermMonths" | "requestedAmount" | "propertyValue" | "notes" | "sharePercentage" | "incorporationDate" | "shareTenureMonths" | "legalName" | "companyRfc" | "createdAt" | "updatedAt", ExtArgs["result"]["mortgageCase"]>
+export type MortgageCaseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "advisorId" | "creditTypeId" | "statusId" | "personType" | "propertyLocation" | "estimatedTermMonths" | "requestedAmount" | "propertyValue" | "notes" | "sharePercentage" | "incorporationDate" | "shareTenureMonths" | "legalName" | "companyRfc" | "companyIsBanorteClient" | "createdAt" | "updatedAt", ExtArgs["result"]["mortgageCase"]>
 export type MortgageCaseInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
   advisor?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -2311,6 +2378,7 @@ export type $MortgageCasePayload<ExtArgs extends runtime.Types.Extensions.Intern
     shareTenureMonths: number | null
     legalName: string | null
     companyRfc: string | null
+    companyIsBanorteClient: boolean
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["mortgageCase"]>
@@ -2760,6 +2828,7 @@ export interface MortgageCaseFieldRefs {
   readonly shareTenureMonths: Prisma.FieldRef<"MortgageCase", 'Int'>
   readonly legalName: Prisma.FieldRef<"MortgageCase", 'String'>
   readonly companyRfc: Prisma.FieldRef<"MortgageCase", 'String'>
+  readonly companyIsBanorteClient: Prisma.FieldRef<"MortgageCase", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"MortgageCase", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"MortgageCase", 'DateTime'>
 }

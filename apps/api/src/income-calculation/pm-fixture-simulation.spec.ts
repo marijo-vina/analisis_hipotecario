@@ -10,7 +10,7 @@ describe('PM ejemplo OCR fixture', () => {
     expect(result.capacities.santanderStatements.capacity).toBe(1_231_490.59);
     expect(result.capacities.santanderTaxReturn.capacity).toBe(873_083.37);
     expect(result.capacities.scotiabank.status).toBe('CALCULATED');
-    expect(result.capacities.banorte.status).toBe('REQUIRES_REVIEW');
-    expect(result.capacities.hsbc.status).toBe('REQUIRES_REVIEW');
+    expect(result.capacities.banorteStatements.status).toBe('CALCULATED');
+    expect(result.capacities.hsbcStatements.status).toBe('CALCULATED');
   });
 });

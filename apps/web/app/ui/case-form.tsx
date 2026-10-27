@@ -246,6 +246,24 @@ export default function CaseForm({ creditTypes, clients, initialClientId }: Case
                     <p className="text-xs text-red-600 mt-0.5">{state.errors.companyRfc}</p>
                   )}
                 </div>
+
+                <div className="md:col-span-2">
+                  <input type="hidden" name="companyIsBanorteClient" value="false" />
+                  <label className="flex items-start gap-2 text-sm text-gf-text">
+                    <input
+                      type="checkbox"
+                      name="companyIsBanorteClient"
+                      value="true"
+                      className="mt-0.5 h-4 w-4 accent-[#4B5563]"
+                    />
+                    <span>
+                      La empresa ya es cliente Banorte
+                      <span className="block text-[11px] text-gf-text-muted">
+                        Marcada, el ingreso de estados usa 50%. Sin marcar, usa 40%.
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
             </section>
           )}

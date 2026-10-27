@@ -170,6 +170,7 @@ export default function BankComparisonTab({
 
     return (
       <div className="space-y-4">
+        <StatementWindowNotice notice={bankViability.statementNotice} />
         <StatusHeader
           bankResults={bankResults}
           destination={destination}
@@ -710,6 +711,19 @@ function SuggestedAdjustments({ match }: { match: BankResult }) {
 }
 
 // ── Warning Legend ───────────────────────────────────────────────────────────
+
+function StatementWindowNotice({ notice }: { notice?: string | null }) {
+  if (!notice) return null;
+  return (
+    <div
+      className="flex items-start gap-2.5 px-4 py-3 rounded-lg border"
+      style={{ backgroundColor: "#FFFBEB", borderColor: "#FDE68A" }}
+    >
+      <span className="text-sm mt-px">⚠</span>
+      <p className="text-sm text-gf-text leading-relaxed">{notice}</p>
+    </div>
+  );
+}
 
 function WarningLegend({ legend }: { legend: string }) {
   if (!legend) return null;

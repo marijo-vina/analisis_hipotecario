@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDate,
   IsInt,
   IsNotEmpty,
@@ -44,4 +45,8 @@ export abstract class MortgageCaseCorporateFieldsDto {
   @IsString()
   @Matches(COMPANY_RFC_PATTERN)
   companyRfc?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  companyIsBanorteClient?: boolean;
 }

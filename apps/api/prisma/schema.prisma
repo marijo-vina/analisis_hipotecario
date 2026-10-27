@@ -93,6 +93,7 @@ model MortgageCase {
   shareTenureMonths Int?
   legalName       String?
   companyRfc      String?
+  companyIsBanorteClient Boolean @default(false)
   documents       Document[]
   analysisRuns    AnalysisRun[]
   liabilitySnapshots LiabilitySnapshot[]

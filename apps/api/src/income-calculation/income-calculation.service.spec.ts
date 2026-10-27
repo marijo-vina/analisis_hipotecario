@@ -847,6 +847,7 @@ describe('IncomeCalculationService', () => {
         id: 'case-1',
         personType: 'PM',
         sharePercentage: 50,
+        companyIsBanorteClient: false,
       });
       mockPrisma.liabilitySnapshot.findFirst.mockResolvedValue({
         pmMonthlyDebt: 17971.92,
@@ -927,8 +928,11 @@ describe('IncomeCalculationService', () => {
       expect(bases.capacities.santanderStatements.capacity).toBe(1_231_490.59);
       expect(bases.capacities.santanderTaxReturn.capacity).toBe(873_083.37);
       expect(bases.capacities.scotiabank.status).toBe('CALCULATED');
-      expect(bases.capacities.banorte.status).toBe('REQUIRES_REVIEW');
-      expect(bases.capacities.hsbc.status).toBe('REQUIRES_REVIEW');
+      expect(bases.banorteClientFactor).toBe(0.4);
+      expect(bases.capacities.banorteStatements.status).toBe('CALCULATED');
+      expect(bases.capacities.banorteTaxReturn.reason).toBe('MISSING_NET_PROFIT');
+      expect(bases.capacities.hsbcStatements.status).toBe('CALCULATED');
+      expect(bases.capacities.hsbcTaxReturn.status).toBe('CALCULATED');
     });
   });
 

@@ -34,6 +34,12 @@ function parseCorporateFields(formData: FormData): Record<string, unknown> {
   const companyRfc = optionalTrimmed(formData.get("companyRfc"));
   if (companyRfc) fields.companyRfc = companyRfc.toUpperCase();
 
+  if (formData.getAll("companyIsBanorteClient").length > 0) {
+    fields.companyIsBanorteClient = formData
+      .getAll("companyIsBanorteClient")
+      .some((value) => value === "true");
+  }
+
   return fields;
 }
 

@@ -5,6 +5,17 @@ import type { PmBankGateResult } from './pm-gates';
 const STATEMENTS = 1_231_490.59;
 const TAX = 873_083.37;
 
+function priced(capacity: number) {
+  return {
+    status: 'CALCULATED' as const,
+    reason: null,
+    admissibleIncome: capacity,
+    incomeToConsider: capacity,
+    maximumDebt: capacity,
+    capacity,
+  };
+}
+
 function gate(bankCode: PmBankGateResult['bankCode'], locks: PmBankGateResult['locks'] = []): PmBankGateResult {
   return {
     bankCode,
@@ -18,6 +29,7 @@ function bases(share = 50): PmIncomeBases {
     profile: 'PM',
     sharePercentage: share,
     activityFactor: 0.5,
+    banorteClientFactor: 0.4,
     bank: {
       valid: true,
       invalidReason: null,
@@ -66,22 +78,10 @@ function bases(share = 50): PmIncomeBases {
         maximumDebt: 2_236_640.68,
         capacity: 2_079_216.8,
       },
-      banorte: {
-        status: 'REQUIRES_REVIEW',
-        reason: 'BANORTE_PM_INCOME_OPEN',
-        admissibleIncome: null,
-        incomeToConsider: null,
-        maximumDebt: null,
-        capacity: null,
-      },
-      hsbc: {
-        status: 'REQUIRES_REVIEW',
-        reason: 'HSBC_PM_INCOME_OPEN',
-        admissibleIncome: null,
-        incomeToConsider: null,
-        maximumDebt: null,
-        capacity: null,
-      },
+      banorteStatements: priced(1_000),
+      banorteTaxReturn: priced(800),
+      hsbcStatements: priced(900),
+      hsbcTaxReturn: priced(700),
     },
   };
 }
