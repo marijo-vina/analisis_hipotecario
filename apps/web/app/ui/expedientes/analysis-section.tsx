@@ -24,6 +24,14 @@ import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculat
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
 import PmGatesCard from "@/app/ui/expedientes/pm-gates-card";
+import PmCompanyAndActa from "@/app/ui/expedientes/pm-company-and-acta";
+import {
+  identityColumnKeys,
+  identityHeading,
+  pmActaHeadline,
+  showsBankComparison,
+} from "@/app/lib/pm-expediente-view";
+import { parseArticlesDocument } from "@/app/lib/articles-view";
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
@@ -421,39 +429,34 @@ export default function AnalysisSection({
               state={state}
               allDeposits={bankParsed.allDeposits}
               payrollDocs={payrollDocs}
+              documents={documents}
               personType={personType}
             />
           )}
 
           {activeTab === "motor" && (
-            personType === "PM" ? (
-              <Card>
-                <p className="text-sm text-gf-text-muted">
-                  El cálculo de capacidad de pago no aplica para Persona Moral.
-                </p>
-              </Card>
-            ) : (
-              <>
-                <LiabilityCalculationSection caseId={caseId} />
-                <div className="mt-6" />
-                <IncomeCalculationSection
-                  caseId={caseId}
-                  personType={personType}
-                  onSourceSwitched={quietLoadLatest}
-                  peinadoWarn={peinadoWarn}
-                />
-              </>
-            )
+            <>
+              <LiabilityCalculationSection caseId={caseId} />
+              <div className="mt-6" />
+              <IncomeCalculationSection
+                caseId={caseId}
+                personType={personType}
+                onSourceSwitched={quietLoadLatest}
+                peinadoWarn={peinadoWarn}
+              />
+            </>
           )}
 
           {activeTab === "bancos" && (
             <BankComparisonTab
+              sharePercentage={
+                personType === "PM" ? actaSharePercentage(documents) : null
+              }
               bankViability={
-                personType === "PM"
-                  ? undefined
-                  : state.phase === "result" || state.phase === "observations"
-                    ? state.run.detail?.bankViability
-                    : undefined
+                showsBankComparison(personType) &&
+                (state.phase === "result" || state.phase === "observations")
+                  ? state.run.detail?.bankViability
+                  : undefined
               }
               suppressViablePresentation={
                 personType === "PFAE" &&
@@ -487,12 +490,14 @@ function ValidacionesTab({
   state,
   allDeposits,
   payrollDocs,
+  documents,
   personType,
 }: {
   caseId: string;
   state: UiState;
   allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
   payrollDocs: Document[];
+  documents: Document[];
   personType?: string;
 }) {
   const hideConciliation = personType === "PFAE" || personType === "PM";
@@ -502,7 +507,7 @@ function ValidacionesTab({
       {/* ── A) Validación de identidad ──────────────────────────────────── */}
       <section>
         <h3 className="text-sm font-semibold text-gf-text mb-3">
-          Validación de identidad
+          {identityHeading(personType)}
         </h3>
         <IdentityValidationSection
           state={state}
@@ -511,6 +516,10 @@ function ValidacionesTab({
       </section>
 
       {/* ── B) Conciliación nómina vs banco — no aplica para PFAE/PM (sin nómina) ── */}
+      {personType === "PM" && (
+        <PmCompanyAndActa documents={documents} />
+      )}
+
       {personType === "PM" && (
         <section>
           <PmGatesCard
@@ -724,33 +733,29 @@ function ValidationTable({
 
 // ── IdentitySummaryCard ───────────────────────────────────────────────────────
 
+const IDENTITY_LABELS: Record<string, string> = {
+  "official-id": "INE",
+  payroll: "NÓMINA",
+  csf: "CSF",
+  "tax-return": "DECLARACIÓN",
+  "bank-statement": "EDO. CUENTA",
+  "credit-bureau": "BURÓ",
+  client: "EXPEDIENTE",
+};
+
 /** PersonType-aware discrepancy-table columns — PFAE swaps Nómina for CSF + Declaración. */
 function getIdentityColumns(personType?: string) {
-  if (personType === "PM") {
-    return [
-      { key: "official-id", label: "INE" },
-      { key: "bank-statement", label: "EDO. CUENTA" },
-      { key: "credit-bureau", label: "BURÓ" },
-      { key: "client", label: "EXPEDIENTE" },
-    ] as const;
-  }
-  if (personType === "PFAE") {
-    return [
-      { key: "csf", label: "CSF" },
-      { key: "tax-return", label: "DECLARACIÓN" },
-      { key: "official-id", label: "INE" },
-      { key: "bank-statement", label: "EDO. CUENTA" },
-      { key: "credit-bureau", label: "BURÓ" },
-      { key: "client", label: "EXPEDIENTE" },
-    ] as const;
-  }
-  return [
-    { key: "payroll", label: "NÓMINA" },
-    { key: "official-id", label: "INE" },
-    { key: "bank-statement", label: "EDO. CUENTA" },
-    { key: "credit-bureau", label: "BURÓ" },
-    { key: "client", label: "EXPEDIENTE" },
-  ] as const;
+  return identityColumnKeys(personType).map((key) => ({
+    key,
+    label: IDENTITY_LABELS[key] ?? key,
+  }));
+}
+
+function actaSharePercentage(documents: Document[]): number | null {
+  const articles = documents
+    .map((doc) => parseArticlesDocument(doc))
+    .filter((doc) => doc != null);
+  return pmActaHeadline(articles).sharePercentage;
 }
 
 function IdentitySummaryCard({

@@ -13,6 +13,10 @@ import PfaeProductDetailExtras, {
   factorTimesHint,
   originDisplay,
 } from "@/app/ui/expedientes/pfae-product-detail-extras";
+import {
+  comparisonSummaryKind,
+  pmDetailCopy,
+} from "@/app/lib/pm-expediente-view";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -130,6 +134,8 @@ function isInsufficientReasons(reasons: string[]): boolean {
 
 interface BankComparisonTabProps {
   bankViability?: BankViabilitySnapshot;
+  /** Official share from the acta. Persona moral formula copy only. */
+  sharePercentage?: number | null;
   /** Presentational overlay — never persisted, never mutates stored `status`. */
   suppressViablePresentation?: boolean;
   overlayMessage?: string;
@@ -137,6 +143,7 @@ interface BankComparisonTabProps {
 
 export default function BankComparisonTab({
   bankViability,
+  sharePercentage = null,
   suppressViablePresentation = false,
   overlayMessage,
 }: BankComparisonTabProps) {
@@ -185,6 +192,7 @@ export default function BankComparisonTab({
           expandedIndex={expandedIndex}
           onToggle={(i) => setExpandedIndex(expandedIndex === i ? null : i)}
           inputs={bankViability.inputs}
+          sharePercentage={sharePercentage}
           suppressViablePresentation={suppressViablePresentation}
         />
         <WarningLegend legend={bankViability.warningLegend} />
@@ -333,12 +341,12 @@ function FinancialSummary({
       ? `${Math.round(inputs.estimatedTermMonths / 12)} años`
       : null;
   const dest = DESTINATION_LABELS[destination ?? ""] ?? destination ?? "—";
-  const isPfae = inputs.personType === "PFAE";
+  const business = comparisonSummaryKind(inputs.personType) === "business";
   const gross = formatCurrency(inputs.confirmedGrossIncome);
   const net = formatCurrency(inputs.confirmedNetIncome);
   const sent = gross === net ? gross : `${gross} bruto · ${net} neto`;
 
-  const fields = isPfae
+  const fields = business
     ? [
         { label: "Ingreso enviado", value: sent },
         { label: "Origen", value: originDisplay(inputs.incomeSource) },
@@ -388,12 +396,14 @@ function ProductTable({
   expandedIndex,
   onToggle,
   inputs,
+  sharePercentage,
   suppressViablePresentation,
 }: {
   rows: BankResult[];
   expandedIndex: number | null;
   onToggle: (index: number) => void;
   inputs?: BankViabilitySnapshot["inputs"];
+  sharePercentage?: number | null;
   suppressViablePresentation: boolean;
 }) {
   const isPfae = inputs?.personType === "PFAE";
@@ -512,6 +522,7 @@ function ProductTable({
         <ProductDetail
           match={rows[expandedIndex]}
           inputs={inputs}
+          sharePercentage={sharePercentage}
           suppressViablePresentation={suppressViablePresentation}
         />
       )}
@@ -524,16 +535,19 @@ function ProductTable({
 function ProductDetail({
   match,
   inputs,
+  sharePercentage,
   suppressViablePresentation,
 }: {
   match: BankResult;
   inputs?: BankViabilitySnapshot["inputs"];
+  sharePercentage?: number | null;
   suppressViablePresentation: boolean;
 }) {
   const { calculation, checks, reasons, policySnapshot } = match;
   const snap = policySnapshot as unknown as Record<string, unknown>;
   const bankName = (snap.bankName as string) || match.bankCode;
   const isPfae = inputs?.personType === "PFAE";
+  const isPm = inputs?.personType === "PM";
 
   const criterion = policySnapshot.incomeCriterion;
   const isNet = String(criterion).toUpperCase().includes("NET");
@@ -615,7 +629,7 @@ function ProductDetail({
       {/* Body — 2 cols: left (calc + controls), right (reasons) */}
       <div className="px-5 pb-4 space-y-4">
         {/* Top row: salaried repeats calc cards; PFAE leads with the factor sentence. */}
-        {!isPfae && (
+        {!isPfae && !isPm && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {[
             ["Criterio", incomeLabel],
@@ -631,6 +645,23 @@ function ProductDetail({
             </div>
           ))}
         </div>
+        )}
+
+        {isPm && (
+          <div className="bg-white rounded-md border border-gf-border/30 px-3 py-3 space-y-2">
+            {pmDetailCopy({
+              bankCode: match.bankCode,
+              incomeSource: inputs?.incomeSource ?? null,
+              appliedFactor: match.appliedFactor,
+              debtCommitmentFactor: match.policySnapshot.debtCommitmentFactor,
+              sharePercentage: sharePercentage ?? null,
+              matchedNativeLabel: match.matchedNativeLabel,
+            }).map((line) => (
+              <p key={line} className="text-sm text-gf-text leading-snug">
+                {line}
+              </p>
+            ))}
+          </div>
         )}
 
         {isPfae && (
