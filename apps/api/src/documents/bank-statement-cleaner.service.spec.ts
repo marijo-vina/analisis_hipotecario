@@ -48,6 +48,26 @@ describe('BankStatementCleanerService', () => {
       expect(result.depurationSummary.needsReviewCount).toBe(0);
     });
 
+    it('should discard a large own transfer whose reference is glued to traspaso', () => {
+      const tx: RawTransaction = {
+        date: '2026-05-08',
+        amount: 317000,
+        originalConcept:
+          'T20 SPEI RECIBIDOBANAMEX 0080526TRASPASO ENTRE CUENTAS PROPIAS Ref. 0145936959 002 0000279',
+        movementType: 'DEPOSIT',
+      };
+
+      const result = service.clean(
+        [tx],
+        { totalDepositsAmount: 6920719.57 },
+        clientContext,
+      );
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('OWN_TRANSFER');
+      expect(result.depurationSummary.needsReviewCount).toBe(0);
+      expect(result.depurationSummary.totalValidIncome).toBe(0);
+    });
+
     it('should discard transfer with generic own transfer concept', () => {
       const tx: RawTransaction = {
         date: '2026-05-10',
