@@ -17,6 +17,7 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { showsDepositReviewQueue } from "@/app/lib/deposit-review";
 import type { ParsedBankStatement } from "@/app/lib/extraction";
 import { updateBankDepositClassification } from "@/app/actions/documents";
 
@@ -130,6 +131,9 @@ export default function EstadosStatementCard({
     }
   }
 
+  const reviewQueueOpen = showsDepositReviewQueue(
+    statement.financialDepuration?.integrityCheck?.status,
+  );
   const bankBadge = getBankBadge(statement.bankName);
   const bankBg = bankBadge.bg;
 
@@ -530,7 +534,7 @@ export default function EstadosStatementCard({
                   Movimientos y Depósitos Depurados
                 </h4>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {(summary?.needsReviewCount ?? 0) > 0 && (
+                  {(summary?.needsReviewCount ?? 0) > 0 && reviewQueueOpen && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
                       <AlertTriangle className="h-3 w-3 text-amber-600" />
                       {summary?.needsReviewCount} atípico{summary?.needsReviewCount !== 1 ? "s" : ""}
@@ -545,7 +549,7 @@ export default function EstadosStatementCard({
               </div>
 
               {/* Banner explicativo si hay depósitos atípicos de alto impacto */}
-              {(summary?.needsReviewCount ?? 0) > 0 && (
+              {(summary?.needsReviewCount ?? 0) > 0 && reviewQueueOpen && (
                 <div className="mb-3.5 p-3 rounded-xl bg-amber-50/90 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
                   <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
@@ -562,7 +566,9 @@ export default function EstadosStatementCard({
               <div className="space-y-2.5">
                 {deposits.map((dep: any, i: number) => {
                   const dateParts = dep.date ? parseDateParts(dep.date) : null;
-                  const isReview = dep.classification === 'NEEDS_REVIEW' || dep.isHighImpactOutlier === true;
+                  const isReview =
+                    reviewQueueOpen &&
+                    (dep.classification === 'NEEDS_REVIEW' || dep.isHighImpactOutlier === true);
                   const isTrash = dep.classification === 'TRASH';
                   const isValid = dep.classification === 'VALID' && !dep.isHighImpactOutlier;
 

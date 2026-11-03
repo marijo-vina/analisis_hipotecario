@@ -97,6 +97,41 @@ describe('BankStatementCleanerService', () => {
       expect(result.cleanedDeposits[0].trashCategory).toBe('OWN_TRANSFER');
     });
 
+    it('should discard a generic transfer whose counterparty is the same company', () => {
+      const company: ClientFiscalContext = {
+        clientFullName: 'ALIMENTOS RAPIDOS PENINSULARES SA DE CV',
+        clientRfc: 'ARP850101ABC',
+      };
+      const tx: RawTransaction = {
+        date: '2026-05-12',
+        amount: 267000,
+        originalConcept:
+          'T20 SPEI RECIBIDOMIFEL 0120526Transferencia Ref. 0168772679 ALIMENTOS RAPIDOS PENINS',
+        movementType: 'DEPOSIT',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 6920719.57 }, company);
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('OWN_TRANSFER');
+    });
+
+    it('should keep an invoice from another company as commercial income', () => {
+      const company: ClientFiscalContext = {
+        clientFullName: 'ALIMENTOS RAPIDOS PENINSULARES SA DE CV',
+      };
+      const tx: RawTransaction = {
+        date: '2026-09-04',
+        amount: 88810.53,
+        originalConcept:
+          'T20 SPEI RECIBIDOMIFEL 0040926FACTURAS ALIMENTOS Ref. 0186644507 MAYA GAS PENINSULAR',
+        movementType: 'DEPOSIT',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 3503421.84 }, company);
+      expect(result.cleanedDeposits[0].classification).toBe('VALID');
+      expect(result.cleanedDeposits[0].validCategory).toBe('COMMERCIAL_SPEI');
+    });
+
     it('should discard transfer matching normalized client name', () => {
       const tx: RawTransaction = {
         date: '2026-05-15',
@@ -178,6 +213,94 @@ describe('BankStatementCleanerService', () => {
       const result = service.clean([tx]);
       expect(result.cleanedDeposits[0].classification).toBe('TRASH');
       expect(result.cleanedDeposits[0].trashCategory).toBe('INFORMAL_FAMILY');
+    });
+
+    it('should discard an outgoing SPEI read as a deposit', () => {
+      const tx: RawTransaction = {
+        date: '2026-04-14',
+        amount: 502877.25,
+        originalConcept:
+          'T17 SPEI ENVIADO BANAMEX 1404268FACTURA Ref. 0000418886 BEBIDAS PURIFICADAS',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 6500476.45 });
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('OTHER_NON_BUSINESS');
+      expect(result.cleanedDeposits[0].reason).toBe('Cargo SPEI leído como abono');
+    });
+
+    it('should discard a returned SPEI', () => {
+      const tx: RawTransaction = {
+        date: '2026-08-03',
+        amount: 60610.51,
+        originalConcept: 'T22 SPEI DEVUELTOSANTANDER 031082604N1442456 Ref. 0040521050',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 3878523.89 });
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('REFUND_OR_REVERSAL');
+    });
+
+    it('should discard a capital contribution', () => {
+      const tx: RawTransaction = {
+        date: '2026-07-03',
+        amount: 200000,
+        originalConcept:
+          'T20 SPEI RECIBIDOBANORTE 0260703FUTURO AUMENTO DE CAPITAL Ref. 0198819078',
+      };
+
+      const result = service.clean([tx], { totalDepositsAmount: 3840491.48 });
+      expect(result.cleanedDeposits[0].classification).toBe('TRASH');
+      expect(result.cleanedDeposits[0].trashCategory).toBe('OTHER_NON_BUSINESS');
+      expect(result.cleanedDeposits[0].reason).toBe(
+        'Aportación de capital, no es ingreso operativo',
+      );
+    });
+
+    it('should accept a large payment with the word pago', () => {
+      const tx: RawTransaction = {
+        date: '2026-07-07',
+        amount: 142134.25,
+        originalConcept: 'T20 SPEI RECIBIDOTRANSFER 3460280PAGO Ref. 0118772419 CONVENIA',
+      };
+
+      const result = service.clean(
+        [
+          tx,
+          {
+            date: '2026-07-01',
+            amount: 3698357.23,
+            originalConcept: 'VENTA MOSTRADOR',
+            movementType: 'DEPOSIT',
+          },
+        ],
+        { totalDepositsAmount: 3840491.48 },
+      );
+      expect(result.cleanedDeposits[0].classification).toBe('VALID');
+      expect(result.cleanedDeposits[0].validCategory).toBe('GENERAL_INCOME');
+    });
+
+    it('should leave a large deposit with no concept for the advisor', () => {
+      const tx: RawTransaction = {
+        date: '2026-05-12',
+        amount: 106000,
+        originalConcept:
+          'T20 SPEI RECIBIDOBANAMEX BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE',
+      };
+
+      const result = service.clean(
+        [
+          tx,
+          {
+            date: '2026-05-02',
+            amount: 6814719.57,
+            originalConcept: 'VENTA MOSTRADOR',
+            movementType: 'DEPOSIT',
+          },
+        ],
+        { totalDepositsAmount: 6920719.57 },
+      );
+      expect(result.cleanedDeposits[0].classification).toBe('NEEDS_REVIEW');
     });
 
     it('should discard down payment savings', () => {
