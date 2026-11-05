@@ -112,7 +112,10 @@ export default function ExtractionSection({
             <IdentidadTab documents={docsByCategory.get("identidad") ?? []} />
           )}
           {activeTab === "csf" && (
-            <CsfTab documents={docsByCategory.get("csf") ?? []} />
+            <CsfTab
+              documents={docsByCategory.get("csf") ?? []}
+              showOwnerSwitch={personType === "PM"}
+            />
           )}
           {activeTab === "declaracion" && (
             <DeclaracionTab documents={docsByCategory.get("declaracion") ?? []} />
@@ -129,7 +132,11 @@ export default function ExtractionSection({
             />
           )}
           {activeTab === "buro" && (
-            <BuroTab documents={docsByCategory.get("buro") ?? []} caseId={caseId} />
+            <BuroTab
+              documents={docsByCategory.get("buro") ?? []}
+              caseId={caseId}
+              showOwnerSwitch={personType === "PM"}
+            />
           )}
         </div>
       </div>

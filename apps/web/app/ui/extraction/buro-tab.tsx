@@ -34,6 +34,9 @@ import {
   updateInquiries24mManual,
 } from "@/app/actions/documents";
 import EmptyState from "@/app/ui/common/empty-state";
+import ExtractionOwnerSwitch, {
+  type ExtractionOwner,
+} from "@/app/ui/extraction/extraction-owner-switch";
 
 // ---------------------------------------------------------------------------
 // Helpers & Constants
@@ -1198,14 +1201,30 @@ function CompactAlerts({ parsed }: { parsed: ParsedCreditBureau }) {
 interface BuroTabProps {
   documents: Document[];
   caseId: string;
+  /** Persona moral keeps one reporte on screen at a time. */
+  showOwnerSwitch?: boolean;
 }
 
-export default function BuroTab({ documents, caseId }: BuroTabProps) {
-  const [parsed, setParsed] = useState(() => parseBuro(documents));
+export default function BuroTab({
+  documents,
+  caseId,
+  showOwnerSwitch = false,
+}: BuroTabProps) {
+  const [owner, setOwner] = useState<ExtractionOwner>("COMPANY");
+  const [parsed, setParsed] = useState(() =>
+    parseBuro(
+      showOwnerSwitch
+        ? documents.filter((doc) => doc.owner === "COMPANY")
+        : documents,
+    ),
+  );
 
   useEffect(() => {
-    setParsed(parseBuro(documents));
-  }, [documents]);
+    const next = showOwnerSwitch
+      ? documents.filter((doc) => doc.owner === owner)
+      : documents;
+    setParsed(parseBuro(next));
+  }, [documents, owner, showOwnerSwitch]);
 
   function handlePaymentDueUpdate(
     creditIndex: number,
@@ -1240,20 +1259,30 @@ export default function BuroTab({ documents, caseId }: BuroTabProps) {
     });
   }
 
-  if (!parsed) {
-    return (
-      <EmptyState message="Los datos del buró de crédito se mostrarán aquí una vez que se suba y procese el reporte." />
-    );
-  }
+  const emptyMessage = !parsed
+    ? showOwnerSwitch
+      ? owner === "COMPANY"
+        ? "No hay reporte de buró de la persona moral. Cuando se procese el de la empresa, su lectura aparece aquí."
+        : "No hay reporte de buró del accionista. Cuando se procese el de la persona física, su lectura aparece aquí."
+      : "Los datos del buró de crédito se mostrarán aquí una vez que se suba y procese el reporte."
+    : "El reporte de buró está cargado pero aún no ha sido procesado. Usa \"Procesar\" en el explorador de documentos para extraer los datos.";
 
-  if (!parsed.hasData) {
+  if (!parsed || !parsed.hasData) {
     return (
-      <EmptyState message="El reporte de buró está cargado pero aún no ha sido procesado. Usa &quot;Procesar&quot; en el explorador de documentos para extraer los datos." />
+      <div className="space-y-5">
+        {showOwnerSwitch && (
+          <ExtractionOwnerSwitch owner={owner} onChange={setOwner} />
+        )}
+        <EmptyState message={emptyMessage} />
+      </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      {showOwnerSwitch && (
+        <ExtractionOwnerSwitch owner={owner} onChange={setOwner} />
+      )}
       {/* ── Header ────────────────────────────────────────────────────── */}
       <BuroHeader parsed={parsed} />
 

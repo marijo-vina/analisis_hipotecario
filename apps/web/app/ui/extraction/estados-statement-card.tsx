@@ -17,7 +17,10 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { showsDepositReviewQueue } from "@/app/lib/deposit-review";
+import {
+  isAutomaticallyDiscardedDeposit,
+  showsDepositReviewQueue,
+} from "@/app/lib/deposit-review";
 import type { ParsedBankStatement } from "@/app/lib/extraction";
 import { updateBankDepositClassification } from "@/app/actions/documents";
 
@@ -521,9 +524,10 @@ export default function EstadosStatementCard({
             const hasFlagged =
               deposits?.some(
                 (dep: any) =>
-                  dep.classification === "NEEDS_REVIEW" ||
-                  dep.isHighImpactOutlier === true ||
-                  dep.classification === "TRASH",
+                  !isAutomaticallyDiscardedDeposit(dep) &&
+                  (dep.classification === "NEEDS_REVIEW" ||
+                    dep.isHighImpactOutlier === true ||
+                    dep.classification === "TRASH"),
               ) ?? false;
             if (!hasFlagged) return null;
             return (
@@ -538,11 +542,6 @@ export default function EstadosStatementCard({
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold">
                       <AlertTriangle className="h-3 w-3 text-amber-600" />
                       {summary?.needsReviewCount} atípico{summary?.needsReviewCount !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {(summary?.trashDepositsCount ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold">
-                      {summary?.trashDepositsCount} descartados
                     </span>
                   )}
                 </div>
@@ -572,7 +571,7 @@ export default function EstadosStatementCard({
                   const isTrash = dep.classification === 'TRASH';
                   const isValid = dep.classification === 'VALID' && !dep.isHighImpactOutlier;
 
-                  // Solo mostrar advertencias/atípicos y rechazados
+                  if (isAutomaticallyDiscardedDeposit(dep)) return null;
                   if (!isReview && !isTrash) return null;
 
                   return (
