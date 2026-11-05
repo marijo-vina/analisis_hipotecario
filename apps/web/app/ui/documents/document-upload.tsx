@@ -14,8 +14,12 @@ interface DocumentUploadProps {
   documentTypes: DocumentType[];
   onSuccess: () => void;
   defaultDocumentTypeId?: string;
+  /** Limits the type list to the category the advisor already chose. */
+  allowedTypeCodes?: string[];
   personType?: string;
   defaultOwner?: DocumentOwner;
+  /** The category already fixed the owner, so the titular select stays hidden. */
+  lockOwner?: boolean;
 }
 
 export default function DocumentUpload({
@@ -23,11 +27,15 @@ export default function DocumentUpload({
   documentTypes,
   onSuccess,
   defaultDocumentTypeId,
+  allowedTypeCodes,
   personType,
   defaultOwner = "SHAREHOLDER",
+  lockOwner = false,
 }: DocumentUploadProps) {
   const availableDocumentTypes = useMemo<DocumentType[]>(() => {
-    const filtered = filterUploadableDocumentTypes(documentTypes, personType);
+    const filtered = filterUploadableDocumentTypes(documentTypes, personType).filter(
+      (dt) => !allowedTypeCodes || allowedTypeCodes.includes(dt.code),
+    );
     const maxId = Math.max(0, ...filtered.map((dt) => Number(dt.id) || 0));
     return filtered.map((dt, index) => {
       if (dt.code !== "PASSPORT") return dt;
@@ -39,15 +47,19 @@ export default function DocumentUpload({
         isActive: dt.isActive ?? true,
       };
     });
-  }, [documentTypes, personType]);
+  }, [documentTypes, personType, allowedTypeCodes]);
 
   const [files, setFiles] = useState<File[]>([]);
-  const [documentTypeId, setDocumentTypeId] = useState<string>(
-    defaultDocumentTypeId &&
+  const [documentTypeId, setDocumentTypeId] = useState<string>(() => {
+    if (
+      defaultDocumentTypeId &&
       availableDocumentTypes.some((dt: DocumentType) => dt.id === Number(defaultDocumentTypeId))
-      ? defaultDocumentTypeId
-      : "",
-  );
+    ) {
+      return defaultDocumentTypeId;
+    }
+    if (availableDocumentTypes.length === 1) return String(availableDocumentTypes[0].id);
+    return "";
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -192,7 +204,7 @@ export default function DocumentUpload({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Document type selector */}
+        {availableDocumentTypes.length > 1 && (
         <div>
           <label
             htmlFor="documentTypeId"
@@ -210,7 +222,7 @@ export default function DocumentUpload({
             disabled={loading}
             className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
           >
-            <option value="">-- Seleccionar categoría --</option>
+            <option value="">-- Seleccionar tipo --</option>
             {availableDocumentTypes.map((dt: DocumentType) => (
               <option key={dt.id} value={dt.id}>
                 {dt.name}
@@ -218,8 +230,9 @@ export default function DocumentUpload({
             ))}
           </select>
         </div>
+        )}
 
-        {isPm && (
+        {isPm && !lockOwner && (
           <div>
             <label
               htmlFor="documentOwner"
@@ -325,15 +338,16 @@ export default function DocumentUpload({
           </div>
         )}
 
-        {/* Submit Button */}
-        <Button
-          variant="primary"
-          type="submit"
-          disabled={loading || files.length === 0 || !documentTypeId}
-          loading={loading}
-        >
-          {submitLabel}
-        </Button>
+        {files.length > 0 && (
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={loading || !documentTypeId}
+            loading={loading}
+          >
+            {submitLabel}
+          </Button>
+        )}
       </form>
     </div>
   );
