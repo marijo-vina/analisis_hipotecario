@@ -96,10 +96,19 @@ cd apps/api
 
 # Instalar dependencias
 npm install
+```
 
-# Aplicar actualización de base de datos (crear tablas User, VerificationToken, etc.)
-npx prisma db push --config ./prisma.config.ts
+En la base del ambiente que se va a desplegar, `DATABASE_URL` en `apps/api/.env` tiene que apuntar a esa base. Antes de arrancar la API nueva:
 
+```bash
+npx prisma migrate deploy --config ./prisma.config.ts
+```
+
+Ese comando aplica las migraciones que ya están en el repositorio. Incluye persona moral: el tipo de persona, el dueño de cada documento, los datos de la empresa y la deuda mensual de la compañía. No uses `prisma db push` en esa base.
+
+En la máquina de desarrollo, para crear una migración nueva, el comando es `npx prisma migrate dev`. La base local de quien ya trabajó el perfil ya tiene estas tablas.
+
+```bash
 # Arrancar la API
 npm run start:dev
 ```
