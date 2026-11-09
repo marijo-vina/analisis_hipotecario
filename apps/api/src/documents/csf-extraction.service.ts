@@ -75,8 +75,9 @@ const CSF_INSTRUCTIONS = [
   '  - endDate: fecha de fin (YYYY-MM-DD o null).',
   '',
   '─── Sellos y Validación (digitalStamp) ───',
-  '  - originalChain: cadena original del sello (o null).',
-  '  - digitalStamp: sello digital (o null).',
+  '  No transcribas la cadena original ni el sello digital.',
+  '  Esos textos son largos, van partidos en varias líneas y rompen el JSON.',
+  '  originalChain y digitalStamp deben ser null.',
 ].join('\n');
 
 // ---------------------------------------------------------------------------

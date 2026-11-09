@@ -22,6 +22,17 @@ export interface PmCaseFacts {
   companyRfc: string | null;
 }
 
+/** Acta participation wins. The case field is only the fallback. */
+export function pmSharePercentage(
+  documents: OwnedPmDocument[],
+  caseShare: number | null,
+): number | null {
+  const fromActa = resolveVigentShareholding(corporateActs(documents))
+    .applicantSharePercentage;
+  if (fromActa != null && Number.isFinite(fromActa)) return fromActa;
+  return caseShare != null && Number.isFinite(caseShare) ? caseShare : null;
+}
+
 export function collectPmGatesInput(
   facts: PmCaseFacts,
   documents: OwnedPmDocument[],

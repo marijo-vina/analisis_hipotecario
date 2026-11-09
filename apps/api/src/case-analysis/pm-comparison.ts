@@ -98,13 +98,14 @@ export function decidePmBank(input: DecidePmBankInput): PmBankDecision {
   const soft = locks.filter((lock) => lock.code.startsWith('SIN_'));
   const reasons = [...hard, ...soft].map((lock) => lock.code);
   const engine = engineCapacity(input);
-  if (engine?.reason) reasons.push(engine.reason);
+  if (engine?.reason && !reasons.includes(engine.reason)) reasons.push(engine.reason);
 
   const banamex = input.bankCode === 'CITIBANAMEX'
     ? resolveBanamexPmFactor(input.legalForm)
     : null;
-  if (banamex?.kind === 'UNKNOWN') reasons.push('BANAMEX_TIPO_PM_DESCONOCIDO');
-  if (banamex && hard.length === 0) reasons.push('BANAMEX_PM_CAPACITY_OPEN');
+  if (banamex?.kind === 'UNKNOWN' && !reasons.includes('BANAMEX_TIPO_PM_DESCONOCIDO')) {
+    reasons.push('BANAMEX_TIPO_PM_DESCONOCIDO');
+  }
 
   const capacity = engine?.capacity ?? null;
   const negative = capacity != null && capacity <= 0;
@@ -117,7 +118,7 @@ export function decidePmBank(input: DecidePmBankInput): PmBankDecision {
     soft.length > 0 ||
     engine?.status === 'REQUIRES_REVIEW' ||
     engine == null ||
-    banamex != null
+    banamex?.kind === 'UNKNOWN'
   ) {
     status = 'REQUIRES_REVIEW';
   }
@@ -224,6 +225,11 @@ function engineCapacity(input: DecidePmBankInput) {
     return input.incomeSource === 'TAX_RETURN'
       ? capacities.banregioTaxReturn
       : capacities.banregioStatements;
+  }
+  if (input.bankCode === 'CITIBANAMEX') {
+    return input.incomeSource === 'TAX_RETURN'
+      ? capacities.banamexTaxReturn
+      : capacities.banamexStatements;
   }
   return null;
 }

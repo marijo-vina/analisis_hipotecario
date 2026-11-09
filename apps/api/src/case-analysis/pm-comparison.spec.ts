@@ -84,6 +84,15 @@ function bases(share = 50): PmIncomeBases {
       hsbcTaxReturn: priced(700),
       banregioStatements: priced(400),
       banregioTaxReturn: priced(300),
+      banamexStatements: priced(17_500),
+      banamexTaxReturn: {
+        status: 'REQUIRES_REVIEW',
+        reason: 'BANAMEX_SOLO_ESTADOS',
+        admissibleIncome: null,
+        incomeToConsider: null,
+        maximumDebt: null,
+        capacity: null,
+      },
     },
   };
 }
@@ -202,8 +211,9 @@ describe('PM bank comparison', () => {
     });
     expect(company.appliedFactor).toBe('0.15');
     expect(company.matchedNativeLabel).toBe('compañía');
-    expect(company.status).toBe('REQUIRES_REVIEW');
-    expect(company.reasons).toContain('BANAMEX_PM_CAPACITY_OPEN');
+    expect(company.status).toBe('PRELIMINARY_VIABLE');
+    expect(company.availableCapacity).toBe(17_500);
+    expect(company.reasons).not.toContain('BANAMEX_PM_CAPACITY_OPEN');
 
     const civil = decidePmBank({
       bankCode: 'CITIBANAMEX',

@@ -2128,6 +2128,22 @@ describe('BankViabilityRule', () => {
             maximumDebt: 40000,
             capacity: 30000,
           },
+          banamexStatements: {
+            status: 'CALCULATED',
+            reason: null,
+            admissibleIncome: 45000,
+            incomeToConsider: 45000,
+            maximumDebt: 22500,
+            capacity: 17500,
+          },
+          banamexTaxReturn: {
+            status: 'REQUIRES_REVIEW',
+            reason: 'BANAMEX_SOLO_ESTADOS',
+            admissibleIncome: null,
+            incomeToConsider: null,
+            maximumDebt: null,
+            capacity: null,
+          },
         },
       };
     }

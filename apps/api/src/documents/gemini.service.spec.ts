@@ -246,6 +246,26 @@ describe('GeminiService', () => {
       expect(() => invokeParse('')).toThrow('GEMINI_EMPTY_RESPONSE');
     });
 
+    it('reads a CSF object when the stamp string contains a raw line break', () => {
+      const result = invokeParse(
+        '{"taxpayer":{"rfc":"FIFJ9306245J4"},"digitalStamp":{"originalChain":"||2026/08/25|AAA\nBBB||"},"alerts":[]}',
+      );
+      expect(result.taxpayer).toEqual({ rfc: 'FIFJ9306245J4' });
+    });
+
+    it('drops a trailing comma inside an object', () => {
+      const result = invokeParse('{"rfc":"AAA","name":"JUAN",}');
+      expect(result).toEqual({ rfc: 'AAA', name: 'JUAN' });
+    });
+
+    it('drops a broken digital stamp and keeps the taxpayer', () => {
+      const result = invokeParse(
+        '{"taxpayer":{"rfc":"FIFJ9306245J4"},"digitalStamp":{"originalChain":"||"roto||"},"alerts":[]}',
+      );
+      expect(result.taxpayer).toEqual({ rfc: 'FIFJ9306245J4' });
+      expect(result.digitalStamp).toBeNull();
+    });
+
     it('throws GEMINI_INVALID_JSON when response is truly unparseable', () => {
       // salvageTruncatedJson can recover simple truncations (trailing comma + missing brace),
       // so use text that is genuinely unparseable after salvage.

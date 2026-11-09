@@ -279,6 +279,82 @@ describe('calculatePmCapacities gates', () => {
     expect(result.scotiabank.status).toBe('CALCULATED');
   });
 
+  it('prices food service as Santander servicios at 0.50', () => {
+    expect(resolvePmSantanderFactor('Restaurantes de comida para llevar')).toBe(0.5);
+    expect(resolvePmSantanderFactor('Servicios de restaurante')).toBe(0.5);
+  });
+
+  it('prices Citibanamex from a six-month average without share or company debt', () => {
+    const months = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']
+      .map((monthKey) => month(monthKey, 300_000));
+    const company = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Restaurantes de comida para llevar',
+      sharePercentage: 80,
+      pmMonthlyDebt: 99_999,
+      pfMonthlyDebt: 5_000,
+      statementMonths: months,
+      legalForm: 'S.A. de C.V.',
+    });
+    const associated = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Restaurantes de comida para llevar',
+      sharePercentage: 80,
+      pmMonthlyDebt: 99_999,
+      pfMonthlyDebt: 5_000,
+      statementMonths: months,
+      legalForm: 'S.C.',
+    });
+
+    expect(company.banamexStatements).toEqual({
+      status: 'CALCULATED',
+      reason: null,
+      admissibleIncome: 45_000,
+      incomeToConsider: 45_000,
+      maximumDebt: 22_500,
+      capacity: 17_500,
+    });
+    expect(associated.banamexStatements.admissibleIncome).toBe(150_000);
+    expect(associated.banamexStatements.capacity).toBe(70_000);
+    expect(company.banamexTaxReturn.reason).toBe('BANAMEX_SOLO_ESTADOS');
+  });
+
+  it('keeps a short Citibanamex window visible and asks for the company type', () => {
+    const short = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Restaurantes de comida para llevar',
+      sharePercentage: 80,
+      pmMonthlyDebt: 0,
+      pfMonthlyDebt: 5_000,
+      statementMonths: [month('2026-06', 300_000)],
+      legalForm: 'S.A. de C.V.',
+    });
+    const unknown = calculatePmCapacities({
+      bank,
+      tax,
+      depositGateViable: true,
+      activityDescription: 'Restaurantes de comida para llevar',
+      sharePercentage: 80,
+      pmMonthlyDebt: 0,
+      pfMonthlyDebt: 5_000,
+      statementMonths: [month('2026-06', 300_000)],
+    });
+
+    expect(short.banamexStatements).toMatchObject({
+      status: 'REQUIRES_REVIEW',
+      reason: 'BANAMEX_MENOS_DE_6_MESES',
+      admissibleIncome: 45_000,
+      capacity: 17_500,
+    });
+    expect(unknown.banamexStatements.reason).toBe('BANAMEX_TIPO_PM_DESCONOCIDO');
+  });
+
   it('does not invent a Santander factor for an unmapped giro', () => {
     expect(resolvePmSantanderFactor('Comercio al por menor')).toBeNull();
 
@@ -343,5 +419,6 @@ describe('pmTaxBase', () => {
       Number(new Prisma.Decimal(ACCUMULABLE).div(12).toDecimalPlaces(2)),
     );
     expect(base.monthlyGross).not.toBe(1);
+    expect(base.monthlyNet).toBe(1);
   });
 });

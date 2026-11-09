@@ -39,6 +39,7 @@ import {
   pmTaxBase,
   smoothCompanyDeposits,
 } from './pm-capacity';
+import { companyLegalForm, pmSharePercentage } from '../case-analysis/pm-gates-input';
 
 const PFAE_DOCUMENT_CODES = ['CSF', 'BANK_STATEMENT', 'TAX_RETURN'] as const;
 const ZERO = new Prisma.Decimal(0);
@@ -180,20 +181,13 @@ function latestProcessedCompanyTax(
 function projectPmSnapshot(
   bank: BankIncomeBase,
   tax: IncomeBase,
-  capacities: {
-    santanderStatements: { status: string };
-    santanderTaxReturn: { status: string };
-  },
 ): {
   source: IncomeSource;
   gross: Prisma.Decimal;
   net: Prisma.Decimal;
   status: IncomeCalculationStatus;
 } {
-  if (
-    capacities.santanderStatements.status === 'CALCULATED' &&
-    bank.monthlyGross != null
-  ) {
+  if (bank.valid && bank.monthlyGross != null) {
     return {
       source: 'BANK_STATEMENTS',
       gross: new Prisma.Decimal(bank.monthlyGross),
@@ -201,10 +195,7 @@ function projectPmSnapshot(
       status: IncomeCalculationStatus.CALCULATED,
     };
   }
-  if (
-    capacities.santanderTaxReturn.status === 'CALCULATED' &&
-    tax.monthlyGross != null
-  ) {
+  if (tax.valid && tax.monthlyGross != null) {
     return {
       source: 'TAX_RETURN',
       gross: new Prisma.Decimal(tax.monthlyGross),
@@ -327,7 +318,14 @@ export class IncomeCalculationService {
         owner: 'COMPANY',
         documentType: {
           code: {
-            in: ['CSF', 'TAX_SITUATION_PROOF', 'BANK_STATEMENT', 'TAX_RETURN'],
+            in: [
+              'CSF',
+              'TAX_SITUATION_PROOF',
+              'BANK_STATEMENT',
+              'TAX_RETURN',
+              'ARTICLES_OF_INCORPORATION',
+              'CORPORATE_AMENDMENT',
+            ],
           },
         },
       },
@@ -361,10 +359,14 @@ export class IncomeCalculationService {
       orderBy: { calculatedAt: 'desc' },
       select: { pmMonthlyDebt: true, grossCurrentMonthlyDebt: true },
     });
-    const sharePercentage =
+    const caseShare =
       mortgageCase.sharePercentage == null
         ? null
         : Number(mortgageCase.sharePercentage);
+    const sharePercentage = pmSharePercentage(
+      docs,
+      Number.isFinite(caseShare) ? caseShare : null,
+    );
     const capacities = calculatePmCapacities({
       bank,
       tax,
@@ -376,9 +378,10 @@ export class IncomeCalculationService {
       statementMonths: months,
       companyIsBanorteClient: mortgageCase.companyIsBanorteClient,
       fiscalProfit: taxExtract?.fiscalResult?.fiscalProfit ?? null,
+      legalForm: companyLegalForm(docs),
     });
 
-    const projected = projectPmSnapshot(bank, tax, capacities);
+    const projected = projectPmSnapshot(bank, tax);
     const bases: PmIncomeBases = {
       profile: 'PM',
       sharePercentage,
@@ -397,6 +400,8 @@ export class IncomeCalculationService {
         hsbcTaxReturn: capacities.hsbcTaxReturn,
         banregioStatements: capacities.banregioStatements,
         banregioTaxReturn: capacities.banregioTaxReturn,
+        banamexStatements: capacities.banamexStatements,
+        banamexTaxReturn: capacities.banamexTaxReturn,
       },
     };
 

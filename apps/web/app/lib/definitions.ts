@@ -438,6 +438,9 @@ export const REASON_LABELS: Record<string, string> = {
   INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
   MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
   BANREGIO_MENOS_DE_3_MESES: "Banregio pide 3 meses de estados. El promedio usa los que hay.",
+  BANAMEX_MENOS_DE_6_MESES: "Citibanamex pide 6 meses de estados. El promedio usa los que hay.",
+  BANAMEX_TIPO_PM_DESCONOCIDO: "Falta el tipo de sociedad para el factor de Citibanamex",
+  BANAMEX_SOLO_ESTADOS: "Citibanamex persona moral se calcula con estados de cuenta",
 };
 
 export function getReasonLabel(reason: string): string {

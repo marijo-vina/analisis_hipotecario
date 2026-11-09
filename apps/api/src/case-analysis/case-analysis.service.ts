@@ -23,6 +23,7 @@ import {
   employersFromDocuments,
   promoteEmployerPayrollDeposits,
 } from '../documents/payroll-deposit-match';
+import { pmSharePercentage } from './pm-gates-input';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
@@ -107,15 +108,19 @@ export class CaseAnalysisService {
    * simple / revolving formulas. Income reads the snapshot afterwards.
    */
   private async calculatePmLiabilities(mortgageCase: LoadedMortgageCase): Promise<void> {
-    const share =
+    const caseShare =
       mortgageCase.sharePercentage == null
         ? null
         : Number(mortgageCase.sharePercentage);
+    const share = pmSharePercentage(
+      mortgageCase.documents,
+      Number.isFinite(caseShare) ? caseShare : null,
+    );
     await this.liabilityCalcService.calculatePersonaMoral(
       mortgageCase.id,
       this.bureauCredits(mortgageCase, 'SHAREHOLDER').map(mapBureauCreditToInput),
       this.bureauCredits(mortgageCase, 'COMPANY').map(mapCompanyBureauCredit),
-      Number.isFinite(share) ? share : null,
+      share,
     );
   }
 

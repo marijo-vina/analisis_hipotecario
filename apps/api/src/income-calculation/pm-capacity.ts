@@ -1,5 +1,6 @@
 import { Prisma } from '../generated/prisma/client';
 import { normalizeSatText } from '../case-analysis/activity-factor-match';
+import { resolveBanamexPmFactor } from '../case-analysis/pm-comparison';
 import {
   smooth,
   type TaxReturnExtract,
@@ -9,9 +10,15 @@ import type { CompanyStatementMonth } from './pm-company-statements';
 
 /**
  * Persona moral Santander matrix. Servicios is 0.50.
+ * Food service belongs in that row even when the SAT text never says "servicio".
+ * The Oct 2026 sheet that prices shareholders at 0.90 is not applied.
  * The PFAE Santander row for the same word is 0.60 and does not apply here.
  */
-const PM_SANTANDER_GIRO_FACTORS = [{ alias: 'servicio', factor: 0.5 }] as const;
+const PM_SANTANDER_GIRO_FACTORS = [
+  { alias: 'servicio', factor: 0.5 },
+  { alias: 'restaurante', factor: 0.5 },
+  { alias: 'comida para llevar', factor: 0.5 },
+] as const;
 
 const SANTANDER_CE = new Prisma.Decimal('0.50');
 const SCOTIABANK_CE = new Prisma.Decimal('0.40');
@@ -25,6 +32,8 @@ const HSBC_CE = new Prisma.Decimal('0.50');
 const BANREGIO_ACCIONISTA = new Prisma.Decimal('1.00');
 const BANREGIO_ADJUSTMENT = new Prisma.Decimal('0.50');
 const BANREGIO_MONTHS = 3;
+const BANAMEX_CE = new Prisma.Decimal('0.50');
+const BANAMEX_MONTHS = 6;
 
 export type PmCapacityStatus = 'CALCULATED' | 'NOT_VIABLE' | 'REQUIRES_REVIEW';
 
@@ -53,6 +62,8 @@ export interface PmCapacityInput {
   companyIsBanorteClient?: boolean;
   /** Annual utilidad fiscal from the company tax return. */
   fiscalProfit?: number | null;
+  /** Acta legal form. Citibanamex uses it to choose 15% or 50%. */
+  legalForm?: string | null;
 }
 
 export interface PmCapacityResult {
@@ -67,6 +78,8 @@ export interface PmCapacityResult {
   hsbcTaxReturn: PmBankCapacity;
   banregioStatements: PmBankCapacity;
   banregioTaxReturn: PmBankCapacity;
+  banamexStatements: PmBankCapacity;
+  banamexTaxReturn: PmBankCapacity;
 }
 
 function pesos(value: Prisma.Decimal): number {
@@ -94,7 +107,7 @@ export function resolvePmSantanderFactor(
 }
 
 /**
- * Declaration path uses ingresos acumulables / 12.
+ * Gross is ingresos acumulables / 12. Net is utilidad fiscal / 12.
  * Fiscal loss knocks out only this base.
  */
 export function pmTaxBase(extracted: TaxReturnExtract | null | undefined): IncomeBase {
@@ -103,11 +116,16 @@ export function pmTaxBase(extracted: TaxReturnExtract | null | undefined): Incom
   const accumulable = extracted.fiscalResult?.accumulableIncomeTotal;
   if (accumulable == null) return invalidIncome('MISSING_DOCUMENT');
   const monthly = pesos(new Prisma.Decimal(accumulable).div(12));
+  const profit = extracted.fiscalResult?.fiscalProfit;
+  const monthlyNet =
+    profit == null || !Number.isFinite(profit)
+      ? null
+      : pesos(new Prisma.Decimal(profit).div(12));
   return {
     valid: true,
     invalidReason: null,
     monthlyGross: monthly,
-    monthlyNet: monthly,
+    monthlyNet,
   };
 }
 
@@ -216,6 +234,7 @@ function shareRatio(sharePercentage: number): Prisma.Decimal {
  * Banorte statements: promedio simple de 6 × 50% o 40% − deuda PM, luego × % × CE 0.60 − deuda PF.
  * Banorte tax: utilidad mensual × 85% × %.
  * HSBC: flujos o ventas × 30% × % × CE 0.50 − deuda PF.
+ * Citibanamex: promedio simple de 6 meses × 15% o 50% × CE 0.50 − deuda PF.
  */
 export function calculatePmCapacities(input: PmCapacityInput): PmCapacityResult {
   const activityFactor = resolvePmSantanderFactor(input.activityDescription);
@@ -237,6 +256,8 @@ export function calculatePmCapacities(input: PmCapacityInput): PmCapacityResult 
     hsbcTaxReturn: hsbcFromBase(input.tax, input),
     banregioStatements: banregioFromStatements(input),
     banregioTaxReturn: banregioFromBase(input.tax, input),
+    banamexStatements: banamexFromStatements(input),
+    banamexTaxReturn: emptyCapacity('REQUIRES_REVIEW', 'BANAMEX_SOLO_ESTADOS'),
   };
 }
 
@@ -477,6 +498,43 @@ function scotiabankFromBank(input: PmCapacityInput): PmBankCapacity {
   return {
     status: 'CALCULATED',
     reason: null,
+    admissibleIncome: pesos(admissible),
+    incomeToConsider: pesos(admissible),
+    maximumDebt: pesos(maximumDebt),
+    capacity: pesos(capacity),
+  };
+}
+
+/**
+ * Citibanamex persona moral: simple average of the latest six months,
+ * times 15% for a company or 50% for associated professionals, times CE 0.50,
+ * minus the shareholder's personal debt. Share and company debt stay out.
+ */
+function banamexFromStatements(input: PmCapacityInput): PmBankCapacity {
+  const months = input.statementMonths ?? [];
+  const average = simpleRecentAverage(months, BANAMEX_MONTHS);
+  if (average == null) {
+    return emptyCapacity('NOT_VIABLE', 'INSUFFICIENT_MONTHS');
+  }
+  const factor = resolveBanamexPmFactor(input.legalForm);
+  if (factor.factor == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'BANAMEX_TIPO_PM_DESCONOCIDO');
+  }
+  if (input.pfMonthlyDebt == null) {
+    return emptyCapacity('REQUIRES_REVIEW', 'MISSING_SHAREHOLDER_DEBT');
+  }
+
+  const admissible = new Prisma.Decimal(average)
+    .mul(factor.factor)
+    .toDecimalPlaces(2);
+  const maximumDebt = admissible.mul(BANAMEX_CE).toDecimalPlaces(2);
+  const capacity = maximumDebt
+    .minus(input.pfMonthlyDebt)
+    .toDecimalPlaces(2);
+
+  return {
+    status: months.length < BANAMEX_MONTHS ? 'REQUIRES_REVIEW' : 'CALCULATED',
+    reason: months.length < BANAMEX_MONTHS ? 'BANAMEX_MENOS_DE_6_MESES' : null,
     admissibleIncome: pesos(admissible),
     incomeToConsider: pesos(admissible),
     maximumDebt: pesos(maximumDebt),
