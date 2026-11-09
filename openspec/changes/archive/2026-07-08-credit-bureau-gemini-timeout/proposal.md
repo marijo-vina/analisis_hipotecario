@@ -53,7 +53,7 @@ None
 |------|------------|------------|
 | Regex misses borrower data in unusual PDF layouts | Medium | Fallback to Gemini for borrower if regex returns null; log warning |
 | Reduced schema loses edge-case fields layout can't handle | Low | Layout hard-gate already prevents Gemini fallback for financial fields |
-| Trimming instructions causes Gemini to misparse payment fields | Medium | Keep the 2-line golden rule; test against Juan Pérez PDF (16 credits) |
+| Trimming instructions causes Gemini to misparse payment fields | Medium | Keep the 2-line golden rule; test against Alejandro Díaz PDF (16 credits) |
 | preFilterOcr cuts needed context sections | Low | Only trim when ocrLayout present; full OCR still used as fallback |
 
 ## Rollback Plan
@@ -71,5 +71,5 @@ Revert the commit. All changes are in two files with feature-flag compatibility 
 - [ ] Gemini completes bureau extraction for 20-credit PDFs in <60s (currently >300s timeout)
 - [ ] No GEMINI_TIMEOUT or GEMINI_INVALID_JSON errors for real bureau PDFs
 - [ ] All 457 existing unit tests pass
-- [ ] Extraction output matches current quality (same credit count, fields, alerts) on Juan Pérez validation PDF
+- [ ] Extraction output matches current quality (same credit count, fields, alerts) on Alejandro Díaz validation PDF
 - [ ] Prompt size <10K chars for typical bureau PDF (from ~20K)

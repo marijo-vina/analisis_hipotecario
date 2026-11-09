@@ -19,6 +19,8 @@ interface PfaeIncomePanelProps {
   onSnapshotChange: (next: IncomeCalculationResult) => void;
   onSourceSwitched?: () => void;
   peinadoWarn?: boolean;
+  emptyMessage?: string;
+  bankCaption?: string;
 }
 
 const INVALID_REASON_COPY: Record<string, string> = {
@@ -99,13 +101,10 @@ function activityLine(bases: PfaeIncomeBases): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-function EmptyPfaeIncomeCard() {
+function EmptyPfaeIncomeCard({ message }: { message: string }) {
   return (
     <Card>
-      <p className="text-sm text-gf-text-muted">
-        Sin bases PFAE. Ejecuta «Analizar expediente» en Validaciones para
-        calcular las bases.
-      </p>
+      <p className="text-sm text-gf-text-muted">{message}</p>
     </Card>
   );
 }
@@ -182,12 +181,17 @@ function PathCard({
   );
 }
 
+const PFAE_EMPTY =
+  "Sin bases PFAE. Ejecuta «Analizar expediente» en Validaciones para calcular las bases.";
+
 export default function PfaeIncomePanel({
   caseId,
   snapshot,
   onSnapshotChange,
   onSourceSwitched,
   peinadoWarn = false,
+  emptyMessage = PFAE_EMPTY,
+  bankCaption,
 }: PfaeIncomePanelProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -201,7 +205,7 @@ export default function PfaeIncomePanel({
   }, [snapshot]);
 
   if (!snapshot || !bases) {
-    return <EmptyPfaeIncomeCard />;
+    return <EmptyPfaeIncomeCard message={emptyMessage} />;
   }
 
   const taxHasLoss = bases.taxReturn.invalidReason === "TAX_LOSS";
@@ -293,7 +297,9 @@ export default function PfaeIncomePanel({
             <p className="mt-1 text-xl font-semibold tabular-nums text-gf-text">
               {formatMXN(bases.bank.monthlyGross)}
             </p>
-            <p className="mt-2 text-xs text-gf-text-muted">{bankPeriodCopy(bases)}</p>
+            <p className="mt-2 text-xs text-gf-text-muted">
+              {bankCaption ?? bankPeriodCopy(bases)}
+            </p>
             {excluded && (
               <p className="mt-1 text-xs text-gf-text-muted">{excluded}</p>
             )}

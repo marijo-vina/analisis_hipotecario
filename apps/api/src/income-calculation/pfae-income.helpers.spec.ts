@@ -17,6 +17,7 @@ function bankStatement(opts: {
   end?: string | null;
   incomplete?: boolean;
   income?: number;
+  integrityStatus?: string;
 }) {
   return {
     statementPeriod: {
@@ -25,6 +26,9 @@ function bankStatement(opts: {
       isCurrentIncompleteMonth: opts.incomplete ?? false,
     },
     financialDepuration: {
+      integrityCheck: opts.integrityStatus
+        ? { status: opts.integrityStatus }
+        : undefined,
       depurationSummary: {
         totalValidIncome: opts.income ?? 0,
       },
@@ -213,6 +217,46 @@ describe('assembleMonths', () => {
 
     expect(months).toHaveLength(1);
     expect(months[0].monthKey).toBe('2024-05');
+  });
+
+  it('skips a statement whose movements do not match the cover', () => {
+    const months = assembleMonths([
+      bankStatement({
+        start: '2026-04-01',
+        income: 9_737_732.26,
+        integrityStatus: 'CRITICAL_DISCREPANCY',
+      }),
+      bankStatement({
+        start: '2026-05-01',
+        income: 100,
+        integrityStatus: 'MINOR_DIFFERENCE',
+      }),
+      bankStatement({ start: '2026-06-01', income: 50 }),
+    ]);
+
+    expect(months.map((month) => month.monthKey)).toEqual([
+      '2026-05',
+      '2026-06',
+    ]);
+  });
+
+  it('does not average a window once a mismatched month is left out', () => {
+    const months = assembleMonths(
+      ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06'].map(
+        (month, index) =>
+          bankStatement({
+            start: `${month}-01`,
+            income: 100 + index,
+            integrityStatus: index === 3 ? 'CRITICAL_DISCREPANCY' : 'MATCHED',
+          }),
+      ),
+    );
+
+    const result = smooth(months, 6);
+
+    expect(months.map((month) => month.monthKey)).not.toContain('2026-04');
+    expect(result.valid).toBe(false);
+    expect(result.invalidReason).toBe('INSUFFICIENT_MONTHS');
   });
 });
 

@@ -28,6 +28,8 @@ experiments/bureau-pdfplumber-spike/.venv/
 experiments/bureau-pdfplumber-spike/__pycache__/
 # PDF files (documents with personal data)
 *.pdf
+# Expedientes reales (buró, estados, CSF). No se versionan.
+casos/
 
 # GCP credentials
 gcp-credentials.json

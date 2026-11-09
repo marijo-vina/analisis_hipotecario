@@ -1,4 +1,9 @@
-import { mergeBureauGrid, type BureauGridCredit } from './bureau-grid.client';
+import {
+  mergeBureauGrid,
+  mergeCompanyBureauGrid,
+  type BureauGridCredit,
+  type CompanyBureauGridCredit,
+} from './bureau-grid.client';
 
 const banamexGrid: BureauGridCredit = {
   institution: 'BANAMEX TC L',
@@ -148,7 +153,7 @@ describe('mergeBureauGrid', () => {
       },
       {
         institution: 'AMEX COMPANY',
-        creditLimit: 160000,
+        creditLimit: 153441,
         mopCodes: ['1'],
         rawTextReference: 'AMEX COMPANY TARJETA DE CREDITO',
       },
@@ -157,28 +162,150 @@ describe('mergeBureauGrid', () => {
     mergeBureauGrid(credits, [
       {
         institution: 'AMEX',
-        accountNumber: '4000000000000001',
+        accountNumber: '376722482104002',
         paymentDueAmount: 1875,
         lastPaymentAmount: 50000,
-        currentBalance: 30000,
+        currentBalance: 30283,
         creditLimit: 150000,
-        maxCredit: 200000,
+        maxCredit: 193336,
         mopCodes: ['1'],
       },
       {
         institution: 'AMEX COMPANY',
-        accountNumber: '4000000000000003',
+        accountNumber: '376702569371005',
         paymentDueAmount: 0,
         lastPaymentAmount: 41600,
-        currentBalance: 45000,
+        currentBalance: 49948,
         creditLimit: null,
-        maxCredit: 160000,
+        maxCredit: 153441,
         mopCodes: ['1', '1', '3'],
       },
     ]);
 
     expect(credits[0].paymentDueAmount).toBe(1875);
     expect(credits[1].mopCodes).toEqual(['1', '1', '3']);
-    expect(credits[1].accountNumber).toBe('4000000000000003');
+    expect(credits[1].accountNumber).toBe('376702569371005');
+  });
+});
+
+describe('mergeCompanyBureauGrid', () => {
+  const cemex: CompanyBureauGridCredit = {
+    institution: 'CEMEX SAB',
+    accountNumber: '0050017615',
+    creditType: 'LINEA DE CREDITO',
+    classification: 'REVOLVING',
+    originalAmount: 3_850_000,
+    currentBalance: 0,
+    pastDueAmount: 0,
+    termDays: 30,
+    mopCodes: ['1', '1', '2'],
+  };
+
+  it('writes granted amount, balance and term onto the matching account', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'CEMEX',
+        accountNumber: '0050017615',
+        originalAmount: null,
+        currentBalance: 0,
+        classification: 'UNKNOWN',
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [cemex]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].originalAmount).toBe(3_850_000);
+    expect(credits[0].currentBalance).toBe(0);
+    expect(credits[0].termDays).toBe(30);
+    expect(credits[0].classification).toBe('REVOLVING');
+    expect(credits[0].mopCodes).toEqual(['1', '1', '2']);
+  });
+
+  it('appends a company credit Gemini did not return', () => {
+    const credits: Record<string, unknown>[] = [];
+
+    mergeCompanyBureauGrid(credits, [cemex]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].accountNumber).toBe('0050017615');
+    expect(credits[0].originalAmount).toBe(3_850_000);
+    expect(credits[0].status).toBe('ACTIVE');
+  });
+
+  it('fills the account on the existing row instead of appending a second copy', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'ARRENDADORA',
+        accountNumber: null,
+        originalAmount: 29_311_000,
+        currentBalance: 26_610_000,
+        paymentDueAmount: null,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [
+      {
+        institution: 'ARRENDADORA',
+        accountNumber: 'MPM00080',
+        creditType: 'ARRENDAMIENTO PURO',
+        classification: 'FIXED_PAYMENT',
+        originalAmount: 29_311_000,
+        currentBalance: 26_610_000,
+        pastDueAmount: 0,
+        termDays: 7296,
+      },
+    ]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].accountNumber).toBe('MPM00080');
+    expect(credits[0].termDays).toBe(7296);
+  });
+
+  it('moves a past-due amount out of the payment field', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'BANCA MIFEL',
+        accountNumber: null,
+        originalAmount: 3_750_000,
+        currentBalance: 0,
+        paymentDueAmount: 679_000,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, [
+      {
+        institution: 'BANCA MIFEL',
+        accountNumber: '03000459980',
+        creditType: 'SIMPLE',
+        classification: 'FIXED_PAYMENT',
+        originalAmount: 3_750_000,
+        currentBalance: 0,
+        pastDueAmount: 679_000,
+        termDays: 1095,
+      },
+    ]);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].pastDueAmount).toBe(679_000);
+    expect(credits[0].paymentDueAmount).toBeNull();
+    expect(credits[0].accountNumber).toBe('03000459980');
+  });
+
+  it('keeps a commercial overdue amount out of the payment field', () => {
+    const credits: Record<string, unknown>[] = [
+      {
+        institution: 'SORIANA',
+        classification: 'DEPARTMENT_STORE',
+        paymentDueAmount: 58_000,
+        currentBalance: 0,
+      },
+    ];
+
+    mergeCompanyBureauGrid(credits, []);
+
+    expect(credits).toHaveLength(1);
+    expect(credits[0].pastDueAmount).toBe(58_000);
+    expect(credits[0].paymentDueAmount).toBeNull();
   });
 });

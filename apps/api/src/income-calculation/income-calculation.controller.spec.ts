@@ -61,6 +61,7 @@ describe('IncomeCalculationController', () => {
     getLatest: jest.Mock;
     toggleReceipt: jest.Mock;
     switchSource: jest.Mock;
+    evaluateCompanyStatements: jest.Mock;
   };
   let mockCaseAnalysis: {
     runPhaseC: jest.Mock;
@@ -76,6 +77,7 @@ describe('IncomeCalculationController', () => {
       getLatest: jest.fn(),
       toggleReceipt: jest.fn(),
       switchSource: jest.fn(),
+      evaluateCompanyStatements: jest.fn(),
     };
     mockCaseAnalysis = {
       runPhaseC: jest.fn().mockResolvedValue({ runId: 'run-phase-c' }),
@@ -131,6 +133,35 @@ describe('IncomeCalculationController', () => {
       IncomeCalculationController,
     );
     expect(guards).toEqual([JwtAuthGuard]);
+  });
+
+  describe('GET /cases/:caseId/income/company-statements', () => {
+    it('returns the company statement rollup without calculating income', async () => {
+      const rollup = {
+        activity: { windowMonths: 6 },
+        months: [{ monthKey: '2026-05', validDepositCount: 5 }],
+        santanderDepositGate: { viable: true, status: 'VIABLE' },
+      };
+      mockService.evaluateCompanyStatements.mockResolvedValue(rollup);
+
+      const response = await request(app.getHttpServer())
+        .get(`/cases/${caseId}/income/company-statements`)
+        .expect(200);
+
+      expect(response.body.santanderDepositGate.viable).toBe(true);
+      expect(mockService.evaluateCompanyStatements).toHaveBeenCalledWith(caseId);
+      expect(mockService.calculate).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the case does not exist', async () => {
+      mockService.evaluateCompanyStatements.mockRejectedValue(
+        new NotFoundException('Mortgage case not found'),
+      );
+
+      await request(app.getHttpServer())
+        .get(`/cases/${caseId}/income/company-statements`)
+        .expect(404);
+    });
   });
 
   // ── POST /cases/:caseId/income/calculate ────────────────────────────

@@ -45,9 +45,16 @@ export class MortgageCasesController {
     return this.mortgageCasesService.findOne(id);
   }
 
-  @Patch(':id')
   @Put(':id')
   update(
+    @Param('id') id: string,
+    @Body() dto: UpdateMortgageCaseDto,
+  ) {
+    return this.mortgageCasesService.update(id, dto);
+  }
+
+  @Patch(':id')
+  updateViaPatch(
     @Param('id') id: string,
     @Body() dto: UpdateMortgageCaseDto,
   ) {

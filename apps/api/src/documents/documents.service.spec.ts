@@ -173,6 +173,7 @@ describe('DocumentsService', () => {
           documentStatusId: mockDocumentStatus.id,
           originalName: dto.originalName,
           uploadedById: advisorId,
+          owner: 'SHAREHOLDER',
         },
         include: {
           documentType: true,
@@ -218,6 +219,28 @@ describe('DocumentsService', () => {
         BadRequestException,
       );
       expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should persist owner COMPANY when dto.owner is COMPANY', async () => {
+      const companyDto: CreateDocumentDto = {
+        ...dto,
+        owner: 'COMPANY',
+      };
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue(mockDocumentType);
+      mockPrismaService.documentStatus.findUnique.mockResolvedValue(mockDocumentStatus);
+      mockPrismaService.document.create.mockResolvedValue({
+        id: 'doc-uuid-company',
+        owner: 'COMPANY',
+      });
+
+      await service.create(caseId, advisorId, companyDto);
+
+      expect(mockPrismaService.document.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ owner: 'COMPANY' }),
+        }),
+      );
     });
   });
 
@@ -451,6 +474,7 @@ describe('DocumentsService', () => {
         caseId,
         mockDocumentType.code,
         mockFile.originalname,
+        'SHAREHOLDER',
       );
 
       // GCS upload
@@ -472,6 +496,7 @@ describe('DocumentsService', () => {
           sizeBytes: mockFile.size,
           storagePath,
           fileUrl,
+          owner: 'SHAREHOLDER',
         },
         include: {
           documentType: true,
@@ -571,6 +596,46 @@ describe('DocumentsService', () => {
 
       // CRITICAL: Document must NOT be created if GCS upload fails
       expect(mockPrismaService.document.create).not.toHaveBeenCalled();
+    });
+
+    it('should persist COMPANY owner and pass it to buildPath', async () => {
+      const companyPath = 'case-uuid-1/COMPANY/CSF/csf-empresa.pdf';
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue({ id: caseId });
+      mockPrismaService.documentType.findUnique.mockResolvedValue({
+        ...mockDocumentType,
+        code: 'CSF',
+      });
+      mockPrismaService.documentStatus.findUnique.mockResolvedValue(mockDocumentStatus);
+      mockStoragePathService.buildPath.mockReturnValue(companyPath);
+      mockGcsService.uploadFile.mockResolvedValue(`gs://test-bucket/${companyPath}`);
+      mockPrismaService.document.create.mockResolvedValue({
+        ...createdDocument,
+        owner: 'COMPANY',
+        storagePath: companyPath,
+      });
+
+      await service.uploadAndCreate(
+        caseId,
+        advisorId,
+        mockFile,
+        documentTypeId,
+        'COMPANY',
+      );
+
+      expect(mockStoragePathService.buildPath).toHaveBeenCalledWith(
+        caseId,
+        'CSF',
+        mockFile.originalname,
+        'COMPANY',
+      );
+      expect(mockPrismaService.document.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            owner: 'COMPANY',
+            storagePath: companyPath,
+          }),
+        }),
+      );
     });
   });
 

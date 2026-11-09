@@ -11,6 +11,11 @@ import {
   type LiabilityCreditResult,
   type LiabilityCalculationResult,
 } from './liability.types';
+import {
+  calculatePmCompanyCredit,
+  calculatePmCompanyLiabilities,
+  type PmCompanyCreditInput,
+} from './pm-company-liability';
 
 // ── Keyword sets for classification ───────────────────────────────────────
 
@@ -130,7 +135,7 @@ export class LiabilityCalculationService {
 
   /**
    * Default revolving factor from `personType` when the caller omits `factorUsed`.
-   * PFAE → 0.07; SALARIED or absent → 0.06.
+   * PFAE → 0.07. SALARIED, persona moral, or absent → 0.06.
    */
   private async resolveFactor(
     caseId: string,
@@ -195,6 +200,54 @@ export class LiabilityCalculationService {
   }
 
   /**
+   * Persona moral: shareholder credits keep MAX(saldo × 6%, pago).
+   * Company credits use the simple and revolving formulas × share %.
+   * `grossCurrentMonthlyDebt` stays the shareholder bag. Company debt
+   * is `pmMonthlyDebt` and is not subtracted from capacity here.
+   */
+  async calculatePersonaMoral(
+    caseId: string,
+    shareholderCredits: LiabilityCreditInput[],
+    companyCredits: PmCompanyCreditInput[],
+    sharePercentage: number | null,
+  ): Promise<LiabilityCalculationResult> {
+    const pfResults = shareholderCredits.map((credit) =>
+      this.processCredit(credit, SALARIED_REVOLVING_FACTOR),
+    );
+    const company = calculatePmCompanyLiabilities(companyCredits, sharePercentage);
+    const credits = [...pfResults, ...company.credits];
+    const grossCents = this.sumContributionsCents(pfResults);
+    const balanceCents = this.sumBalancesCents(pfResults);
+    const globalStatus = this.aggregateGlobalStatus(credits);
+
+    const snapshot = await this.prisma.liabilitySnapshot.create({
+      data: {
+        mortgageCaseId: caseId,
+        factorUsed: SALARIED_REVOLVING_FACTOR,
+        rulesVersion: this.rulesVersion,
+        credits: credits as unknown as never,
+        globalStatus,
+        grossCurrentMonthlyDebt: centsToPesos(grossCents),
+        pmMonthlyDebt: company.pmMonthlyDebt,
+        totalCurrentBalance: centsToPesos(balanceCents),
+      },
+    });
+
+    return {
+      id: snapshot.id,
+      caseId,
+      calculatedAt: snapshot.calculatedAt.toISOString(),
+      factorUsed: SALARIED_REVOLVING_FACTOR,
+      rulesVersion: this.rulesVersion,
+      credits,
+      globalStatus,
+      grossCurrentMonthlyDebt: centsToPesos(grossCents),
+      pmMonthlyDebt: company.pmMonthlyDebt,
+      totalCurrentBalance: centsToPesos(balanceCents),
+    };
+  }
+
+  /**
    * Return the most recent LiabilitySnapshot for a case, or null.
    */
   async getLatest(
@@ -247,13 +300,50 @@ export class LiabilityCalculationService {
     target.classificationSource = ClassificationSource.MANUAL;
     target.classificationReason = dto.reason ?? null;
 
-    // Recalculate the overridden credit's contribution
-    this.recalculateCredit(target, factor);
-    credits[creditIndex] = target;
+    if (target.liabilityBag === 'PM') {
+      const recomputed = calculatePmCompanyCredit(
+        {
+          creditReference: target.creditReference,
+          institution: target.institution,
+          creditType:
+            target.creditNature === CreditNature.REVOLVING
+              ? 'REVOLVENTE'
+              : target.creditType,
+          classification:
+            target.creditNature === CreditNature.REVOLVING
+              ? 'REVOLVING'
+              : target.creditNature === CreditNature.FIXED
+                ? 'FIXED_PAYMENT'
+                : target.classification,
+          isClosed: target.isClosed,
+          originalAmount: target.originalAmount ?? null,
+          currentBalance: target.currentBalance,
+          termDays: target.termDays ?? null,
+        },
+        target.sharePercentage ?? null,
+      );
+      credits[creditIndex] = {
+        ...recomputed,
+        classificationSource: ClassificationSource.MANUAL,
+        classificationReason: dto.reason ?? recomputed.classificationReason,
+      };
+    } else {
+      this.recalculateCredit(target, factor);
+      credits[creditIndex] = target;
+    }
 
-    // Recompute aggregates
-    const grossCents = this.sumContributionsCents(credits);
-    const balanceCents = this.sumBalancesCents(credits);
+    const pfCredits = credits.filter((credit) => credit.liabilityBag !== 'PM');
+    const pmCredits = credits.filter((credit) => credit.liabilityBag === 'PM');
+    const grossCents = this.sumContributionsCents(pfCredits);
+    const balanceCents = this.sumBalancesCents(pfCredits);
+    const pmMonthlyDebt =
+      pmCredits.length === 0
+        ? (latest.pmMonthlyDebt ?? null)
+        : pmCredits.some(
+              (credit) => credit.liabilityStatus === LiabilityStatus.INCOMPLETE,
+            )
+          ? null
+          : centsToPesos(this.sumContributionsCents(pmCredits));
     const globalStatus = this.aggregateGlobalStatus(credits);
 
     const snapshot = await this.prisma.liabilitySnapshot.create({
@@ -264,6 +354,7 @@ export class LiabilityCalculationService {
         credits: credits as unknown as never,
         globalStatus,
         grossCurrentMonthlyDebt: centsToPesos(grossCents),
+        pmMonthlyDebt,
         totalCurrentBalance: centsToPesos(balanceCents),
       },
     });
@@ -277,6 +368,7 @@ export class LiabilityCalculationService {
       credits,
       globalStatus,
       grossCurrentMonthlyDebt: centsToPesos(grossCents),
+      pmMonthlyDebt,
       totalCurrentBalance: centsToPesos(balanceCents),
     };
   }
@@ -767,6 +859,8 @@ export class LiabilityCalculationService {
       credits: snapshot.credits as LiabilityCreditResult[],
       globalStatus: snapshot.globalStatus as GlobalLiabilityStatus,
       grossCurrentMonthlyDebt: gross,
+      pmMonthlyDebt:
+        snapshot.pmMonthlyDebt == null ? null : Number(snapshot.pmMonthlyDebt),
       totalCurrentBalance: total,
     };
   }

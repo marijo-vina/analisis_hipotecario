@@ -19,6 +19,7 @@ export type ExtractionCategory =
   | "identidad"
   | "csf"
   | "declaracion"
+  | "acta"
   | "nomina"
   | "estados"
   | "buro";
@@ -27,6 +28,7 @@ export const CATEGORY_LABELS: Record<ExtractionCategory, string> = {
   identidad: "Identidad",
   csf: "Constancia fiscal (CSF)",
   declaracion: "Declaración anual",
+  acta: "Acta",
   nomina: "Recibos de nómina",
   estados: "Estados de cuenta",
   buro: "Buró de crédito",
@@ -65,6 +67,9 @@ export function docCategory(
       return "csf";
     case "TAX_RETURN":
       return "declaracion";
+    case "ARTICLES_OF_INCORPORATION":
+    case "CORPORATE_AMENDMENT":
+      return "acta";
     case "PAYROLL_RECEIPT":
       return "nomina";
     case "BANK_STATEMENT":
@@ -1171,6 +1176,10 @@ export interface ParsedCreditBureauCredit extends CreditAuditFields, PaymentDueG
   paymentDueAmount: number | null;
   lastPaymentAmount: number | null;
   creditLimit: number | null;
+  /** Crédito otorgado on a Personas Morales report, in pesos. */
+  originalAmount?: number | null;
+  /** Plazo in days on a Personas Morales report. */
+  termDays?: number | null;
   currency: string;
   paymentHistory: string | null;
   mopCodes: string[];
@@ -1206,6 +1215,7 @@ export interface ParsedCreditBureauSummary {
 export interface ParsedCreditBureau {
   documentId: string;
   originalName: string;
+  owner?: "SHAREHOLDER" | "COMPANY" | null;
   statusCode: string;
   statusName: string;
   hasData: boolean;
@@ -1272,6 +1282,7 @@ function emptyBuro(doc: Document): ParsedCreditBureau {
   return {
     documentId: doc.id,
     originalName: doc.originalName,
+    owner: doc.owner ?? null,
     statusCode: doc.documentStatus.code,
     statusName: doc.documentStatus.name,
     hasData: false,
@@ -1468,6 +1479,8 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
       paymentDueAmount,
       lastPaymentAmount,
       creditLimit: (credit.creditLimit as number) ?? null,
+      originalAmount: (credit.originalAmount as number) ?? null,
+      termDays: (credit.termDays as number) ?? null,
       currency: (credit.currency as string) ?? "MXN",
       paymentHistory: (credit.paymentHistory as string) ?? null,
       mopCodes: (credit.mopCodes as string[]) ?? [],
@@ -1598,6 +1611,7 @@ export function parseBuro(documents: Document[]): ParsedCreditBureau | null {
   return {
     documentId: doc.id,
     originalName: doc.originalName,
+    owner: doc.owner ?? null,
     statusCode: doc.documentStatus.code,
     statusName: doc.documentStatus.name,
     hasData: true,
@@ -1667,6 +1681,8 @@ export enum LiabilityRuleApplied {
   UNKNOWN_PROVISIONAL = "UNKNOWN_PROVISIONAL",
   CLOSED_ZERO = "CLOSED_ZERO",
   INCOMPLETE_DATA = "INCOMPLETE_DATA",
+  PM_SIMPLE = "PM_SIMPLE",
+  PM_REVOLVING = "PM_REVOLVING",
 }
 
 /** Enriched credit result from the liability calculation engine (HU-11). */
@@ -1687,6 +1703,10 @@ export interface LiabilityCreditResult {
   liabilityStatus: LiabilityStatus;
   classificationSource: LiabilityClassificationSource;
   classificationReason: string | null;
+  liabilityBag?: "PF" | "PM";
+  originalAmount?: number | null;
+  termDays?: number | null;
+  sharePercentage?: number | null;
 }
 
 /** Full liability calculation result returned by the API (HU-11). */
@@ -1699,6 +1719,7 @@ export interface LiabilityCalculationResult {
   credits: LiabilityCreditResult[];
   globalStatus: GlobalLiabilityStatus;
   grossCurrentMonthlyDebt: number;
+  pmMonthlyDebt?: number | null;
   totalCurrentBalance: number;
 }
 

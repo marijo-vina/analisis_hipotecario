@@ -1,0 +1,212 @@
+{
+  "case": {
+    "personType": "PM",
+    "sharePercentage": 50
+  },
+  "documents": [
+    {
+      "owner": "COMPANY",
+      "type": "CSF",
+      "status": "PROCESSED",
+      "processedAt": "2026-06-01T00:00:00.000Z",
+      "createdAt": "2026-06-01T00:00:00.000Z",
+      "extractedData": {
+        "taxpayer": {
+          "fullName": "EMPRESA EJEMPLO SA DE CV",
+          "rfc": "EEJ010101AAA"
+        },
+        "activities": [
+          {
+            "description": "Servicios",
+            "percentage": 100,
+            "order": 1,
+            "endDate": null
+          }
+        ]
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-01-01",
+          "periodEndDate": "2026-01-31",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 11940000,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-02-01",
+          "periodEndDate": "2026-02-28",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 12710000,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-03-01",
+          "periodEndDate": "2026-03-31",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 7800000,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-04-01",
+          "periodEndDate": "2026-04-30",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 9480000,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-05-01",
+          "periodEndDate": "2026-05-31",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 14780000,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "BANK_STATEMENT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "statementPeriod": {
+          "periodStartDate": "2026-06-01",
+          "periodEndDate": "2026-06-30",
+          "isCurrentIncompleteMonth": false
+        },
+        "financialDepuration": {
+          "depurationSummary": {
+            "totalValidIncome": 10602813.68,
+            "validDepositsCount": 5
+          }
+        }
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "TAX_RETURN",
+      "status": "PROCESSED",
+      "processedAt": "2026-06-03T00:00:00.000Z",
+      "createdAt": "2026-06-03T00:00:00.000Z",
+      "extractedData": {
+        "fiscalResult": {
+          "fiscalProfit": 50000000,
+          "accumulableIncomeTotal": 99791348.16
+        },
+        "hasTaxLoss": false
+      }
+    },
+    {
+      "owner": "COMPANY",
+      "type": "CREDIT_BUREAU_REPORT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "credits": [
+          {
+            "accountNumber": "PM-SIMPLE-1460",
+            "institution": "BANCO",
+            "creditType": "CREDITO SIMPLE",
+            "classification": "FIXED_PAYMENT",
+            "status": "ACTIVE",
+            "isClosed": false,
+            "originalAmount": 445000,
+            "currentBalance": 445000,
+            "termDays": 1460
+          },
+          {
+            "accountNumber": "PM-SIMPLE-30",
+            "institution": "BANCO",
+            "creditType": "CREDITO SIMPLE",
+            "classification": "FIXED_PAYMENT",
+            "status": "ACTIVE",
+            "isClosed": false,
+            "originalAmount": 24000,
+            "currentBalance": 24000,
+            "termDays": 30
+          },
+          {
+            "accountNumber": "PM-REVOLVENTE",
+            "institution": "BANCO",
+            "creditType": "LINEA REVOLVENTE",
+            "classification": "REVOLVING",
+            "status": "ACTIVE",
+            "isClosed": false,
+            "originalAmount": 28000,
+            "currentBalance": 28000,
+            "termDays": null
+          }
+        ]
+      }
+    },
+    {
+      "owner": "SHAREHOLDER",
+      "type": "CREDIT_BUREAU_REPORT",
+      "status": "PROCESSED",
+      "extractedData": {
+        "credits": [
+          {
+            "accountNumber": "PF-FIJO",
+            "institution": "BANCO",
+            "creditType": "PRESTAMO PERSONAL",
+            "classification": "FIXED_PAYMENT",
+            "status": "ACTIVE",
+            "isClosed": false,
+            "currentBalance": 2000000,
+            "paymentDueAmount": 157423.88
+          }
+        ]
+      }
+    }
+  ]
+}

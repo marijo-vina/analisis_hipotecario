@@ -94,6 +94,8 @@ export interface CaseStatus {
   order: number;
 }
 
+export type DocumentOwner = "SHAREHOLDER" | "COMPANY";
+
 export interface MortgageCase {
   id: string;
   clientId: string;
@@ -107,11 +109,18 @@ export interface MortgageCase {
   propertyValue?: number;
   estimatedTermMonths?: number;
   notes?: string;
+  sharePercentage?: string | number | null;
+  incorporationDate?: string | null;
+  shareTenureMonths?: number | null;
+  legalName?: string | null;
+  companyRfc?: string | null;
+  companyIsBanorteClient?: boolean | null;
   documents?: Array<{
     id: string;
     documentStatus: { id: number; code: string; name: string };
     documentType: { id: number; code: string; name: string };
     processingError?: string | null;
+    owner?: DocumentOwner | null;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -168,6 +177,7 @@ export interface Document {
   originalName: string;
   uploadedById: string;
   uploadedBy?: { id: string; name: string };
+  owner?: DocumentOwner | null;
   // OCR fields (HU-07 document processing)
   ocrText?: string;
   processedAt?: string;
@@ -218,6 +228,20 @@ export interface PfaeValidationSnapshot {
   coherence: { rentWithoutRegimeCount: number; outcome: "PASS" | "WARNING" } | null;
 }
 
+export type PmBankGateStatus = "VIABLE" | "NOT_VIABLE" | "INCOMPLETE";
+
+export interface PmGatesSnapshot {
+  banks: Array<{
+    bankCode: string;
+    status: PmBankGateStatus;
+    locks: Array<{ code: string; message: string }>;
+  }>;
+  companyIdentity: "PASS" | "FAIL";
+  identityLocks: Array<{ code: string; message: string }>;
+  prohibitedActivity: string | null;
+  ageExceeded: boolean;
+}
+
 export interface AnalysisRuleResult {
   ruleId: string;
   outcome: "PASS" | "PARTIAL" | "FAIL";
@@ -227,6 +251,7 @@ export interface AnalysisRuleResult {
     fields: FieldComparison[];
     pfaeValidation?: PfaeValidationSnapshot;
     bankViability?: BankViabilitySnapshot;
+    pmGates?: PmGatesSnapshot;
   };
   alerts: Array<{
     ruleCode: string;
@@ -368,6 +393,7 @@ export interface BankViabilitySnapshot {
   destination: string | null;
   calculatedAt: string;
   warningLegend: string;
+  statementNotice?: string | null;
   reasons: string[];
   inputs: BankViabilityInputs;
   bankResults: BankResult[];
@@ -411,6 +437,10 @@ export const REASON_LABELS: Record<string, string> = {
   HSBC_LIQUIDITY_ACTIVITY_RESTRICTED: "Giro restringido para liquidez HSBC",
   INSUFFICIENT_ACTIVITY_TENURE: "Antigüedad de actividad insuficiente",
   MISSING_ACTIVITY_START_DATE: "Fecha de inicio de actividad no disponible",
+  BANREGIO_MENOS_DE_3_MESES: "Banregio pide 3 meses de estados. El promedio usa los que hay.",
+  BANAMEX_MENOS_DE_6_MESES: "Citibanamex pide 6 meses de estados. El promedio usa los que hay.",
+  BANAMEX_TIPO_PM_DESCONOCIDO: "Falta el tipo de sociedad para el factor de Citibanamex",
+  BANAMEX_SOLO_ESTADOS: "Citibanamex persona moral se calcula con estados de cuenta",
 };
 
 export function getReasonLabel(reason: string): string {

@@ -99,6 +99,8 @@ export interface BankViabilitySnapshot {
   destination: string | null;
   calculatedAt: string;
   warningLegend: string;
+  /** Persona moral notice when the statement window is shorter than the activity asks. */
+  statementNotice?: string | null;
   reasons: string[];
   inputs: BankViabilityInputs;
   bankResults: BankResult[];

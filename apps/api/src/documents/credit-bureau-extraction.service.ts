@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { extractCompanyShareholders } from './bureau-shareholders';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { LayoutFinancialExtractorService } from './layout-financial-extractor.service';
 import {
   BureauGridClient,
   BureauGridCredit,
+  CompanyBureauGridCredit,
   mergeBureauGrid,
+  mergeCompanyBureauGrid,
 } from './bureau-grid.client';
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { GcsService } from './gcs.service';
@@ -774,16 +777,7 @@ export class CreditBureauExtractionService {
     }
 
     // ── consultationDate ───────────────────────────────────────────────
-    const consultIdx = upper.indexOf('FECHA DE CONSULTA');
-    if (consultIdx !== -1) {
-      const after = raw.slice(consultIdx, consultIdx + 200);
-      const dateMatch = after.match(
-        /(\d{2}[/.\-]\d{2}[/.\-]\d{4}|\d{4}[/.\-]\d{2}[/.\-]\d{2})/,
-      );
-      if (dateMatch) {
-        result.consultationDate = this.normalizeOcrDate(dateMatch[1]);
-      }
-    }
+    result.consultationDate = this.extractConsultationDateFromOcr(raw);
 
     return result;
   }
@@ -811,34 +805,62 @@ export class CreditBureauExtractionService {
   };
 
   /**
-   * Extracts the consultation date from page 1 of the OCR text.
-   * Looks for "FECHA DE CONSULTA" followed by a date in either
-   * DD-MMM-YYYY (Spanish months) or DD/MM/YYYY format.
+   * Consultation date next to "FECHA DE CONSULTA".
+   * Persona física prints it after the label. The company report prints
+   * 20-OCT-2026 alone on the line before the label; the next date is the
+   * registration date, so a bare date on the previous line wins.
    */
   private extractConsultationDateFromOcr(ocrText: string): string | null {
     if (!ocrText) return null;
-    const consultIdx = ocrText.toUpperCase().indexOf('FECHA DE CONSULTA');
+    const normalized = ocrText.replace(/[\u2010-\u2015]/g, '-');
+    const upper = normalized.toUpperCase();
+    const label = 'FECHA DE CONSULTA';
+    const consultIdx = upper.indexOf(label);
     if (consultIdx === -1) return null;
-    const after = ocrText.slice(consultIdx, consultIdx + 200);
 
-    // Try Spanish month format: "22-AGO-2025"
-    const spanishMatch = after.match(
-      /\b(\d{2})-(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-(\d{4})\b/i,
-    );
-    if (spanishMatch) {
-      const day = spanishMatch[1];
-      const month = CreditBureauExtractionService.SPANISH_MONTHS[spanishMatch[2].toUpperCase()];
-      const year = spanishMatch[3];
-      if (month) return `${year}-${String(month).padStart(2, '0')}-${day}`;
+    const lineStart = normalized.lastIndexOf('\n', consultIdx - 1) + 1;
+    const previousBreak = normalized.lastIndexOf('\n', lineStart - 2);
+    const previousLine = normalized.slice(previousBreak + 1, lineStart - 1).trim();
+    const bareDate = this.parseBureauDate(previousLine);
+    if (bareDate && previousLine === previousLine.match(this.bureauDatePattern())?.[0]) {
+      return bareDate;
     }
 
-    // Try numeric format: "22/08/2025" or "22-08-2025"
-    const dateMatch = after.match(
-      /(\d{2})[/.\-](\d{2})[/.\-](\d{4})/,
-    );
-    if (dateMatch) return this.normalizeOcrDate(dateMatch[1]);
+    const after = normalized.slice(consultIdx, consultIdx + 200);
+    return this.parseBureauDate(after);
+  }
 
-    return null;
+  private applyCompanyShareholders(data: Record<string, unknown>, ocrText: string): void {
+    const rows = extractCompanyShareholders(ocrText);
+    if (rows.length === 0) return;
+    data.shareholders = rows;
+  }
+
+  private foldLatinLookalikes(text: string): string {
+    const greekToLatin: Record<string, string> = {
+      '\u0391': 'A', '\u0392': 'B', '\u0395': 'E', '\u0397': 'H',
+      '\u0399': 'I', '\u039A': 'K', '\u039C': 'M', '\u039D': 'N',
+      '\u039F': 'O', '\u03A1': 'P', '\u03A4': 'T', '\u03A5': 'Y',
+      '\u03A7': 'X', '\u0396': 'Z',
+    };
+    return text.replace(/[\u0391\u0392\u0395-\u0397\u0399\u039A\u039C\u039D\u039F\u03A1\u03A4\u03A5\u03A7\u0396]/g, (ch) => greekToLatin[ch] ?? ch);
+  }
+
+  private bureauDatePattern(): RegExp {
+    return /\b(\d{2})-(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-(\d{4})\b|\b(\d{2}[/.\-]\d{2}[/.\-]\d{4})\b/i;
+  }
+
+  private parseBureauDate(text: string): string | null {
+    const match = text.match(this.bureauDatePattern());
+    if (!match) return null;
+    if (match[1]) return this.spanishMonthDate(match[1], match[2], match[3]);
+    return this.normalizeOcrDate(match[4]);
+  }
+
+  private spanishMonthDate(day: string, monthName: string, year: string): string | null {
+    const month = CreditBureauExtractionService.SPANISH_MONTHS[monthName.toUpperCase()];
+    if (!month) return null;
+    return `${year}-${String(month).padStart(2, '0')}-${day}`;
   }
 
   /**
@@ -871,7 +893,8 @@ export class CreditBureauExtractionService {
     // Extract all Spanish-format dates after the section header.
     // Pattern: DD-MMM-YYYY with valid Spanish month abbreviations.
     const datePattern = /\b(\d{2})-(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)-(\d{4})\b/gi;
-    const sectionText = ocrText.slice(sectionIdx);
+    // Document AI sometimes writes the month with Greek lookalikes (ΕΝΕ for ENE).
+    const sectionText = this.foldLatinLookalikes(ocrText.slice(sectionIdx));
 
     let count = 0;
     let match: RegExpExecArray | null;
@@ -1023,8 +1046,9 @@ export class CreditBureauExtractionService {
     // returns (see mergeCoordinateResults below) so they overwrite Gemini's
     // paymentDueAmount. Any error → log warning + fall through to the
     // Gemini-only pipeline (never break the flow).
+    const isCompanyBureau = document.owner === 'COMPANY';
     let coordinateResult: CoordinateExtractionResult | null = null;
-    if (this.isCoordinateExtractionEnabled()) {
+    if (!isCompanyBureau && this.isCoordinateExtractionEnabled()) {
       try {
         if (document.storagePath) {
           const pdfBuffer =
@@ -1052,22 +1076,33 @@ export class CreditBureauExtractionService {
     // Máximo and keeps digit MOP codes. A down service leaves the
     // extraction that already ran.
     let bureauGridCredits: BureauGridCredit[] | null = null;
+    let companyGridCredits: CompanyBureauGridCredit[] | null = null;
     if (this.isBureauGridEnabled() && document.storagePath) {
       try {
         const pdfBuffer = await this.gcsService.downloadFile(
           document.storagePath,
         );
-        bureauGridCredits = await this.bureauGrid.extract(pdfBuffer);
-        if (bureauGridCredits) {
-          this.logger.log(
-            `[CreditBureau] Bureau grid: ${bureauGridCredits.length} credits for doc ${documentId}`,
-          );
+        if (isCompanyBureau) {
+          companyGridCredits = await this.bureauGrid.extractCompany(pdfBuffer);
+          if (companyGridCredits) {
+            this.logger.log(
+              `[CreditBureau] Company bureau grid: ${companyGridCredits.length} credits for doc ${documentId}`,
+            );
+          }
+        } else {
+          bureauGridCredits = await this.bureauGrid.extract(pdfBuffer);
+          if (bureauGridCredits) {
+            this.logger.log(
+              `[CreditBureau] Bureau grid: ${bureauGridCredits.length} credits for doc ${documentId}`,
+            );
+          }
         }
       } catch (err) {
         this.logger.warn(
           `[CreditBureau] Bureau grid failed — keeping the current extraction: ${(err as Error).message}`,
         );
         bureauGridCredits = null;
+        companyGridCredits = null;
       }
     }
 
@@ -1075,14 +1110,12 @@ export class CreditBureauExtractionService {
     // Runs BEFORE Gemini so it always executes, even when Gemini fails.
     // Extracts consultation date directly from the OCR text.
     let deterministicInquiryCount: number | null = null;
-    {
-      const consultDate = this.extractConsultationDateFromOcr(document.ocrText);
-      if (consultDate) {
-        deterministicInquiryCount = this.countInquiriesFromOcr(
-          document.ocrText,
-          consultDate,
-        );
-      }
+    const consultationDateIso = this.extractConsultationDateFromOcr(document.ocrText);
+    if (consultationDateIso) {
+      deterministicInquiryCount = this.countInquiriesFromOcr(
+        document.ocrText,
+        consultationDateIso,
+      );
     }
 
     // ── 7. Pre-filter OCR ──────────────────────────────────────────────
@@ -1102,11 +1135,22 @@ export class CreditBureauExtractionService {
     const schema = useLayoutPath
       ? { ...CREDIT_BUREAU_SCHEMA_REDUCED }
       : { ...CREDIT_BUREAU_SCHEMA_LEAN };
+    if (isCompanyBureau && Array.isArray(schema.credits) && schema.credits[0]) {
+      const companyCredit = {
+        ...(schema.credits[0] as Record<string, unknown>),
+        originalAmount: 'number | null — monto original del crédito',
+        termDays:
+          'number | null — plazo en días. Si el documento trae meses, multiplica por 30.',
+      };
+      (schema as { credits: unknown[] }).credits = [companyCredit];
+    }
     const geminiResult = await this.geminiService.extractStructuredData(
       ocrText,
       document.documentType.code,
       schema,
-      CREDIT_BUREAU_INSTRUCTIONS_LEAN,
+      isCompanyBureau
+        ? `${CREDIT_BUREAU_INSTRUCTIONS_LEAN}\n\n─── Persona moral (empresa) ───\nEste reporte es de una persona moral.\n- originalAmount: monto original o monto del crédito al inicio.\n- currentBalance: saldo vigente.\n- termDays: plazo en días. Si viene en meses, conviértelo a días × 30.\n- classification: REVOLVING si es línea revolvente o tarjeta. FIXED_PAYMENT si es crédito simple o arrendamiento.`
+        : CREDIT_BUREAU_INSTRUCTIONS_LEAN,
     );
 
     if (!geminiResult.success) {
@@ -1137,12 +1181,19 @@ export class CreditBureauExtractionService {
           const storedCredits = data.credits as Record<string, unknown>[];
           mergeBureauGrid(storedCredits, bureauGridCredits);
         }
-        if (deterministicInquiryCount !== null) {
+        if (deterministicInquiryCount !== null || consultationDateIso) {
           const reportData = (data.report ?? {}) as Record<string, unknown>;
-          reportData.numberOfInquiries = deterministicInquiryCount;
+          if (deterministicInquiryCount !== null) {
+            reportData.numberOfInquiries = deterministicInquiryCount;
+          }
+          if (consultationDateIso) {
+            reportData.consultationDate = consultationDateIso;
+          }
           data.report = reportData;
         }
+        this.applyCompanyShareholders(data, document.ocrText);
         this.normalizeCreditBureau(data);
+        this.applyCompanyGrid(data, companyGridCredits);
         data.alerts = this.computeAlerts(data);
         const missingFields = this.computeMissingFields(data);
         data.alerts = this.normalizeAlerts(
@@ -1211,11 +1262,17 @@ export class CreditBureauExtractionService {
     }
 
     // ── Deterministic inquiry count from pre-Gemini extraction ─────────
-    if (deterministicInquiryCount !== null) {
+    if (deterministicInquiryCount !== null || consultationDateIso) {
       const reportData = (data.report ?? {}) as Record<string, unknown>;
-      reportData.numberOfInquiries = deterministicInquiryCount;
+      if (deterministicInquiryCount !== null) {
+        reportData.numberOfInquiries = deterministicInquiryCount;
+      }
+      if (consultationDateIso) {
+        reportData.consultationDate = consultationDateIso;
+      }
       data.report = reportData;
     }
+    this.applyCompanyShareholders(data, document.ocrText);
 
     // ── 9. Disambiguate payment fields using OCR text (Layer 1 only) ──
     // Gemini sometimes swaps paymentDueAmount ↔ lastPaymentAmount. This
@@ -1255,6 +1312,7 @@ export class CreditBureauExtractionService {
 
     // ── 8. Normalize credit bureau fields ──────────────────────────────
     this.normalizeCreditBureau(data);
+    this.applyCompanyGrid(data, companyGridCredits);
 
     // ── 9. Compute alerts deterministically from normalized data ─────────
     // Alerts are computed entirely in the backend. Gemini extracts raw data only.
@@ -1391,6 +1449,15 @@ export class CreditBureauExtractionService {
       this.configService.get<string>('COORDINATE_EXTRACTION_ENABLED') ??
       'true';
     return String(v).toLowerCase() !== 'false';
+  }
+
+  private applyCompanyGrid(
+    data: Record<string, unknown>,
+    rows: CompanyBureauGridCredit[] | null,
+  ): void {
+    if (!rows || rows.length === 0) return;
+    if (!Array.isArray(data.credits)) data.credits = [];
+    mergeCompanyBureauGrid(data.credits as Record<string, unknown>[], rows);
   }
 
   /**

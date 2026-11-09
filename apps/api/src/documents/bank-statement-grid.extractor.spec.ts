@@ -192,12 +192,12 @@ describe('BankStatementGridExtractor', () => {
           confidence: 0.99,
         },
         {
-          text: 'ACAMEX DE LA CLABE 699 CON RFC',
+          text: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL DE LA CLABE 699 CON RFC',
           boundingBox: { top: 340, bottom: 360, left: 150, right: 900 },
           confidence: 0.98,
         },
         {
-          text: 'ACM230101AA1 CONCEPTO: PAGO REFERENCIA: 1777159',
+          text: 'LST230905G7A CONCEPTO: PAGO REFERENCIA: 1777159',
           boundingBox: { top: 370, bottom: 390, left: 150, right: 900 },
           confidence: 0.98,
         },
@@ -223,8 +223,8 @@ describe('BankStatementGridExtractor', () => {
     expect(transactions).toHaveLength(1);
     expect(transactions[0].amount).toBe(190000);
     expect(transactions[0].date).toBe('2026-06-01');
-    expect(transactions[0].originalConcept).toContain('ACAMEX');
-    expect(transactions[0].originalConcept).toContain('ACM230101AA1');
-    expect(transactions[0].payerRfc).toBe('ACM230101AA1');
+    expect(transactions[0].originalConcept).toContain('LUXMARBY');
+    expect(transactions[0].originalConcept).toContain('LST230905G7A');
+    expect(transactions[0].payerRfc).toBe('LST230905G7A');
   });
 });

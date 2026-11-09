@@ -7,11 +7,11 @@
 // the deterministic LayoutFinancialExtractor merge. They verify the
 // specific regression values the layout-aware work was built to fix:
 //
-//   6.5 (Carlos Lopez PDF):
+//   6.5 (Claudio Medici PDF):
 //     - SANTANDER credit  -> paymentDueAmount = 8775   (NOT 8475 — old bug)
-//     - TELCEL MER 10002030 -> paymentDueAmount = 0     (NOT 229  — old bug)
+//     - TELCEL MER 82953660 -> paymentDueAmount = 0     (NOT 229  — old bug)
 //
-//   6.6 (Juan Perez PDF):
+//   6.6 (Alejandro Diaz PDF):
 //     - AMEX credit         -> paymentDueAmount = 1875
 //     - AMEX COMPANY credit -> paymentDueAmount != 49800 and != 41600
 //
@@ -231,11 +231,11 @@ async function runExtraction(pdfPath: string): Promise<{
 }
 
 // ===========================================================================
-// 6.5 — Carlos Lopez PDF (SANTANDER=8775, TELCEL MER 10002030=0)
+// 6.5 — Claudio Medici PDF (SANTANDER=8775, TELCEL MER 82953660=0)
 // ===========================================================================
 
 describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)', () => {
-  describe('6.5 Carlos Lopez PDF', () => {
+  describe('6.5 Claudio Medici PDF', () => {
     it('SANTANDER credit has paymentDueAmount=8775 (NOT 8475)', async () => {
       const skipReason = missingCreds();
       if (skipReason) {
@@ -244,12 +244,12 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
         return;
       }
       const pdfPath = await findPdf({
-        name: 'Carlos Lopez',
+        name: 'Claudio Medici',
         filenameMatchers: [/claudio|medici/i, /CM\w*\.pdf/i, /buro|bureau/i],
       });
       if (!pdfPath) {
         // eslint-disable-next-line no-console
-        console.warn('[6.5] Skipping: Carlos Lopez PDF not found on disk.');
+        console.warn('[6.5] Skipping: Claudio Medici PDF not found on disk.');
         return;
       }
 
@@ -269,7 +269,7 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
       expect(santander!.financialFieldsSource).not.toBe('GEMINI');
     }, 300_000);
 
-    it('TELCEL MER account 10002030 has paymentDueAmount=0 (NOT 229)', async () => {
+    it('TELCEL MER account 82953660 has paymentDueAmount=0 (NOT 229)', async () => {
       const skipReason = missingCreds();
       if (skipReason) {
         // eslint-disable-next-line no-console
@@ -277,12 +277,12 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
         return;
       }
       const pdfPath = await findPdf({
-        name: 'Carlos Lopez',
+        name: 'Claudio Medici',
         filenameMatchers: [/claudio|medici/i, /CM\w*\.pdf/i, /buro|bureau/i],
       });
       if (!pdfPath) {
         // eslint-disable-next-line no-console
-        console.warn('[6.5] Skipping: Carlos Lopez PDF not found on disk.');
+        console.warn('[6.5] Skipping: Claudio Medici PDF not found on disk.');
         return;
       }
 
@@ -295,7 +295,7 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
         credits,
         (c) =>
           /telcel/i.test(String(c.institution ?? '')) &&
-          String(c.accountNumber ?? '').includes('10002030'),
+          String(c.accountNumber ?? '').includes('82953660'),
       );
       expect(telcel).toBeDefined();
       expect(telcel!.paymentDueAmount).toBe(0);
@@ -306,10 +306,10 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
   });
 
   // ===========================================================================
-  // 6.6 — Juan Perez PDF (AMEX=1875, AMEX COMPANY != 49800/41600)
+  // 6.6 — Alejandro Diaz PDF (AMEX=1875, AMEX COMPANY != 49800/41600)
   // ===========================================================================
 
-  describe('6.6 Juan Perez PDF', () => {
+  describe('6.6 Alejandro Diaz PDF', () => {
     it('AMEX credit has paymentDueAmount=1875', async () => {
       const skipReason = missingCreds();
       if (skipReason) {
@@ -318,12 +318,12 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
         return;
       }
       const pdfPath = await findPdf({
-        name: 'Juan Perez',
+        name: 'Alejandro Diaz',
         filenameMatchers: [/alejandro|diaz/i, /buro|bureau/i],
       });
       if (!pdfPath) {
         // eslint-disable-next-line no-console
-        console.warn('[6.6] Skipping: Juan Perez PDF not found on disk.');
+        console.warn('[6.6] Skipping: Alejandro Diaz PDF not found on disk.');
         return;
       }
 
@@ -351,12 +351,12 @@ describe('Bureau Acceptance — CreditBureauExtractionService (Phase 6.5 / 6.6)'
         return;
       }
       const pdfPath = await findPdf({
-        name: 'Juan Perez',
+        name: 'Alejandro Diaz',
         filenameMatchers: [/alejandro|diaz/i, /buro|bureau/i],
       });
       if (!pdfPath) {
         // eslint-disable-next-line no-console
-        console.warn('[6.6] Skipping: Juan Perez PDF not found on disk.');
+        console.warn('[6.6] Skipping: Alejandro Diaz PDF not found on disk.');
         return;
       }
 

@@ -70,7 +70,7 @@ Target was ≤500. The combined file (PR1 foundation + PR2 extraction) is ~330 l
 
 ### Acceptance criteria (verified with synthetic fixtures)
 - ✅ SANTANDER = 8775 (HIGH confidence)
-- ✅ TELCEL MER 10002030 = 0 (HIGH confidence, explicit zero)
+- ✅ TELCEL MER 82953660 = 0 (HIGH confidence, explicit zero)
 - ✅ AMEX = 1875 (HIGH confidence)
 - ✅ Closed credit without payment line → null + LOW confidence
 - ✅ paymentDueAmount NEVER uses lastPaymentAmount as fallback

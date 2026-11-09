@@ -207,14 +207,14 @@ Observation keys MUST map to flags correctly: LC → quita (Q flag, `hasWriteOff
 
 ## Validation Case
 
-### Scenario: BC - JUAN PEREZ - 2025.08.22
+### Scenario: BC - ALEJANDRO DIAZ - 2025.08.22
 
-- GIVEN the PDF "BC - JUAN PEREZ - 2025.08.22" is processed as REPORT_CREDIT_BUREAU
+- GIVEN the PDF "BC - ALEJANDRO DIAZ - 2025.08.22" is processed as REPORT_CREDIT_BUREAU
 - WHEN extraction completes
 - THEN 16 credits are extracted (8 active, 8 closed)
 - AND `report.publicScore` = null
-- AND `borrower.rfc` = "PEGJ800101XX1"
-- AND `borrower.birthDate` = "1980-01-01"
+- AND `borrower.rfc` = "DICA690402SD3"
+- AND `borrower.birthDate` = "1969-04-02"
 - AND `riskSummary.hasWriteOff` = false (no quebranto)
 - AND `riskSummary.hasFraudFlag` = false (no fraude)
 - AND `riskSummary.hasMinorDelinquency` = true (MOP 2-3 present)

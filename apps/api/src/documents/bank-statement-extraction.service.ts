@@ -12,6 +12,9 @@ import {
   GridDiagnostics,
 } from './bank-statement-grid.extractor';
 import { OcrLayout } from './document-ai.types';
+import { bbvaDepositsMatchCover } from './bbva-statement';
+import { BureauGridClient } from './bureau-grid.client';
+import { GcsService } from './gcs.service';
 import {
   employersFromDocuments,
   promoteEmployerPayrollDeposits,
@@ -298,7 +301,7 @@ export interface BankStatementDiagnostics {
   };
   grid: GridDiagnostics | null;
   transactions: {
-    source: 'grid' | 'gemini-fallback' | 'none';
+    source: 'grid' | 'gemini-fallback' | 'bbva-pdf' | 'none';
     count: number;
   };
   coverTextChars: number;
@@ -337,6 +340,8 @@ export class BankStatementExtractionService {
     private readonly prisma: PrismaService,
     private readonly geminiService: GeminiService,
     private readonly cleanerService: BankStatementCleanerService,
+    private readonly gcsService: GcsService,
+    private readonly bureauGrid: BureauGridClient,
   ) {}
 
   static isBankStatementDocument(documentTypeCode: string): boolean {
@@ -434,13 +439,19 @@ export class BankStatementExtractionService {
       throw new Error('Required document status codes not found in database');
     }
 
-    // ── 6. Query CSF context if available ──────────────────────────────
+    // ── 6. Query CSF context for the same document owner ───────────────
+    // Company statements use the company CSF (RFC, name, giro). Shareholder
+    // statements keep the shareholder CSF. A missing owner is shareholder.
+    const statementOwner = document.owner === 'COMPANY' ? 'COMPANY' : 'SHAREHOLDER';
     const csfDoc = await this.prisma.document.findFirst({
       where: {
         mortgageCaseId: caseId,
+        owner: statementOwner,
         documentType: { code: { in: ['CSF', 'TAX_SITUATION_PROOF'] } },
         documentStatus: { code: 'PROCESSED' },
       },
+      // Same choice as selectLatestProcessedFiscal: newest processed constancia.
+      orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }],
     });
     const csfData = csfDoc?.extractedData as Record<string, any> | null;
     const clientContext: ClientFiscalContext = {
@@ -598,7 +609,8 @@ export class BankStatementExtractionService {
 
     let rawTransactions: RawTransaction[] = [];
     let gridDiagnostics: GridDiagnostics | null = null;
-    let transactionSource: 'grid' | 'gemini-fallback' | 'none' = 'none';
+    let transactionSource: 'grid' | 'gemini-fallback' | 'bbva-pdf' | 'none' =
+      'none';
     const gridStart = Date.now();
     if (layout && Array.isArray(layout.pages) && layout.pages.length > 0) {
       const gridOutput = BankStatementGridExtractor.extractWithDiagnostics(
@@ -626,6 +638,17 @@ export class BankStatementExtractionService {
       data.statementPeriod ||
       {}) as StatementSummary;
 
+    const bbvaDeposits = await this.readBbvaDeposits(
+      document,
+      data,
+      statementSummary,
+    );
+    if (bbvaDeposits) {
+      rawTransactions = bbvaDeposits;
+      data.allTransactions = bbvaDeposits;
+      transactionSource = 'bbva-pdf';
+    }
+
     const cleanerStart = Date.now();
     const depurationResult = this.cleanerService.clean(
       rawTransactions,
@@ -635,11 +658,12 @@ export class BankStatementExtractionService {
     timings.cleanerMs = Date.now() - cleanerStart;
     data.financialDepuration = depurationResult;
 
-    const isPfaeCase =
-      (document as { mortgageCase?: { personType?: string | null } }).mortgageCase
-        ?.personType === 'PFAE';
+    const personType = (document as { mortgageCase?: { personType?: string | null } })
+      .mortgageCase?.personType;
+    const skipsSalariedPayroll =
+      personType === 'PFAE' || personType === 'PM';
 
-    if (!isPfaeCase) {
+    if (!skipsSalariedPayroll) {
       const payrollEmployers = employersFromDocuments(
         await this.prisma.document.findMany({
           where: {
@@ -654,7 +678,7 @@ export class BankStatementExtractionService {
     }
 
     // ── 10. Compute alerts from normalized data & depuration ─────────────
-    const alerts = this.computeAlerts(data, isPfaeCase);
+    const alerts = this.computeAlerts(data, skipsSalariedPayroll);
     this.appendDepurationAlerts(alerts, depurationResult);
     const missingFields = this.computeMissingFields(data);
 
@@ -688,8 +712,8 @@ export class BankStatementExtractionService {
       (data.alerts as ExtractionAlert[]) ?? [],
     );
 
-    // If PFAE profile / CSF active, suppress salaried payroll alerts
-    if (isPfaeCase && Array.isArray(data.alerts)) {
+    // If PFAE or PM, suppress salaried payroll alerts
+    if (skipsSalariedPayroll && Array.isArray(data.alerts)) {
       data.alerts = (data.alerts as ExtractionAlert[]).filter(
         (a) =>
           a.code !== 'BANK_NO_PAYROLL_DEPOSITS' &&
@@ -749,6 +773,42 @@ export class BankStatementExtractionService {
       missingFields,
       diagnostics: collectDiagnostics ? diagnostics : undefined,
     };
+  }
+
+  // -----------------------------------------------------------------------
+  // Private: BBVA deposits from the PDF column, when they match the cover
+  // -----------------------------------------------------------------------
+  private async readBbvaDeposits(
+    document: { storagePath?: string | null },
+    data: Record<string, unknown>,
+    summary: StatementSummary,
+  ): Promise<RawTransaction[] | null> {
+    const bank = (data.bank ?? {}) as { institutionName?: string | null };
+    const institution = bank.institutionName ?? '';
+    if (!/BBVA/i.test(institution) || !document.storagePath) return null;
+    try {
+      const pdf = await this.gcsService.downloadFile(document.storagePath);
+      const deposits = await this.bureauGrid.extractBbvaDeposits(pdf);
+      if (!deposits) return null;
+      if (!bbvaDepositsMatchCover(deposits, summary.totalDepositsAmount)) {
+        this.logger.warn(
+          '[BankStatement] BBVA column read did not match the cover; keeping the OCR movements',
+        );
+        return null;
+      }
+      return deposits.map((row) => ({
+        date: row.date,
+        amount: row.amount,
+        currency: 'MXN',
+        movementType: 'DEPOSIT',
+        originalConcept: row.concept,
+      }));
+    } catch (err) {
+      this.logger.warn(
+        `[BankStatement] BBVA column read failed; keeping the OCR movements: ${(err as Error).message}`,
+      );
+      return null;
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -1007,7 +1067,7 @@ export class BankStatementExtractionService {
 
   private computeAlerts(
     data: Record<string, unknown>,
-    isPfaeCase = false,
+    skipsSalariedPayroll = false,
   ): ExtractionAlert[] {
     const alerts: ExtractionAlert[] = [];
 
@@ -1025,7 +1085,7 @@ export class BankStatementExtractionService {
     // ── BANK_NO_PAYROLL_DEPOSITS — payrollDeposits[] empty (salaried only) ────
     const hasPayrollDeposits =
       Array.isArray(payrollDeposits) && payrollDeposits.length > 0;
-    if (!hasPayrollDeposits && !isPfaeCase) {
+    if (!hasPayrollDeposits && !skipsSalariedPayroll) {
       alerts.push({
         code: 'BANK_NO_PAYROLL_DEPOSITS',
         severity: 'WARNING',

@@ -430,8 +430,22 @@ Taxonomía más gruesa del catálogo (4 etiquetas). El mapeo CSF → Servicios /
 Otros / Informal es el trabajo de alias; Accionistas suele ser persona moral /
 participación (fuera de MVP persona física, o flag manual).
 
-No hay en estas capturas: meses de estados (6 vs 12), suavizado, ni si el
+No hay en estas capturas de persona física: meses de estados (6 vs 12), suavizado, ni si el
 factor aplica también a declaración.
+
+### Persona moral — solo en la comparativa
+
+La fila de Banregio usa el perfil **Accionistas**. No cambia el promedio del expediente ni las fórmulas de los otros bancos.
+
+| Paso | Regla |
+|------|--------|
+| Ingreso | Promedio simple de los últimos **3** meses de depósitos de la empresa. Con menos de 3 se promedia lo que hay y la fila avisa. |
+| Giro | Accionista **100%** |
+| Ajuste | × **50%** |
+| Capacidad | Ingreso ajustado − compromisos del buró de la empresa y del socio |
+| Declaración | Si la fuente elegida es la declaración, el mismo 100% × 50% sobre el ingreso mensual de la declaración, menos esos compromisos |
+
+Ejemplo de la lámina para comercio, no para accionista: $100,000 × 60% × 50% − $10,000 = $20,000. Para accionista el 60% se sustituye por 100%.
 
 ---
 

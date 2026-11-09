@@ -25,10 +25,53 @@ export class BureauGridClient {
   constructor(private readonly configService: ConfigService) {}
 
   async extract(pdf: Buffer): Promise<BureauGridCredit[] | null> {
+    const credits = await this.post('/extract/bureau', pdf);
+    return credits as BureauGridCredit[] | null;
+  }
+
+  /** Personas Morales report. Amounts come back in pesos. */
+  async extractCompany(pdf: Buffer): Promise<CompanyBureauGridCredit[] | null> {
+    const credits = await this.post('/extract/bureau-company', pdf);
+    return credits as CompanyBureauGridCredit[] | null;
+  }
+
+  /** BBVA movement rows whose amount sits in the ABONOS column. */
+  async extractBbvaDeposits(pdf: Buffer): Promise<BbvaGridDeposit[] | null> {
+    const body = await this.postJson('/extract/bbva-statement', pdf);
+    const rows = body?.deposits;
+    if (!Array.isArray(rows)) return null;
+    const deposits: BbvaGridDeposit[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const amount = (row as { amount?: unknown }).amount;
+      const concept = (row as { concept?: unknown }).concept;
+      const date = (row as { date?: unknown }).date;
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+        continue;
+      }
+      deposits.push({
+        date: typeof date === 'string' && date.trim() !== '' ? date : null,
+        amount,
+        concept: typeof concept === 'string' ? concept : '',
+      });
+    }
+    return deposits.length > 0 ? deposits : null;
+  }
+
+  private async post(path: string, pdf: Buffer): Promise<unknown[] | null> {
+    const body = await this.postJson(path, pdf);
+    if (!body || !Array.isArray(body.credits)) return null;
+    return body.credits;
+  }
+
+  private async postJson(
+    path: string,
+    pdf: Buffer,
+  ): Promise<{ credits?: unknown; deposits?: unknown } | null> {
     const base =
       this.configService.get<string>('BUREAU_GRID_URL') ??
       'http://127.0.0.1:8077';
-    const url = `${base.replace(/\/$/, '')}/extract/bureau`;
+    const url = `${base.replace(/\/$/, '')}${path}`;
     const form = new FormData();
     form.append(
       'file',
@@ -49,9 +92,11 @@ export class BureauGridClient {
         );
         return null;
       }
-      const body = (await response.json()) as { credits?: unknown };
-      if (!body || !Array.isArray(body.credits)) return null;
-      return body.credits as BureauGridCredit[];
+      const body = (await response.json()) as {
+        credits?: unknown;
+        deposits?: unknown;
+      };
+      return body ?? null;
     } catch (err) {
       this.logger.warn(
         `[BureauGrid] Unavailable, keeping the current extraction: ${(err as Error).message}`,
@@ -61,6 +106,26 @@ export class BureauGridClient {
       clearTimeout(timer);
     }
   }
+}
+
+/** One BBVA deposit taken from the ABONOS column. */
+export interface BbvaGridDeposit {
+  date: string | null;
+  amount: number;
+  concept: string;
+}
+
+/** One active credit from a Personas Morales report, already in pesos. */
+export interface CompanyBureauGridCredit {
+  institution: string;
+  accountNumber: string | null;
+  creditType: string | null;
+  classification: string | null;
+  originalAmount: number | null;
+  currentBalance: number | null;
+  pastDueAmount: number | null;
+  termDays: number | null;
+  mopCodes?: string[];
 }
 
 function digits(value: unknown): string {
@@ -216,5 +281,166 @@ export function mergeBureauGrid(
     );
     if (match === -1) continue;
     claim(match, credit);
+  }
+}
+
+function companyAccountKey(value: unknown): string {
+  return String(value ?? '')
+    .replace(/[^0-9A-Za-z]/g, '')
+    .toUpperCase();
+}
+
+function sameCompanyAccount(left: string, right: string): boolean {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (/[A-Z]/.test(left) || /[A-Z]/.test(right)) return false;
+  const leftDigits = left.replace(/\D/g, '');
+  const rightDigits = right.replace(/\D/g, '');
+  if (!leftDigits || !rightDigits) return false;
+  if (leftDigits === rightDigits) return true;
+  const short = leftDigits.length <= rightDigits.length ? leftDigits : rightDigits;
+  const long = leftDigits.length < rightDigits.length ? rightDigits : leftDigits;
+  return short.length >= 6 && long.endsWith(short);
+}
+
+function moneyEqual(left: unknown, right: number | null): boolean {
+  return (
+    typeof left === 'number' &&
+    right != null &&
+    Number.isFinite(left) &&
+    Math.abs(left - right) < 1
+  );
+}
+
+/**
+ * Two agreeing figures, and at least one of them is not zero.
+ * A zero balance alone is not enough to call two credits the same.
+ */
+function companyAmountScore(
+  credit: Record<string, unknown>,
+  row: CompanyBureauGridCredit,
+): number {
+  let hits = 0;
+  let nonzero = false;
+  if (moneyEqual(credit.originalAmount, row.originalAmount)) {
+    hits += 1;
+    if (row.originalAmount) nonzero = true;
+  }
+  if (moneyEqual(credit.currentBalance, row.currentBalance)) {
+    hits += 1;
+    if (row.currentBalance) nonzero = true;
+  }
+  const overdue =
+    moneyEqual(credit.pastDueAmount, row.pastDueAmount) ||
+    moneyEqual(credit.paymentDueAmount, row.pastDueAmount);
+  if (overdue) {
+    hits += 1;
+    if (row.pastDueAmount) nonzero = true;
+  }
+  return nonzero && hits >= 2 ? hits : 0;
+}
+
+function applyCompanyRow(
+  credit: Record<string, unknown>,
+  row: CompanyBureauGridCredit,
+): void {
+  if (row.institution) credit.institution = row.institution;
+  if (row.accountNumber) credit.accountNumber = row.accountNumber;
+  if (row.creditType) credit.creditType = row.creditType;
+  if (row.classification && row.classification !== 'UNKNOWN') {
+    credit.classification = row.classification;
+  }
+  if (row.originalAmount != null) credit.originalAmount = row.originalAmount;
+  if (row.currentBalance != null) credit.currentBalance = row.currentBalance;
+  if (row.pastDueAmount != null) {
+    credit.pastDueAmount = row.pastDueAmount;
+    if (
+      row.pastDueAmount !== 0 &&
+      credit.paymentDueAmount === row.pastDueAmount
+    ) {
+      credit.paymentDueAmount = null;
+    }
+  }
+  if (row.termDays != null) credit.termDays = row.termDays;
+  if (Array.isArray(row.mopCodes) && row.mopCodes.length > 0) {
+    credit.mopCodes = row.mopCodes.map((code) => String(code));
+    credit.paymentHistory = row.mopCodes.join('');
+  }
+}
+
+/**
+ * Overwrite the company columns (tipo, saldo, crédito otorgado, plazo)
+ * from the Personas Morales reader. Amounts are already in pesos.
+ * A grid row with no matching account is appended.
+ */
+export function mergeCompanyBureauGrid(
+  credits: Record<string, unknown>[],
+  grid: CompanyBureauGridCredit[],
+): void {
+  const claimed = new Set<number>();
+  const used = new Set<Record<string, unknown>>();
+
+  const take = (credit: Record<string, unknown>, index: number): void => {
+    claimed.add(index);
+    used.add(credit);
+    applyCompanyRow(credit, grid[index]);
+  };
+
+  for (const credit of credits) {
+    const account = companyAccountKey(credit.accountNumber);
+    if (!account) continue;
+    const match = grid.findIndex(
+      (row, index) =>
+        !claimed.has(index) &&
+        sameCompanyAccount(account, companyAccountKey(row.accountNumber)),
+    );
+    if (match === -1) continue;
+    take(credit, match);
+  }
+
+  for (const [index, row] of grid.entries()) {
+    if (claimed.has(index)) continue;
+    const candidates = credits.filter(
+      (credit) => !used.has(credit) && companyAmountScore(credit, row) > 0,
+    );
+    if (candidates.length === 1) {
+      take(candidates[0], index);
+      continue;
+    }
+    const credit: Record<string, unknown> = { status: 'ACTIVE' };
+    applyCompanyRow(credit, row);
+    credits.push(credit);
+  }
+
+  moveCommercialOverdueOutOfPayment(credits);
+}
+
+const COMMERCIAL_CREDIT_MARKERS = [
+  'COMERCIAL',
+  'DEPARTMENT_STORE',
+  'SORIANA',
+  'TELCEL',
+  'LIVERPOOL',
+  'COPPEL',
+];
+
+function moveCommercialOverdueOutOfPayment(
+  credits: Record<string, unknown>[],
+): void {
+  for (const credit of credits) {
+    const text = `${credit.institution ?? ''} ${credit.creditType ?? ''} ${credit.classification ?? ''}`
+      .toUpperCase();
+    if (!COMMERCIAL_CREDIT_MARKERS.some((marker) => text.includes(marker))) {
+      continue;
+    }
+    const payment = credit.paymentDueAmount;
+    if (
+      (credit.pastDueAmount == null || credit.pastDueAmount === '') &&
+      typeof payment === 'number' &&
+      payment !== 0
+    ) {
+      credit.pastDueAmount = payment;
+      credit.paymentDueAmount = null;
+    }
   }
 }

@@ -413,8 +413,8 @@ describe('extractFromCoordinateWords', () => {
       }
 
       it('parses a ≥6-digit run from creditorInfo into accountNumber and strips it from institution', () => {
-        const { credit } = extractBlockValues(makeBlock('SANTANDER 10002030'), []);
-        expect(credit.accountNumber).toBe('10002030');
+        const { credit } = extractBlockValues(makeBlock('SANTANDER 82953660'), []);
+        expect(credit.accountNumber).toBe('82953660');
         expect(credit.institution).toBe('SANTANDER');
       });
 

@@ -91,8 +91,13 @@ export class CaseStatusCalculatorService {
     documents: Array<{
       documentType: { code: string };
       documentStatus: { code: string };
+      owner?: string | null;
     }>,
   ): string {
+    if (personType === 'PM') {
+      return this.evaluatePm(documents);
+    }
+
     const isPFAE = personType === 'PFAE';
 
     if (isPFAE) {
@@ -127,6 +132,50 @@ export class CaseStatusCalculatorService {
         const allProcessed = typeDocs.every((d) => d.documentStatus.code === 'PROCESSED');
         if (!allProcessed) return 'DOCUMENTS_UPLOADED';
       }
+    }
+
+    return 'DOCUMENTS_PROCESSED';
+  }
+
+  /**
+   * PM dual checklist: shareholder and company packets are independent
+   * (code + owner). A missing Document.owner counts as SHAREHOLDER.
+   * The shareholder packet is INE, personal CSF, and personal bureau.
+   * Personal bank statements and the personal tax return are not required.
+   */
+  private evaluatePm(
+    documents: Array<{
+      documentType: { code: string };
+      documentStatus: { code: string };
+      owner?: string | null;
+    }>,
+  ): string {
+    const resolveOwner = (owner?: string | null) => owner ?? 'SHAREHOLDER';
+    const slots: Array<{ codes: readonly string[]; owner: 'SHAREHOLDER' | 'COMPANY' }> = [
+      { codes: ['INE', 'PASSPORT'], owner: 'SHAREHOLDER' },
+      { codes: ['CREDIT_BUREAU_REPORT'], owner: 'SHAREHOLDER' },
+      { codes: ['CSF'], owner: 'SHAREHOLDER' },
+      { codes: ['CREDIT_BUREAU_REPORT'], owner: 'COMPANY' },
+      { codes: ['CSF'], owner: 'COMPANY' },
+      { codes: ['BANK_STATEMENT'], owner: 'COMPANY' },
+      { codes: ['TAX_RETURN'], owner: 'COMPANY' },
+      { codes: ['ARTICLES_OF_INCORPORATION'], owner: 'COMPANY' },
+    ];
+
+    const docsForSlot = (codes: readonly string[], owner: 'SHAREHOLDER' | 'COMPANY') =>
+      documents.filter(
+        (d) => codes.includes(d.documentType.code) && resolveOwner(d.owner) === owner,
+      );
+
+    for (const slot of slots) {
+      if (docsForSlot(slot.codes, slot.owner).length === 0) return 'PENDING_DOCUMENTS';
+    }
+
+    for (const slot of slots) {
+      const allProcessed = docsForSlot(slot.codes, slot.owner).every(
+        (d) => d.documentStatus.code === 'PROCESSED',
+      );
+      if (!allProcessed) return 'DOCUMENTS_UPLOADED';
     }
 
     return 'DOCUMENTS_PROCESSED';

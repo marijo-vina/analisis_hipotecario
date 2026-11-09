@@ -686,9 +686,9 @@ UI MUST show `****` + last 4 under Institución (MUST NOT show the full number).
 
 #### Scenario: Mask and fallback
 
-- GIVEN `accountNumber` "10002030"
+- GIVEN `accountNumber` "82953660"
 - WHEN Institución renders
-- THEN UI MUST show `****2030`
+- THEN UI MUST show `****3660`
 - AND with no `accountNumber` and institution "Visa 1234567890" MUST show `****7890`; if no ≥4-digit source, `"—"` without silent re-extract
 
 ---

@@ -2,6 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 import {
+  mergeOcrParts,
+  pageWindows,
+  pagesOverSyncLimit,
+  type OcrPart,
+} from './document-ai-pages';
+import {
   BoundingBox,
   OcrLayout,
   OcrLine,
@@ -40,13 +46,8 @@ export class DocumentAiService {
    * from 15 pages to 30 pages.
    */
   async extractText(gcsUri: string, mimeType: string): Promise<string> {
-    const [result] = await this.client.processDocument({
-      name: this.processorName,
-      gcsDocument: { gcsUri, mimeType },
-      imagelessMode: true,
-    });
-
-    return result.document?.text ?? '';
+    const { ocrText } = await this.extractTextWithLayout(gcsUri, mimeType);
+    return ocrText;
   }
 
   /**
@@ -60,23 +61,51 @@ export class DocumentAiService {
    * response; the full raw Document AI object is NOT retained.
    *
    * Uses `imagelessMode: true` to raise the synchronous Document AI limit
-   * from 15 pages to 30 pages.
+   * from 15 pages to 30 pages. A PDF over that limit is requested again in
+   * page windows and the text is joined.
    */
   async extractTextWithLayout(
     gcsUri: string,
     mimeType: string,
   ): Promise<{ ocrText: string; ocrLayout: OcrLayout }> {
+    try {
+      return await this.processOnce(gcsUri, mimeType);
+    } catch (error) {
+      const over = pagesOverSyncLimit(error);
+      if (!over || mimeType !== 'application/pdf') throw error;
+
+      const windows = pageWindows(over.total, over.limit);
+      this.logger.warn(
+        `Document AI page limit hit (${over.total} pages, max ${over.limit}). Processing ${windows.length} windows.`,
+      );
+      const parts: OcrPart[] = [];
+      for (const pages of windows) {
+        const part = await this.processOnce(gcsUri, mimeType, pages);
+        parts.push({ startPage: pages[0], ...part });
+      }
+      return mergeOcrParts(parts);
+    }
+  }
+
+  private async processOnce(
+    gcsUri: string,
+    mimeType: string,
+    pages?: number[],
+  ): Promise<{ ocrText: string; ocrLayout: OcrLayout }> {
     const [result] = await this.client.processDocument({
       name: this.processorName,
       gcsDocument: { gcsUri, mimeType },
       imagelessMode: true,
+      ...(pages
+        ? { processOptions: { individualPageSelector: { pages } } }
+        : {}),
     });
 
     const document: RawDocument | undefined = result.document;
-    const ocrText: string = document?.text ?? '';
-    const ocrLayout: OcrLayout = this.buildOcrLayout(document);
-
-    return { ocrText, ocrLayout };
+    return {
+      ocrText: document?.text ?? '',
+      ocrLayout: this.buildOcrLayout(document),
+    };
   }
 
   // -------------------------------------------------------------------------

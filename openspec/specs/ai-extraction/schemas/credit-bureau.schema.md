@@ -111,7 +111,7 @@ Extraer datos de comportamiento crediticio, créditos activos, créditos cerrado
     "fullName": "MARIA JOSE PEREZ LOPEZ",
     "birthDate": "1992-04-12",
     "rfc": "PELJ920412AB1",
-    "lastReportedAddress": "AV REFORMA 100 COL JUAREZ CIUDAD DE MEXICO CP 06600"
+    "lastReportedAddress": "CALLE 20 NUM 100 COLONIA CENTRO MERIDA YUCATAN CP 97000"
   },
   "report": {
     "consultationDate": "2026-06-01",

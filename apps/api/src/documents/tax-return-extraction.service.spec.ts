@@ -54,46 +54,46 @@ describe('TaxReturnExtractionService', () => {
     it('should correctly process RESICO declaration sample', () => {
       const rawData = {
         satReceipt: {
-          rfc: 'PEGJ800101AB1',
-          taxpayerName: 'JUAN PEREZ GARCIA',
+          rfc: 'DICA690402RZ4',
+          taxpayerName: 'ALEJANDRO DE LA CRUZ DIAZ',
           declarationType: 'Normal',
           periodDescription: 'Del Ejercicio',
           taxYear: 2025,
           presentationDate: '2026-04-15 19:45',
-          operationNumber: '100000000012',
+          operationNumber: '230010729212',
           presentationMedium: 'Internet',
         },
         taxPayment: {
           paymentConcept: 'ISR PERSONAS FÍSICAS RÉGIMEN SIMPLIFICADO DE CONFIANZA',
-          amountInFavor: 500,
+          amountInFavor: 1826,
           amountDue: 0,
           amountToPay: 0,
         },
         declaredRegimes: ['RÉGIMEN SIMPLIFICADO DE CONFIANZA'],
         resicoIncome: {
-          totalEffectiveIncome: 120000,
-          totalInvoicedIncome: 120000,
-          totalActivityIncome: 120000,
+          totalEffectiveIncome: 184726,
+          totalInvoicedIncome: 184726,
+          totalActivityIncome: 184726,
           taxWithheld: 0,
         },
         fiscalResult: {
-          accumulableIncomeTotal: 120000,
-          fiscalProfit: 120000,
+          accumulableIncomeTotal: 184726,
+          fiscalProfit: 184726,
           fiscalLoss: 0,
-          taxResult: 120000,
+          taxResult: 184726,
         },
       };
 
       const result = service.postProcessTaxReturn(rawData);
 
       expect(result.documentType).toBe('TAX_RETURN');
-      expect(result.satReceipt.rfc).toBe('PEGJ800101AB1');
+      expect(result.satReceipt.rfc).toBe('DICA690402RZ4');
       expect(result.satReceipt.taxYear).toBe(2025);
-      expect(result.satReceipt.operationNumber).toBe('100000000012');
+      expect(result.satReceipt.operationNumber).toBe('230010729212');
       expect(result.isValidTaxYear).toBe(true);
       expect(result.hasTaxLoss).toBe(false);
       expect(result.hasOfficialReceipt).toBe(true);
-      expect(result.fiscalResult.accumulableIncomeTotal).toBe(120000);
+      expect(result.fiscalResult.accumulableIncomeTotal).toBe(184726);
       expect(result.alerts).toHaveLength(0);
     });
 
@@ -105,7 +105,7 @@ describe('TaxReturnExtractionService', () => {
           declarationType: 'Normal',
           taxYear: 2025,
           presentationDate: '2026-04-20 10:15',
-          operationNumber: '100000000021',
+          operationNumber: '230010729221',
         },
         declaredRegimes: [
           'Sueldos, salarios y asimilados',
@@ -178,6 +178,28 @@ describe('TaxReturnExtractionService', () => {
       const lossAlert = result.alerts.find((a) => a.code === 'PERDIDA_FISCAL_KNOCKOUT_DECLARACION');
       expect(lossAlert).toBeDefined();
       expect(lossAlert?.severity).toBe('ERROR');
+      expect(lossAlert?.message).toContain('Estados de Cuenta');
+    });
+
+    it('limits a company fiscal loss to the declaration path', () => {
+      const rawData = {
+        satReceipt: {
+          rfc: 'EMP010101AAA',
+          taxYear: 2025,
+          operationNumber: '230010729999',
+        },
+        fiscalResult: {
+          accumulableIncomeTotal: 500000,
+          fiscalProfit: 0,
+          fiscalLoss: 45000,
+          taxResult: -45000,
+        },
+      };
+
+      const result = service.postProcessTaxReturn(rawData, 'COMPANY');
+      const lossAlert = result.alerts.find((a) => a.code === 'PERDIDA_FISCAL_KNOCKOUT_DECLARACION');
+      expect(lossAlert?.message).toContain('solo el camino de declaración');
+      expect(lossAlert?.message).toContain('estados de cuenta');
     });
 
     it('should trigger EJERCICIO_FISCAL_OBSOLETO for taxYear older than previous year', () => {
@@ -211,7 +233,7 @@ describe('TaxReturnExtractionService', () => {
       mockPrismaService.document.findUnique.mockResolvedValue({
         id: documentId,
         mortgageCaseId: caseId,
-        ocrText: 'ACUSE DE RECIBO DECLARACION ANUAL 2025 RFC PEGJ800101AB1',
+        ocrText: 'ACUSE DE RECIBO DECLARACION ANUAL 2025 RFC DICA690402RZ4',
         documentType: { code: 'TAX_RETURN' },
         documentStatusId: 1,
       });
@@ -219,9 +241,9 @@ describe('TaxReturnExtractionService', () => {
       mockGeminiService.extractStructuredData.mockResolvedValue({
         success: true,
         extractedData: {
-          satReceipt: { rfc: 'PEGJ800101AB1', taxYear: 2025, operationNumber: '100000000012' },
+          satReceipt: { rfc: 'DICA690402RZ4', taxYear: 2025, operationNumber: '230010729212' },
           declaredRegimes: ['Régimen Simplificado de Confianza'],
-          fiscalResult: { accumulableIncomeTotal: 120000, fiscalProfit: 120000, fiscalLoss: 0 },
+          fiscalResult: { accumulableIncomeTotal: 184726, fiscalProfit: 184726, fiscalLoss: 0 },
         },
       });
 

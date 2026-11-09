@@ -27,7 +27,7 @@ const TAX_RETURN_INSTRUCTIONS = [
   '  - periodDescription: Periodo de la declaración (ej. "Del Ejercicio").',
   '  - taxYear: Ejercicio fiscal declarado como número entero (ej. 2025, 2024, 2022).',
   '  - presentationDate: Fecha y hora de presentación (YYYY-MM-DD o YYYY-MM-DD HH:mm, ej. "2023-08-21 19:48").',
-  '  - operationNumber: Número de operación oficial del SAT (ej. "100000000021").',
+  '  - operationNumber: Número de operación oficial del SAT (ej. "230010729221").',
   '  - presentationMedium: Medio de presentación (ej. "Internet").',
   '',
   '─── Impuestos y Determinación (taxPayment) ───',
@@ -297,7 +297,9 @@ export class TaxReturnExtractionService {
       document.ocrText,
       document.documentType.code,
       TAX_RETURN_RESPONSE_SCHEMA,
-      TAX_RETURN_INSTRUCTIONS,
+      document.owner === 'COMPANY'
+        ? `${TAX_RETURN_INSTRUCTIONS}\n\n─── Persona moral (empresa) ───\nEsta declaración es de una persona moral.\n- rfc: RFC de la empresa (12 caracteres).\n- taxpayerName: razón social.\n- fiscalResult.fiscalLoss: pérdida fiscal del ejercicio, número positivo si hubo pérdida.\n- fiscalResult.accumulableIncomeTotal: ingresos acumulables.`
+        : TAX_RETURN_INSTRUCTIONS,
     );
 
     if (!result.success || !result.extractedData) {
@@ -310,7 +312,7 @@ export class TaxReturnExtractionService {
     const rawData = result.extractedData;
 
     // Post-process and compute business rules & alerts
-    const payload = this.postProcessTaxReturn(rawData);
+    const payload = this.postProcessTaxReturn(rawData, document.owner);
 
     // Save extractedData to database
     const extractionReadyStatus = await this.prisma.documentStatus.findUnique({
@@ -332,7 +334,10 @@ export class TaxReturnExtractionService {
   /**
    * Post-processes raw Gemini output: validates tax year, evaluates fiscal profit/loss, and generates alerts.
    */
-  postProcessTaxReturn(rawData: Record<string, unknown>): TaxReturnExtractionPayload {
+  postProcessTaxReturn(
+    rawData: Record<string, unknown>,
+    owner?: string | null,
+  ): TaxReturnExtractionPayload {
     const satReceipt = (rawData.satReceipt ?? {}) as Record<string, unknown>;
     const taxPayment = (rawData.taxPayment ?? {}) as Record<string, unknown>;
     const declaredRegimes = Array.isArray(rawData.declaredRegimes)
@@ -416,7 +421,10 @@ export class TaxReturnExtractionService {
         code: 'PERDIDA_FISCAL_KNOCKOUT_DECLARACION',
         severity: 'ERROR',
         category: 'FINANCIAL_HEALTH',
-        message: `El contribuyente registró PÉRDIDA FISCAL en el ejercicio ${taxYear ?? ''}. Descarte inmediato del camino de comprobación fiscal: se debe respaldar 100% por Estados de Cuenta Bancarios para evitar rechazo en mesa de control.`,
+        message:
+          owner === 'COMPANY'
+            ? `La empresa registró PÉRDIDA FISCAL en el ejercicio ${taxYear ?? ''}. Se descarta solo el camino de declaración. Los estados de cuenta de la empresa siguen como camino de comprobación.`
+            : `El contribuyente registró PÉRDIDA FISCAL en el ejercicio ${taxYear ?? ''}. Descarte inmediato del camino de comprobación fiscal: se debe respaldar 100% por Estados de Cuenta Bancarios para evitar rechazo en mesa de control.`,
         field: 'fiscalResult.fiscalLoss',
         requiresManualReview: true,
       });

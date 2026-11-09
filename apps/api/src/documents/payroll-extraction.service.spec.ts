@@ -608,26 +608,26 @@ describe('PayrollExtractionService', () => {
     });
   });
 
-  // ── IMSS receipt: synthetic fixture ────────────────────────────────
-  describe('extract — IMSS receipt (synthetic fixture)', () => {
+  // ── IMSS receipt: real data extraction ─────────────────────────────
+  describe('extract — IMSS receipt (real data)', () => {
     const imssOcrText =
       'INSTITUTO MEXICANO DEL SEGURO SOCIAL\n' +
       'IMS421231I45\n' +
-      'JUAN PEREZ GARCIA\n' +
-      'RFC: PEGJ800101AB1\n' +
-      'CURP: PEGJ800101HDFRRN09\n' +
+      'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS\n' +
+      'RFC: DICA690402RZ4\n' +
+      'CURP: DICA690402HYNZBL09\n' +
       'PERIODO: 1A-MAY-2025\n' +
       'FECHA PAGO: 30-ABR-2025\n' +
-      'TOTAL PERCEPCIONES: 25000.00\n' +
-      'TOTAL DEDUCCIONES: 5000.00\n' +
-      'LIQUIDO: 20000.00\n' +
-      'FECHA INGRESO: 15/01/2015\n' +
-      'ANTIGÜEDAD: 10 AÑOS\n' +
-      'FOLIO FISCAL: 11111111-2222-4333-8444-555555555555\n' +
+      'TOTAL PERCEPCIONES: 39104.26\n' +
+      'TOTAL DEDUCCIONES: 12814.26\n' +
+      'LIQUIDO: 26290.00\n' +
+      'FECHA INGRESO: 20/12/2001\n' +
+      'ANTIGÜEDAD: 21 AÑOS 7 QNAS 10 DIAS\n' +
+      'FOLIO FISCAL: ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED\n' +
       'FECHA CERTIFICACION: 2025-04-30T09:35:53\n' +
-      'CREDITO HIPOTECARIO ESMI: 1500.00\n' +
-      'FALTAS INJUSTIFICADAS: 500.00\n' +
-      'ISR: 3000.00\n' +
+      'CREDITO HIPOTECARIO ESMI: 3972.48\n' +
+      'FALTAS INJUSTIFICADAS: 1618.43\n' +
+      'ISR: 3506.04\n' +
       'METODO PAGO: ACREDITAMIENTO EN CUENTA\n' +
       'BANCO: BANCOMER\n' +
       'SELLO DIGITAL SAT: PRESENTE\n' +
@@ -653,11 +653,11 @@ describe('PayrollExtractionService', () => {
         requirementNotes: null,
       },
       employee: {
-        fullName: 'JUAN PEREZ GARCIA',
-        rfc: 'PEGJ800101AB1',
-        curp: 'PEGJ800101HDFRRN09',
-        employmentStartDate: '2015-01-15',
-        employmentSeniorityText: '10 AÑOS',
+        fullName: 'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS',
+        rfc: 'DICA690402RZ4',
+        curp: 'DICA690402HYNZBL09',
+        employmentStartDate: '2001-12-20',
+        employmentSeniorityText: '21 AÑOS 7 QNAS 10 DIAS',
         contributesToImss: null,
       },
       employer: {
@@ -673,9 +673,9 @@ describe('PayrollExtractionService', () => {
         isClosedPeriod: true,
       },
       income: {
-        grossIncome: 25000.00,
-        totalDeductions: 5000.00,
-        netIncome: 20000.0,
+        grossIncome: 39104.26,
+        totalDeductions: 12814.26,
+        netIncome: 26290.0,
         currency: 'MXN',
         incomeBehaviorDetected: 'FIXED',
         variablePerceptions: [],
@@ -684,19 +684,19 @@ describe('PayrollExtractionService', () => {
         {
           type: 'TAX',
           description: 'ISR',
-          amount: 3000.00,
+          amount: 3506.04,
           requiresAlert: false,
         },
         {
           type: 'MORTGAGE_LOAN',
           description: 'CREDITO HIPOTECARIO ESMI',
-          amount: 1500.00,
+          amount: 3972.48,
           requiresAlert: true,
         },
         {
           type: 'OTHER',
           description: 'FALTAS INJUSTIFICADAS',
-          amount: 500.00,
+          amount: 1618.43,
           requiresAlert: false,
         },
       ],
@@ -704,12 +704,12 @@ describe('PayrollExtractionService', () => {
         hasQrCode: true,
         hasSatDigitalSeal: true,
         hasCfdiStamp: true,
-        fiscalFolio: '11111111-2222-4333-8444-555555555555',
+        fiscalFolio: 'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
         certificationDate: '2025-04-30T09:35:53',
       },
       employment: {
-        hireDate: '2015-01-15',
-        seniorityText: '10 AÑOS',
+        hireDate: '2001-12-20',
+        seniorityText: '21 AÑOS 7 QNAS 10 DIAS',
         hasMinimumSeniority: null,
         contributesToImss: null,
         imssEvidence: null,
@@ -717,7 +717,7 @@ describe('PayrollExtractionService', () => {
       },
       evidence: {},
       crossCheckPreparation: {
-        expectedBankDepositAmount: 20000.0,
+        expectedBankDepositAmount: 26290.0,
         expectedBankDepositDate: '2025-04-30',
         expectedEmployerName: 'INSTITUTO MEXICANO DEL SEGURO SOCIAL',
         requiresBankStatementMatch: true,
@@ -759,7 +759,7 @@ describe('PayrollExtractionService', () => {
       const ed = result.extractedData as Record<string, unknown>;
       const employee = ed.employee as Record<string, unknown>;
       expect(employee.fullName).toBe(
-        'JUAN PEREZ GARCIA',
+        'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS',
       );
     });
 
@@ -767,21 +767,21 @@ describe('PayrollExtractionService', () => {
       const result = await service.extract('case-1', 'doc-payroll-1');
       const ed = result.extractedData as Record<string, unknown>;
       const employee = ed.employee as Record<string, unknown>;
-      expect(employee.rfc).toBe('PEGJ800101AB1');
+      expect(employee.rfc).toBe('DICA690402RZ4');
     });
 
     it('extracts gross income correctly', async () => {
       const result = await service.extract('case-1', 'doc-payroll-1');
       const ed = result.extractedData as Record<string, unknown>;
       const income = ed.income as Record<string, unknown>;
-      expect(income.grossIncome).toBe(25000.00);
+      expect(income.grossIncome).toBe(39104.26);
     });
 
     it('extracts net income correctly', async () => {
       const result = await service.extract('case-1', 'doc-payroll-1');
       const ed = result.extractedData as Record<string, unknown>;
       const income = ed.income as Record<string, unknown>;
-      expect(income.netIncome).toBe(20000.0);
+      expect(income.netIncome).toBe(26290.0);
     });
 
     it('extracts fiscal folio (UUID) correctly', async () => {
@@ -789,7 +789,7 @@ describe('PayrollExtractionService', () => {
       const ed = result.extractedData as Record<string, unknown>;
       const fs = ed.fiscalStamp as Record<string, unknown>;
       expect(fs.fiscalFolio).toBe(
-        '11111111-2222-4333-8444-555555555555',
+        'ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED',
       );
     });
 

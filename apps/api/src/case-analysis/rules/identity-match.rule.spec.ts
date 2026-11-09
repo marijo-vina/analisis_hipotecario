@@ -448,4 +448,78 @@ describe('IdentityMatchRule', () => {
       expect(curpField?.originalValue['tax-return']).toBeNull();
     });
   });
+
+  // ── PM personType-aware sources (HU-22) ────────────────────────────────
+  describe('PM personType', () => {
+    const pmClient = (over: Partial<PrismaClientLike> = {}): PrismaClientLike => ({
+      fullName: 'JOSE PEREZ GARCIA',
+      rfc: 'PELJ900101ABC',
+      curp: 'PEJ900315HYNRLN08',
+      personType: 'PM',
+      ...over,
+    });
+
+    it('uses shareholder sources: official-id, bank-statement, credit-bureau, client', async () => {
+      const docs = [
+        doc('INE', {
+          identity: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('BANK_STATEMENT', {
+          accountHolder: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC' },
+        }),
+        doc('CREDIT_BUREAU_REPORT', {
+          borrower: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC' },
+        }),
+      ];
+      const result = await rule.execute(pmClient(), docs);
+
+      expect(result.detail.sources).toEqual(
+        expect.arrayContaining(['official-id', 'bank-statement', 'credit-bureau', 'client']),
+      );
+      expect(result.outcome).toBe('PASS');
+    });
+
+    it('excludes payroll even with a stray PAYROLL_RECEIPT whose RFC would conflict', async () => {
+      const docs = [
+        doc('INE', {
+          identity: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('PAYROLL_RECEIPT', {
+          employee: { fullName: 'SOMEONE ELSE', rfc: 'XAXX010101000', curp: 'XXXX000101HXXXXX00' },
+        }),
+      ];
+      const result = await rule.execute(pmClient(), docs);
+
+      expect(result.detail.sources).not.toContain('payroll');
+      expect(result.outcome).not.toBe('FAIL');
+    });
+
+    it('excludes CSF even when a CSF document is present with a conflicting RFC', async () => {
+      const docs = [
+        doc('INE', {
+          identity: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('CSF', {
+          taxpayer: { fullName: 'EMPRESA SA DE CV', rfc: 'EMP010101AAA', curp: null },
+        }),
+      ];
+      const result = await rule.execute(pmClient(), docs);
+
+      expect(result.detail.sources).not.toContain('csf');
+      expect(result.outcome).not.toBe('FAIL');
+    });
+
+    it('excludes tax-return even when a TAX_RETURN document is present with a conflicting RFC', async () => {
+      const docs = [
+        doc('INE', {
+          identity: { fullName: 'JOSE PEREZ GARCIA', rfc: 'PELJ900101ABC', curp: 'PEJ900315HYNRLN08' },
+        }),
+        doc('TAX_RETURN', { satReceipt: { taxpayerName: 'EMPRESA SA DE CV', rfc: 'EMP010101AAA' } }),
+      ];
+      const result = await rule.execute(pmClient(), docs);
+
+      expect(result.detail.sources).not.toContain('tax-return');
+      expect(result.outcome).not.toBe('FAIL');
+    });
+  });
 });

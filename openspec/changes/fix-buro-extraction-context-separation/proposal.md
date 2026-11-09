@@ -15,7 +15,7 @@ The credit bureau extraction (Task 2.10) has six critical data-accuracy bugs cau
 - Fix balance alert: distinguish null (undetectable) from 0 (explicitly zero) — only null triggers BURO_MISSING_BALANCE
 - Mark closed credits so future Sprint 3 pasivos can exclude them (zero monthly debt contribution)
 - Frontend: show "Score no disponible" + note when score is null; show "Fuente: Mi Score" when from CREDIT_SCORE doc
-- Validation case: PDF "BC - JUAN PEREZ" must yield 16 credits (8 active, 8 closed), score=null, RFC=PEGJ800101XX1
+- Validation case: PDF "BC - ALEJANDRO DIAZ" must yield 16 credits (8 active, 8 closed), score=null, RFC=DICA690402SD3
 
 ### Out of Scope
 - Sprint 3 pasivos/debt-ratio calculations (only prepare data shape)
@@ -66,11 +66,11 @@ Revert the extraction service prompt and schema changes. Old prompt/schema is ba
 ## Dependencies
 
 - Document type `CREDIT_SCORE` must exist in `DocumentType` seed/migration before extraction can process it
-- Validation PDF "BC - JUAN PEREZ - 2025.08.22" must be available in test fixtures
+- Validation PDF "BC - ALEJANDRO DIAZ - 2025.08.22" must be available in test fixtures
 
 ## Success Criteria
 
-- [ ] Test PDF "BC - JUAN PEREZ" yields: 16 credits (8 active, 8 closed), score=null, RFC=PEGJ800101XX1, birth=01-01-1980
+- [ ] Test PDF "BC - ALEJANDRO DIAZ" yields: 16 credits (8 active, 8 closed), score=null, RFC=DICA690402SD3, birth=02-04-1969
 - [ ] No false BURO_MISSING_BALANCE alerts when currentBalance is explicitly $0.00
 - [ ] MOP codes 0-1 do NOT trigger hasLatePayments; only codes 2+ do
 - [ ] "Mi Score" document produces score independently; absence yields score=null (not inferred)

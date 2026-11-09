@@ -7,10 +7,15 @@ import type {
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
+import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
+import { PmGatesRule } from './rules/pm-gates.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
-import { mapBureauCreditToInput } from '../liability/credit-mapper';
+import {
+  mapBureauCreditToInput,
+  mapCompanyBureauCredit,
+} from '../liability/credit-mapper';
 import type { BankarizationFlags } from './types/bank-viability.types';
 import { CaseStatusCalculatorService } from '../case-status-calculator/case-status-calculator.service';
 import {
@@ -18,15 +23,19 @@ import {
   employersFromDocuments,
   promoteEmployerPayrollDeposits,
 } from '../documents/payroll-deposit-match';
+import { pmSharePercentage } from './pm-gates-input';
 
 /** Loaded mortgage case shape used by the orchestrator. */
 interface LoadedMortgageCase {
   id: string;
   client: Record<string, unknown>;
   personType?: string | null;
+  sharePercentage?: unknown;
   documents: {
     extractedData: unknown;
     documentType: { code: string };
+    owner?: string | null;
+    createdAt?: Date | string | null;
   }[];
   [k: string]: unknown;
 }
@@ -51,10 +60,13 @@ export interface AnalysisResultPayload {
  *
  * 3-phase execution:
  *  Phase A: identity-match + personType-specific validation rules
- *    (SALARIED: bankarization-validation; PFAE: pfae-validation)
+ *    (SALARIED: bankarization-validation; PFAE: pfae-validation;
+ *     PM: identity-match on shareholder documents only)
  *  Phase B: income calculation + liability calculation (services)
  *  Phase C: bank-viability rule (reads income/liability from DB)
  *
+ * PM runs identity on shareholder documents plus the CSF/tax-return gates,
+ * and skips payroll persist, Phase B, and Phase C (no capacity / bankViability).
  * Phase failure produces a warning but does not block subsequent phases.
  */
 @Injectable()
@@ -64,6 +76,8 @@ export class CaseAnalysisService {
     private readonly identityMatchRule: IdentityMatchRule,
     private readonly bankarizationValidationRule: BankarizationValidationRule,
     private readonly pfaeValidationRule: PfaeValidationRule,
+    private readonly pmCsfTaxRule: PmCsfTaxRule,
+    private readonly pmGatesRule: PmGatesRule,
     private readonly bankViabilityRule: BankViabilityRule,
     @Inject(forwardRef(() => IncomeCalculationService))
     private readonly incomeCalcService: IncomeCalculationService,
@@ -74,14 +88,70 @@ export class CaseAnalysisService {
   /**
    * Resolves the Phase A rule set per request based on `personType`.
    * PFAE runs `identity-match` + `pfae-validation` (CSF/bank gates).
+   * Persona Moral does not use this list: `run` applies identity on
+   * shareholder documents and `pm-csf-tax` before Phase B.
    * SALARIED (or absent/unrecognized `personType`) runs `identity-match` +
    * `bankarization-validation`, matching prior behavior.
    */
   private resolvePhaseARules(personType?: string | null): AnalysisRule[] {
+    if (personType === 'PM') {
+      return [this.identityMatchRule];
+    }
     if (personType === 'PFAE') {
       return [this.identityMatchRule, this.pfaeValidationRule];
     }
     return [this.identityMatchRule, this.bankarizationValidationRule];
+  }
+
+  /**
+   * Shareholder bureau uses the 6% engine. Company bureau uses the
+   * simple / revolving formulas. Income reads the snapshot afterwards.
+   */
+  private async calculatePmLiabilities(mortgageCase: LoadedMortgageCase): Promise<void> {
+    const caseShare =
+      mortgageCase.sharePercentage == null
+        ? null
+        : Number(mortgageCase.sharePercentage);
+    const share = pmSharePercentage(
+      mortgageCase.documents,
+      Number.isFinite(caseShare) ? caseShare : null,
+    );
+    await this.liabilityCalcService.calculatePersonaMoral(
+      mortgageCase.id,
+      this.bureauCredits(mortgageCase, 'SHAREHOLDER').map(mapBureauCreditToInput),
+      this.bureauCredits(mortgageCase, 'COMPANY').map(mapCompanyBureauCredit),
+      share,
+    );
+  }
+
+  /** Latest bureau report for one owner. A missing owner counts as SHAREHOLDER. */
+  private bureauCredits(
+    mortgageCase: LoadedMortgageCase,
+    owner: 'SHAREHOLDER' | 'COMPANY',
+  ): Record<string, unknown>[] {
+    const matches = mortgageCase.documents.filter((doc) => {
+      if (doc.documentType?.code !== 'CREDIT_BUREAU_REPORT') return false;
+      const docOwner = doc.owner === 'COMPANY' ? 'COMPANY' : 'SHAREHOLDER';
+      return docOwner === owner;
+    });
+    if (matches.length === 0) return [];
+
+    const latest = matches.reduce((best, doc) => {
+      const bestTime = best.createdAt ? new Date(best.createdAt).getTime() : 0;
+      const docTime = doc.createdAt ? new Date(doc.createdAt).getTime() : 0;
+      return docTime >= bestTime ? doc : best;
+    });
+    const extracted = latest.extractedData as { credits?: unknown } | null;
+    return Array.isArray(extracted?.credits)
+      ? (extracted.credits as Record<string, unknown>[])
+      : [];
+  }
+
+  /** Shareholder packet for PM identity: missing owner counts as SHAREHOLDER. */
+  private shareholderDocuments(
+    docs: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    return docs.filter((doc) => (doc.owner ?? 'SHAREHOLDER') !== 'COMPANY');
   }
 
   /**
@@ -129,6 +199,39 @@ export class CaseAnalysisService {
       personType: mortgageCase.personType,
     } as Record<string, unknown>;
     const docs = mortgageCase.documents as unknown as Record<string, unknown>[];
+
+    if (mortgageCase.personType === 'PM') {
+      const identityResult = await this.identityMatchRule.execute(
+        context,
+        this.shareholderDocuments(docs),
+      );
+      const pmCsfTaxResult = await this.pmCsfTaxRule.execute(context, docs);
+      const pmGatesResult = await this.pmGatesRule.execute(context, docs);
+      try {
+        await this.calculatePmLiabilities(mortgageCase);
+      } catch (err) {
+        console.warn(
+          `[CaseAnalysis] Phase B persona moral liability warning for case ${caseId}:`,
+          (err as Error).message,
+        );
+      }
+      try {
+        await this.incomeCalcService.calculate(caseId, []);
+      } catch (err) {
+        console.warn(
+          `[CaseAnalysis] Phase B persona moral income warning for case ${caseId}:`,
+          (err as Error).message,
+        );
+      }
+      const bankViabilityResult = await this.bankViabilityRule.execute(context, docs);
+      return this.persistCompletedRun(
+        caseId,
+        triggeredBy,
+        [identityResult, pmCsfTaxResult, pmGatesResult, bankViabilityResult],
+        bankViabilityResult,
+      );
+    }
+
     if (mortgageCase.personType !== 'PFAE') {
       await this.persistEmployerPayrollDeposits(docs);
     }
@@ -254,11 +357,12 @@ export class CaseAnalysisService {
     caseId: string,
     triggeredBy: string,
     ruleResults: RuleResult[],
-    bankViabilityResult: RuleResult,
+    bankViabilityResult: RuleResult | null,
   ): Promise<AnalysisResultPayload> {
     const aggregate = this.aggregate(ruleResults);
-    const bankViability = (bankViabilityResult.detail as Record<string, unknown>)
-      .bankViability;
+    const bankViability = bankViabilityResult
+      ? (bankViabilityResult.detail as Record<string, unknown>).bankViability
+      : null;
 
     const createdRun = await this.prisma.analysisRun.create({
       data: {

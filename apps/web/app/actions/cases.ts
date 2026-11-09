@@ -4,6 +4,45 @@ import { redirect } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
 import type { MortgageCase, ActionState } from "@/app/lib/definitions";
 
+function optionalTrimmed(value: FormDataEntryValue | null): string | undefined {
+  return value && typeof value === "string" && value.trim()
+    ? value.trim()
+    : undefined;
+}
+
+function optionalNumber(value: FormDataEntryValue | null): number | undefined {
+  if (!value || typeof value !== "string" || value.trim() === "") return undefined;
+  const n = Number(value.replace(/[^0-9.-]/g, ""));
+  return Number.isNaN(n) ? undefined : n;
+}
+
+function parseCorporateFields(formData: FormData): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+
+  const sharePercentage = optionalNumber(formData.get("sharePercentage"));
+  if (sharePercentage !== undefined) fields.sharePercentage = sharePercentage;
+
+  const incorporationDate = optionalTrimmed(formData.get("incorporationDate"));
+  if (incorporationDate) fields.incorporationDate = incorporationDate;
+
+  const shareTenureMonths = optionalNumber(formData.get("shareTenureMonths"));
+  if (shareTenureMonths !== undefined) fields.shareTenureMonths = shareTenureMonths;
+
+  const legalName = optionalTrimmed(formData.get("legalName"));
+  if (legalName) fields.legalName = legalName;
+
+  const companyRfc = optionalTrimmed(formData.get("companyRfc"));
+  if (companyRfc) fields.companyRfc = companyRfc.toUpperCase();
+
+  if (formData.getAll("companyIsBanorteClient").length > 0) {
+    fields.companyIsBanorteClient = formData
+      .getAll("companyIsBanorteClient")
+      .some((value) => value === "true");
+  }
+
+  return fields;
+}
+
 export async function createCase(
   prevState: ActionState,
   formData: FormData,
@@ -74,6 +113,8 @@ export async function createCase(
 
   const noteStr = str(notes);
   if (noteStr) body.notes = noteStr;
+
+  Object.assign(body, parseCorporateFields(formData));
 
   // ---- Call backend -------------------------------------------------------
   const result = await apiFetch<MortgageCase>("/mortgage-cases", {
@@ -155,6 +196,8 @@ export async function updateCase(
 
   const noteStr = str(notes);
   if (noteStr) body.notes = noteStr;
+
+  Object.assign(body, parseCorporateFields(formData));
 
   // ---- Call backend -------------------------------------------------------
   const result = await apiFetch<MortgageCase>(`/mortgage-cases/${caseId}`, {

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
-import type { DocumentType } from "@/app/lib/definitions";
+import type { DocumentOwner, DocumentType } from "@/app/lib/definitions";
+import {
+  filterUploadableDocumentTypes,
+  resolveUploadOwner,
+} from "@/app/lib/required-documents";
 import Button from "@/app/ui/common/button";
 import { FileText, X, UploadCloud } from "lucide-react";
 
@@ -10,7 +14,12 @@ interface DocumentUploadProps {
   documentTypes: DocumentType[];
   onSuccess: () => void;
   defaultDocumentTypeId?: string;
+  /** Limits the type list to the category the advisor already chose. */
+  allowedTypeCodes?: string[];
   personType?: string;
+  defaultOwner?: DocumentOwner;
+  /** The category already fixed the owner, so the titular select stays hidden. */
+  lockOwner?: boolean;
 }
 
 export default function DocumentUpload({
@@ -18,47 +27,55 @@ export default function DocumentUpload({
   documentTypes,
   onSuccess,
   defaultDocumentTypeId,
+  allowedTypeCodes,
   personType,
+  defaultOwner = "SHAREHOLDER",
+  lockOwner = false,
 }: DocumentUploadProps) {
   const availableDocumentTypes = useMemo<DocumentType[]>(() => {
-    // 1. Exclude PROOF_OF_ADDRESS
-    let filtered = documentTypes.filter(
-      (dt: DocumentType) => dt.code !== "PROOF_OF_ADDRESS",
+    const filtered = filterUploadableDocumentTypes(documentTypes, personType).filter(
+      (dt) => !allowedTypeCodes || allowedTypeCodes.includes(dt.code),
     );
-
-    // 2. Filter by personType
-    if (personType === "PFAE") {
-      filtered = filtered.filter((dt) => dt.code !== "PAYROLL_RECEIPT");
-    } else {
-      filtered = filtered.filter((dt) => dt.code !== "CSF" && dt.code !== "TAX_RETURN");
-    }
-
-    // 3. Ensure PASSPORT is present in the list
-    const hasPassport = filtered.some((dt: DocumentType) => dt.code === "PASSPORT");
-    if (!hasPassport) {
-      const maxId = Math.max(0, ...filtered.map((dt: DocumentType) => Number(dt.id) || 0));
-      filtered.push({
-        id: maxId + 1000,
-        code: "PASSPORT",
-        name: "Pasaporte",
-        isActive: true,
-      });
-    }
-
-    return filtered;
-  }, [documentTypes, personType]);
+    const maxId = Math.max(0, ...filtered.map((dt) => Number(dt.id) || 0));
+    return filtered.map((dt, index) => {
+      if (dt.code !== "PASSPORT") return dt;
+      if (dt.name && dt.id) return dt;
+      return {
+        ...dt,
+        id: dt.id || maxId + 1000 + index,
+        name: dt.name || "Pasaporte",
+        isActive: dt.isActive ?? true,
+      };
+    });
+  }, [documentTypes, personType, allowedTypeCodes]);
 
   const [files, setFiles] = useState<File[]>([]);
-  const [documentTypeId, setDocumentTypeId] = useState<string>(
-    defaultDocumentTypeId &&
+  const [documentTypeId, setDocumentTypeId] = useState<string>(() => {
+    if (
+      defaultDocumentTypeId &&
       availableDocumentTypes.some((dt: DocumentType) => dt.id === Number(defaultDocumentTypeId))
-      ? defaultDocumentTypeId
-      : "",
-  );
+    ) {
+      return defaultDocumentTypeId;
+    }
+    if (availableDocumentTypes.length === 1) return String(availableDocumentTypes[0].id);
+    return "";
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [selectedOwner, setSelectedOwner] =
+    useState<DocumentOwner>(defaultOwner);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isPm = personType === "PM";
+  const selectedType = availableDocumentTypes.find(
+    (dt) => String(dt.id) === documentTypeId,
+  );
+  const selectedTypeCode = selectedType?.code ?? "";
+  const resolvedOwner = resolveUploadOwner(
+    personType,
+    selectedTypeCode,
+    selectedOwner,
+  );
 
   // ---- Drop handlers ------------------------------------------------------
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -127,6 +144,9 @@ export default function DocumentUpload({
           const formData = new FormData();
           formData.append("file", f);
           formData.append("documentTypeId", documentTypeId);
+          if (resolvedOwner) {
+            formData.append("owner", resolvedOwner);
+          }
 
           const res = await fetch(
             `/api/mortgage-cases/${caseId}/documents/upload`,
@@ -163,7 +183,7 @@ export default function DocumentUpload({
         setLoading(false);
       }
     },
-    [files, documentTypeId, caseId, onSuccess],
+    [files, documentTypeId, caseId, onSuccess, resolvedOwner],
   );
 
   const submitLabel = (() => {
@@ -184,7 +204,7 @@ export default function DocumentUpload({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Document type selector */}
+        {availableDocumentTypes.length > 1 && (
         <div>
           <label
             htmlFor="documentTypeId"
@@ -202,7 +222,7 @@ export default function DocumentUpload({
             disabled={loading}
             className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
           >
-            <option value="">-- Seleccionar categoría --</option>
+            <option value="">-- Seleccionar tipo --</option>
             {availableDocumentTypes.map((dt: DocumentType) => (
               <option key={dt.id} value={dt.id}>
                 {dt.name}
@@ -210,6 +230,40 @@ export default function DocumentUpload({
             ))}
           </select>
         </div>
+        )}
+
+        {isPm && !lockOwner && (
+          <div>
+            <label
+              htmlFor="documentOwner"
+              className="block text-xs font-semibold text-gf-text mb-1"
+            >
+              Titular del documento
+            </label>
+            <select
+              id="documentOwner"
+              value={resolvedOwner ?? selectedOwner}
+              onChange={(e) =>
+                setSelectedOwner(e.target.value as DocumentOwner)
+              }
+              disabled={
+                loading ||
+                selectedTypeCode === "ARTICLES_OF_INCORPORATION" ||
+                selectedTypeCode === "CORPORATE_AMENDMENT"
+              }
+              className="block w-full rounded-xl border border-gf-border bg-white px-3 py-2 text-sm text-gf-text shadow-2xs focus:border-gf-red focus:outline-none focus:ring-1 focus:ring-gf-red disabled:opacity-50 h-10 font-medium"
+            >
+              <option value="SHAREHOLDER">Accionista</option>
+              <option value="COMPANY">Empresa</option>
+            </select>
+            {(selectedTypeCode === "ARTICLES_OF_INCORPORATION" ||
+              selectedTypeCode === "CORPORATE_AMENDMENT") && (
+              <p className="mt-1 text-[11px] text-gf-text-muted">
+                Este documento se guarda como documento de la empresa.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Drag-and-drop zone / file input */}
         <div>
@@ -284,15 +338,16 @@ export default function DocumentUpload({
           </div>
         )}
 
-        {/* Submit Button */}
-        <Button
-          variant="primary"
-          type="submit"
-          disabled={loading || files.length === 0 || !documentTypeId}
-          loading={loading}
-        >
-          {submitLabel}
-        </Button>
+        {files.length > 0 && (
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={loading || !documentTypeId}
+            loading={loading}
+          >
+            {submitLabel}
+          </Button>
+        )}
       </form>
     </div>
   );

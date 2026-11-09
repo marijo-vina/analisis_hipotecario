@@ -33,7 +33,7 @@ Create follow-up change to redesign `LayoutFinancialExtractor`:
 - Grid reconstruction approach
 - Visual credit-block detection
 - Real column extraction (hybrid lines + tokens)
-- Test with Juan Pérez and Carlos Lopez PDFs
+- Test with Alejandro Díaz and Claudio Medici PDFs
 
 ## Sprint 3 Rule
 

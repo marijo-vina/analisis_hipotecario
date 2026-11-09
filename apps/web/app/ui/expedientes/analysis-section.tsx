@@ -13,12 +13,25 @@ import type {
   FieldComparison,
   Document,
 } from "@/app/lib/definitions";
+import {
+  getRequiredDocChecks,
+  isRequiredDocReady,
+} from "@/app/lib/required-documents";
 import Card from "@/app/ui/common/card";
 import Button from "@/app/ui/common/button";
 import EstadosConciliacion from "@/app/ui/extraction/estados-conciliacion";
 import LiabilityCalculationSection from "@/app/ui/expedientes/liability-calculation-section";
 import IncomeCalculationSection from "@/app/ui/expedientes/income-calculation-section";
 import BankComparisonTab from "@/app/ui/expedientes/bank-comparison-tab";
+import PmGatesCard from "@/app/ui/expedientes/pm-gates-card";
+import PmCompanyAndActa from "@/app/ui/expedientes/pm-company-and-acta";
+import {
+  identityColumnKeys,
+  identityHeading,
+  pmActaHeadline,
+  showsBankComparison,
+} from "@/app/lib/pm-expediente-view";
+import { parseArticlesDocument } from "@/app/lib/articles-view";
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface AnalysisSectionProps {
@@ -83,54 +96,6 @@ const SOURCE_ICONS: Record<string, string> = {
   "credit-bureau": "📊",
   client: "📋",
 };
-
-/**
- * PersonType-aware required-document checklist. Single source of truth
- * consumed by both `hasMissingDocs` and `AnalysisConfirmModal`'s checklist
- * (mirrors `case-status-calculator.service.ts`'s PFAE/SALARIED branch) —
- * prevents the two from drifting out of sync.
- */
-interface RequiredDocCheck {
-  key: string;
-  label: string;
-  /** DocumentType codes that satisfy this check (any one is sufficient). */
-  codes: string[];
-}
-
-function getRequiredDocChecks(personType?: string): RequiredDocCheck[] {
-  const identity: RequiredDocCheck = {
-    key: "identity",
-    label: "Identificación oficial (INE/Pasaporte)",
-    codes: ["INE", "PASSPORT"],
-  };
-  const bankStatement: RequiredDocCheck = {
-    key: "bank-statement",
-    label: "Estado de cuenta bancario",
-    codes: ["BANK_STATEMENT"],
-  };
-  const creditBureau: RequiredDocCheck = {
-    key: "credit-bureau",
-    label: "Buró de crédito / Score",
-    codes: ["CREDIT_BUREAU_REPORT", "CREDIT_SCORE"],
-  };
-
-  if (personType === "PFAE") {
-    return [
-      identity,
-      { key: "csf", label: "Constancia de Situación Fiscal (CSF)", codes: ["CSF"] },
-      { key: "tax-return", label: "Declaración anual", codes: ["TAX_RETURN"] },
-      bankStatement,
-      creditBureau,
-    ];
-  }
-
-  return [
-    identity,
-    { key: "payroll", label: "Recibo de nómina", codes: ["PAYROLL_RECEIPT"] },
-    bankStatement,
-    creditBureau,
-  ];
-}
 
 const FIELD_STATUS_BADGE: Record<
   string,
@@ -214,12 +179,7 @@ export default function AnalysisSection({
       (d) => d.documentStatus.code !== "PROCESSED",
     );
     const hasMissingRequired = requiredDocChecks.some(
-      (check) =>
-        !documents.some(
-          (d) =>
-            check.codes.includes(d.documentType.code) &&
-            d.documentStatus.code === "PROCESSED",
-        ),
+      (check) => !isRequiredDocReady(check, documents),
     );
     return hasMissingRequired || hasUnprocessed;
   }, [documents, requiredDocChecks]);
@@ -340,7 +300,12 @@ export default function AnalysisSection({
             Paso 1: Sube la documentación del cliente
           </h3>
           <p className="text-xs text-gf-text-muted leading-relaxed">
-            Este expediente aún no cuenta con documentos subidos. Usa el botón <span className="font-semibold text-gf-text">+ Agregar</span> o el panel lateral izquierdo para cargar la identificación, nómina o estados de cuenta.
+            Este expediente aún no cuenta con documentos subidos. Usa el botón <span className="font-semibold text-gf-text">+ Agregar</span> o el panel lateral izquierdo para cargar{" "}
+            {personType === "PM"
+              ? "los documentos del socio y de la empresa, incluida el acta constitutiva."
+              : personType === "PFAE"
+                ? "la identificación, la constancia fiscal y los estados de cuenta."
+                : "la identificación, la nómina o los estados de cuenta."}
           </p>
         </div>
       </div>
@@ -464,6 +429,7 @@ export default function AnalysisSection({
               state={state}
               allDeposits={bankParsed.allDeposits}
               payrollDocs={payrollDocs}
+              documents={documents}
               personType={personType}
             />
           )}
@@ -483,8 +449,12 @@ export default function AnalysisSection({
 
           {activeTab === "bancos" && (
             <BankComparisonTab
+              sharePercentage={
+                personType === "PM" ? actaSharePercentage(documents) : null
+              }
               bankViability={
-                state.phase === "result" || state.phase === "observations"
+                showsBankComparison(personType) &&
+                (state.phase === "result" || state.phase === "observations")
                   ? state.run.detail?.bankViability
                   : undefined
               }
@@ -520,22 +490,24 @@ function ValidacionesTab({
   state,
   allDeposits,
   payrollDocs,
+  documents,
   personType,
 }: {
   caseId: string;
   state: UiState;
   allDeposits: ReturnType<typeof parseBankStatements>["allDeposits"];
   payrollDocs: Document[];
+  documents: Document[];
   personType?: string;
 }) {
-  const isPFAE = personType === "PFAE";
+  const hideConciliation = personType === "PFAE" || personType === "PM";
 
   return (
     <div className="space-y-6">
       {/* ── A) Validación de identidad ──────────────────────────────────── */}
       <section>
         <h3 className="text-sm font-semibold text-gf-text mb-3">
-          Validación de identidad
+          {identityHeading(personType)}
         </h3>
         <IdentityValidationSection
           state={state}
@@ -543,8 +515,24 @@ function ValidacionesTab({
         />
       </section>
 
-      {/* ── B) Conciliación nómina vs banco — no aplica para PFAE (sin nómina) ── */}
-      {!isPFAE && (
+      {/* ── B) Conciliación nómina vs banco — no aplica para PFAE/PM (sin nómina) ── */}
+      {personType === "PM" && (
+        <PmCompanyAndActa documents={documents} />
+      )}
+
+      {personType === "PM" && (
+        <section>
+          <PmGatesCard
+            run={
+              state.phase === "result" || state.phase === "observations"
+                ? state.run
+                : null
+            }
+          />
+        </section>
+      )}
+
+      {!hideConciliation && (
         <section>
           <h3 className="text-sm font-semibold text-gf-text mb-3">
             Conciliación nómina vs banco
@@ -745,25 +733,29 @@ function ValidationTable({
 
 // ── IdentitySummaryCard ───────────────────────────────────────────────────────
 
+const IDENTITY_LABELS: Record<string, string> = {
+  "official-id": "INE",
+  payroll: "NÓMINA",
+  csf: "CSF",
+  "tax-return": "DECLARACIÓN",
+  "bank-statement": "EDO. CUENTA",
+  "credit-bureau": "BURÓ",
+  client: "EXPEDIENTE",
+};
+
 /** PersonType-aware discrepancy-table columns — PFAE swaps Nómina for CSF + Declaración. */
 function getIdentityColumns(personType?: string) {
-  if (personType === "PFAE") {
-    return [
-      { key: "csf", label: "CSF" },
-      { key: "tax-return", label: "DECLARACIÓN" },
-      { key: "official-id", label: "INE" },
-      { key: "bank-statement", label: "EDO. CUENTA" },
-      { key: "credit-bureau", label: "BURÓ" },
-      { key: "client", label: "EXPEDIENTE" },
-    ] as const;
-  }
-  return [
-    { key: "payroll", label: "NÓMINA" },
-    { key: "official-id", label: "INE" },
-    { key: "bank-statement", label: "EDO. CUENTA" },
-    { key: "credit-bureau", label: "BURÓ" },
-    { key: "client", label: "EXPEDIENTE" },
-  ] as const;
+  return identityColumnKeys(personType).map((key) => ({
+    key,
+    label: IDENTITY_LABELS[key] ?? key,
+  }));
+}
+
+function actaSharePercentage(documents: Document[]): number | null {
+  const articles = documents
+    .map((doc) => parseArticlesDocument(doc))
+    .filter((doc) => doc != null);
+  return pmActaHeadline(articles).sharePercentage;
 }
 
 function IdentitySummaryCard({
@@ -1018,15 +1010,28 @@ function AnalysisConfirmModal({
   const requiredDocChecks = getRequiredDocChecks(personType);
   const checklist = requiredDocChecks.map((check) => ({
     ...check,
-    ready: documents.some(
-      (d) =>
-        check.codes.includes(d.documentType.code) &&
-        d.documentStatus.code === "PROCESSED",
-    ),
+    ready: isRequiredDocReady(check, documents),
   }));
   const unprocessedCount = documents.filter(
     (d) => d.documentStatus.code !== "PROCESSED",
   ).length;
+  const isPm = personType === "PM";
+  const shareholderChecks = checklist.filter((check) => check.group === "SHAREHOLDER");
+  const companyChecks = checklist.filter((check) => check.group === "COMPANY");
+
+  const renderCheckRow = (
+    check: (typeof checklist)[number],
+    index: number,
+  ) => (
+    <div key={check.key} className="flex items-center justify-between">
+      <span className="text-gf-text font-medium">
+        {index + 1}. {check.label}:
+      </span>
+      <span className={check.ready ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
+        {check.ready ? "✓ Procesado" : "⚠ Pendiente"}
+      </span>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
@@ -1046,16 +1051,20 @@ function AnalysisConfirmModal({
         </div>
 
         <div className="bg-gf-surface border border-gf-border/60 rounded-xl p-3.5 space-y-2 text-xs">
-          {checklist.map((check, i) => (
-            <div key={check.key} className="flex items-center justify-between">
-              <span className="text-gf-text font-medium">
-                {i + 1}. {check.label}:
-              </span>
-              <span className={check.ready ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>
-                {check.ready ? "✓ Procesado" : "⚠ Pendiente"}
-              </span>
-            </div>
-          ))}
+          {isPm ? (
+            <>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted">
+                Accionista
+              </p>
+              {shareholderChecks.map((check, i) => renderCheckRow(check, i))}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gf-text-muted pt-1.5">
+                Empresa
+              </p>
+              {companyChecks.map((check, i) => renderCheckRow(check, i))}
+            </>
+          ) : (
+            checklist.map((check, i) => renderCheckRow(check, i))
+          )}
           {unprocessedCount > 0 && (
             <div className="pt-1.5 border-t border-gf-border/40 flex items-center justify-between text-amber-800 font-medium">
               <span>Archivos sin procesar:</span>

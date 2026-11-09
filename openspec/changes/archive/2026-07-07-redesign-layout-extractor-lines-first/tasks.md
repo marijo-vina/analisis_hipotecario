@@ -70,7 +70,7 @@ Target was Γëñ500. The combined file (PR1 foundation + PR2 extraction) is ~33
 
 ### Acceptance criteria (verified with synthetic fixtures)
 - Γ£à SANTANDER = 8775 (HIGH confidence)
-- Γ£à TELCEL MER 10002030 = 0 (HIGH confidence, explicit zero)
+- Γ£à TELCEL MER 82953660 = 0 (HIGH confidence, explicit zero)
 - Γ£à AMEX = 1875 (HIGH confidence)
 - Γ£à Closed credit without payment line ΓåÆ null + LOW confidence
 - Γ£à paymentDueAmount NEVER uses lastPaymentAmount as fallback

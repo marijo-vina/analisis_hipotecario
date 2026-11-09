@@ -15,6 +15,7 @@ const DEFAULT_TAB_ORDER: ExtractionCategory[] = [
   "identidad",
   "csf",
   "declaracion",
+  "acta",
   "nomina",
   "estados",
   "buro",
