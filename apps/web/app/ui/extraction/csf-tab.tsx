@@ -20,10 +20,15 @@ import FieldGrid from "@/app/ui/common/field-grid";
 import CopyButton from "@/app/ui/common/copy-button";
 import EmptyState from "@/app/ui/common/empty-state";
 import DocumentConsultationDrawer from "@/app/ui/documents/document-consultation-drawer";
+import ExtractionOwnerSwitch, {
+  type ExtractionOwner,
+} from "@/app/ui/extraction/extraction-owner-switch";
 
 interface CsfTabProps {
   /** CSF documents. */
   documents: Document[];
+  /** Persona moral keeps one constancia on screen at a time. */
+  showOwnerSwitch?: boolean;
 }
 
 function formatTenure(months: number | null): string {
@@ -39,22 +44,33 @@ function formatTenure(months: number | null): string {
   return `${remMonths} ${remMonths === 1 ? "mes" : "meses"}`;
 }
 
-export default function CsfTab({ documents }: CsfTabProps) {
+export default function CsfTab({
+  documents,
+  showOwnerSwitch = false,
+}: CsfTabProps) {
   const [drawerDoc, setDrawerDoc] = useState<Document | null>(null);
+  const [owner, setOwner] = useState<ExtractionOwner>("COMPANY");
 
-  const processed = documents.filter(
+  const visible = showOwnerSwitch
+    ? documents.filter((doc) => doc.owner === owner)
+    : documents;
+  const processed = visible.filter(
     (d) => d.documentStatus.code === "PROCESSED",
   );
-
-  if (processed.length === 0) {
-    return (
-      <EmptyState message="No hay Constancias de Situación Fiscal procesadas aún. Cuando se procese la CSF, sus datos fiscales extraídos aparecerán aquí." />
-    );
-  }
+  const emptyMessage = showOwnerSwitch
+    ? owner === "COMPANY"
+      ? "No hay constancia procesada de la persona moral. Cuando se procese la de la empresa, su lectura aparece aquí."
+      : "No hay constancia procesada del accionista. Cuando se procese la de la persona física, su lectura aparece aquí."
+    : "No hay Constancias de Situación Fiscal procesadas aún. Cuando se procese la CSF, sus datos fiscales extraídos aparecerán aquí.";
 
   return (
     <div className="space-y-6">
-      {processed.map((doc) => {
+      {showOwnerSwitch && (
+        <ExtractionOwnerSwitch owner={owner} onChange={setOwner} />
+      )}
+      {processed.length === 0 ? (
+        <EmptyState message={emptyMessage} />
+      ) : processed.map((doc) => {
         const parsed = parseCsf(doc);
         if (!parsed) return null;
 
@@ -74,6 +90,14 @@ export default function CsfTab({ documents }: CsfTabProps) {
                     Constancia de Situación Fiscal (SAT)
                   </h3>
                   <p className="text-xs text-gf-text-muted">
+                    {doc.owner === "COMPANY"
+                      ? "Empresa"
+                      : doc.owner === "SHAREHOLDER"
+                        ? "Accionista"
+                        : null}
+                    {doc.owner === "COMPANY" || doc.owner === "SHAREHOLDER"
+                      ? " · "
+                      : null}
                     Archivo: <span className="font-semibold text-gf-text">{doc.originalName}</span>
                   </p>
                 </div>

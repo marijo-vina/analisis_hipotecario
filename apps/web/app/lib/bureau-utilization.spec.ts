@@ -20,7 +20,7 @@ type CreditStub = {
   rawTextReference?: string | null;
 };
 
-function credit(overrides: CreditStub = {}): CreditStub {
+function credit(overrides: Partial<CreditStub> = {}): CreditStub {
   return {
     classification: "REVOLVING",
     creditType: "Tarjeta de crédito",
@@ -150,7 +150,7 @@ describe("computeRowUtilization", () => {
         classification: "NON_BANK_SERVICE",
         creditType: "TARJETA DE CRÉDITO",
         institution: "AMEX",
-        currentBalance: 30000,
+        currentBalance: 30283,
         creditLimit: 150000,
         isClosed: false,
       }),
@@ -278,8 +278,8 @@ describe("getUtilizationBand", () => {
 
 describe("maskLastFour", () => {
   it("masks accountNumber as **** plus last 4", () => {
-    expect(maskLastFour(credit({ accountNumber: "10002030" }))).toBe(
-      "****2030",
+    expect(maskLastFour(credit({ accountNumber: "82953660" }))).toBe(
+      "****3660",
     );
   });
 
@@ -318,12 +318,12 @@ describe("maskLastFour", () => {
   it("prefers accountNumber over institution and never returns the full number", () => {
     const masked = maskLastFour(
       credit({
-        accountNumber: "10002030",
+        accountNumber: "82953660",
         institution: "Visa 1234567890",
       }),
     );
-    expect(masked).toBe("****2030");
-    expect(masked).not.toContain("10002030");
+    expect(masked).toBe("****3660");
+    expect(masked).not.toContain("82953660");
     expect(masked).not.toContain("1234567890");
   });
 });
@@ -369,14 +369,14 @@ describe("parseBuro accountNumber", () => {
             status: "ACTIVE",
             currentBalance: 3000,
             creditLimit: 10000,
-            accountNumber: "10002030",
+            accountNumber: "82953660",
           },
         ],
       }),
     ]);
     expect(parsed?.credits).toHaveLength(1);
-    expect(parsed!.credits[0].accountNumber).toBe("10002030");
-    expect(maskLastFour(parsed!.credits[0])).toBe("****2030");
+    expect(parsed!.credits[0].accountNumber).toBe("82953660");
+    expect(maskLastFour(parsed!.credits[0])).toBe("****3660");
   });
 
   it("leaves accountNumber null when the stored field is missing", () => {

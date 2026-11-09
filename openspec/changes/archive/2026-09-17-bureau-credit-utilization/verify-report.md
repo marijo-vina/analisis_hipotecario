@@ -55,7 +55,7 @@ Test Files  1 passed (1)
 | Shared Buro Utilization Display | In-scope rate | `bureau-utilization.spec.ts` > shows rounded rate and band for an open in-scope card (30% / Muy buena). No component/browser test that both tables and SALARIED/PFAE share the column. Static: shared `CreditRow` / `BuroTab` has no `personType`. | ⚠️ PARTIAL |
 | Shared Buro Utilization Display | Dashes | `bureau-utilization.spec.ts` > dashes excluded, closed, and null-balance rows (null is not 0%) | ⚠️ PARTIAL |
 | Shared Buro Utilization Display | Weighted KPI and stored bureau | `bureau-utilization.spec.ts` > weights by sum(balances)/sum(limits) → 14%; denom 0 → —. Static: fifth KPI after consultas; original four remain. No render test of KPI row or no-re-OCR on tab open. | ⚠️ PARTIAL |
-| Masked Last-4 under Institution | Mask and fallback | `bureau-utilization.spec.ts` > masks accountNumber as ****2030; institution ≥4 digits; rawTextReference; dash when no source; prefers accountNumber and never returns full number. `parseBuro accountNumber` copies stored field. No Institución cell render test. | ⚠️ PARTIAL |
+| Masked Last-4 under Institution | Mask and fallback | `bureau-utilization.spec.ts` > masks accountNumber as ****3660; institution ≥4 digits; rawTextReference; dash when no source; prefers accountNumber and never returns full number. `parseBuro accountNumber` copies stored field. No Institución cell render test. | ⚠️ PARTIAL |
 
 **Compliance summary**: 5/9 scenarios ✅ COMPLIANT, 4/9 ⚠️ PARTIAL, 0 ❌ FAILING, 0 ❌ UNTESTED
 
@@ -139,7 +139,7 @@ Scenario coverage layer: API persist/parse = unit; frontend display/mask = unit 
 |------|------|-----------|-------|----------|
 | — | — | — | — | — |
 
-New/changed tests assert production values (`accountNumber` `'10002030'`, display `"30%"` / `"14%"`, band labels, `****2030`, `not.toHaveProperty('utilization')`, schema JSON omit). `isInScope(...).toBe(true)` is a production-boolean check, not a tautology. No ghost loops, no smoke-only renders, no mocks in the web spec.
+New/changed tests assert production values (`accountNumber` `'82953660'`, display `"30%"` / `"14%"`, band labels, `****3660`, `not.toHaveProperty('utilization')`, schema JSON omit). `isInScope(...).toBe(true)` is a production-boolean check, not a tautology. No ghost loops, no smoke-only renders, no mocks in the web spec.
 
 **Assertion quality**: ✅ All assertions verify real behavior (0 CRITICAL, 0 WARNING in new tests)
 

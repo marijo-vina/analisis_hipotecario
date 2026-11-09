@@ -50,7 +50,7 @@ Chain strategy: single-pr-default
 - [x] 4.4 Test payment split: both fields populated, null fallbacks (PAY scenario)
 - [x] 4.5 Test closed credits: isClosed + contribution=0 for CLOSED, contribution=paymentDueAmount for ACTIVE (CLS scenario)
 - [x] 4.6 Test observation keys: LC/UP→writeOff, FD→fraud, RI→identityTheft no fraud (OBS scenario)
-- [x] 4.7 Integration test "BC - JUAN PEREZ": 16 credits, score=null, RFC=PEGJ800101XX1, birth=1980-01-01
+- [x] 4.7 Integration test "BC - ALEJANDRO DIAZ": 16 credits, score=null, RFC=DICA690402SD3, birth=1969-04-02
 
 ## Phase 5: Frontend — Types & Parsing
 

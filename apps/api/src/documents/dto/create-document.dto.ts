@@ -1,5 +1,6 @@
-import { IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DocumentOwner } from '../../generated/prisma/client';
 
 export class CreateDocumentDto {
   @IsInt()
@@ -10,4 +11,8 @@ export class CreateDocumentDto {
   @IsString()
   @IsNotEmpty()
   originalName: string;
+
+  @IsOptional()
+  @IsEnum(DocumentOwner)
+  owner?: DocumentOwner;
 }

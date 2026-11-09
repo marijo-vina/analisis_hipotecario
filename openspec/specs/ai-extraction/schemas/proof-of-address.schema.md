@@ -96,15 +96,15 @@ Extraer datos de domicilio para validación documental y operativa del expedient
     "holderName": "MARIA JOSE PEREZ LOPEZ",
     "serviceProvider": "CFE",
     "address": {
-      "fullAddress": "AV REFORMA 100 COL JUAREZ CIUDAD DE MEXICO CP 06600",
-      "street": "AV REFORMA",
+      "fullAddress": "CALLE 20 NUM 100 COLONIA CENTRO MERIDA YUCATAN CP 97000",
+      "street": "CALLE 20",
       "exteriorNumber": "100",
       "interiorNumber": null,
-      "neighborhood": "JUAREZ",
-      "municipality": "CUAUHTEMOC",
-      "city": "CIUDAD DE MEXICO",
-      "state": "CIUDAD DE MEXICO",
-      "postalCode": "06600"
+      "neighborhood": "CENTRO",
+      "municipality": "MERIDA",
+      "city": "MERIDA",
+      "state": "YUCATAN",
+      "postalCode": "97000"
     },
     "period": "MAYO 2026",
     "issueDate": "2026-05-31",

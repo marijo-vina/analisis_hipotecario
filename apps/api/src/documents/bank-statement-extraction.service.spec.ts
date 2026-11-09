@@ -6,6 +6,8 @@ import {
   BankStatementExtractionResult,
 } from './bank-statement-extraction.service';
 import { BankStatementCleanerService } from './bank-statement-cleaner.service';
+import { BureauGridClient } from './bureau-grid.client';
+import { GcsService } from './gcs.service';
 
 // ---------------------------------------------------------------------------
 // Helpers — mock document builder
@@ -14,6 +16,7 @@ import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 interface MockDocument {
   id: string;
   mortgageCaseId: string;
+  owner?: 'SHAREHOLDER' | 'COMPANY';
   documentType: { id: number; code: string; name: string; isActive: boolean };
   documentStatus: { id: number; code: string; name: string; order: number };
   ocrText: string | null;
@@ -165,6 +168,8 @@ describe('BankStatementExtractionService', () => {
     documentStatus: { findUnique: jest.Mock };
   };
   let mockGemini: { extractStructuredData: jest.Mock };
+  let mockGcs: { downloadFile: jest.Mock };
+  let mockBbva: { extractBbvaDeposits: jest.Mock };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -195,6 +200,8 @@ describe('BankStatementExtractionService', () => {
       },
     };
     mockGemini = { extractStructuredData: jest.fn() };
+    mockGcs = { downloadFile: jest.fn() };
+    mockBbva = { extractBbvaDeposits: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -202,6 +209,8 @@ describe('BankStatementExtractionService', () => {
         BankStatementCleanerService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GeminiService, useValue: mockGemini },
+        { provide: GcsService, useValue: mockGcs },
+        { provide: BureauGridClient, useValue: mockBbva },
       ],
     }).compile();
 
@@ -379,6 +388,58 @@ describe('BankStatementExtractionService', () => {
           documentStatusId: 4,
         }),
       });
+    });
+
+    it('uses the BBVA abonos column when the sum matches the cover', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        storagePath: 'case-1/statement.pdf',
+      });
+      mockGcs.downloadFile.mockResolvedValue(Buffer.from('%PDF'));
+      mockBbva.extractBbvaDeposits.mockResolvedValue([
+        {
+          date: '2026-05-06',
+          amount: 15500,
+          concept: 'T20 SPEI RECIBIDO TRASPASO ENTRE CUENTAS PROPIAS',
+        },
+      ]);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const data = result.extractedData as {
+        allTransactions: Array<{ originalConcept: string; amount: number }>;
+        financialDepuration: { integrityCheck: { status: string } };
+      };
+      expect(data.allTransactions).toEqual([
+        expect.objectContaining({
+          amount: 15500,
+          originalConcept: 'T20 SPEI RECIBIDO TRASPASO ENTRE CUENTAS PROPIAS',
+          movementType: 'DEPOSIT',
+        }),
+      ]);
+      expect(data.financialDepuration.integrityCheck.status).toBe('MATCHED');
+    });
+
+    it('keeps the OCR movements when the BBVA column sum does not match the cover', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        storagePath: 'case-1/statement.pdf',
+      });
+      mockGcs.downloadFile.mockResolvedValue(Buffer.from('%PDF'));
+      mockBbva.extractBbvaDeposits.mockResolvedValue([
+        { date: '2026-05-06', amount: 1, concept: 'SALDO MAL LEIDO' },
+      ]);
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(createMockExtractionResult()),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const data = result.extractedData as {
+        allTransactions: Array<{ originalConcept: string }>;
+      };
+      expect(data.allTransactions[0].originalConcept).toBe('NOMINA MAYO');
     });
   });
 
@@ -1280,19 +1341,60 @@ describe('BankStatementExtractionService', () => {
     };
 
     it('replaces XAXX010101000 with the client RFC from CSF', async () => {
-      setupTitularRfc('XAXX010101000', 'PEGJ800101AB1');
+      setupTitularRfc('XAXX010101000', 'DICA690402RZ4');
       const result = await service.extract('case-1', 'doc-bank-1');
       const ed = result.extractedData as Record<string, unknown>;
       const accountHolder = ed.accountHolder as Record<string, unknown>;
-      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+      expect(accountHolder.rfc).toBe('DICA690402RZ4');
     });
 
     it('replaces corrupted generic RFC XAX010101000 with the client RFC from CSF', async () => {
-      setupTitularRfc('XAX010101000', 'PEGJ800101AB1');
+      setupTitularRfc('XAX010101000', 'DICA690402RZ4');
       const result = await service.extract('case-1', 'doc-bank-1');
       const ed = result.extractedData as Record<string, unknown>;
       const accountHolder = ed.accountHolder as Record<string, unknown>;
-      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+      expect(accountHolder.rfc).toBe('DICA690402RZ4');
+    });
+
+    it('uses the company CSF when the statement owner is COMPANY', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(
+        makeDocument({ owner: 'COMPANY' }),
+      );
+      mockPrisma.document.findFirst.mockImplementation(
+        async (args: {
+          where?: { owner?: string };
+          orderBy?: unknown;
+        }) => {
+          expect(args.where?.owner).toBe('COMPANY');
+          expect(args.orderBy).toEqual([
+            { processedAt: 'desc' },
+            { createdAt: 'desc' },
+          ]);
+          return {
+            id: 'doc-csf-company',
+            extractedData: {
+              taxpayer: { rfc: 'EMP800101ABC', fullName: 'EMPRESA SA DE CV' },
+              activities: [{ description: 'Servicios' }],
+            },
+          };
+        },
+      );
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({
+            accountHolder: {
+              fullName: 'EMPRESA SA DE CV',
+              rfc: 'XAXX010101000',
+              isJointAccount: false,
+            },
+          }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      const accountHolder = (result.extractedData as Record<string, unknown>)
+        .accountHolder as Record<string, unknown>;
+      expect(accountHolder.rfc).toBe('EMP800101ABC');
     });
 
     it('nulls a generic placeholder RFC when no CSF fallback exists', async () => {
@@ -1309,11 +1411,11 @@ describe('BankStatementExtractionService', () => {
     });
 
     it('does not override a valid non-placeholder RFC from Gemini', async () => {
-      setupTitularRfc('PEGJ800101AB1', 'PEMJ900101ABC');
+      setupTitularRfc('DICA690402RZ4', 'PEMJ900101ABC');
       const result = await service.extract('case-1', 'doc-bank-1');
       const ed = result.extractedData as Record<string, unknown>;
       const accountHolder = ed.accountHolder as Record<string, unknown>;
-      expect(accountHolder.rfc).toBe('PEGJ800101AB1');
+      expect(accountHolder.rfc).toBe('DICA690402RZ4');
     });
   });
 
@@ -1683,8 +1785,8 @@ describe('BankStatementExtractionService', () => {
           documentType: { code: 'PAYROLL_RECEIPT' },
           extractedData: {
             employer: {
-              legalName: 'ACAMEX SA DE CV',
-              rfc: 'ACM230101AA1',
+              legalName: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBLICIDAD SA DE CV',
+              rfc: 'LST230905G7A',
             },
           },
         },
@@ -1699,7 +1801,7 @@ describe('BankStatementExtractionService', () => {
             amount: 190000,
             movementType: 'DEPOSIT',
             originalConcept:
-              'SPEI RECIBIDO DEL CLIENTE ACAMEX CON RFC ACM230101AA1 CONCEPTO: PAGO',
+              'SPEI RECIBIDO DEL CLIENTE LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL CON RFC LST230905G7A CONCEPTO: PAGO',
           },
           {
             date: '2026-06-02',
@@ -1735,6 +1837,83 @@ describe('BankStatementExtractionService', () => {
         ).toBeDefined();
         expect(result.alerts.find((a) => a.code === 'BANK_NO_PAYROLL_DEPOSITS')).toBeUndefined();
       });
+    });
+  });
+
+  describe('PM skips salaried payroll depuration and alerts (HU-22)', () => {
+    it('does not fire BANK_NO_PAYROLL_DEPOSITS when payrollDeposits is empty', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'PM' },
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(
+          createMockExtractionResult({ payrollDeposits: [], allTransactions: [] }),
+        ),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(result.success).toBe(true);
+      expect(
+        result.alerts.find((a) => a.code === 'BANK_NO_PAYROLL_DEPOSITS'),
+      ).toBeUndefined();
+      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
+    });
+
+    it('does not set salaried PAYROLL incomeMode on mixed deposits', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({
+        ...makeDocument(),
+        mortgageCase: { personType: 'PM' },
+      });
+      mockPrisma.document.findMany.mockResolvedValue([
+        {
+          documentType: { code: 'PAYROLL_RECEIPT' },
+          extractedData: {
+            employer: {
+              legalName: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBLICIDAD SA DE CV',
+              rfc: 'LST230905G7A',
+            },
+          },
+        },
+      ]);
+
+      const extractionData = createMockExtractionResult({
+        payrollDeposits: [],
+        statementSummary: { totalDepositsAmount: 300000 },
+        allTransactions: [
+          {
+            date: '2026-06-01',
+            amount: 190000,
+            movementType: 'DEPOSIT',
+            originalConcept:
+              'SPEI RECIBIDO DEL CLIENTE LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL CON RFC LST230905G7A CONCEPTO: PAGO',
+          },
+          {
+            date: '2026-06-02',
+            amount: 61000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'DEP.EFECTIVO',
+          },
+          {
+            date: '2026-06-03',
+            amount: 10000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'PAGO NOMINA QUINCENA',
+          },
+        ],
+      });
+      mockGemini.extractStructuredData.mockResolvedValue(
+        validGeminiSuccess(extractionData),
+      );
+
+      const result = await service.extract('case-1', 'doc-bank-1');
+      expect(result.success).toBe(true);
+      const depuration = result.extractedData?.financialDepuration as Record<
+        string,
+        any
+      >;
+      expect(depuration.incomeMode).not.toBe('PAYROLL');
+      expect(mockPrisma.document.findMany).not.toHaveBeenCalled();
     });
   });
 });

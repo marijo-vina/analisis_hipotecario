@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityMatchRule } from './rules/identity-match.rule';
 import { BankarizationValidationRule } from './rules/bankarization-validation.rule';
 import { PfaeValidationRule } from './rules/pfae-validation.rule';
+import { PmCsfTaxRule } from './rules/pm-csf-tax.rule';
+import { PmGatesRule } from './rules/pm-gates.rule';
 import { BankViabilityRule } from './rules/bank-viability.rule';
 import { IncomeCalculationService } from '../income-calculation/income-calculation.service';
 import { LiabilityCalculationService } from '../liability/liability.service';
@@ -54,6 +56,16 @@ describe('CaseAnalysisService', () => {
     execute: jest.fn(),
   };
 
+  const mockPmCsfTaxRule = {
+    ruleId: 'pm-csf-tax',
+    execute: jest.fn(),
+  };
+
+  const mockPmGatesRule = {
+    ruleId: 'pm-gates',
+    execute: jest.fn(),
+  };
+
   const mockBankViabilityRule = {
     ruleId: 'bank-viability',
     execute: jest.fn(),
@@ -65,6 +77,7 @@ describe('CaseAnalysisService', () => {
 
   const mockLiabilityCalcService = {
     calculate: jest.fn(),
+    calculatePersonaMoral: jest.fn(),
   };
 
   const mockCaseStatusCalculatorService = {
@@ -84,6 +97,22 @@ describe('CaseAnalysisService', () => {
     outcome: 'PASS',
     severity: 'INFO',
     detail: { sources: ['csf'], fields: [], pfaeValidation: {} },
+    alerts: [],
+  };
+
+  const mockPmCsfTaxPassResult: RuleResult = {
+    ruleId: 'pm-csf-tax',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: [], fields: [], declarationPathKnockedOut: false },
+    alerts: [],
+  };
+
+  const mockPmGatesPassResult: RuleResult = {
+    ruleId: 'pm-gates',
+    outcome: 'PASS',
+    severity: 'INFO',
+    detail: { sources: [], fields: [], pmGates: { banks: [] } },
     alerts: [],
   };
 
@@ -129,6 +158,8 @@ describe('CaseAnalysisService', () => {
     // agregado reciba un RuleResult valido sin que cada test lo configure.
     mockBankarizationRule.execute.mockResolvedValue(mockBankarizationPassResult);
     mockPfaeValidationRule.execute.mockResolvedValue(mockPfaeValidationPassResult);
+    mockPmCsfTaxRule.execute.mockResolvedValue(mockPmCsfTaxPassResult);
+    mockPmGatesRule.execute.mockResolvedValue(mockPmGatesPassResult);
     mockBankViabilityRule.execute.mockResolvedValue(mockBankViabilityPassResult);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,6 +168,8 @@ describe('CaseAnalysisService', () => {
         { provide: IdentityMatchRule, useValue: mockIdentityMatchRule },
         { provide: BankarizationValidationRule, useValue: mockBankarizationRule },
         { provide: PfaeValidationRule, useValue: mockPfaeValidationRule },
+        { provide: PmCsfTaxRule, useValue: mockPmCsfTaxRule },
+        { provide: PmGatesRule, useValue: mockPmGatesRule },
         { provide: BankViabilityRule, useValue: mockBankViabilityRule },
         { provide: IncomeCalculationService, useValue: mockIncomeCalcService },
         { provide: LiabilityCalculationService, useValue: mockLiabilityCalcService },
@@ -359,6 +392,8 @@ describe('CaseAnalysisService', () => {
 
       expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
       expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
       expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
     });
 
@@ -590,6 +625,154 @@ describe('CaseAnalysisService', () => {
             },
           }),
         }),
+      );
+    });
+  });
+
+  describe('PM Analyze (HU-22)', () => {
+    const pmShareholderIne = {
+      id: 'doc-ine',
+      owner: 'SHAREHOLDER',
+      extractedData: { identity: { fullName: 'JOSE PEREZ', curp: 'PEJ900315HYNRLN08' } },
+      documentType: { code: 'INE' },
+    };
+    const pmCompanyCsf = {
+      id: 'doc-csf-company',
+      owner: 'COMPANY',
+      extractedData: { taxpayer: { fullName: 'EMPRESA SA', rfc: 'EMP010101AAA' } },
+      documentType: { code: 'CSF' },
+    };
+    const pmMissingOwnerBank = {
+      id: 'doc-bank-shareholder',
+      extractedData: {
+        accountHolder: { fullName: 'JOSE PEREZ', rfc: 'PELJ900101ABC' },
+        allTransactions: [
+          {
+            date: '2026-05-15',
+            amount: 15000,
+            movementType: 'DEPOSIT',
+            originalConcept: 'PAGO NOMINA QUINCENA',
+          },
+        ],
+        payrollDeposits: [],
+        financialDepuration: {
+          depurationSummary: { totalValidIncome: 0, validDepositsCount: 0 },
+          cleanedDeposits: [],
+        },
+      },
+      documentType: { code: 'BANK_STATEMENT' },
+    };
+
+    const buildPmCase = () =>
+      buildCase({
+        personType: 'PM',
+        documents: [pmShareholderIne, pmCompanyCsf, pmMissingOwnerBank],
+      });
+
+    it('runs IdentityMatch only on documents whose owner is not COMPANY; missing owner counts as SHAREHOLDER', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildPmCase());
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-pm-1' });
+
+      await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalledTimes(1);
+      const [, docsArg] = mockIdentityMatchRule.execute.mock.calls[0] as [
+        Record<string, unknown>,
+        { id: string; owner?: string }[],
+      ];
+      expect(docsArg.map((d) => d.id)).toEqual(['doc-ine', 'doc-bank-shareholder']);
+      expect(docsArg.map((d) => d.id)).not.toContain('doc-csf-company');
+      expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).toHaveBeenCalledTimes(1);
+      expect(mockPmGatesRule.execute).toHaveBeenCalledTimes(1);
+      const [, pmDocs] = mockPmCsfTaxRule.execute.mock.calls[0] as [
+        Record<string, unknown>,
+        { id: string }[],
+      ];
+      expect(pmDocs.map((d) => d.id)).toEqual([
+        'doc-ine',
+        'doc-csf-company',
+        'doc-bank-shareholder',
+      ]);
+    });
+
+    it('runs persona moral liabilities, income, then the bank comparison', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(buildPmCase());
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-pm-2' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(mockPrismaService.document.update).not.toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculate).not.toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculatePersonaMoral).toHaveBeenCalledWith(
+        'case-1',
+        [],
+        [],
+        null,
+      );
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalledWith('case-1', []);
+      const liabilityOrder =
+        mockLiabilityCalcService.calculatePersonaMoral.mock.invocationCallOrder[0];
+      const incomeOrder = mockIncomeCalcService.calculate.mock.invocationCallOrder[0];
+      const viabilityOrder = mockBankViabilityRule.execute.mock.invocationCallOrder[0];
+      expect(liabilityOrder).toBeLessThan(incomeOrder);
+      expect(incomeOrder).toBeLessThan(viabilityOrder);
+      expect(mockBankViabilityRule.execute).toHaveBeenCalledTimes(1);
+      expect(result.detail).toHaveProperty('bankViability');
+      const persistedDetail = mockPrismaService.analysisRun.create.mock.calls[0][0]
+        .data.detail as Record<string, unknown>;
+      expect(persistedDetail).toHaveProperty('bankViability');
+      expect(result.executionStatus).toBe('COMPLETED');
+    });
+
+    it('SALARIED Analyze still runs Phase A/B/C with bankViability (regression)', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'SALARIED' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-sal' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).not.toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();
+      expect(mockBankViabilityRule.execute).toHaveBeenCalled();
+      expect((result.detail as Record<string, unknown>).bankViability).toEqual(
+        (mockBankViabilityPassResult.detail as Record<string, unknown>).bankViability,
+      );
+    });
+
+    it('PFAE Analyze still runs identity + pfae-validation, Phase B, and Phase C (regression)', async () => {
+      mockPrismaService.mortgageCase.findUnique.mockResolvedValue(
+        buildCase({ personType: 'PFAE' }),
+      );
+      mockIdentityMatchRule.execute.mockResolvedValue(mockPassRuleResult);
+      mockIncomeCalcService.calculate.mockResolvedValue({});
+      mockLiabilityCalcService.calculate.mockResolvedValue({});
+      mockPrismaService.analysisRun.create.mockResolvedValue({ id: 'run-pfae' });
+
+      const result = await service.run('case-1', 'advisor-1');
+
+      expect(mockIdentityMatchRule.execute).toHaveBeenCalled();
+      expect(mockPfaeValidationRule.execute).toHaveBeenCalled();
+      expect(mockPmCsfTaxRule.execute).not.toHaveBeenCalled();
+      expect(mockPmGatesRule.execute).not.toHaveBeenCalled();
+      expect(mockBankarizationRule.execute).not.toHaveBeenCalled();
+      expect(mockIncomeCalcService.calculate).toHaveBeenCalled();
+      expect(mockLiabilityCalcService.calculate).toHaveBeenCalled();
+      expect(mockBankViabilityRule.execute).toHaveBeenCalled();
+      expect((result.detail as Record<string, unknown>).bankViability).toEqual(
+        (mockBankViabilityPassResult.detail as Record<string, unknown>).bankViability,
       );
     });
   });

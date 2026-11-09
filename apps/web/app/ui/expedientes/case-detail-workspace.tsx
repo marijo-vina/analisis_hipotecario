@@ -38,7 +38,7 @@ interface CaseDetailWorkspaceProps {
 const PERSON_TYPE_LABELS: Record<string, string> = {
   SALARIED: "Asalariado",
   PFAE: "Persona Física con Actividad Empresarial (PFAE)",
-  MORAL: "Persona Moral",
+  PM: "Persona Moral",
 };
 
 function personTypeLabel(code?: string): string {
@@ -70,7 +70,6 @@ export default function CaseDetailWorkspace({
 }: CaseDetailWorkspaceProps) {
   const [clientDrawerOpen, setClientDrawerOpen] = useState(false);
   const [caseDrawerOpen, setCaseDrawerOpen] = useState(false);
-  const [isDocsCollapsed, setIsDocsCollapsed] = useState(false);
 
   return (
     <div className="flex flex-col w-full min-h-[calc(100vh-5rem)] relative">
@@ -88,8 +87,6 @@ export default function CaseDetailWorkspace({
           caseId={caseId}
           documents={documents}
           documentTypes={documentTypes}
-          isCollapsed={isDocsCollapsed}
-          onToggleCollapse={() => setIsDocsCollapsed(!isDocsCollapsed)}
           personType={caseData.personType}
         />
 

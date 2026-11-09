@@ -98,7 +98,7 @@ const createMockExtractionResult = (
     fullName: 'MARIA PEREZ LOPEZ',
     birthDate: '1992-04-12',
     rfc: 'PELJ920412AB1',
-    lastReportedAddress: 'AV REFORMA 100 COL JUAREZ CDMX CP 06600',
+    lastReportedAddress: 'CALLE 20 NUM 100 COL CENTRO MERIDA YUC CP 97000',
   },
   report: {
     consultationDate: '2026-06-01',
@@ -568,7 +568,7 @@ describe('CreditBureauExtractionService', () => {
       mockLayoutExtractor.extract.mockReturnValue({
         credits: [
           {
-            accountNumber: '10002030',
+            accountNumber: '82953660',
             institution: 'BBVA',
             orderInBlock: 0,
             subsection: null,
@@ -595,7 +595,7 @@ describe('CreditBureauExtractionService', () => {
       expect(mockLayoutExtractor.extract).toHaveBeenCalled();
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
-      expect(credits[0].accountNumber).toBe('10002030');
+      expect(credits[0].accountNumber).toBe('82953660');
     });
 
     it('copies accountNumber from OCR institution lines when layout is missing', async () => {
@@ -630,7 +630,7 @@ describe('CreditBureauExtractionService', () => {
             'DETALLE DE CRÉDITOS',
             '1.',
             'BBVA',
-            '41523110002030',
+            '41523182953660',
             'TARJETA DE CRÉDITO',
             '2.',
             'HSBC MEXICO',
@@ -648,7 +648,7 @@ describe('CreditBureauExtractionService', () => {
       expect(result.success).toBe(true);
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
-      expect(credits[0].accountNumber).toBe('41523110002030');
+      expect(credits[0].accountNumber).toBe('41523182953660');
       expect(credits[1].accountNumber).toBe('987654321000');
     });
 
@@ -660,7 +660,7 @@ describe('CreditBureauExtractionService', () => {
             creditType: 'TARJETA DE CREDITO',
             classification: 'NON_BANK_SERVICE',
             status: 'ACTIVE',
-            currentBalance: 30000,
+            currentBalance: 30283,
             paymentDueAmount: 1875,
             creditLimit: 150000,
             currency: 'MXN',
@@ -670,9 +670,9 @@ describe('CreditBureauExtractionService', () => {
             creditType: 'TARJETA DE CREDITO',
             classification: 'NON_BANK_SERVICE',
             status: 'ACTIVE',
-            currentBalance: 70000,
+            currentBalance: 73881,
             paymentDueAmount: 0,
-            creditLimit: 300000,
+            creditLimit: 307825,
             currency: 'MXN',
           },
         ],
@@ -683,10 +683,10 @@ describe('CreditBureauExtractionService', () => {
           ocrText: [
             '1.',
             'AMEX',
-            '4000000000000001',
+            '376722482104002',
             'TARJETA DE CRÉDITO',
             'AMEX COMPANY',
-            '4000000000000002',
+            '376662329074002',
             'TARJETA DE CRÉDITO',
           ].join('\n'),
         }),
@@ -698,8 +698,8 @@ describe('CreditBureauExtractionService', () => {
       const result = await service.extract('case-1', 'doc-buro-1');
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
-      expect(credits[0].accountNumber).toBe('4000000000000001');
-      expect(credits[1].accountNumber).toBe('4000000000000002');
+      expect(credits[0].accountNumber).toBe('376722482104002');
+      expect(credits[1].accountNumber).toBe('376662329074002');
     });
 
     it('does not treat a SALDO amount on a data line as accountNumber', async () => {
@@ -1709,15 +1709,15 @@ describe('CreditBureauExtractionService', () => {
     });
   });
 
-  // ── Validation case: BC - JUAN PEREZ ────────────────────────────────
+  // ── Validation case: BC - ALEJANDRO DIAZ ────────────────────────────────
 
-  describe('extract — validation case BC JUAN PEREZ', () => {
+  describe('extract — validation case BC ALEJANDRO DIAZ', () => {
     beforeEach(() => {
       mockPrisma.document.findUnique.mockResolvedValue(makeDocument());
       mockPrisma.document.update.mockResolvedValue({});
     });
 
-    it('yields 16 credits (8 active, 8 closed), score=null, RFC=PEGJ800101XX1', async () => {
+    it('yields 16 credits (8 active, 8 closed), score=null, RFC=DICA690402SD3', async () => {
       const activeCredits = Array.from({ length: 8 }, (_, i) => ({
         institution: `INST-A-${i}`,
         creditType: 'TARJETA',
@@ -1761,9 +1761,9 @@ describe('CreditBureauExtractionService', () => {
         validGeminiSuccess(
           createMockExtractionResult({
             borrower: {
-              fullName: 'JUAN PEREZ',
-              birthDate: '1980-01-01',
-              rfc: 'PEGJ800101XX1',
+              fullName: 'ALEJANDRO DIAZ',
+              birthDate: '1969-04-02',
+              rfc: 'DICA690402SD3',
               lastReportedAddress: null,
             },
             report: {
@@ -1796,8 +1796,8 @@ describe('CreditBureauExtractionService', () => {
       expect(credits.filter((c) => c.status === 'ACTIVE').length).toBe(8);
       expect(credits.filter((c) => c.status === 'CLOSED').length).toBe(8);
       expect(report.publicScore).toBeNull();
-      expect(borrower.rfc).toBe('PEGJ800101XX1');
-      expect(borrower.birthDate).toBe('1980-01-01');
+      expect(borrower.rfc).toBe('DICA690402SD3');
+      expect(borrower.birthDate).toBe('1969-04-02');
       // no quebranto/fraude
       expect(
         result.alerts.some((a) => a.code === 'BURO_WRITE_OFF'),
@@ -2091,7 +2091,7 @@ describe('CreditBureauExtractionService', () => {
                 creditType: 'TARJETA',
                 classification: 'REVOLVING',
                 status: 'ACTIVE',
-                currentBalance: 70000,
+                currentBalance: 73881,
                 paymentDueAmount: 49800, // ← Gemini mistaken value
                 lastPaymentAmount: 49800,
                 creditLimit: null,
@@ -2155,7 +2155,7 @@ describe('CreditBureauExtractionService', () => {
                 creditType: 'TARJETA',
                 classification: 'REVOLVING',
                 status: 'ACTIVE',
-                currentBalance: 70000,
+                currentBalance: 73881,
                 paymentDueAmount: 8475,
                 lastPaymentAmount: 1000,
                 creditLimit: 150000,
@@ -2242,7 +2242,7 @@ describe('CreditBureauExtractionService', () => {
                 creditType: 'TARJETA',
                 classification: 'REVOLVING',
                 status: 'ACTIVE',
-                currentBalance: 70000,
+                currentBalance: 73881,
                 paymentDueAmount: 8475, // Gemini mistake (layout corrects)
                 lastPaymentAmount: 1000,
                 creditLimit: 150000,
@@ -2324,7 +2324,7 @@ describe('CreditBureauExtractionService', () => {
           [
             buildLayoutCredit({
               institution: 'BBVA',
-              accountNumber: '10002030',
+              accountNumber: '82953660',
               fields: { paymentDueAmount: 8775 },
             }),
           ],
@@ -2345,7 +2345,7 @@ describe('CreditBureauExtractionService', () => {
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
 
-      expect(credits[0].accountNumber).toBe('10002030');
+      expect(credits[0].accountNumber).toBe('82953660');
       expect(credits[0]).not.toHaveProperty('utilization');
     });
 
@@ -2362,7 +2362,7 @@ describe('CreditBureauExtractionService', () => {
           [
             buildLayoutCredit({
               institution: 'BBVA',
-              accountNumber: '10002030',
+              accountNumber: '82953660',
               fields: { paymentDueAmount: 8775 },
             }),
           ],
@@ -2377,7 +2377,7 @@ describe('CreditBureauExtractionService', () => {
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
 
-      expect(credits[0].accountNumber).toBe('10002030');
+      expect(credits[0].accountNumber).toBe('82953660');
       expect(credits[0]).not.toHaveProperty('utilization');
     });
   });
@@ -2400,7 +2400,7 @@ describe('CreditBureauExtractionService', () => {
     'Fecha de Consulta: 01/06/2026',
     '',
     'DATOS DEL ACREDITADO',
-    'Domicilio: AV REFORMA 100 COL JUAREZ CDMX CP 06600',
+    'Domicilio: CALLE 20 NUM 100 COL CENTRO MERIDA YUC CP 97000',
     '',
     'RESUMEN DE CRÉDITOS',
     'Number of credits: 1',
@@ -2576,6 +2576,51 @@ describe('CreditBureauExtractionService', () => {
     it('extracts consultationDate as ISO YYYY-MM-DD', () => {
       const result = (service as any).extractBorrowerFromOcr(BORROWER_OCR);
       expect(result.consultationDate).toBe('2026-06-01');
+    });
+
+    it('reads the company consultation date when it sits before the label', () => {
+      const ocr = [
+        '20-OCT-2026',
+        'Fecha de Consulta',
+        '10-NOV-2021',
+        'Fecha de Registro',
+      ].join('\n');
+      expect((service as any).extractConsultationDateFromOcr(ocr)).toBe('2026-10-20');
+    });
+
+    it('counts the 18 company inquiries inside twelve months of 20 Oct 2026', () => {
+      const inquiries = [
+        'KONFIO 11-OCT-2026',
+        'BBV 06-OCT-2026',
+        'ENGENIUM 09-SEP-2026',
+        'KONFIO 30-AGO-2026',
+        'BBV 27-AGO-2026',
+        'BANAMEX 25-AGO-2026',
+        'KONFIO 21-JUL-2026',
+        'Bepensa 07-JUL-2026',
+        'Bepensa 26-JUN-2026',
+        'ENGENIUM 15-JUN-2026',
+        'ENGENIUM 13-MAY-2026',
+        'BBV 14-ABR-2026',
+        'BBV 07-ABR-2026',
+        'BANAMEX 26-MAR-2026',
+        'BBV 09-MAR-2026',
+        'AMERICAN EXPRESS 21-ENE-2026',
+        'TIP AUTO 19-NOV-2025',
+        'CIRCULO CREDITO 31-OCT-2025',
+        'BBV 08-JUL-2025',
+      ].join('\n');
+      const ocr = `20-OCT-2026\nFecha de Consulta\nDETALLE DE CONSULTAS\n${inquiries}`;
+      const date = (service as any).extractConsultationDateFromOcr(ocr);
+      expect(date).toBe('2026-10-20');
+      expect((service as any).countInquiriesFromOcr(ocr, date)).toBe(18);
+    });
+
+    it('counts the January inquiry when the month is Greek lookalikes', () => {
+      const ocr = 'Fecha de Consulta\n20-OCT-2026\nDETALLE DE CONSULTAS\n21-\u0395\u039D\u0395-2026\n';
+      const date = (service as any).extractConsultationDateFromOcr(ocr);
+      expect(date).toBe('2026-10-20');
+      expect((service as any).countInquiriesFromOcr(ocr, date)).toBe(1);
     });
 
     it('derives birthDate from RFC embedded date when Fecha de Nacimiento absent', () => {
@@ -2798,7 +2843,7 @@ describe('CreditBureauExtractionService', () => {
                 creditType: 'TARJETA',
                 classification: 'REVOLVING',
                 status: 'ACTIVE',
-                currentBalance: 70000,
+                currentBalance: 73881,
                 paymentDueAmount: 999999, // would be flagged/corrected
                 lastPaymentAmount: 1000,
                 creditLimit: 150000,
@@ -2841,7 +2886,7 @@ describe('CreditBureauExtractionService', () => {
                 creditType: 'TARJETA',
                 classification: 'REVOLVING',
                 status: 'ACTIVE',
-                currentBalance: 70000,
+                currentBalance: 73881,
                 paymentDueAmount: 999999, // Gemini mistake
                 lastPaymentAmount: 1743, // OCR "NO APLICA" anchor value
                 creditLimit: 150000,
@@ -2988,7 +3033,7 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
         'Fecha de Nacimiento: 12/04/1992',
         'Fecha de Consulta: 01/06/2026',
         'DATOS DEL ACREDITADO',
-        'Domicilio: AV REFORMA 100 COL JUAREZ CDMX CP 06600',
+        'Domicilio: CALLE 20 NUM 100 COL CENTRO MERIDA YUC CP 97000',
         'RESUMEN DE CRÉDITOS',
         'Total credits: 20 Active: 12 Closed: 8',
         detalleSection,
@@ -3228,7 +3273,7 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
         '8775',
         PaymentDueAmountSource.BAND_MATCH,
       );
-      coord.credits[0].accountNumber = '10002030';
+      coord.credits[0].accountNumber = '82953660';
       mockCoordinateExtractor.extract.mockResolvedValue(coord);
       const geminiData = createMockExtractionResult();
       const geminiCredit = {
@@ -3244,7 +3289,7 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
       const credits = (result.extractedData as Record<string, unknown>)
         .credits as Record<string, unknown>[];
 
-      expect(credits[0].accountNumber).toBe('10002030');
+      expect(credits[0].accountNumber).toBe('82953660');
       expect(credits[0]).not.toHaveProperty('utilization');
     });
 
@@ -3260,7 +3305,7 @@ PAGO MÍNIMO PARA CUENTAS REVOLVENTES`;
         '8775',
         PaymentDueAmountSource.BAND_MATCH,
       );
-      coord.credits[0].accountNumber = '10002030';
+      coord.credits[0].accountNumber = '82953660';
       mockCoordinateExtractor.extract.mockResolvedValue(coord);
       mockGemini.extractStructuredData.mockResolvedValue(
         validGeminiSuccess(createMockExtractionResult()),

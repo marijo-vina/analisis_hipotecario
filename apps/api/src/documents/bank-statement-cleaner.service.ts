@@ -118,6 +118,21 @@ const TRASH_PATTERNS: Array<{
   reason: string;
 }> = [
   {
+    category: 'OTHER_NON_BUSINESS',
+    regex: /\bSPEI\s+ENVIADO\b/i,
+    reason: 'Cargo SPEI leído como abono',
+  },
+  {
+    category: 'REFUND_OR_REVERSAL',
+    regex: /\bSPEI\s+DEVUELTO/i,
+    reason: 'SPEI devuelto, no es ingreso',
+  },
+  {
+    category: 'OTHER_NON_BUSINESS',
+    regex: /\b((?:FUTURO\s+)?AUMENTO\s+DE\s+CAPITAL|APORTACION\s+DE\s+CAPITAL)\b/i,
+    reason: 'Aportación de capital, no es ingreso operativo',
+  },
+  {
     category: 'LOAN_OR_CREDIT',
     regex:
       /\b(DISP(OSICION)?(\s+DE)?\s+(TDC|LINEA|CREDITO)|CREDITO(\s+(PERSONAL|NOMINA|AUTO|LIQUIDEZ))?|PRESTAMO|KUESKI|FINANCIERA|MERCADO\s*CREDITO|CREDI-NISSAN|FONDO\s+DE\s+CREDITO|DISP\s+TARJETA|DISP\s+CRED|DISPOSICION)\b/i,
@@ -175,7 +190,7 @@ const VALID_PATTERNS: Array<{
   {
     category: 'COMMERCIAL_SPEI',
     regex:
-      /\b(HONORARIOS|SERV(ICIOS)?\s*PROF(ESIONALES)?|PAGO\s*DE\s*SERV|FACTURA(\s+NO|\s+FOLIO)?|FAC-|FOLIO\s*FAC|ABONO\s*CLIENTE|ANTICIPO\s*CLIENTE|PAGO\s*CLIENTE|FINIQUITO\s*CLIENTE|COBRO\s*SERVICIO)\b/i,
+      /\b(HONORARIOS|SERV(ICIOS)?\s*PROF(ESIONALES)?|PAGO\s*DE\s*SERV|FAC-|FOLIO\s*FAC|ABONO\s*CLIENTE|ANTICIPO\s*CLIENTE|PAGO\s*CLIENTE|FINIQUITO\s*CLIENTE|COBRO\s*SERVICIO)\b|(?:^|[^A-Z])FACTURAS?(?:\s+NO|\s+FOLIO)?\b/i,
     reason: 'Pago comercial / facturación de servicios profesionales o clientes',
   },
   {
@@ -462,7 +477,9 @@ export class BankStatementCleanerService {
       totalMonthlyDeposits > 0 && amount / totalMonthlyDeposits >= 0.25 && amount >= 20000;
     
     // Large ambiguous transfer: > $50,000 without clear commercial concept
-    const isLargeAmbiguous = amount >= 50000 && !/\b(FAC|PAGO|SERV|TPV|CLIP|VENTA)\b/i.test(fullText);
+    const isLargeAmbiguous =
+      amount >= 50000 &&
+      !/(?:^|[^A-Z])(?:FAC|PAGO|SERV|TPV|CLIP|VENTA)/i.test(fullText);
 
     if (isConcentratedOutlier || isLargeAmbiguous) {
       return {
@@ -496,10 +513,14 @@ export class BankStatementCleanerService {
   ): boolean {
     // 1. Generic own-transfer phrases
     if (
-      /\b(MIS\s+CUENTAS|TRASPASO\s+(ENTRE\s+)?CUENTAS|TRASPASO\s+PROPIO|MISMO\s+TITULAR|SPEI\s+A\s+MI\s+NOMBRE|RETIRO\/DEPOSITO\s+PROPIO|CUENTA\s+PROPIA)\b/i.test(
+      /\b(MIS\s+CUENTAS|MISMO\s+TITULAR|SPEI\s+A\s+MI\s+NOMBRE|RETIRO\/DEPOSITO\s+PROPIO|CUENTA\s+PROPIA)\b|(?:^|[^A-Z])TRASPASO\s+(?:ENTRE\s+)?CUENTAS|(?:^|[^A-Z])TRASPASO\s+PROPIO/i.test(
         fullText,
       )
     ) {
+      return true;
+    }
+
+    if (this.isGenericSameCompanyTransfer(fullText, clientContext)) {
       return true;
     }
 
@@ -530,6 +551,38 @@ export class BankStatementCleanerService {
     }
 
     return false;
+  }
+
+  /**
+   * A generic "Transferencia" whose counterparty is the same company.
+   * An invoice or a payment in the concept stays eligible as income.
+   */
+  private isGenericSameCompanyTransfer(
+    fullText: string,
+    clientContext: ClientFiscalContext,
+  ): boolean {
+    if (!/(?:^|[^A-Z])TRANSFERENCIA/i.test(fullText)) return false;
+    if (/FACTURA|\bPAGO\b|\bSERV/i.test(fullText)) return false;
+    const text = this.normalizeName(fullText);
+    return this.clientNameKeys(clientContext).some((key) => text.includes(key));
+  }
+
+  private clientNameKeys(clientContext: ClientFiscalContext): string[] {
+    const normalized = this.normalizeName(clientContext.clientFullName || '')
+      .replace(/\bS A P I DE C V\b/g, '')
+      .replace(/\bS A DE C V\b/g, '')
+      .replace(/\bS DE R L DE C V\b/g, '')
+      .replace(/\bDE C V\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalized.length < 8) return [];
+    const keys = [normalized];
+    const tokens = normalized.split(' ').filter((token) => token.length > 2);
+    if (tokens.length >= 2) {
+      const prefix = tokens.slice(0, 2).join(' ');
+      if (prefix.length >= 8 && prefix !== normalized) keys.push(prefix);
+    }
+    return keys;
   }
 
   /**

@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { capitalSuffixFromOcr, joinCompanyLegalName } from './csf-capital-regime';
 import { GeminiService, GeminiErrorCode } from './gemini.service';
 import { pickPrimaryIndependentActivity } from './csf-independent-activity';
+import { hasActiveShareholderRegime } from './pm-shareholder-regime';
 
 // ---------------------------------------------------------------------------
 // Document type codes that trigger CSF extraction
@@ -22,34 +24,34 @@ const CSF_INSTRUCTIONS = [
   'Extraé ÚNICAMENTE de la información presente en el OCR.',
   '',
   '─── Lugar y Fecha de Emisión (issuance) ───',
-  '  - issuanceDateRaw: texto tal cual de lugar y fecha (ej. "CIUDAD DE MEXICO A 15 DE ENERO DE 2024").',
-  '  - issuanceDate: fecha normalizada a ISO YYYY-MM-DD (ej. "2024-01-15").',
-  '  - issuanceLocation: ciudad / estado de emisión (ej. "CIUDAD DE MEXICO").',
-  '  - idCIF: número identificador del CIF (ej. "12345678901").',
+  '  - issuanceDateRaw: texto tal cual de lugar y fecha (ej. "MERIDA , YUCATAN A 05 DE AGOSTO DE 2025").',
+  '  - issuanceDate: fecha normalizada a ISO YYYY-MM-DD (ej. "2025-08-05").',
+  '  - issuanceLocation: ciudad / estado de emisión (ej. "MERIDA, YUCATAN").',
+  '  - idCIF: número identificador del CIF (ej. "14111086381").',
   '',
   '─── Datos de Identificación del Contribuyente (taxpayer) ───',
   '  - rfc: RFC del contribuyente con homoclave (13 caracteres para persona física).',
   '  - curp: CURP (18 caracteres).',
-  '  - firstName: Nombre(s) (ej. "JUAN").',
-  '  - firstLastName: Primer Apellido (ej. "PEREZ").',
-  '  - secondLastName: Segundo Apellido (ej. "GARCIA").',
-  '  - fullName: Nombre completo ordenado NOMBRE + APELLIDOS (ej. "JUAN PEREZ GARCIA").',
-  '  - operationsStartDate: Fecha inicio de operaciones general (normalizar a YYYY-MM-DD, ej. "2010-01-15").',
+  '  - firstName: Nombre(s) (ej. "ALEJANDRO DE LA CRUZ").',
+  '  - firstLastName: Primer Apellido (ej. "DIAZ").',
+  '  - secondLastName: Segundo Apellido (ej. "CABAÑAS").',
+  '  - fullName: Nombre completo ordenado NOMBRE + APELLIDOS (ej. "ALEJANDRO DE LA CRUZ DIAZ CABAÑAS").',
+  '  - operationsStartDate: Fecha inicio de operaciones general (normalizar a YYYY-MM-DD, ej. "1994-06-01").',
   '  - statusInPadron: Estatus en el padrón (ej. "ACTIVO", "REACTIVADO", "SUSPENDIDO").',
   '  - lastStatusChangeDate: Fecha de último cambio de estado (YYYY-MM-DD o null).',
   '  - commercialName: Nombre Comercial (o null).',
   '',
   '─── Datos del Domicilio Registrado (fiscalAddress) ───',
-  '  - postalCode: Código Postal (ej. "01000").',
+  '  - postalCode: Código Postal (ej. "97133").',
   '  - streetType: Tipo de vialidad (ej. "CALLE", "AVENIDA").',
-  '  - streetName: Nombre de vialidad (ej. "REFORMA").',
-  '  - exteriorNumber: Número exterior (ej. "100").',
-  '  - interiorNumber: Número interior (ej. "INT 1" o null).',
-  '  - neighborhood: Colonia / Fraccionamiento (ej. "COLONIA JUAREZ").',
+  '  - streetName: Nombre de vialidad (ej. "26").',
+  '  - exteriorNumber: Número exterior (ej. "199").',
+  '  - interiorNumber: Número interior (ej. "INT 523" o null).',
+  '  - neighborhood: Colonia / Fraccionamiento (ej. "FRACCIONAMIENTO ALTABRISA").',
   '  - locality: Localidad (o null).',
-  '  - municipality: Municipio o Demarcación Territorial (ej. "CUAUHTEMOC").',
-  '  - state: Entidad Federativa (ej. "CIUDAD DE MEXICO").',
-  '  - betweenStreets: Entre calles (ej. "CALLE A Y CALLE B" o null).',
+  '  - municipality: Municipio o Demarcación Territorial (ej. "MERIDA").',
+  '  - state: Entidad Federativa (ej. "YUCATAN").',
+  '  - betweenStreets: Entre calles (ej. "CALLE 15 Y CALLE 7" o null).',
   '',
   '─── Actividades Económicas (activities) ───',
   '  Extraé cada fila de la tabla "Actividades Económicas":',
@@ -73,8 +75,9 @@ const CSF_INSTRUCTIONS = [
   '  - endDate: fecha de fin (YYYY-MM-DD o null).',
   '',
   '─── Sellos y Validación (digitalStamp) ───',
-  '  - originalChain: cadena original del sello (o null).',
-  '  - digitalStamp: sello digital (o null).',
+  '  No transcribas la cadena original ni el sello digital.',
+  '  Esos textos son largos, van partidos en varias líneas y rompen el JSON.',
+  '  originalChain y digitalStamp deben ser null.',
 ].join('\n');
 
 // ---------------------------------------------------------------------------
@@ -204,6 +207,7 @@ export interface CsfExtractionPayload {
     firstLastName: string | null;
     secondLastName: string | null;
     fullName: string | null;
+    capitalRegime: string | null;
     operationsStartDate: string | null;
     statusInPadron: string | null;
     lastStatusChangeDate: string | null;
@@ -256,6 +260,7 @@ export interface CsfExtractionPayload {
   hasSalariedRegime: boolean;
   hasIndependentRegime: boolean;
   isSolelySalaried: boolean;
+  hasShareholderRegime: boolean;
   alerts: CsfAlert[];
   extractionTimestamp: string;
 }
@@ -305,7 +310,9 @@ export class CsfExtractionService {
       document.ocrText,
       document.documentType.code,
       CSF_RESPONSE_SCHEMA,
-      CSF_INSTRUCTIONS,
+      document.owner === 'COMPANY'
+        ? `${CSF_INSTRUCTIONS}\n\n─── Persona moral (empresa) ───\nEsta constancia es de una persona moral.\n- taxpayer.rfc: RFC de la empresa (12 caracteres).\n- taxpayer.fullName: razón social.\n- taxpayer.commercialName: nombre comercial, si aparece.`
+        : CSF_INSTRUCTIONS,
     );
 
     if (!result.success || !result.extractedData) {
@@ -318,7 +325,7 @@ export class CsfExtractionService {
     const rawData = result.extractedData;
 
     // Post-process and compute business rules & alerts
-    const payload = this.postProcessCsf(rawData);
+    const payload = this.postProcessCsf(rawData, document.ocrText);
 
     // Save extractedData to database
     const extractionReadyStatus = await this.prisma.documentStatus.findUnique({
@@ -340,7 +347,7 @@ export class CsfExtractionService {
   /**
    * Post-processes raw Gemini output: normalizes fields, computes tenure and generates business alerts.
    */
-  postProcessCsf(rawData: Record<string, unknown>): CsfExtractionPayload {
+  postProcessCsf(rawData: Record<string, unknown>, ocrText = ''): CsfExtractionPayload {
     const taxpayer = (rawData.taxpayer ?? {}) as Record<string, unknown>;
     const issuance = (rawData.issuance ?? {}) as Record<string, unknown>;
     const fiscalAddress = (rawData.fiscalAddress ?? {}) as Record<string, unknown>;
@@ -363,6 +370,10 @@ export class CsfExtractionService {
     }
 
     const rfc = (taxpayer.rfc as string)?.toUpperCase()?.replace(/[^A-Z0-9&Ñ]/g, '') ?? null;
+    const capitalRegime = rfc?.length === 12 ? capitalSuffixFromOcr(ocrText) : null;
+    if (fullName && capitalRegime) {
+      fullName = joinCompanyLegalName(fullName, capitalRegime);
+    }
     const curp = (taxpayer.curp as string)?.toUpperCase()?.replace(/[^A-Z0-9]/g, '') ?? null;
     const operationsStartDate = (taxpayer.operationsStartDate as string) ?? null;
 
@@ -393,6 +404,7 @@ export class CsfExtractionService {
     ) || activities.some((a) => !/asalariado|sueldos/i.test(a.description) && !a.endDate);
 
     const isSolelySalaried = hasSalariedRegime && !hasIndependentRegime;
+    const hasShareholderRegime = hasActiveShareholderRegime(regimes);
 
     // 4. Compute Activity Start Date & Tenure (Arraigo)
     // Use the primary independent *economic activity* start date — never the
@@ -478,6 +490,7 @@ export class CsfExtractionService {
         firstLastName,
         secondLastName,
         fullName,
+        capitalRegime,
         operationsStartDate,
         statusInPadron: (taxpayer.statusInPadron as string) ?? null,
         lastStatusChangeDate: (taxpayer.lastStatusChangeDate as string) ?? null,
@@ -519,6 +532,7 @@ export class CsfExtractionService {
       hasSalariedRegime,
       hasIndependentRegime,
       isSolelySalaried,
+      hasShareholderRegime,
       alerts,
       extractionTimestamp: new Date().toISOString(),
     };

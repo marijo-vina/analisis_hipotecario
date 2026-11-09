@@ -28,6 +28,8 @@ export interface BankIncomeBase extends IncomeBase {
   monthsUsed: string[];
   droppedMax: string | null;
   droppedMin: string | null;
+  /** Set when the average used fewer months than the activity window. */
+  statementNotice?: string | null;
 }
 
 export interface ActivityResolution {
@@ -42,6 +44,40 @@ export interface PfaeIncomeBases {
   bank: BankIncomeBase;
   taxReturn: IncomeBase;
   activity: ActivityResolution;
+}
+
+export interface PmBankCapacity {
+  status: 'CALCULATED' | 'NOT_VIABLE' | 'REQUIRES_REVIEW';
+  reason: string | null;
+  admissibleIncome: number | null;
+  incomeToConsider: number | null;
+  maximumDebt: number | null;
+  capacity: number | null;
+}
+
+/** Capacities for the closed PM formulas. Banorte and HSBC stay in review. */
+export interface PmIncomeBases {
+  profile: 'PM';
+  sharePercentage: number | null;
+  activityFactor: number | null;
+  /** 0.50 when the company is already a Banorte client, otherwise 0.40. */
+  banorteClientFactor: number | null;
+  bank: BankIncomeBase;
+  taxReturn: IncomeBase;
+  activity: ActivityResolution;
+  capacities: {
+    santanderStatements: PmBankCapacity;
+    santanderTaxReturn: PmBankCapacity;
+    scotiabank: PmBankCapacity;
+    banorteStatements: PmBankCapacity;
+    banorteTaxReturn: PmBankCapacity;
+    hsbcStatements: PmBankCapacity;
+    hsbcTaxReturn: PmBankCapacity;
+    banregioStatements: PmBankCapacity;
+    banregioTaxReturn: PmBankCapacity;
+    banamexStatements: PmBankCapacity;
+    banamexTaxReturn: PmBankCapacity;
+  };
 }
 
 // ── Interfaces ───────────────────────────────────────────────────────────
@@ -87,5 +123,5 @@ export interface IncomeCalculationResult {
   confirmedAt: string | null;
   observations: string | null;
   source?: IncomeSource;
-  bases?: PfaeIncomeBases | null;
+  bases?: PfaeIncomeBases | PmIncomeBases | null;
 }

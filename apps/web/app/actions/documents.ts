@@ -510,6 +510,35 @@ export async function extractTaxReturn(
 }
 
 /**
+ * Extrae el acta constitutiva o la modificación de poderes.
+ *
+ * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-articles`.
+ */
+export async function extractArticles(
+  caseId: string,
+  documentId: string,
+): Promise<{
+  success: boolean;
+  extractedData: Record<string, unknown> | null;
+}> {
+  const result = await apiFetch<{
+    data: Record<string, unknown>;
+  }>(
+    `/mortgage-cases/${caseId}/documents/${documentId}/extract-articles`,
+    { method: "POST" },
+  );
+
+  if (!result.ok) {
+    throw new Error(
+      result.errors._form ?? "Error al extraer datos del acta",
+    );
+  }
+
+  revalidatePath(`/dashboard/expedientes/${caseId}`);
+  return { success: true, extractedData: result.data.data };
+}
+
+/**
  * Actualiza la clasificación de un depósito en la depuración financiera de un estado de cuenta.
  *
  * Llama a `PATCH /mortgage-cases/:caseId/documents/:documentId/bank-deposits/:depositIndex/classification`

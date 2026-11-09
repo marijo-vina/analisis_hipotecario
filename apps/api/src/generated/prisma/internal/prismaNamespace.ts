@@ -1771,6 +1771,12 @@ export const MortgageCaseScalarFieldEnum = {
   requestedAmount: 'requestedAmount',
   propertyValue: 'propertyValue',
   notes: 'notes',
+  sharePercentage: 'sharePercentage',
+  incorporationDate: 'incorporationDate',
+  shareTenureMonths: 'shareTenureMonths',
+  legalName: 'legalName',
+  companyRfc: 'companyRfc',
+  companyIsBanorteClient: 'companyIsBanorteClient',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1786,6 +1792,7 @@ export const LiabilitySnapshotScalarFieldEnum = {
   credits: 'credits',
   globalStatus: 'globalStatus',
   grossCurrentMonthlyDebt: 'grossCurrentMonthlyDebt',
+  pmMonthlyDebt: 'pmMonthlyDebt',
   totalCurrentBalance: 'totalCurrentBalance',
   calculatedAt: 'calculatedAt'
 } as const
@@ -1818,6 +1825,7 @@ export const DocumentScalarFieldEnum = {
   mortgageCaseId: 'mortgageCaseId',
   documentTypeId: 'documentTypeId',
   documentStatusId: 'documentStatusId',
+  owner: 'owner',
   fileUrl: 'fileUrl',
   storagePath: 'storagePath',
   mimeType: 'mimeType',
@@ -2125,6 +2133,20 @@ export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'J
  * Reference to a field of type 'QueryMode'
  */
 export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'DocumentOwner'
+ */
+export type EnumDocumentOwnerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DocumentOwner'>
+    
+
+
+/**
+ * Reference to a field of type 'DocumentOwner[]'
+ */
+export type ListEnumDocumentOwnerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DocumentOwner[]'>
     
 
 

@@ -8,9 +8,9 @@ carita solo cuando el PDF trae ese dato.
 
 | PDF | Cuentas | Campos | Asertividad | Fecha |
 |---|---|---|---|---|
-| bureau-fixture-a.pdf | 60 / 60 | 225 / 225 | 100% | 2026-10-02 |
-| bureau-fixture-b.pdf | 20 / 20 | 79 / 79 | 100% | 2026-10-02 |
-| 7. BC - JUAN PEREZ - 2024.01.15.pdf | 16 / 16 | 55 / 55 | 100% | 2026-10-05 |
+| Buro de Credito Sep2026.pdf | 60 / 60 | 225 / 225 | 100% | 2026-10-02 |
+| Reporte Buro Credito CM17022026.pdf | 20 / 20 | 79 / 79 | 100% | 2026-10-02 |
+| 7. BC - ALEJANDRO DIAZ - 2025.08.22.pdf | 16 / 16 | 55 / 55 | 100% | 2026-10-05 |
 | **Conjunto** | **96** | **359 / 359** | **100%** | |
 
 Los PDFs viven en esta carpeta y no se versionan (`*.pdf` en `.gitignore`).
@@ -22,7 +22,7 @@ Los PDFs viven en esta carpeta y no se versionan (`*.pdf` en `.gitignore`).
 3. Cruzar JSON guardado con la grilla:
 
 ```text
-.venv\Scripts\python.exe score_columns.py "bureau-fixture-a.pdf" "bureau-fixture-b.pdf" "7. BC - JUAN PEREZ - 2024.01.15.pdf"
+.venv\Scripts\python.exe score_columns.py "Buro de Credito Sep2026.pdf" "Reporte Buro Credito CM17022026.pdf" "7. BC - ALEJANDRO DIAZ - 2025.08.22.pdf"
 .venv\Scripts\python.exe compare_pair.py <extract-ui.json> <pdf-grid.json> <etiqueta>
 ```
 
@@ -40,5 +40,5 @@ Gribma 3119, NU 17740, Amex 1875, Amex Company sin 49800/41600, y Santander
 ## Siguiente paso
 
 El procesamiento de buró cierra en esta rama. Persona moral espera a
-definir flujo. Para ver Pérez en la UI hay que reiniciar el API y
+definir flujo. Para ver Díaz en la UI hay que reiniciar el API y
 reextraer el expediente; esta medición no se persistió.

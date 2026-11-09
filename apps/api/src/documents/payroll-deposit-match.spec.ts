@@ -7,26 +7,26 @@ import {
   selectPayrollDeposits,
 } from './payroll-deposit-match';
 
-const ACAMEX_SPEI =
-  'TRK0000000000000001 SPEI RECIBIDO, BCO:0699 FONDEADORA HR LIQ: 16:42:52 DEL CLIENTE ACAMEX DE LA CLABE 012180001234567890 CON RFC ACM230101AA1 CONCEPTO: PAGO REFERENCIA: 2204490';
+const LUXMARBY_SPEI =
+  'FN779227T1782945765 SPEI RECIBIDO, BCO:0699 FONDEADORA HR LIQ: 16:42:52 DEL CLIENTE LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBL DE LA CLABE 699180600007792275 CON RFC LST230905G7A CONCEPTO: PAGO REFERENCIA: 2204490';
 
 const employer = {
-  legalName: 'ACAMEX SA DE CV',
-  rfc: 'ACM230101AA1',
+  legalName: 'LUXMARBY SOLUCIONES EN TECNOLOGIA Y PUBLICIDAD SA DE CV',
+  rfc: 'LST230905G7A',
 };
 
 describe('payroll deposit employer match', () => {
   it('keeps the brand token and drops generic words', () => {
-    expect(distinctiveEmployerTokens(employer.legalName)).toEqual(['ACAMEX']);
+    expect(distinctiveEmployerTokens(employer.legalName)).toEqual(['LUXMARBY']);
   });
 
   it('matches a SPEI whose concept is only PAGO when the employer name and RFC are in the description', () => {
-    expect(depositMatchesEmployer(ACAMEX_SPEI, null, employer)).toBe(true);
+    expect(depositMatchesEmployer(LUXMARBY_SPEI, null, employer)).toBe(true);
     const [hit] = selectPayrollDeposits(
-      [{ date: '2026-09-15', amount: 50000, originalConcept: ACAMEX_SPEI, movementType: 'DEPOSIT' }],
+      [{ date: '2026-09-15', amount: 50000, originalConcept: LUXMARBY_SPEI, movementType: 'DEPOSIT' }],
       [employer],
     );
-    expect(hit.detectedPayerRfc).toBe('ACM230101AA1');
+    expect(hit.detectedPayerRfc).toBe('LST230905G7A');
     expect(hit.amount).toBe(50000);
   });
 
@@ -54,9 +54,9 @@ describe('payroll deposit employer match', () => {
 
   it('matches by RFC when the legal name is truncated past the brand token', () => {
     expect(
-      depositMatchesEmployer('SPEI CONCEPTO: PAGO CON RFC ACM230101AA1', null, {
+      depositMatchesEmployer('SPEI CONCEPTO: PAGO CON RFC LST230905G7A', null, {
         legalName: null,
-        rfc: 'ACM230101AA1',
+        rfc: 'LST230905G7A',
       }),
     ).toBe(true);
   });
@@ -64,7 +64,7 @@ describe('payroll deposit employer match', () => {
   it('promotes matched movements and clears the empty-payroll alert', () => {
     const data: Record<string, unknown> = {
       allTransactions: [
-        { date: '2026-09-15', amount: 50000, originalConcept: ACAMEX_SPEI, movementType: 'DEPOSIT' },
+        { date: '2026-09-15', amount: 50000, originalConcept: LUXMARBY_SPEI, movementType: 'DEPOSIT' },
         { date: '2026-09-16', amount: 200, originalConcept: 'SPEI CONCEPTO: PAGO', movementType: 'DEPOSIT' },
       ],
       payrollDeposits: [],
@@ -79,7 +79,7 @@ describe('payroll deposit employer match', () => {
   it('keeps salaried valid income to payroll keyword and employer matches only', () => {
     const data: Record<string, unknown> = {
       payrollDeposits: [
-        { date: '2026-06-01', amount: 190000, originalConcept: ACAMEX_SPEI, containsPayrollKeyword: false },
+        { date: '2026-06-01', amount: 190000, originalConcept: LUXMARBY_SPEI, containsPayrollKeyword: false },
         { date: '2026-06-03', amount: 10000, originalConcept: 'PAGO NOMINA QUINCENA', containsPayrollKeyword: true },
       ],
       alerts: [{ code: 'STATEMENT_HIGH_IMPACT_OUTLIER_DETECTED', message: 'atipico' }],

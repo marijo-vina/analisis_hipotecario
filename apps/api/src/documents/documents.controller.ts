@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseEnumPipe,
   ParseIntPipe,
   Patch,
   Post,
@@ -29,7 +30,9 @@ import { CreditScoreExtractionService } from './credit-score-extraction.service'
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { ArticlesExtractionService } from './articles-extraction.service';
 import { GcsService } from './gcs.service';
+import { DocumentOwner } from '../generated/prisma/client';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mortgage-cases/:caseId/documents')
@@ -43,6 +46,7 @@ export class DocumentsController {
     private readonly creditScoreExtractionService: CreditScoreExtractionService,
     private readonly csfExtractionService: CsfExtractionService,
     private readonly taxReturnExtractionService: TaxReturnExtractionService,
+    private readonly articlesExtractionService: ArticlesExtractionService,
     private readonly coordinateExtractionService: CoordinateExtractionService,
     private readonly gcsService: GcsService,
   ) {}
@@ -83,6 +87,8 @@ export class DocumentsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('documentTypeId', ParseIntPipe) documentTypeId: number,
     @Req() req: { user: { id: string } },
+    @Body('owner', new ParseEnumPipe(DocumentOwner, { optional: true }))
+    owner?: DocumentOwner,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -92,6 +98,7 @@ export class DocumentsController {
       req.user.id,
       file,
       documentTypeId,
+      owner ?? 'SHAREHOLDER',
     );
     return { data };
   }
@@ -320,6 +327,16 @@ export class DocumentsController {
     @Param('documentId') documentId: string,
   ) {
     const data = await this.taxReturnExtractionService.extract(caseId, documentId);
+    return { data };
+  }
+
+  @Post(':documentId/extract-articles')
+  @HttpCode(200)
+  async extractArticles(
+    @Param('caseId') caseId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const data = await this.articlesExtractionService.extract(caseId, documentId);
     return { data };
   }
 

@@ -1,4 +1,5 @@
 import { BadGatewayException, BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DocumentOwner } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { QueryDocumentDto } from './dto/query-document.dto';
@@ -62,6 +63,7 @@ export class DocumentsService {
         documentStatusId: uploadedStatus.id,
         originalName: dto.originalName,
         uploadedById: advisorId,
+        owner: dto.owner ?? 'SHAREHOLDER',
       },
       include: DOCUMENT_INCLUDE,
     });
@@ -72,7 +74,9 @@ export class DocumentsService {
     advisorId: string,
     file: Express.Multer.File,
     documentTypeId: number,
+    owner: DocumentOwner = 'SHAREHOLDER',
   ) {
+    const documentOwner = owner ?? 'SHAREHOLDER';
     // 1. Validate case exists
     const mortgageCase = await this.prisma.mortgageCase.findUnique({
       where: { id: caseId },
@@ -102,6 +106,7 @@ export class DocumentsService {
       caseId,
       documentType.code,
       file.originalname,
+      documentOwner,
     );
 
     // 5. Upload to GCS — if throws, NO Document created
@@ -131,6 +136,7 @@ export class DocumentsService {
         sizeBytes: file.size,
         storagePath,
         fileUrl,
+        owner: documentOwner,
       },
       include: DOCUMENT_INCLUDE,
     });

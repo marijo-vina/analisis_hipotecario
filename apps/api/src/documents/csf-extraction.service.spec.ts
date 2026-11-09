@@ -51,40 +51,40 @@ describe('CsfExtractionService', () => {
   });
 
   describe('postProcessCsf', () => {
-    it('should correctly process a synthetic CSF fixture and detect mixed regime + tenure', () => {
+    it('should correctly process real sample CSF and detect mixed regime + tenure', () => {
       const rawData = {
         issuance: {
-          issuanceDateRaw: 'CIUDAD DE MEXICO A 15 DE ENERO DE 2024',
-          issuanceDate: '2024-01-15',
-          issuanceLocation: 'CIUDAD DE MEXICO',
-          idCIF: '12345678901',
+          issuanceDateRaw: 'MERIDA , YUCATAN A 05 DE AGOSTO DE 2025',
+          issuanceDate: '2025-08-05',
+          issuanceLocation: 'MERIDA, YUCATAN',
+          idCIF: '14111086381',
         },
         taxpayer: {
-          rfc: 'PEGJ800101AB1',
-          curp: 'PEGJ800101HDFRRN09',
-          firstName: 'JUAN',
-          firstLastName: 'PEREZ',
-          secondLastName: 'GARCIA',
-          fullName: 'JUAN PEREZ GARCIA',
-          operationsStartDate: '2010-01-15',
+          rfc: 'DICA690402RZ4',
+          curp: 'DICA690402HYNZBL09',
+          firstName: 'ALEJANDRO DE LA CRUZ',
+          firstLastName: 'DIAZ',
+          secondLastName: 'CABAÑAS',
+          fullName: 'ALEJANDRO DE LA CRUZ DIAZ CABAÑAS',
+          operationsStartDate: '1994-06-01',
           statusInPadron: 'REACTIVADO',
-          lastStatusChangeDate: '2016-03-01',
+          lastStatusChangeDate: '2001-10-01',
         },
         fiscalAddress: {
-          postalCode: '01000',
+          postalCode: '97133',
           streetType: 'CALLE',
-          streetName: 'REFORMA',
-          exteriorNumber: '100',
-          interiorNumber: 'INT 1',
-          neighborhood: 'COLONIA JUAREZ',
-          municipality: 'CUAUHTEMOC',
-          state: 'CIUDAD DE MEXICO',
-          betweenStreets: 'CALLE A Y CALLE B',
+          streetName: '26',
+          exteriorNumber: '199',
+          interiorNumber: 'INT 523',
+          neighborhood: 'FRACCIONAMIENTO ALTABRISA',
+          municipality: 'MERIDA',
+          state: 'YUCATAN',
+          betweenStreets: 'CALLE 15 Y CALLE 7',
         },
         activities: [
           {
             order: 1,
-            description: 'Servicios de consultoría en administración de empresas',
+            description: 'Consultorios de medicina especializada pertenecientes al sector privado',
             percentage: 70,
             startDate: '2011-03-01',
             endDate: null,
@@ -110,27 +110,42 @@ describe('CsfExtractionService', () => {
           },
         ],
         digitalStamp: {
-          originalChain: '||2024/01/15|PEGJ800101AB1|CONSTANCIA DE SITUACIÓN FISCAL||',
-          digitalStamp: 'SYNTHETICSTAMPEXAMPLE',
+          originalChain: '||2025/08/05|DICA690402RZ4|CONSTANCIA DE SITUACIÓN FISCAL||',
+          digitalStamp: 'AepPKeFlpS4JdCujxN...',
         },
       };
 
       const result = service.postProcessCsf(rawData);
 
       expect(result.documentType).toBe('CSF');
-      expect(result.taxpayer.rfc).toBe('PEGJ800101AB1');
-      expect(result.taxpayer.curp).toBe('PEGJ800101HDFRRN09');
-      expect(result.taxpayer.fullName).toBe('JUAN PEREZ GARCIA');
+      expect(result.taxpayer.rfc).toBe('DICA690402RZ4');
+      expect(result.taxpayer.curp).toBe('DICA690402HYNZBL09');
+      expect(result.taxpayer.fullName).toBe('ALEJANDRO DE LA CRUZ DIAZ CABAÑAS');
       expect(result.activityStartDate).toBe('2011-03-01');
       expect(result.hasSalariedRegime).toBe(true);
       expect(result.hasIndependentRegime).toBe(true);
       expect(result.isSolelySalaried).toBe(false);
+      expect(result.hasShareholderRegime).toBe(false);
       expect(result.tenureMonths).toBeGreaterThan(120);
 
       // Check mixed income alert
       const mixedAlert = result.alerts.find((a) => a.code === 'REGIMEN_SUELDOS_Y_SALARIOS_AVISO_MIXTO');
       expect(mixedAlert).toBeDefined();
       expect(mixedAlert?.severity).toBe('INFO');
+    });
+
+    it('joins the company denomination with the capital regime', () => {
+      const result = service.postProcessCsf(
+        {
+          taxpayer: { rfc: 'ARP210212GC6', fullName: 'ALIMENTOS RAPIDOS PENINSULARES' },
+          regimes: [],
+          activities: [],
+        },
+        'RégimenCapital: SOCIEDADANONIMADECAPITALVARIABLE',
+      );
+
+      expect(result.taxpayer.capitalRegime).toBe('SA DE CV');
+      expect(result.taxpayer.fullName).toBe('ALIMENTOS RAPIDOS PENINSULARES SA DE CV');
     });
 
     it('does not use the independent tax-regime start date for arraigo', () => {
@@ -220,7 +235,7 @@ describe('CsfExtractionService', () => {
       mockPrismaService.document.findUnique.mockResolvedValue({
         id: documentId,
         mortgageCaseId: caseId,
-        ocrText: 'CONSTANCIA DE SITUACION FISCAL RFC PEGJ800101AB1 JUAN PEREZ',
+        ocrText: 'CONSTANCIA DE SITUACION FISCAL RFC DICA690402RZ4 ALEJANDRO DE LA CRUZ',
         documentType: { code: 'CSF' },
         documentStatusId: 1,
       });
@@ -228,7 +243,7 @@ describe('CsfExtractionService', () => {
       mockGeminiService.extractStructuredData.mockResolvedValue({
         success: true,
         extractedData: {
-          taxpayer: { rfc: 'PEGJ800101AB1', fullName: 'JUAN PEREZ' },
+          taxpayer: { rfc: 'DICA690402RZ4', fullName: 'ALEJANDRO DE LA CRUZ' },
           regimes: [{ description: 'Régimen Simplificado de Confianza', startDate: '2023-01-01' }],
           activities: [{ description: 'Servicios Profesionales', percentage: 100, startDate: '2023-01-01' }],
         },

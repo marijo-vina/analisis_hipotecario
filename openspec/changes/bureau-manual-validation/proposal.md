@@ -2,7 +2,7 @@
 
 ## Intent
 
-The payment-due-guardrail added source tracking (UNCONFIRMED/CONFIRMED_AUTO/MANUAL) but only gates unconfirmed credits. Manual testing with Juan Perez's bureau revealed: AMEX COMPANY shows incorrect amounts (49,800/41,600 should be 0), some credits show "No confirmado", inquiries (consultas) are not extracted, and from the second AMEX COMPANY onwards fields are empty (low confidence matching). Analysts need to correct ANY active credit's amount — not just unconfirmed ones — and edit inquiry counts. This change extends the guardrail into a full manual-validation layer for MVP.
+The payment-due-guardrail added source tracking (UNCONFIRMED/CONFIRMED_AUTO/MANUAL) but only gates unconfirmed credits. Manual testing with Alejandro Diaz's bureau revealed: AMEX COMPANY shows incorrect amounts (49,800/41,600 should be 0), some credits show "No confirmado", inquiries (consultas) are not extracted, and from the second AMEX COMPANY onwards fields are empty (low confidence matching). Analysts need to correct ANY active credit's amount — not just unconfirmed ones — and edit inquiry counts. This change extends the guardrail into a full manual-validation layer for MVP.
 
 ## Scope
 

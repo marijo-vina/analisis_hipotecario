@@ -18,6 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "simulate:pm": "ts-node -r tsconfig-paths/register src/income-calculation/pm-fixture-simulation.ts",
     "prisma:generate": "prisma generate --config ./prisma.config.ts",
     "prisma:validate": "prisma validate --config ./prisma.config.ts",
     "prisma:studio": "prisma studio --config ./prisma.config.ts",

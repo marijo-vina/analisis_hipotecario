@@ -21,7 +21,7 @@ Classification enum (Gemini + schema): `REVOLVING | FIXED_PAYMENT | MORTGAGE | A
 | Coordinate `extractBlockValues` | Field exists; **always set `null`** | Coordinate merge does not copy it |
 | Default flags (`.env.example`) | `COORDINATE_EXTRACTION_ENABLED=true`, `USE_LAYOUT_EXTRACTION=false` | Layout path (the one that actually parses digits) is off by default |
 
-Acceptance tests sometimes assert `credit.accountNumber` (e.g. TELCEL `10002030`), so Gemini *may* emit extras on some PDFs, but that is not a contract.
+Acceptance tests sometimes assert `credit.accountNumber` (e.g. TELCEL `82953660`), so Gemini *may* emit extras on some PDFs, but that is not a contract.
 
 **Utilization can be shown for existing stored bureaus without re-OCR** because balance and limit are already on JSONB. **Last-4 cannot be guaranteed without re-extraction** unless digits already live on `accountNumber`, `institution`, or `rawTextReference`.
 

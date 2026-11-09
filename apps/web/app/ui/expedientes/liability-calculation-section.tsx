@@ -261,15 +261,34 @@ function KpiRow({ snapshot }: { snapshot: LiabilityCalculationResult }) {
         style={{ backgroundColor: "#EFF6FF" }}
       >
         <span className="text-xs font-medium" style={{ color: "#1E40AF" }}>
-          Deuda total mensual
+          {snapshot.pmMonthlyDebt != null ? "Deuda persona física" : "Deuda total mensual"}
         </span>
         <span className="mt-1 text-lg font-bold" style={{ color: "#1E40AF" }}>
           {formatMXN(snapshot.grossCurrentMonthlyDebt)}
         </span>
         <span className="mt-1 text-xs text-gf-text-muted">
-          Pasivo mensual calculado
+          {snapshot.pmMonthlyDebt != null
+            ? "Buró del socio, al 6%"
+            : "Pasivo mensual calculado"}
         </span>
       </div>
+
+      {snapshot.pmMonthlyDebt != null && (
+        <div
+          className="flex flex-1 flex-col rounded-lg border border-blue-200 p-4"
+          style={{ backgroundColor: "#EFF6FF" }}
+        >
+          <span className="text-xs font-medium" style={{ color: "#1E40AF" }}>
+            Deuda de la empresa
+          </span>
+          <span className="mt-1 text-lg font-bold" style={{ color: "#1E40AF" }}>
+            {formatMXN(snapshot.pmMonthlyDebt)}
+          </span>
+          <span className="mt-1 text-xs text-gf-text-muted">
+            Buró de la empresa, prorrateado por el % de acciones
+          </span>
+        </div>
+      )}
 
       {/* Estado del cálculo — amber */}
       <div

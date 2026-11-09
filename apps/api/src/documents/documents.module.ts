@@ -17,6 +17,7 @@ import { LayoutFinancialExtractorService } from './layout-financial-extractor.se
 import { CoordinateExtractionService } from './coordinate-extraction.service';
 import { CsfExtractionService } from './csf-extraction.service';
 import { TaxReturnExtractionService } from './tax-return-extraction.service';
+import { ArticlesExtractionService } from './articles-extraction.service';
 import { BankStatementCleanerService } from './bank-statement-cleaner.service';
 
 @Module({
@@ -39,12 +40,14 @@ import { BankStatementCleanerService } from './bank-statement-cleaner.service';
     CoordinateExtractionService,
     CsfExtractionService,
     TaxReturnExtractionService,
+    ArticlesExtractionService,
   ],
   exports: [
     DocumentsService,
     StoragePathService,
     CsfExtractionService,
     TaxReturnExtractionService,
+    ArticlesExtractionService,
     BankStatementCleanerService,
   ],
 })

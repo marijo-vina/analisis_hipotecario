@@ -110,11 +110,11 @@
 - WHEN normalization runs
 - THEN `hasFraudFlag` = false AND no BURO_FRAUD_FLAG alert fires
 
-### Validation Case: BC - JUAN PEREZ
-- GIVEN the PDF "BC - JUAN PEREZ - 2025.08.22" processed as REPORT_CREDIT_BUREAU
+### Validation Case: BC - ALEJANDRO DIAZ
+- GIVEN the PDF "BC - ALEJANDRO DIAZ - 2025.08.22" processed as REPORT_CREDIT_BUREAU
 - WHEN extraction completes
-- THEN 16 credits (8 active, 8 closed), `report.publicScore` = null, RFC = PEGJ800101XX1
-- AND birthDate = "1980-01-01", no quebranto/fraude, minor delinquency from MOP 2-3
+- THEN 16 credits (8 active, 8 closed), `report.publicScore` = null, RFC = DICA690402SD3
+- AND birthDate = "1969-04-02", no quebranto/fraude, minor delinquency from MOP 2-3
 
 ---
 

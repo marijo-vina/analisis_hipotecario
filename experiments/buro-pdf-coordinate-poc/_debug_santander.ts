@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 async function main() {
-  const buf = fs.readFileSync('samples/bureau-fixture-b.pdf');
+  const buf = fs.readFileSync('samples/Reporte Buro Credito CM17022026.pdf');
   const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf).buffer, disableFontFace: true }).promise;
 
   const page = await doc.getPage(4);

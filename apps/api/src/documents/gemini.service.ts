@@ -224,17 +224,101 @@ export class GeminiService {
       cleaned = fenceMatch[1].trim();
     }
 
-    // First attempt: direct parse
-    try {
-      return JSON.parse(cleaned) as Record<string, unknown>;
-    } catch {
-      // Second attempt: salvage truncated JSON (model hit MAX_TOKENS)
+    let lastError: unknown = null;
+    const candidates = [
+      cleaned,
+      this.repairModelJson(cleaned),
+      this.repairModelJson(this.dropDigitalStamp(cleaned)),
+    ];
+    for (const candidate of candidates) {
       try {
-        return this.salvageTruncatedJson(cleaned);
-      } catch {
-        throw new Error(GeminiErrorCode.GEMINI_INVALID_JSON);
+        return JSON.parse(candidate) as Record<string, unknown>;
+      } catch (error) {
+        lastError = error;
+        try {
+          return this.salvageTruncatedJson(candidate);
+        } catch (salvageError) {
+          lastError = salvageError;
+        }
       }
     }
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    const at = Number(message.match(/position (\d+)/)?.[1] ?? 0);
+    this.logger.error(
+      `[Gemini] JSON still invalid at ${at}: ${message}. Around: ${JSON.stringify(cleaned.slice(Math.max(0, at - 80), at + 80))}`,
+    );
+    throw new Error(GeminiErrorCode.GEMINI_INVALID_JSON);
+  }
+
+  /**
+   * Models copy OCR line breaks, bad backslashes and trailing commas into JSON.
+   * Repair those without changing text that is already outside a string.
+   */
+  private repairModelJson(text: string): string {
+    let out = '';
+    let inString = false;
+    let i = 0;
+    while (i < text.length) {
+      const ch = text[i];
+      if (inString) {
+        if (ch === '\\') {
+          const next = text[i + 1];
+          if (next && '"\\/bfnrtu'.includes(next)) {
+            out += ch + next;
+            i += 2;
+            continue;
+          }
+          out += '\\\\';
+          i += 1;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+          out += ch;
+          i += 1;
+          continue;
+        }
+        if (ch === '\n') { out += '\\n'; i += 1; continue; }
+        if (ch === '\r') { out += '\\r'; i += 1; continue; }
+        if (ch === '\t') { out += '\\t'; i += 1; continue; }
+        if (ch.charCodeAt(0) < 0x20) { i += 1; continue; }
+        out += ch;
+        i += 1;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        out += ch;
+        i += 1;
+        continue;
+      }
+      if (ch === ',') {
+        let look = i + 1;
+        while (look < text.length && /\s/.test(text[look])) look += 1;
+        if (text[look] === '}' || text[look] === ']') {
+          i += 1;
+          continue;
+        }
+      }
+      out += ch;
+      i += 1;
+    }
+    return out;
+  }
+
+  /**
+   * The SAT stamp is not used by the mortgage rules. Drop it when its
+   * base64 breaks the object so the taxpayer fields can still be read.
+   */
+  private dropDigitalStamp(text: string): string {
+    const marker = '"digitalStamp"';
+    const start = text.indexOf(marker);
+    if (start < 0) return text;
+    const alerts = text.indexOf('"alerts"', start + marker.length);
+    if (alerts >= 0) {
+      return `${text.slice(0, start)}"digitalStamp": null, ${text.slice(alerts)}`;
+    }
+    return `${text.slice(0, start)}"digitalStamp": null}`;
   }
 
   /**

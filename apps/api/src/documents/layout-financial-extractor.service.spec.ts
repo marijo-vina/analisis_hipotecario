@@ -83,7 +83,7 @@ describe('LayoutFinancialExtractorService (lines-first)', () => {
         makeLine('SANTANDER 1234567890', 50),
         makeLine('0 53,763 MX NO APLICA', 70),
         makeLine('8,775 PAGO MÍNIMO', 90),
-        makeLine('TELCEL MER 10002030', 130),
+        makeLine('TELCEL MER 82953660', 130),
         makeLine('1,200 5,000 MX NO APLICA', 150),
         makeLine('0 MENSUAL', 170),
       ];
@@ -148,7 +148,7 @@ describe('LayoutFinancialExtractorService (lines-first)', () => {
         makeLine('BBVA 9876543210', 80),
         makeLine('0 50,000 MX NO APLICA', 100),
         makeLine('Créditos No Bancarios', 140),
-        makeLine('TELCEL MER 10002030', 170),
+        makeLine('TELCEL MER 82953660', 170),
         makeLine('1,200 MX NO APLICA', 190),
       ];
 

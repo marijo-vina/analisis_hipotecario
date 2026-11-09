@@ -55,9 +55,9 @@ describe('detectHeaderFromLines', () => {
 
 describe('parseInstitutionAndAccount', () => {
   it('parses a ≥6-digit run as accountNumber and strips it from institution', () => {
-    expect(parseInstitutionAndAccount('SANTANDER 10002030')).toEqual({
+    expect(parseInstitutionAndAccount('SANTANDER 82953660')).toEqual({
       institution: 'SANTANDER',
-      accountNumber: '10002030',
+      accountNumber: '82953660',
     });
   });
 
@@ -69,9 +69,9 @@ describe('parseInstitutionAndAccount', () => {
   });
 
   it('picks the longest ≥6-digit run when several are present', () => {
-    expect(parseInstitutionAndAccount('BBVA 123456 10002030')).toEqual({
+    expect(parseInstitutionAndAccount('BBVA 123456 82953660')).toEqual({
       institution: 'BBVA 123456',
-      accountNumber: '10002030',
+      accountNumber: '82953660',
     });
   });
 
@@ -85,7 +85,7 @@ describe('parseInstitutionAndAccount', () => {
 
 describe('extractInstitutionFromLine', () => {
   it('delegates to parseInstitutionAndAccount for the line text', () => {
-    const line = makeLine('SANTANDER 10002030');
+    const line = makeLine('SANTANDER 82953660');
     expect(extractInstitutionFromLine(line)).toEqual(
       parseInstitutionAndAccount(line.text),
     );

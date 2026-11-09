@@ -8,9 +8,9 @@ The system MUST copy `accountNumber` from layout and coordinate merge onto persi
 
 #### Scenario: Layout and coordinate copy
 
-- GIVEN layout or coordinate credit with `accountNumber` "10002030"
+- GIVEN layout or coordinate credit with `accountNumber` "82953660"
 - WHEN merge writes `credits[]`
-- THEN that credit MUST include `accountNumber` "10002030"
+- THEN that credit MUST include `accountNumber` "82953660"
 - AND MUST NOT include a utilization field
 
 #### Scenario: Gemini schema unchanged

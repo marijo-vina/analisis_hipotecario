@@ -40,10 +40,28 @@ export interface BankStatementExtract {
     isCurrentIncompleteMonth?: boolean | null;
   };
   financialDepuration?: {
+    integrityCheck?: {
+      status?: string | null;
+    } | null;
     depurationSummary?: {
       totalValidIncome?: number | null;
     };
   };
+}
+
+/**
+ * True when the cleaner already proved the movement sum does not match
+ * the cover. A missing check stays usable: older extracts have no status.
+ */
+export function hasCriticalCoverDiscrepancy(statement: {
+  financialDepuration?: {
+    integrityCheck?: { status?: string | null } | null;
+  } | null;
+}): boolean {
+  return (
+    statement.financialDepuration?.integrityCheck?.status ===
+    'CRITICAL_DISCREPANCY'
+  );
 }
 
 export interface TaxReturnExtract {
@@ -121,8 +139,8 @@ export function resolveActivity(
 
 /**
  * Groups bank statements by YYYY-MM of `periodStartDate` (fallback
- * `periodEndDate`), skipping incomplete current months, and sums
- * `totalValidIncome` per month.
+ * `periodEndDate`), skipping incomplete current months and months whose
+ * movements do not match the cover, and sums `totalValidIncome` per month.
  */
 export function assembleMonths(
   statements: BankStatementExtract[],
@@ -131,6 +149,7 @@ export function assembleMonths(
   for (const statement of statements) {
     const period = statement.statementPeriod ?? {};
     if (period.isCurrentIncompleteMonth === true) continue;
+    if (hasCriticalCoverDiscrepancy(statement)) continue;
     const monthKey =
       monthKeyFromDate(period.periodStartDate) ??
       monthKeyFromDate(period.periodEndDate);

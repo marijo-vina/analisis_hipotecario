@@ -12,6 +12,7 @@ import {
 import { Check, X } from "lucide-react";
 import Card from "@/app/ui/common/card";
 import PfaeIncomePanel from "@/app/ui/expedientes/pfae-income-panel";
+import { pmBankWindowCopy } from "@/app/lib/pm-expediente-view";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -239,12 +240,20 @@ export default function IncomeCalculationSection({
     );
   }
 
-  if (personType === "PFAE") {
+  if (personType === "PFAE" || personType === "PM") {
+    const notice =
+      personType === "PM" ? snapshot?.bases?.bank.statementNotice : null;
+    const bankCaption =
+      personType === "PM" && snapshot?.bases
+        ? pmBankWindowCopy(snapshot.bases.bank)
+        : undefined;
     return (
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-gf-text">
-            Cálculo de ingreso mensual admisible
+            {personType === "PM"
+              ? "Cálculo de ingreso de la empresa"
+              : "Cálculo de ingreso mensual admisible"}
           </h3>
         </div>
 
@@ -254,12 +263,27 @@ export default function IncomeCalculationSection({
           </div>
         )}
 
+        {notice && (
+          <div
+            className="flex items-start gap-2.5 rounded-lg border px-4 py-3"
+            style={{ backgroundColor: "#FFFBEB", borderColor: "#FDE68A" }}
+          >
+            <p className="text-sm leading-relaxed text-gf-text">{notice}</p>
+          </div>
+        )}
+
         <PfaeIncomePanel
           caseId={caseId}
           snapshot={snapshot}
           onSnapshotChange={setSnapshot}
           onSourceSwitched={onSourceSwitched}
           peinadoWarn={peinadoWarn}
+          emptyMessage={
+            personType === "PM"
+              ? "Sin bases de la empresa. Ejecuta «Analizar expediente» en Validaciones para calcularlas."
+              : undefined
+          }
+          bankCaption={bankCaption}
         />
       </section>
     );

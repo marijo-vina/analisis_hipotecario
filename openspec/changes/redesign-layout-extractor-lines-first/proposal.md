@@ -71,7 +71,7 @@ Set `USE_LAYOUT_EXTRACTION=false` in environment. This disables the ENTIRE layou
 ## Success Criteria
 
 - [ ] SANTANDER paymentDueAmount = 8775
-- [ ] TELCEL MER 10002030 paymentDueAmount = 0
+- [ ] TELCEL MER 82953660 paymentDueAmount = 0
 - [ ] AMEX paymentDueAmount = 1875
 - [ ] AMEX COMPANY paymentDueAmount ≠ 49800 and ≠ 41600
 - [ ] All 457 existing unit tests still pass

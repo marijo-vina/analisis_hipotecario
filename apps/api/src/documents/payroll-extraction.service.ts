@@ -117,8 +117,8 @@ const PAYROLL_INSTRUCTIONS = [
   '  Buscar fecha de ingreso / antigüedad bajo CUALQUIERA de estos alias:',
   '    Fecha de ingreso, Fecha ingreso, Fecha de alta, Fecha alta, Antigüedad,',
   '    Antigüedad efectiva, Fecha inicio laboral, Ingreso a la empresa, Alta IMSS.',
-  '  - hireDate: YYYY-MM-DD. Si la fecha original es "15/01/2015", normalizar a "2015-01-15".',
-  '  - seniorityText: texto original de antigüedad ("10 AÑOS").',
+  '  - hireDate: YYYY-MM-DD. Si la fecha original es "20/12/2001", normalizar a "2001-12-20".',
+  '  - seniorityText: texto original de antigüedad ("21 AÑOS 7 QNAS 10 DIAS").',
   '  - hasMinimumSeniority: null (el backend lo calculará).',
 
   '  Buscar evidencia de cotización IMSS. Marcar contributesToImss = true si aparece CUALQUIERA de:',
@@ -135,12 +135,12 @@ const PAYROLL_INSTRUCTIONS = [
 
   '─── Evidencia textual (evidence) ───',
   '  Para cada campo importante, cuando sea posible, guardá el texto original usado:',
-  '    netIncome: "Líquido 20,000.00"',
-  '    grossIncome: "Total Percepciones 25,000.00"',
-  '    totalDeductions: "Total Deducciones 5,000.00"',
+  '    netIncome: "Líquido 26,290.00"',
+  '    grossIncome: "Total Percepciones 39,104.26"',
+  '    totalDeductions: "Total Deducciones 12,814.26"',
   '    period: "Período de pago: 1A-MAY-2025"',
-  '    hireDate: "Fecha de Ingreso: 15/01/2015"',
-  '    fiscalStamp: "Folio Fiscal: 11111111-2222-4333-8444-555555555555"',
+  '    hireDate: "Fecha de Ingreso: 20/12/2001"',
+  '    fiscalStamp: "Folio Fiscal: ACBC5764-82D2-41B9-A6BC-505BAA3CA6ED"',
 
   '─── Reglas de alertas ───',
   '  Generá las alertas que correspondan según los datos detectados.',

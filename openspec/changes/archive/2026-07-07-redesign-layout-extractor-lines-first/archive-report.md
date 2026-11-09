@@ -40,7 +40,7 @@ All removed tests were replaced by simpler, more focused unit tests. The module-
 | Criterion | Result |
 |-----------|--------|
 | SANTANDER = 8775 | ✅ HIGH confidence |
-| TELCEL MER 10002030 = 0 | ✅ HIGH confidence (explicit zero) |
+| TELCEL MER 82953660 = 0 | ✅ HIGH confidence (explicit zero) |
 | AMEX = 1875 | ✅ HIGH confidence |
 | Closed credit → null + LOW | ✅ Never infers 0 |
 | paymentDueAmount never falls back to lastPaymentAmount | ✅ Enforced structurally |
