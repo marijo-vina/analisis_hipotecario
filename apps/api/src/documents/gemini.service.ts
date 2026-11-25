@@ -55,7 +55,22 @@ export interface GeminiCallTimings {
   responseChars: number;
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.8-flash';
+
+/**
+ * Vertex retired these ids. An environment that still names one of them
+ * would fail every extraction, so the service uses the current default.
+ */
+const RETIRED_MODELS = new Set([
+  'gemini-1.0-pro',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+]);
 const DEFAULT_LOCATION = 'us-central1';
 const DEFAULT_TIMEOUT_MS = 60000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
@@ -98,8 +113,15 @@ export class GeminiService {
 
     this.vertexAI = new VertexAI({ project: projectId, location });
 
-    this.modelName =
-      this.configService.get<string>('GEMINI_MODEL') || DEFAULT_MODEL;
+    const configuredModel = this.configService.get<string>('GEMINI_MODEL')?.trim();
+    if (configuredModel && RETIRED_MODELS.has(configuredModel)) {
+      this.logger.warn(
+        `[Gemini] ${configuredModel} ya no está disponible en Vertex. Se usa ${DEFAULT_MODEL}.`,
+      );
+      this.modelName = DEFAULT_MODEL;
+    } else {
+      this.modelName = configuredModel || DEFAULT_MODEL;
+    }
 
     this.timeoutMs = parseInt(
       this.configService.get<string>('GEMINI_TIMEOUT_MS') ||

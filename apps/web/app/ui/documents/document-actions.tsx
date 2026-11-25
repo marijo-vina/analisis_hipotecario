@@ -156,12 +156,16 @@ export default function DocumentActions({
 
       if (document.documentType.code === "CREDIT_BUREAU_REPORT") {
         try {
-          await extractCreditBureau(caseId, document.id);
+          const extracted = await extractCreditBureau(caseId, document.id);
+          if (!extracted.success) {
+            setProcessError(
+              extracted.errorMessage ??
+                "No se pudo extraer el buró. Intente de nuevo.",
+            );
+          }
         } catch {
           setProcessError(
-            skipBureauOcr
-              ? "No se pudo reextraer el buró. Intente de nuevo."
-              : "OCR completado, pero la extracción del buró de crédito falló. Puede intentar reprocesar.",
+            "No se pudo extraer el buró. Intente de nuevo.",
           );
         }
       }
