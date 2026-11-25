@@ -246,9 +246,8 @@ export async function extractBankStatement(
  * usando Gemini AI.
  *
  * Llama a `POST /mortgage-cases/:caseId/documents/:documentId/extract-bureau`
- * del backend NestJS. El documento debe estar en estado PROCESSED.
- *
- * @throws {Error} si el backend responde con error o hay fallo de red.
+ * del backend NestJS. El documento debe tener OCR. Si la extracción falla,
+ * devuelve `success: false` y `errorMessage` para que la pantalla lo muestre.
  */
 export async function extractCreditBureau(
   caseId: string,
@@ -265,6 +264,7 @@ export async function extractCreditBureau(
     requiresManualReview: boolean;
   }>;
   missingFields: string[];
+  errorMessage?: string;
 }> {
   const result = await apiFetch<{
     data: {
@@ -287,24 +287,26 @@ export async function extractCreditBureau(
   );
 
   if (!result.ok) {
-    throw new Error(
-      result.errors._form ??
-        "Error al extraer datos del buró de crédito",
-    );
+    return {
+      success: false,
+      extractedData: null,
+      alerts: [],
+      missingFields: [],
+      errorMessage:
+        result.errors._form ?? "Error al extraer datos del buró de crédito",
+    };
   }
 
   if (!result.data.data.success) {
-    throw new Error(
-      result.data.data.error?.message ??
+    return {
+      success: false,
+      extractedData: null,
+      alerts: [],
+      missingFields: [],
+      errorMessage:
+        result.data.data.error?.message ??
         "Error al extraer datos del buró de crédito",
-    );
-  }
-
-  if (!result.data.data.success) {
-    throw new Error(
-      result.data.data.error?.message ??
-        "Error al extraer datos del buró de crédito",
-    );
+    };
   }
 
   return result.data.data;

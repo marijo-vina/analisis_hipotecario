@@ -90,7 +90,7 @@ describe('GeminiService', () => {
     });
 
     it('stores the model name from GEMINI_MODEL env var (verified via getModel call)', async () => {
-      configureEnv({ GEMINI_MODEL: 'gemini-2.0-flash' });
+      configureEnv({ GEMINI_MODEL: 'gemini-3.5-flash' });
       const module = await buildModule();
       service = module.get<GeminiService>(GeminiService);
 
@@ -104,7 +104,26 @@ describe('GeminiService', () => {
 
       expect(mockGetGenerativeModel).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-3.5-flash',
+        }),
+      );
+    });
+
+    it('replaces a retired GEMINI_MODEL with the current default', async () => {
+      configureEnv({ GEMINI_MODEL: 'gemini-2.5-flash' });
+      const module = await buildModule();
+      service = module.get<GeminiService>(GeminiService);
+
+      mockGenerateContent.mockResolvedValue({
+        response: {
+          candidates: [{ content: { parts: [{ text: '{"x":"y"}' }] } }],
+        },
+      });
+      await service.extractStructuredData('t', 'INE', {});
+
+      expect(mockGetGenerativeModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-3.8-flash',
         }),
       );
     });
