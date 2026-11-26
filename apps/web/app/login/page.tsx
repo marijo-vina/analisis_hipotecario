@@ -1,13 +1,27 @@
-import { getSession } from "@/app/lib/session";
+import { getSession, deleteSession } from "@/app/lib/session";
+import { tokenExpired } from "@/app/lib/token-expiry";
 import { redirect } from "next/navigation";
 import LoginForm from "@/app/ui/login-form";
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reason?: string }>;
+}) {
+  const params = await searchParams;
   const token = await getSession();
+  const sessionExpired =
+    params.reason === "expired" || Boolean(token && tokenExpired(token));
 
-  if (token) {
+  if (sessionExpired) {
+    try {
+      await deleteSession();
+    } catch {
+      // The proxy also clears the cookie on this request.
+    }
+  } else if (token) {
     redirect("/dashboard");
   }
 
@@ -35,7 +49,7 @@ export default async function LoginPage() {
         <h2 className="text-xl font-semibold text-gf-text mb-6 text-center">
           Acceso interno
         </h2>
-        <LoginForm />
+        <LoginForm sessionExpired={sessionExpired} />
       </div>
 
       {/* Security Footer */}
