@@ -10,12 +10,26 @@ import Link from "next/link";
 
 const initialState: ActionState = { errors: {} };
 
-export default function LoginForm() {
+export default function LoginForm({
+  sessionExpired = false,
+}: {
+  sessionExpired?: boolean;
+}) {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
     <form action={formAction} className="space-y-5">
       {/* General form error banner */}
+      {sessionExpired && !state?.errors?._form && (
+        <div
+          className="rounded-[10px] bg-red-50 border border-red-200 p-3 text-xs font-medium text-red-700 flex items-center gap-2"
+          role="alert"
+        >
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" strokeWidth={2} />
+          <span>La sesión venció. Vuelve a entrar.</span>
+        </div>
+      )}
+
       {state?.errors?._form && (
         <div 
           className="rounded-[10px] bg-red-50 border border-red-200 p-3 text-xs font-medium text-red-700 flex items-center gap-2" 
